@@ -314,6 +314,30 @@ a{ color:inherit; text-decoration:none; }
   position:absolute; top:10px; left:10px; width:10px; height:10px; border-radius:50%;
   box-shadow:0 0 0 3px color-mix(in srgb, var(--bg) 75%, transparent), inset 0 0 0 1px rgba(0,0,0,.25);
 }
+/* Избранное: сердце в углу карточки и в шапке паспорта. Пустое — обводка,
+   отмеченное — заливка акцентом. Хранится в localStorage (chaynya-favs). */
+.tea__fav, .sheet__fav{
+  border:0; cursor:pointer; display:grid; place-items:center; color:var(--text-2);
+  border-radius:50%; padding:0;
+  transition:color .2s var(--ease), background .2s var(--ease), transform .12s var(--ease);
+}
+.tea__fav{
+  position:absolute; top:8px; right:8px; width:34px; height:34px; z-index:2;
+  background:color-mix(in srgb, var(--bg) 60%, transparent);
+  -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px);
+}
+.sheet__fav{ width:40px; height:40px; flex:none; background:transparent; }
+.tea__fav svg, .sheet__fav svg{ width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.7; }
+.sheet__fav svg{ width:21px; height:21px; }
+.tea__fav:hover, .sheet__fav:hover{ color:var(--accent); }
+.tea__fav[aria-pressed="true"], .sheet__fav[aria-pressed="true"]{ color:var(--accent); }
+.tea__fav[aria-pressed="true"] svg, .sheet__fav[aria-pressed="true"] svg{ fill:var(--accent); stroke:var(--accent); }
+.tea__fav:active, .sheet__fav:active{ transform:scale(.86); }
+/* Чип «Избранное» в фильтрах */
+.chip__heart{ width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:1.7; margin-right:1px; }
+.chip--fav[aria-pressed="true"] .chip__heart{ fill:currentColor; }
+.chip__n{ margin-left:4px; opacity:.65; }
+#fav-empty{ margin:26px 0 0; color:var(--text-3); font-size:14.5px; }
 .tea__body{ padding:16px 18px 18px; display:flex; flex-direction:column; flex:1; }
 .tea__name{ font-family:'Prata',Georgia,serif; font-size:1.18rem; line-height:1.2; letter-spacing:-.01em; }
 .tea__orig{ margin-top:5px; font-size:12.5px; color:var(--text-3); }
@@ -612,6 +636,7 @@ select.input{
   .link-arrow{ min-height:44px; }
   .chip{ min-height:44px; padding:0 16px; }
   .slot, .day, .pack{ min-height:46px; }
+  .tea__fav, .sheet__fav{ width:44px; height:44px; }
   .fmt{ grid-template-columns:1fr; gap:8px; }
   /* На узком экране карточка — строка: имя слева, цена справа, описание под
      ними. В разметке цена стоит первой (для вертикальной десктоп-раскладки),
@@ -876,6 +901,7 @@ select.input{
     </div>
     <div class="chips" id="filters"></div>
     <div class="tea-grid" id="menu-teas"></div>
+    <p id="fav-empty" data-i18n="fav_empty" hidden>Здесь появится то, что вы отметите сердечком.</p>
     <p class="shop__foot" data-i18n="shop_foot"></p>
   </div>
 </section>
@@ -1108,7 +1134,10 @@ select.input{
 <div class="scrim" id="scrim"></div>
 <aside class="sheet" id="tea-sheet" tabindex="-1" role="dialog" aria-modal="true" data-i18n-aria="a_tea" aria-label="О чае">
   <div class="sheet__head">
-    <h2 id="ts-name">—</h2>
+    <h2 id="ts-name" style="flex:1; min-width:0">—</h2>
+    <button class="sheet__fav" id="ts-fav" aria-pressed="false" data-i18n-aria="fav_label" aria-label="В избранное">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+    </button>
     <button class="icon-btn" id="ts-close" data-i18n-aria="a_close" aria-label="Закрыть" style="flex:none">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
     </button>
@@ -1230,6 +1259,7 @@ select.input{
     shop_foot:'Цены на пакеты считаются от цены за 10 г. Прессованное продаём целиком: мандарин и квадратик поштучно, блины по запросу.',
     types:['Все','Белый','Зелёный','Красный','Улун','Пуэр','Особое'],
     more:'о чае', per_pc:'за штуку', per_pack25:'за 25 г', gram:'г',
+    fav_label:'В избранное', filter_fav:'Избранное', fav_empty:'Здесь появится то, что вы отметите сердечком.',
     unit_pc:'Одна штука', unit_pack:'Пакет {g} г',
     ts_buy:'Купить с доставкой',
     ts_note:'За столом этот чай можно выпить бесплатно: два на выбор входят в стоимость стола.',
@@ -1354,6 +1384,7 @@ select.input{
     shop_foot:'Bag prices are worked out from the per-10 g price. Pressed tea goes whole: the mandarin and the mini brick are sold by the piece, cakes on request.',
     types:['All','White','Green','Black','Oolong','Pu-erh','Unusual'],
     more:'more', per_pc:'each', per_pack25:'for 25 g', gram:'g',
+    fav_label:'Add to favourites', filter_fav:'Favourites', fav_empty:'Teas you heart will show up here.',
     unit_pc:'One piece', unit_pack:'A {g} g bag',
     ts_buy:'Buy with delivery',
     ts_note:'At the table this tea costs you nothing: two of your choice come with the table.',
@@ -1478,6 +1509,7 @@ select.input{
     shop_foot:'分装价格按每10克的价格折算。紧压茶整件出售：小青柑和小金砖论个，茶饼可另询。',
     types:['全部','白茶','绿茶','红茶','乌龙','普洱','特别'],
     more:'详情', per_pc:'每个', per_pack25:'25克装', gram:'克',
+    fav_label:'加入收藏', filter_fav:'收藏', fav_empty:'你用爱心标记的茶会显示在这里。',
     unit_pc:'一个', unit_pack:'{g}克装',
     ts_buy:'下单配送',
     ts_note:'在店里喝这款茶不另收费：茶席已含任选两款。',
@@ -1601,10 +1633,13 @@ select.input{
   function teaCard(m){
     const txt = T().teas[m.id];
     const node = el(`
-      <article class="tea" data-type="${m.t}" tabindex="0" role="button" aria-label="${txt.n}">
+      <article class="tea" data-type="${m.t}" data-id="${m.id}" tabindex="0" role="button" aria-label="${txt.n}">
         <div class="tea__art">
           <img src="${m.img}" alt="${txt.n}" loading="lazy" width="360" height="360">
           <span class="tea__dot" style="background:${LQ[m.t]}"></span>
+          <button class="tea__fav" data-id="${m.id}" aria-pressed="${isFav(m.id)}" aria-label="${T().fav_label}" title="${T().fav_label}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+          </button>
         </div>
         <div class="tea__body">
           <h3 class="tea__name">${txt.n}</h3>
@@ -1621,6 +1656,10 @@ select.input{
     node.addEventListener('keydown', e => {
       if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); lastCard = node; openTea(m); }
     });
+    // Сердце не должно открывать паспорт — гасим всплытие
+    const fav = $('.tea__fav', node);
+    fav.addEventListener('click', e => { e.stopPropagation(); toggleFav(m.id); });
+    fav.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
     return node;
   }
 
@@ -1657,6 +1696,28 @@ select.input{
   }
 
   let lastCard = null;   // куда вернуть фокус после закрытия панели
+  /* ─────────────  ИЗБРАННОЕ  ─────────────
+     Чистый фронт: список id в localStorage, сердце на карточке и в паспорте,
+     отдельный чип-фильтр. Сервер не нужен. */
+  const FAV_KEY = 'chaynya-favs';
+  function getFavs(){ try{ return new Set(JSON.parse(localStorage.getItem(FAV_KEY) || '[]')); }catch(e){ return new Set(); } }
+  function saveFavs(s){ try{ localStorage.setItem(FAV_KEY, JSON.stringify([...s])); }catch(e){} }
+  function isFav(id){ return getFavs().has(id); }
+  function toggleFav(id){
+    const s = getFavs();
+    s.has(id) ? s.delete(id) : s.add(id);
+    saveFavs(s);
+    const on = s.has(id);
+    $$(`.tea__fav[data-id="${id}"]`).forEach(b => b.setAttribute('aria-pressed', on));
+    const sf = $('#ts-fav'); if (sf.dataset.id === id) sf.setAttribute('aria-pressed', on);
+    updateFavCount();
+    if (curFilter === 'fav') applyFilter();   // снятое сердце сразу исчезает из подборки
+  }
+  function updateFavCount(){
+    const n = getFavs().size;
+    const el = $('#fav-count'); if (el) el.textContent = n ? n : '';
+  }
+
   let curFilter = 'all';
   function buildTeaGrids(){
     const home = $('#home-teas'), menu = $('#menu-teas');
@@ -1666,13 +1727,32 @@ select.input{
     applyFilter();
   }
   function applyFilter(){
+    const favs = getFavs();
+    let shown = 0;
     $$('#menu-teas .tea').forEach(c => {
-      c.style.display = (curFilter === 'all' || c.dataset.type === curFilter) ? '' : 'none';
+      const ok = curFilter === 'all' ? true
+        : curFilter === 'fav' ? favs.has(c.dataset.id)
+        : c.dataset.type === curFilter;
+      c.style.display = ok ? '' : 'none';
+      if (ok) shown++;
     });
+    // подсказка, когда в избранном пусто
+    $('#fav-empty').hidden = !(curFilter === 'fav' && shown === 0);
   }
   function buildFilters(){
     const f = $('#filters');
     f.innerHTML = '';
+    // Чип «Избранное» — первым, отдельно от типов
+    const fav = el(`<button class="chip chip--fav" data-t="fav" aria-pressed="${curFilter === 'fav'}">
+      <svg class="chip__heart" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>${T().filter_fav}<span class="chip__n num" id="fav-count"></span>
+    </button>`);
+    fav.addEventListener('click', () => {
+      curFilter = 'fav';
+      $$('.chip', f).forEach(x => x.setAttribute('aria-pressed', x === fav));
+      applyFilter();
+    });
+    f.append(fav);
+    updateFavCount();
     TYPE_IDS.forEach((id, i) => {
       const c = id === 'all' ? null : LQ[id];
       const b = el(`<button class="chip" aria-pressed="${id === curFilter}" data-t="${id}">
@@ -1718,6 +1798,9 @@ select.input{
     $('#ts-img').src = m.img;
     $('#ts-img').alt = txt.n;
     $('#ts-buy').href = m.buy || '#';
+    const sf = $('#ts-fav');
+    sf.dataset.id = m.id;
+    sf.setAttribute('aria-pressed', isFav(m.id));
 
     const packs = $('#ts-packs');
     packs.innerHTML = '';
@@ -1756,6 +1839,7 @@ select.input{
     if (lastCard){ lastCard.focus({ preventScroll:true }); lastCard = null; }
   }
   $('#ts-close').addEventListener('click', closeTea);
+  $('#ts-fav').addEventListener('click', () => { const id = $('#ts-fav').dataset.id; if (id) toggleFav(id); });
   $('#scrim').addEventListener('click', closeTea);
   addEventListener('keydown', e => { if (e.key === 'Escape') closeTea(); });
 

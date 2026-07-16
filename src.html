@@ -423,6 +423,36 @@ a{ color:inherit; text-decoration:none; }
 .sheet__art img{ width:100%; height:100%; object-fit:cover; }
 .ts-orig{ margin:0; font-size:13.5px; color:var(--text-3); }
 .ts-desc{ margin:14px 0 0; font-size:15px; line-height:1.62; color:var(--text-2); }
+
+/* Статус наличия в паспорте: спокойная плашка, «нет» — акцентом */
+.ts-meta{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.ts-stock{
+  font-size:11px; letter-spacing:.04em; text-transform:uppercase;
+  padding:3px 9px; border-radius:100px; color:var(--text-2);
+  background:var(--bg-2); border:1px solid var(--line-soft); white-space:nowrap;
+}
+.ts-stock--oos{ color:var(--accent); border-color:color-mix(in srgb, var(--accent) 45%, var(--line)); }
+
+/* Бейдж «нет в наличии» на карточке + приглушение фото */
+.tea__oos{
+  position:absolute; top:9px; left:9px; z-index:2;
+  font-size:10.5px; letter-spacing:.03em; text-transform:uppercase;
+  padding:3px 8px; border-radius:100px; color:var(--on-accent); background:var(--accent);
+}
+.tea__art--oos img{ filter:grayscale(.55) opacity(.72); }
+
+/* Вкусовой профиль (паутинка) */
+.ts-taste{ margin-top:22px; }
+.ts-taste__h{
+  font-family:'Montserrat',sans-serif; font-size:11px; font-weight:600;
+  letter-spacing:.12em; text-transform:uppercase; color:var(--text-3); margin:0 0 4px;
+}
+.ts-radar{ width:100%; max-width:300px; height:auto; display:block; margin:2px auto 0; overflow:visible; }
+.ts-radar .grid{ fill:none; stroke:var(--line); stroke-width:.6; opacity:.55; }
+.ts-radar .spoke{ stroke:var(--line-soft); stroke-width:.6; }
+.ts-radar .area{ fill:color-mix(in srgb, var(--accent) 22%, transparent); stroke:var(--accent); stroke-width:1.4; stroke-linejoin:round; }
+.ts-radar .dot{ fill:var(--accent); }
+.ts-radar .lbl{ fill:var(--text-3); font-family:'Golos Text',sans-serif; font-size:8.7px; }
 .sheet__foot{ padding:18px var(--pad) 26px; border-top:1px solid var(--line); }
 .sheet__sum{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px; }
 .sheet__sum b{ font-family:'Prata',Georgia,serif; font-weight:400; font-size:1.5rem; font-variant-numeric:tabular-nums; }
@@ -1145,8 +1175,12 @@ select.input{
   <div class="sheet__body">
     <!-- без src: пустой атрибут заставляет браузер грузить саму страницу -->
     <div class="sheet__art"><img id="ts-img" alt=""></div>
-    <p class="ts-orig" id="ts-orig"></p>
+    <div class="ts-meta"><span class="ts-stock" id="ts-stock"></span><p class="ts-orig" id="ts-orig"></p></div>
     <p class="ts-desc" id="ts-desc"></p>
+    <div class="ts-taste" id="ts-taste" hidden>
+      <h4 class="ts-taste__h" data-i18n="taste_h">Вкусовой профиль</h4>
+      <svg class="ts-radar" id="ts-radar" viewBox="0 0 300 240" role="img" data-i18n-aria="taste_h" aria-label="Вкусовой профиль"></svg>
+    </div>
   </div>
   <!-- Фасовка живёт в футере, а не в теле: тело скроллится, и на коротком
        экране кнопки 50/100 г уезжали за край — человек не знал, что они есть -->
@@ -1179,7 +1213,7 @@ select.input{
     { id:'baihao',      t:'white',  p:175, unit:'g',  img:'{{img:tea-baihao}}' },
     { id:'baimudan',    t:'white',  p:165, unit:'g',  img:'{{img:tea-baimudan}}' },
     { id:'longjing',    t:'green',  p:160, unit:'g',  img:'{{img:tea-longjing}}' },
-    { id:'molimaojian', t:'green',  p:115, unit:'g',  img:'{{img:tea-molimaojian}}' },
+    { id:'molimaojian', t:'green',  p:115, unit:'g', stock:false, img:'{{img:tea-molimaojian}}' },
     { id:'biluogold',   t:'red',    p:245, unit:'g',  img:'{{img:tea-biluogold}}' },
     { id:'xiaozhong',   t:'red',    p:150, unit:'g',  img:'{{img:tea-xiaozhong}}' },
     { id:'longjinghong',t:'red',    p:150, unit:'g',  img:'{{img:tea-longjinghong}}' },
@@ -1199,7 +1233,91 @@ select.input{
     { id:'nuomixiang',  t:'puer',   p:95,  unit:'pc', img:'{{img:tea-nuomixiang}}' },
     { id:'jinhuawang',  t:'other',  p:140, unit:'g',  img:'{{img:tea-jinhuawang}}' },
     { id:'herbal',      t:'other',  p:120, unit:'g',  img:'{{img:tea-herbal}}' },
+    { id:'molisiaobaiya', t:'green', p:170, unit:'g',  img:'{{img:tea-molisiaobaiya}}' },
+    { id:'biluochun', t:'green', p:175, unit:'g',  img:'{{img:tea-biluochun}}' },
+    { id:'dancongmilan', t:'oolong', p:230, unit:'g',  img:'{{img:tea-dancongmilan}}' },
+    { id:'dancongtongtian', t:'oolong', p:240, unit:'g',  img:'{{img:tea-dancongtongtian}}' },
+    { id:'yeshenghong', t:'red', p:235, unit:'g',  img:'{{img:tea-yeshenghong}}' },
+    { id:'shengchenxiang', t:'puer', p:130, unit:'g',  img:'{{img:tea-shengchenxiang}}' },
+    { id:'osmanthus', t:'other', p:370, unit:'g',  img:'{{img:tea-osmanthus}}' },
+    { id:'vitamin', t:'other', p:120, unit:'g',  img:'{{img:tea-vitamin}}' },
   ];
+
+  /* Вкусовой профиль (0–5 по 9 осям). Оценки проставлены по описаниям +
+     ресёрчу; владелец правит. Оси и подписи — в AXES ниже. */
+  const TASTE = {
+    molisiaobaiya:{floral:5,fruity:1,driedfruit:0,honey:2,nutty:0,roasted:0,spicy:0,woody:0,herbal:2},
+    biluochun:{floral:4,fruity:4,driedfruit:0,honey:1,nutty:1,roasted:1,spicy:0,woody:0,herbal:2},
+    dancongmilan:{floral:4,fruity:3,driedfruit:1,honey:4,nutty:0,roasted:2,spicy:1,woody:1,herbal:0},
+    dancongtongtian:{floral:5,fruity:2,driedfruit:0,honey:3,nutty:0,roasted:2,spicy:1,woody:1,herbal:1},
+    yeshenghong:{floral:1,fruity:3,driedfruit:4,honey:3,nutty:0,roasted:1,spicy:1,woody:3,herbal:0},
+    osmanthus:{floral:5,fruity:3,driedfruit:2,honey:3,nutty:0,roasted:0,spicy:0,woody:0,herbal:1},
+    vitamin:{floral:1,fruity:3,driedfruit:2,honey:1,nutty:0,roasted:0,spicy:1,woody:0,herbal:4},
+    shengchenxiang:{floral:1,fruity:3,driedfruit:2,honey:2,nutty:1,roasted:0,spicy:0,woody:2,herbal:3},
+    chongshicha:{floral:0,fruity:1,driedfruit:2,honey:3,nutty:0,roasted:1,spicy:0,woody:4,herbal:1},
+    baihao:{floral:3,fruity:1,driedfruit:0,honey:2,nutty:0,roasted:0,spicy:0,woody:1,herbal:5},
+    baimudan:{floral:4,fruity:1,driedfruit:0,honey:2,nutty:0,roasted:0,spicy:0,woody:1,herbal:3},
+    longjing:{floral:2,fruity:0,driedfruit:0,honey:1,nutty:4,roasted:3,spicy:0,woody:1,herbal:4},
+    molimaojian:{floral:5,fruity:0,driedfruit:0,honey:2,nutty:0,roasted:1,spicy:0,woody:0,herbal:4},
+    biluogold:{floral:1,fruity:2,driedfruit:4,honey:5,nutty:2,roasted:1,spicy:1,woody:1,herbal:0},
+    xiaozhong:{floral:0,fruity:3,driedfruit:2,honey:1,nutty:1,roasted:5,spicy:2,woody:4,herbal:0},
+    longjinghong:{floral:1,fruity:2,driedfruit:2,honey:3,nutty:4,roasted:2,spicy:0,woody:1,herbal:1},
+    dianhong:{floral:2,fruity:1,driedfruit:4,honey:2,nutty:3,roasted:4,spicy:0,woody:1,herbal:0},
+    dancong:{floral:5,fruity:2,driedfruit:1,honey:3,nutty:0,roasted:2,spicy:3,woody:1,herbal:2},
+    gabahoney:{floral:1,fruity:3,driedfruit:1,honey:5,nutty:1,roasted:1,spicy:0,woody:1,herbal:2},
+    gabaruby:{floral:1,fruity:5,driedfruit:4,honey:2,nutty:0,roasted:2,spicy:1,woody:1,herbal:0},
+    huangjingui:{floral:4,fruity:4,driedfruit:0,honey:1,nutty:0,roasted:1,spicy:0,woody:0,herbal:3},
+    dahongpao:{floral:1,fruity:2,driedfruit:1,honey:1,nutty:3,roasted:4,spicy:4,woody:3,herbal:0},
+    maoxie:{floral:5,fruity:2,driedfruit:0,honey:1,nutty:1,roasted:1,spicy:0,woody:0,herbal:2},
+    gabamaocha:{floral:0,fruity:3,driedfruit:4,honey:2,nutty:3,roasted:2,spicy:1,woody:1,herbal:0},
+    ginseng:{floral:2,fruity:4,driedfruit:1,honey:3,nutty:1,roasted:1,spicy:1,woody:1,herbal:3},
+    mandarin:{floral:0,fruity:4,driedfruit:2,honey:1,nutty:0,roasted:1,spicy:1,woody:3,herbal:2},
+    laochatou:{floral:0,fruity:1,driedfruit:4,honey:4,nutty:1,roasted:3,spicy:0,woody:3,herbal:1},
+    peacock:{floral:0,fruity:0,driedfruit:2,honey:1,nutty:1,roasted:3,spicy:0,woody:4,herbal:1},
+    bingdao:{floral:1,fruity:1,driedfruit:4,honey:4,nutty:2,roasted:1,spicy:0,woody:3,herbal:0},
+    nuomixiang:{floral:0,fruity:1,driedfruit:3,honey:3,nutty:1,roasted:1,spicy:0,woody:4,herbal:3},
+    jinhuawang:{floral:0,fruity:1,driedfruit:4,honey:2,nutty:1,roasted:1,spicy:1,woody:4,herbal:2},
+    herbal:{floral:3,fruity:2,driedfruit:1,honey:1,nutty:0,roasted:0,spicy:1,woody:0,herbal:5},
+  };
+  const inStock = m => m.stock !== false;
+
+  /* ─────────────  ВКУСОВОЙ ПРОФИЛЬ (паутинка)  ─────────────
+     9 осей, оценки из TASTE. Рисуем SVG: сетка, спицы, залитый
+     многоугольник и подписи. Подписи зависят от языка. */
+  const AXES = [
+    { k:'floral',     ru:'Цветочный', en:'Floral',      zh:'花香' },
+    { k:'fruity',     ru:'Фруктовый', en:'Fruity',      zh:'果香' },
+    { k:'driedfruit', ru:'Сухофрукты',en:'Dried fruit', zh:'果干' },
+    { k:'honey',      ru:'Медовый',   en:'Honey',       zh:'蜜甜' },
+    { k:'nutty',      ru:'Ореховый',  en:'Nutty',       zh:'坚果' },
+    { k:'roasted',    ru:'Жареный',   en:'Roasted',     zh:'烘烤' },
+    { k:'spicy',      ru:'Пряный',    en:'Spicy',       zh:'辛香' },
+    { k:'woody',      ru:'Древесный', en:'Woody',       zh:'木质' },
+    { k:'herbal',     ru:'Травяной',  en:'Herbal',      zh:'草本' },
+  ];
+  function renderRadar(id){
+    const t = TASTE[id], box = $('#ts-taste');
+    if (!t){ box.hidden = true; return; }
+    box.hidden = false;
+    const cx = 150, cy = 116, R = 72, n = AXES.length;
+    const ang = i => (-90 + i * 360 / n) * Math.PI / 180;
+    const pt = (i, r) => [cx + r * Math.cos(ang(i)), cy + r * Math.sin(ang(i))];
+    const poly = r => AXES.map((_, i) => pt(i, r).map(v => v.toFixed(1)).join(',')).join(' ');
+    let s = '';
+    [1 / 3, 2 / 3, 1].forEach(f => { s += `<polygon class="grid" points="${poly(R * f)}"/>`; });
+    AXES.forEach((_, i) => { const [x, y] = pt(i, R); s += `<line class="spoke" x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`; });
+    const dpts = AXES.map((a, i) => pt(i, R * (t[a.k] || 0) / 5).map(v => v.toFixed(1)).join(',')).join(' ');
+    s += `<polygon class="area" points="${dpts}"/>`;
+    AXES.forEach((a, i) => { if (t[a.k]){ const [x, y] = pt(i, R * t[a.k] / 5); s += `<circle class="dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.4"/>`; } });
+    AXES.forEach((a, i) => {
+      const [x, y] = pt(i, R + 15), c = Math.cos(ang(i)), sn = Math.sin(ang(i));
+      const anc = c > 0.3 ? 'start' : c < -0.3 ? 'end' : 'middle';
+      const dy = sn < -0.5 ? -2 : sn > 0.5 ? 8 : 3;
+      s += `<text class="lbl" x="${x.toFixed(1)}" y="${(y + dy).toFixed(1)}" text-anchor="${anc}">${a[LANG] || a.ru}</text>`;
+    });
+    $('#ts-radar').innerHTML = s;
+  }
+
   /* Что показываем на главной: редкость, флагман и понятный вход */
   const FEATURED = ['chongshicha', 'dancong', 'gabahoney'];
 
@@ -1260,6 +1378,7 @@ select.input{
     types:['Все','Белый','Зелёный','Красный','Улун','Пуэр','Особое'],
     more:'о чае', per_pc:'за штуку', per_pack25:'за 25 г', gram:'г',
     fav_label:'В избранное', filter_fav:'Избранное', fav_empty:'Здесь появится то, что вы отметите сердечком.',
+    taste_h:'Вкусовой профиль', in_stock:'в наличии', oos:'нет в наличии',
     unit_pc:'Одна штука', unit_pack:'Пакет {g} г',
     ts_buy:'Купить с доставкой',
     ts_note:'За столом этот чай можно выпить бесплатно: два на выбор входят в стоимость стола.',
@@ -1328,6 +1447,14 @@ select.input{
       nuomixiang:{ n:'Квадратик Ноу Ми Сян', o:'Пуэр · плитка на одну заварку', d:'Риса тут нет и в помине: аромат даёт трава номи сян из Сишуанбаньны, её прессуют вместе с пуэром. Не ароматизатор, а живой лист. Разворачиваете фольгу и кидаете плитку целиком.' },
       jinhuawang:{ n:'Цзинь Хуа Ван 2002', o:'Хэй Ча · Аньхуа · выдержка', d:'Аньхуаский хэй ча 2002 года. «Золотые цветки» — это гриб, который в этом чае выращивают нарочно: он даёт сухофруктовый аромат и тот самый вкус погреба и старой библиотеки.' },
       herbal:{ n:'Травяной сбор «Тонизирующий»', o:'Без кофеина · травы и шиповник', d:'Травы, цветки и шиповник, чайного листа нет вовсе. Кофеина ноль, но бодрит за счёт трав. Берут те, кому нельзя чай или для кого уже поздно.' },
+      molisiaobaiya:{ n:"Мо Ли Сяо Бай Я", o:"Жасминовый зелёный · Китай (Фуцзянь / Гуанси) · ворсистые серебряные почки", d:"Зелёный чай из мелких почек в серебристом пушке, ароматизированный живыми цветками жасмина: их несколько раз перекладывают с чайной основой, чтобы почки впитали запах, а потом убирают. Аромат чистый жасминовый, без парфюмерной приторности. Во вкусе мягкая цветочная сладость поверх лёгкой зелёной основы, горечи почти нет. Спокойный, деликатный чай, хорошо держит несколько проливов." },
+      biluochun:{ n:"Би Ло Чунь", o:"Зелёный · Дунтин, Сучжоу (Цзянсу) · ворсистые спиральки", d:"Тугие серебристо-ворсистые спиральки, скрученные вручную из самых ранних весенних почек: те самые «изумрудные спирали весны» с гор Дунтин у озера Тайху. Там чайные кусты растут вперемешку с абрикосами, сливами и мушмулой, так что цветочно-фруктовый аромат лист впитывает ещё на ветке. В чашке он свежий и мягко-сладкий, с ясной цветочной нотой и лёгкой фруктовой кислинкой, грубой зелени нет. Заваривайте не крутым кипятком, а водой около 80°, иначе нежный лист начинает горчить." },
+      dancongmilan:{ n:"Фэн Хуан Дань Цун Ми Лань Сян", o:"Улун · гора Феникс, Чаочжоу · медово-орхидейный аромат", d:"Фэнхуанский дань цун ароматического типа Ми Лань Сян, что переводят как «медовый аромат орхидеи». В запахе спелая жёлтая слива и мёд поверх орхидеи, во вкусе плотная медовая сладость с характерной для дань цунов горчинкой, которая быстро уходит в долгое цветочное послевкусие. Растёт на горе Феникс в Чаочжоу, кусты там не подрезают, так что лист собирают с отдельных деревьев. Мягкий угольный обжиг держит фрукты в фокусе, а не перекрывает их." },
+      dancongtongtian:{ n:"Фэн Хуан Дань Цун Тонг Тянь Сян", o:"Улун дань цун · гора Феникс, Чаочжоу · имбирный цвет (姜花香)", d:"Фэнхуанский дань цун редкого ароматического типа «имбирный цвет» (姜花香); за высоту и стойкость аромата его и прозвали «достигающим небес». В сухом листе и в чашке крупный белый цветок: имбирная лилия, гардения, немного сливочной, почти масляной сладости. Во вкусе спелая жёлтая мякоть вроде манго и характерная для дань цунов лёгкая горчинка, которая быстро уходит в сладкое послевкусие. Держит много проливов, и аромат не выдыхается." },
+      yeshenghong:{ n:"Е Шэн Хун", o:"Красный · Юньнань · дикорастущие деревья", d:"Красный чай с дикорастущих деревьев Юньнани, из того самого пурпурнолистного сорта е шэн. В аромате тёмные ягоды и печёная слива, во вкусе спелые косточковые фрукты, чернослив и медовая сладость, на фоне тянется смолистая древесная нота. Настой плотный, тёмно-янтарный, послевкусие чистое и сладкое." },
+      shengchenxiang:{ n:"Шэн Пуэр «Чэнсян» 2020", o:"Шэн пуэр · Юньнань · 2020 год, начинает стареть", d:"Молодой сырой пуэр 2020 года. По чайным меркам он ещё подросток, но выдержка уже проступает, и имя Чэнсян как раз про аромат старения. В сухом листе зелень и сено, в настое много юньнаньской горчинки с вяжущестью, которая быстро оборачивается сладостью и медовым хвостом. Тело плотное, ближе к последним проливам вылезают сухофрукты и тёплое дерево. Заваривайте проливами водой около 90 °C, первый пролив слейте." },
+      osmanthus:{ n:"Османтус", o:"Цветочный настой · Гуйлинь, Гуанси · сушёные цветки, не чайный лист", d:"Сушёные золотистые цветки коричника душистого, они же гуй хуа. В аромате спелый абрикос и персик со сливочно-медовой сладостью, настой выходит чистый и мягкий, с лёгким хвостиком сушёного абрикоса в конце. Заваривают сами по себе или подмешивают щепоть к улуну или шу пуэру: цветок к ним хорошо ложится и не забивает чайную основу. Родина — Гуйлинь в Гуанси, где османтусом засажены целые улицы, оттого и название города переводится как «османтусовый лес»." },
+      vitamin:{ n:"Травяной сбор «Витаминный»", o:"Травяной сбор · без кофеина · ягодный", d:"Авторский травяной сбор чайной без кофеина, так что пить можно хоть на ночь и предложить детям. Во вкусе ягодная кислинка с лёгкой терпкостью, по аромату угадываются шиповник и облепиха, а следом идёт тёплый, почти луговой травяной тон. Кислосладкое послевкусие держится долго и хорошо утоляет жажду. Состав у нас свой, точный список трав лучше уточнить у хозяев." },
     },
   },
 
@@ -1385,6 +1512,7 @@ select.input{
     types:['All','White','Green','Black','Oolong','Pu-erh','Unusual'],
     more:'more', per_pc:'each', per_pack25:'for 25 g', gram:'g',
     fav_label:'Add to favourites', filter_fav:'Favourites', fav_empty:'Teas you heart will show up here.',
+    taste_h:'Flavour profile', in_stock:'in stock', oos:'out of stock',
     unit_pc:'One piece', unit_pack:'A {g} g bag',
     ts_buy:'Buy with delivery',
     ts_note:'At the table this tea costs you nothing: two of your choice come with the table.',
@@ -1453,6 +1581,14 @@ select.input{
       nuomixiang:{ n:'Nuo Mi Xiang mini brick', o:'Pu-erh · single-serve brick', d:'There is no rice in it whatsoever: the scent comes from the nuo mi xiang herb of Xishuangbanna, pressed together with the pu-erh. A real leaf, not a flavouring. Unwrap the foil and drop the brick in whole.' },
       jinhuawang:{ n:'Jin Hua Wang 2002', o:'Hei cha · Anhua · aged', d:'Anhua hei cha from 2002. The “golden flowers” are a fungus grown in this tea deliberately: it gives the dried-fruit aroma and that cellar-and-old-library taste.' },
       herbal:{ n:'“Tonic” herbal blend', o:'Caffeine-free · herbs and rosehip', d:'Herbs, flowers and rosehip, with no tea leaf at all. Zero caffeine, yet it picks you up. For people who cannot drink tea, or for whom it is already too late in the day.' },
+      molisiaobaiya:{ n:"Mo Li Xiao Bai Ya", o:"Scented green · China (Fujian / Guangxi) · downy silver buds", d:"A green tea of small buds covered in silver down, scented with living jasmine blossoms: the flowers are layered with the tea leaf several times so the buds soak up the fragrance, then removed. The aroma is clean jasmine, never soapy or perfumey. The taste is a soft floral sweetness over a light green base with almost no bitterness. A calm, delicate tea that holds up over several infusions." },
+      biluochun:{ n:"Bi Luo Chun", o:"Green · Dongting, Suzhou (Jiangsu) · downy spring spirals", d:"Tight, silver-downy spirals hand-rolled from the earliest spring buds, the famous 'Green Snail Spring' from the hills of Dongting above Lake Tai. There the tea bushes grow interplanted with apricot, plum and loquat, so the leaf takes on its floral-fruity scent right on the branch. In the cup it is fresh and gently sweet, with a clear floral note and a light fruity tang, none of the coarse green edge. Brew it with cooler water around 80°C, or the delicate leaf turns bitter." },
+      dancongmilan:{ n:"Feng Huang Dan Cong Mi Lan Xiang", o:"Oolong · Phoenix Mountain, Chaozhou (Guangdong) · honey-orchid aroma", d:"A Fenghuang Dan Cong of the Mi Lan Xiang type, which translates as 'honey-orchid fragrance.' The nose is ripe yellow plum and honey over orchid; the cup is a thick honeyed sweetness with the bitterness typical of dan congs that quickly turns into a long floral finish. It grows on Phoenix Mountain in Chaozhou, where the bushes are left unpruned and the leaf is picked tree by tree. A gentle charcoal roast keeps the fruit in focus rather than covering it." },
+      dancongtongtian:{ n:"Feng Huang Dan Cong Tong Tian Xiang", o:"Dan cong oolong · Phoenix Mountain, Chaozhou · ginger-lily aroma (姜花香)", d:"A Phoenix dan cong of the rare ginger-lily aroma type (姜花香); its scent is so high and long-lasting that growers nicknamed it \"the aroma that reaches heaven.\" Both the dry leaf and the cup carry big white-flower notes of ginger lily and gardenia, with a creamy, almost buttery sweetness. The taste brings ripe yellow fruit close to mango and the light bitterness typical of dan cong, which turns quickly into a sweet finish. It holds up over many infusions, and the fragrance doesn't fade." },
+      yeshenghong:{ n:"Ye Sheng Hong (Wild Red)", o:"Red · Yunnan · wild-growing trees", d:"A red tea from wild-growing tea trees in Yunnan, made from the same purple-leaf 'ye sheng' varietal. The aroma carries dark berries and baked plum; the cup is ripe stone fruit, prune and honeyed sweetness, with a resinous, woody note underneath. The liquor is thick and dark amber, finishing clean and sweet." },
+      shengchenxiang:{ n:"Sheng Puer Chenxiang 2020", o:"Raw puer · Yunnan · 2020, starting to age", d:"A young raw puer from 2020. By tea standards it is still a teenager, but the years are beginning to show, and the name Chenxiang points exactly to that aged aroma. The dry leaf smells of greens and hay; the liquor still carries plenty of Yunnan bitterness and astringency that quickly turns to sweetness and a honeyed finish. The body is full, and toward the later infusions notes of dried fruit and warm wood come through. Brew it gongfu-style with water around 90 °C and pour off the first rinse." },
+      osmanthus:{ n:"Osmanthus (Gui Hua)", o:"Flower infusion · Guilin, Guangxi · dried blossoms, not tea leaf", d:"The tiny golden dried blossoms of sweet osmanthus, known as gui hua. The aroma is ripe apricot and peach with a creamy, honeyed sweetness; the infusion is clean and soft, trailing off into a faint dried-apricot note. Drink it on its own, or stir a pinch into an oolong or shou pu'er, where it sits comfortably without burying the tea itself. It comes from Guilin in Guangxi, a city so planted with osmanthus that its name literally means \"osmanthus forest.\"" },
+      vitamin:{ n:"\"Vitaminny\" Herbal Blend", o:"Herbal blend · caffeine-free · berry", d:"Our own house herbal blend with no caffeine, so it's fine late in the evening and safe for kids. The taste is berry-bright and gently tart, with rosehip and sea buckthorn coming through in the aroma, followed by a warm, almost meadow-like herbal note. The sweet-and-sour finish lingers and quenches thirst well. The recipe is our own, so ask the staff for the exact herbs." },
     },
   },
 
@@ -1510,6 +1646,7 @@ select.input{
     types:['全部','白茶','绿茶','红茶','乌龙','普洱','特别'],
     more:'详情', per_pc:'每个', per_pack25:'25克装', gram:'克',
     fav_label:'加入收藏', filter_fav:'收藏', fav_empty:'你用爱心标记的茶会显示在这里。',
+    taste_h:'风味特征', in_stock:'现货', oos:'暂时售罄',
     unit_pc:'一个', unit_pack:'{g}克装',
     ts_buy:'下单配送',
     ts_note:'在店里喝这款茶不另收费：茶席已含任选两款。',
@@ -1578,6 +1715,14 @@ select.input{
       nuomixiang:{ n:'糯香小金砖', o:'普洱 · 单泡小砖', d:'里面没有一粒米：香气来自西双版纳的糯米香叶，与普洱一同压制。是真叶子，不是香精。剥开锡纸，整块投入即可。' },
       jinhuawang:{ n:'金花王 2002', o:'黑茶 · 安化 · 陈化', d:'2002年的安化黑茶。「金花」是特意在茶里养出来的菌：它带来果脯般的香气，也带来那股地窖与旧图书馆的味道。' },
       herbal:{ n:'草本「提神」茶', o:'无咖啡因 · 草药与蔷薇果', d:'草药、花与蔷薇果，完全不含茶叶。零咖啡因，却照样提神。适合不能喝茶的客人，或已经太晚不宜喝茶的时候。' },
+      molisiaobaiya:{ n:"茉莉小白芽", o:"茉莉花茶（绿茶）· 中国福建 / 广西 · 银毫嫩芽", d:"以披着银毫的细嫩芽头为底的绿茶，用鲜茉莉花窨制而成：将鲜花与茶坯层层相叠，反复几次让芽头吸香，之后再把花挑出。香气是干净的茉莉花香，不腻不冲。滋味在清淡的绿茶底上带柔和的花香甜意，几乎没有苦涩。风格安静细腻，可以经得起数泡。" },
+      biluochun:{ n:"碧螺春", o:"绿茶 · 苏州洞庭（江苏） · 满披白毫的螺形", d:"太湖之滨洞庭山的手工绿茶，芽叶纤细、卷曲成螺，满身银毫，正是有名的洞庭碧螺春。茶树与枇杷、杨梅、桃李等果树交错种植，鲜叶在枝头就带上了天然的花果香。茶汤清鲜甘甜，花香清晰，尾调略带果酸，几乎没有生涩的青草气。冲泡水温不宜太高，八十度左右为佳，否则嫩芽容易发苦。" },
+      dancongmilan:{ n:"凤凰单丛 蜜兰香", o:"乌龙 · 广东潮州凤凰山 · 蜜兰花香", d:"凤凰单丛中的蜜兰香，名字意为蜜与兰花的香气。干香与茶汤里是熟黄李和蜂蜜，衬着兰花香；入口是浓厚的蜜甜，带着单丛特有的微苦，很快化开成悠长的花香回甘。茶树长在潮州凤凰山，茶农不修剪茶树，鲜叶按单株采摘。轻炭焙让果香更突出，而不会盖过它。" },
+      dancongtongtian:{ n:"凤凰单丛 通天香", o:"乌龙单丛 · 潮州凤凰山 · 姜花香", d:"凤凰单丛中珍贵的姜花香型，因香气高扬持久、直冲云霄而得名\"通天香\"。干茶与茶汤都有浓郁的白色花香：姜花、栀子，还带一点奶油般的甜。滋味有黄色熟果（近似芒果）的甜润，以及单丛特有的微苦，入口很快回甘。极耐冲泡，香气持久不散。" },
+      yeshenghong:{ n:"野生红", o:"红茶 · 云南 · 野生茶树", d:"采自云南野生茶树的红茶，用的正是带紫芽的野生品种。香气里有深色浆果和烤李子，入口是熟透的核果、西梅和蜜糖般的甜，底下透着一缕松脂般的木质气息。茶汤浓稠、呈深琥珀色，回味干净而甜。" },
+      shengchenxiang:{ n:"陈香 生普洱 2020", o:"生普 · 云南 · 2020年，开始转化", d:"2020年的年轻生普。按茶的年纪它还算少年，但陈化已经初露端倪，「陈香」正是指这份随年份而来的气息。干茶有青草和干草的气息，茶汤仍带着云南生普的苦与涩，很快化为甜润，尾韵带蜜香。茶体饱满，到后段渐渐透出干果和暖木的味道。建议用约90℃的水盖碗快出，第一泡先润茶倒掉。" },
+      osmanthus:{ n:"桂花", o:"花茶 · 广西桂林 · 干花，非茶叶", d:"金黄色的干桂花，即「桂花」本身，而非茶叶。香气是熟透的杏与桃，带着奶油般的蜜甜；茶汤清澈柔和，尾韵有一丝杏干的味道。可单独冲泡，也可取一撮拌入乌龙或熟普，桂花与它们相处融洽，不会盖过茶底本身。原产广西桂林，此城遍植桂树，故名中即含「桂」字。" },
+      vitamin:{ n:"「维生素」草本拼配茶 (Vitaminny)", o:"草本拼配 · 无咖啡因 · 浆果", d:"茶馆自制的草本拼配茶，不含咖啡因，晚上喝也无妨，孩子也能喝。入口是明亮的浆果酸，带一点涩，香气里能辨出玫瑰果和沙棘，随后是温暖的、近似草甸的草本气息。酸甜的回味悠长，很解渴。配方是我们自己的，具体用了哪些草药可以问店里。" },
     },
   },
 
@@ -1634,9 +1779,10 @@ select.input{
     const txt = T().teas[m.id];
     const node = el(`
       <article class="tea" data-type="${m.t}" data-id="${m.id}" tabindex="0" role="button" aria-label="${txt.n}">
-        <div class="tea__art">
+        <div class="tea__art${inStock(m) ? '' : ' tea__art--oos'}">
           <img src="${m.img}" alt="${txt.n}" loading="lazy" width="360" height="360">
           <span class="tea__dot" style="background:${LQ[m.t]}"></span>
+          ${inStock(m) ? '' : `<span class="tea__oos">${T().oos}</span>`}
           <button class="tea__fav" data-id="${m.id}" aria-pressed="${isFav(m.id)}" aria-label="${T().fav_label}" title="${T().fav_label}">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
           </button>
@@ -1801,6 +1947,12 @@ select.input{
     const sf = $('#ts-fav');
     sf.dataset.id = m.id;
     sf.setAttribute('aria-pressed', isFav(m.id));
+
+    const st = $('#ts-stock'), ok = inStock(m);
+    st.textContent = ok ? T().in_stock : T().oos;
+    st.classList.toggle('ts-stock--oos', !ok);
+
+    renderRadar(m.id);
 
     const packs = $('#ts-packs');
     packs.innerHTML = '';

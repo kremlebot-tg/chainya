@@ -17,10 +17,10 @@ from PIL import Image, ImageDraw, ImageEnhance, ImageFont
 root = pathlib.Path(__file__).parent
 
 W, H = 1200, 630
-BG = (20, 17, 16)
-INK = (241, 237, 230)
-JADE = (143, 175, 152)
-MUTE = (148, 140, 131)
+BG = (28, 14, 16)         # #1C0E10 — винный сумрак, как тёмная тема сайта
+INK = (244, 232, 228)     # #F4E8E4
+ACCENT = (219, 106, 98)   # #DB6A62 — акцент сайта (тёмная тема), кармин
+MUTE = (158, 130, 126)    # #9E827E
 
 
 # Сайту хватает woff2-сабсетов, но Pillow их не читает и не умеет подменять
@@ -96,7 +96,7 @@ d.text((X + mark.width + 18, 66 + mh // 2), "Ч А Й Н Я", font=f_brand, fill
 
 # ── заголовок: тот же оффер, что в герое ──
 f_h = prata(58)
-lines = [("Два часа,", INK), ("два чая", INK), ("и мастер напротив", JADE)]
+lines = [("Два часа,", INK), ("два чая", INK), ("и мастер напротив", ACCENT)]
 y = 214
 for text, color in lines:
     d.text((X, y), text, font=f_h, fill=color)

@@ -1770,6 +1770,15 @@ select.input{
     go(t.dataset.go);
   });
 
+  // Глубокие ссылки: #shop / #book / #b2b открывают раздел сразу — нужно для
+  // кнопок телеграм-бота (мини-апп) и для шаринга на конкретную вкладку.
+  const HASH_VIEWS = ['home', 'shop', 'b2b', 'book'];
+  function goFromHash(){
+    const h = location.hash.replace('#', '');
+    if (HASH_VIEWS.includes(h)) go(h);
+  }
+  addEventListener('hashchange', goFromHash);
+
   /* ─────────────  КАРТОЧКА ЧАЯ  ─────────────
      На карточке показываем цену минимального пакета (25 г), а не «за 10 г»:
      покупателю важно, сколько он отдаст на кассе. */
@@ -2208,5 +2217,6 @@ select.input{
   }));
 
   applyLang();
+  goFromHash();
 })();
 </script>

@@ -33,6 +33,10 @@ TITLE = "Чайня · чайная на Острякова"
 DESC = ("Камерная чайная у метро Аэропорт. Чайная церемония с мастером, два чая "
         "на выбор уже в стоимости. Китайский чай прямого привоза и доставка по России.")
 
+# og:image обязан быть абсолютным: по относительному пути телеграм и соцсети
+# картинку не подтянут. Меняется на свой домен, когда он появится.
+SITE = "https://kremlebot-tg.github.io/chainya/"
+
 HEAD_EXTRA = f"""<meta name="description" content="{DESC}">
 <meta name="theme-color" content="#141110" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#E7E6DF" media="(prefers-color-scheme: light)">
@@ -40,8 +44,12 @@ HEAD_EXTRA = f"""<meta name="description" content="{DESC}">
 <meta property="og:title" content="{TITLE}">
 <meta property="og:description" content="{DESC}">
 <meta property="og:locale" content="ru_RU">
-<meta property="og:image" content="og.jpg">
+<meta property="og:url" content="{SITE}">
+<meta property="og:image" content="{SITE}og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="{SITE}">
 <link rel="icon" href="favicon.png" type="image/png">
 <link rel="apple-touch-icon" href="favicon.png">"""
 

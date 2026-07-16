@@ -30,6 +30,11 @@ jobs:
           test -f dist/index.html
           test -d dist/img
           test -d dist/fonts
+          # картинка превью лежит под именем с хэшем; проверяем, что та,
+          # на которую ссылается og:image, действительно есть в dist
+          OG=$(grep -o 'og:image" content="[^"]*' dist/index.html | sed 's#.*/##')
+          test -n "$OG" && test -f "dist/$OG" || { echo "нет картинки превью: $OG"; exit 1; }
+          echo "превью: $OG ($(du -h "dist/$OG" | cut -f1))"
           echo "index.html: $(du -h dist/index.html | cut -f1)"
           echo "файлов в dist: $(find dist -type f | wc -l)"
 

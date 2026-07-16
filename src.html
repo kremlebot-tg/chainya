@@ -425,6 +425,26 @@ select.input{
   background-repeat:no-repeat; background-position:right 14px center;
 }
 .row2{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+
+/* Формат церемонии: две радио-карточки, цена сразу на виду. Выбор формата —
+   это и есть модель заведения, в брони он должен быть первым, а не отсутствовать */
+.fmt{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.fmt__opt{
+  display:flex; flex-direction:column; gap:4px; text-align:left;
+  padding:14px 16px 15px; border:1px solid var(--line); border-radius:var(--r);
+  background:var(--bg-3); cursor:pointer;
+  transition:border-color .2s var(--ease), background .2s var(--ease);
+}
+.fmt__opt:hover{ border-color:var(--text-3); }
+.fmt__opt[aria-pressed="true"]{
+  border-color:var(--accent);
+  background:color-mix(in srgb, var(--accent) 10%, var(--bg-3));
+}
+.fmt__opt .fmt__price{ font-family:'Prata',Georgia,serif; font-size:1.35rem; line-height:1; }
+.fmt__name{ font-size:14px; font-weight:600; letter-spacing:-.01em; }
+.fmt__d{ font-size:11.5px; color:var(--text-3); line-height:1.45; }
+.fmt__incl{ margin:11px 0 0; font-size:12.5px; color:var(--text-3); line-height:1.5; }
+
 /* Дни лентой вместо календаря: год в чайной брони не нужен, он всегда текущий */
 .days{ display:flex; gap:7px; overflow-x:auto; padding-bottom:6px; scrollbar-width:thin; }
 .day{
@@ -592,6 +612,14 @@ select.input{
   .link-arrow{ min-height:44px; }
   .chip{ min-height:44px; padding:0 16px; }
   .slot, .day, .pack{ min-height:46px; }
+  .fmt{ grid-template-columns:1fr; gap:8px; }
+  /* На узком экране карточка — строка: имя слева, цена справа, описание под
+     ними. В разметке цена стоит первой (для вертикальной десктоп-раскладки),
+     поэтому порядок правим через order, иначе цена повисает по центру */
+  .fmt__opt{ flex-direction:row; align-items:baseline; flex-wrap:wrap; column-gap:10px; min-height:44px; }
+  .fmt__name{ order:1; }
+  .fmt__opt .fmt__price{ order:2; margin-left:auto; }
+  .fmt__d{ order:3; flex-basis:100%; }
   .day{ padding:0 12px; display:flex; flex-direction:column; justify-content:center; }
   .pack{ padding:0; display:flex; flex-direction:column; justify-content:center; }
   .btn{ min-height:50px; }
@@ -964,6 +992,22 @@ select.input{
       <div class="book">
         <div>
           <div class="field">
+            <span class="label" data-i18n="f_format">Формат</span>
+            <div class="fmt" id="fmt">
+              <button class="fmt__opt" type="button" data-fmt="master" aria-pressed="true">
+                <span class="fmt__price num">1500 ₽</span>
+                <span class="fmt__name" data-i18n="fmt_master">Церемония с мастером</span>
+                <span class="fmt__d" data-i18n="fmt_master_d">мастер заваривает и ведёт стол</span>
+              </button>
+              <button class="fmt__opt" type="button" data-fmt="self" aria-pressed="false">
+                <span class="fmt__price num">1200 ₽</span>
+                <span class="fmt__name" data-i18n="fmt_self">Самостоятельно</span>
+                <span class="fmt__d" data-i18n="fmt_self_d">посуду и воду даём, завариваете сами</span>
+              </button>
+            </div>
+            <p class="fmt__incl" data-i18n="fmt_incl">В обе цены входят два чая на выбор. Третий — по желанию, на месте.</p>
+          </div>
+          <div class="field">
             <span class="label" data-i18n="f_date">Дата</span>
             <div class="days" id="days"></div>
           </div>
@@ -994,14 +1038,15 @@ select.input{
         <aside class="summary">
           <h3 data-i18n="sum_h">Ваша бронь</h3>
           <p class="summary__sub" data-i18n="sum_sub">Чайня · Острякова, 3</p>
+          <div class="srow"><span data-i18n="sum_format">Формат</span><span id="s-format">—</span></div>
           <div class="srow"><span data-i18n="sum_date">Дата</span><span id="s-date">—</span></div>
           <div class="srow"><span data-i18n="sum_time">Время</span><span id="s-time">—</span></div>
           <div class="srow"><span data-i18n="sum_guests">Гостей</span><span id="s-guests" class="num">2</span></div>
-          <div class="srow muted"><span data-i18n="sum_session">Стол</span><span data-i18n="sum_session_v">2 часа</span></div>
+          <div class="srow muted"><span data-i18n="sum_session">Стол</span><span data-i18n="sum_session_v">2 часа · 2 чая</span></div>
           <button class="btn btn--solid btn--wide" id="submit" disabled data-i18n="book_btn_wait">Выберите дату и время</button>
           <p class="or"><span data-i18n="or">или</span></p>
-          <a class="btn btn--ghost btn--wide" id="tg-link" href="#" style="margin-top:14px">
-            <span data-i18n="tg_write">Написать в телеграм</span>
+          <a class="btn btn--ghost btn--wide" id="call-link" href="tel:+79055908801" style="margin-top:14px">
+            <span data-i18n="book_call">Позвонить: +7 905 590-88-01</span>
           </a>
           <p class="summary__note" data-i18n="sum_note"></p>
         </aside>
@@ -1205,21 +1250,24 @@ select.input{
     b2b_done_h:'Заявка у нас', b2b_done_back:'Посмотреть чаи',
     b2bDoneText:(name) => `${name ? name + ', с' : 'С'}пишемся в течение рабочего дня.`,
     book_label:'Бронь', book_h:'Занять стол',
-    book_lead:'Бронь бесплатная и ни к чему не обязывает. Если планы поменяются, просто напишите нам, мы не обидимся.',
+    book_lead:'Бронь бесплатная и ни к чему не обязывает. Выбираете время — мы открываем телеграм с готовой заявкой, вам остаётся отправить.',
+    f_format:'Формат',
+    fmt_master:'Церемония с мастером', fmt_master_d:'мастер заваривает и ведёт стол',
+    fmt_self:'Самостоятельно', fmt_self_d:'посуду и воду даём, завариваете сами',
+    fmt_incl:'В обе цены входят два чая на выбор. Третий — по желанию, на месте.',
     f_date:'Дата', today:'сегодня', tomorrow:'завтра', f_time:'Время посадки', f_guests:'Гостей',
     f_name:'Имя', f_name_ph:'Как к вам обращаться', f_phone:'Телефон',
     f_note:'Пожелания', f_note_ph:'Первый раз на чайной церемонии, хотим что-нибудь бодрящее. Или: у нас день рождения, нужна свеча.',
     sum_h:'Ваша бронь', sum_sub:'Чайня · Острякова, 3',
-    sum_date:'Дата', sum_time:'Время', sum_guests:'Гостей', sum_session:'Стол', sum_session_v:'2 часа',
-    book_btn_wait:'Выберите дату и время', book_btn_go:'Забронировать',
-    or:'или', tg_write:'Написать в телеграм',
-    sum_note:'Платить сейчас ничего не нужно. Мы перезвоним и подтвердим. Если время к тому моменту займут, предложим соседнее.',
-    done_h:'Стол за вами', done_back:'На главную',
+    sum_format:'Формат', sum_date:'Дата', sum_time:'Время', sum_guests:'Гостей', sum_session:'Стол', sum_session_v:'2 часа · 2 чая',
+    book_btn_wait:'Выберите дату и время', book_btn_go:'Отправить бронь в телеграм',
+    or:'или', book_call:'Позвонить: +7 905 590-88-01',
+    msg_hi:'Здравствуйте! Хочу забронировать стол в Чайне.',
+    sum_note:'Платить ничего не нужно. Заявка уходит нам в телеграм, мы ответим и подтвердим время. Если оно к тому моменту занято, предложим соседнее.',
+    done_h:'Почти готово', done_back:'На главную',
     guests:['1 гость','2 гостя','3 гостя','4 гостя','5 гостей','6 гостей','7 гостей','8 гостей','9 гостей, весь зал'],
-    doneText:(name, date, time, n) => {
-      const NA = ['на одного','на двоих','на троих','на четверых','на пятерых','на шестерых','на семерых','на восьмерых','на девятерых'];
-      return `${name ? name + ', ждём вас' : 'Ждём вас'} ${date} в ${time}, стол ${NA[n - 1]}. Перезвоним и всё подтвердим.`;
-    },
+    doneText:({ name, dateStr, time }) =>
+      `${name ? name + ', бронь' : 'Бронь'} на ${dateStr} в ${time} уже набрана в телеграме — осталось нажать «Отправить», и мы подтвердим время. Не открылся телеграм? Напишите @chainyamsk или позвоните +7 905 590-88-01.`,
     foot_desc:'Чайная на Острякова. Китайский лист, чайный мастер и никакой спешки.',
     foot_addr_h:'Адрес', foot_addr1:'Москва, ул. Острякова, 3', foot_addr2:'первый этаж, помещение 114', foot_addr3:'метро Аэропорт',
     foot_contact_h:'Связь', foot_tg:'Телеграм: @chainyamsk', foot_phone:'+7 (905) 590-88-01', foot_ya:'Мы на Яндекс.Картах',
@@ -1326,21 +1374,24 @@ select.input{
     b2b_done_h:'Enquiry received', b2b_done_back:'See the teas',
     b2bDoneText:(name) => `${name ? name + ', we' : 'We'}’ll get back to you within one working day.`,
     book_label:'Booking', book_h:'Take a table',
-    book_lead:'Booking is free, no strings attached. If plans change, just drop us a line; no hard feelings.',
+    book_lead:'Booking is free, no strings attached. Pick a time and we open Telegram with the request ready — you just hit send.',
+    f_format:'Format',
+    fmt_master:'Ceremony with a master', fmt_master_d:'the master brews and runs the table',
+    fmt_self:'On your own', fmt_self_d:'we give you the ware and water, you brew',
+    fmt_incl:'Both prices already include two teas of your choice. A third one is optional, at the table.',
     f_date:'Date', today:'today', tomorrow:'tomorrow', f_time:'Seating time', f_guests:'Guests',
     f_name:'Name', f_name_ph:'What should we call you', f_phone:'Phone',
     f_note:'Special requests', f_note_ph:'First tea ceremony, something invigorating please. Or: it’s a birthday, we need a candle.',
     sum_h:'Your booking', sum_sub:'Chaynya · Ostryakova 3',
-    sum_date:'Date', sum_time:'Time', sum_guests:'Guests', sum_session:'Table', sum_session_v:'2 hours',
-    book_btn_wait:'Pick a date and time', book_btn_go:'Book',
-    or:'or', tg_write:'Message us on Telegram',
-    sum_note:'Nothing to pay now. We’ll call to confirm; if the slot has gone by then, we’ll offer the nearest one.',
-    done_h:'The table is yours', done_back:'Back to home',
+    sum_format:'Format', sum_date:'Date', sum_time:'Time', sum_guests:'Guests', sum_session:'Table', sum_session_v:'2 hours · 2 teas',
+    book_btn_wait:'Pick a date and time', book_btn_go:'Send booking via Telegram',
+    or:'or', book_call:'Call: +7 905 590-88-01',
+    msg_hi:'Hello! I’d like to book a table at Chaynya.',
+    sum_note:'Nothing to pay now. The request reaches us on Telegram; we’ll reply and confirm the time. If it’s taken by then, we’ll offer the nearest one.',
+    done_h:'Almost there', done_back:'Back to home',
     guests:['1 guest','2 guests','3 guests','4 guests','5 guests','6 guests','7 guests','8 guests','9 guests, the whole room'],
-    doneText:(name, date, time, n) => {
-      const W = ['one','two','three','four','five','six','seven','eight','nine'];
-      return `${name ? name + ', we' : 'We'} look forward to seeing you on ${date} at ${time}, a table for ${W[n - 1]}. We’ll call to confirm.`;
-    },
+    doneText:({ name, dateStr, time }) =>
+      `${name ? name + ', your' : 'Your'} booking for ${dateStr} at ${time} is already typed out in Telegram — just hit send and we’ll confirm the time. Telegram didn’t open? Message @chainyamsk or call +7 905 590-88-01.`,
     foot_desc:'A tea house on Ostryakova. Chinese leaf, a tea master, and no hurry whatsoever.',
     foot_addr_h:'Address', foot_addr1:'Moscow, Ostryakova St 3', foot_addr2:'ground floor, unit 114', foot_addr3:'Aeroport metro',
     foot_contact_h:'Contact', foot_tg:'Telegram: @chainyamsk', foot_phone:'+7 (905) 590-88-01', foot_ya:'Find us on Yandex Maps',
@@ -1447,19 +1498,24 @@ select.input{
     b2b_done_h:'申请已收到', b2b_done_back:'看茶',
     b2bDoneText:(name) => `${name ? name + '，' : ''}我们将在一个工作日内回复。`,
     book_label:'订座', book_h:'订一张茶桌',
-    book_lead:'订座免费，随时可以取消。计划有变，给我们留言即可，我们不会介意。',
+    book_lead:'订座免费，随时可以取消。选好时间后，我们会打开Telegram并填好预订内容，您发送即可。',
+    f_format:'形式',
+    fmt_master:'茶艺师主泡', fmt_master_d:'茶艺师亲自冲泡、掌席',
+    fmt_self:'自助冲泡', fmt_self_d:'我们提供茶具和用水，您自己泡',
+    fmt_incl:'两种价格均已含两款自选茶。第三款可在现场按需加点。',
     f_date:'日期', today:'今天', tomorrow:'明天', f_time:'入座时间', f_guests:'人数',
     f_name:'称呼', f_name_ph:'怎么称呼您', f_phone:'电话',
     f_note:'备注', f_note_ph:'第一次喝工夫茶，想要提神的。或者：过生日，需要一支蜡烛。',
     sum_h:'您的预订', sum_sub:'Chaynya · 奥斯特里亚科娃街3号',
-    sum_date:'日期', sum_time:'时间', sum_guests:'人数', sum_session:'茶席', sum_session_v:'2小时',
-    book_btn_wait:'请选择日期和时间', book_btn_go:'确认订座',
-    or:'或者', tg_write:'用Telegram联系我们',
-    sum_note:'现在无需付款。我们会致电确认；若届时该时段已满，将为您推荐前后的时段。',
-    done_h:'茶桌已为您留好', done_back:'回首页',
+    sum_format:'形式', sum_date:'日期', sum_time:'时间', sum_guests:'人数', sum_session:'茶席', sum_session_v:'2小时 · 2款茶',
+    book_btn_wait:'请选择日期和时间', book_btn_go:'用Telegram发送预订',
+    or:'或者', book_call:'致电：+7 905 590-88-01',
+    msg_hi:'您好！我想在Chaynya订一张茶桌。',
+    sum_note:'现在无需付款。预订通过Telegram发给我们，我们会回复并确认时间。若届时该时段已满，将为您推荐前后的时段。',
+    done_h:'就差一步', done_back:'回首页',
     guests:['1位','2位','3位','4位','5位','6位','7位','8位','9位（包场）'],
-    doneText:(name, date, time, n) =>
-      `${name ? name + '，' : ''}您的茶席已订好：${date} ${time}，${n}位。我们将致电确认。`,
+    doneText:({ name, dateStr, time }) =>
+      `${name ? name + '，' : ''}${dateStr} ${time}的预订已在Telegram中填好，点击「发送」即可，我们会确认时间。Telegram没有打开？请联系 @chainyamsk 或致电 +7 905 590-88-01。`,
     foot_desc:'奥斯特里亚科娃街上的茶馆。中国茶叶、茶艺师，从不催客。',
     foot_addr_h:'地址', foot_addr1:'莫斯科，奥斯特里亚科娃街3号', foot_addr2:'一层114号铺', foot_addr3:'机场地铁站',
     foot_contact_h:'联系', foot_tg:'Telegram：@chainyamsk', foot_phone:'+7 (905) 590-88-01', foot_ya:'在Yandex地图上找到我们',
@@ -1519,6 +1575,12 @@ select.input{
       if (a.dataset.go === view) a.setAttribute('aria-current','page');
       else a.removeAttribute('aria-current');
     });
+    // Разделы «Бронь» и «Для бизнеса» двухшаговые (форма → подтверждение).
+    // Подтверждение показывается на месте, без навигации, поэтому при любом
+    // переходе возвращаем форму — иначе повторный заход застревает на «Почти
+    // готово» вместо чистой формы.
+    $('#book-form').hidden = false; $('#book-done').hidden = true;
+    $('#b2b-form-wrap').hidden = false; $('#b2b-done').hidden = true;
     closeTea();
     scrollTo({ top:0, behavior:'instant' });
   }
@@ -1723,7 +1785,17 @@ select.input{
   });
 
   /* ─────────────  БРОНЬ  ───────────── */
-  const B = { date:'', time:'', guests:'2' };
+  const B = { format:'master', date:'', time:'', guests:'2' };
+
+  // Цена универсальна (рубли), название — из словаря. Это ядро модели заведения.
+  const FMT = { master:'1500 ₽', self:'1200 ₽' };
+  const fmtName = () => B.format === 'master' ? T().fmt_master : T().fmt_self;
+
+  $$('#fmt .fmt__opt').forEach(o => o.addEventListener('click', () => {
+    B.format = o.dataset.fmt;
+    $$('#fmt .fmt__opt').forEach(x => x.setAttribute('aria-pressed', x === o));
+    sync();
+  }));
 
   // Не toISOString: он отдаёт UTC, и после полуночи по Москве «сегодня» становится вчера
   const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -1753,13 +1825,14 @@ select.input{
   }
 
   const slots = $('#slots');
-  // Прототип: занятость выдумана. Часы настоящие: 12:00–22:00, последняя посадка в 20:00
-  const BUSY = ['14:30','15:00','19:00','19:30'];
+  // Часы настоящие: 12:00–22:00, последняя посадка в 20:00. Занятость не
+  // выдумываем — свободные слоты подтверждает хозяин при ответе (см. sum_note);
+  // фиктивное «занято» только отпугнуло бы от реально свободного времени.
   for (let m = 12 * 60; m <= 20 * 60; m += 30){
     const time = `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
-    const busy = BUSY.includes(time);
-    const b = el(`<button class="slot num" data-t="${time}" aria-pressed="false" ${busy ? 'disabled' : ''}>${time}</button>`);
-    if (!busy) b.addEventListener('click', () => {
+    const b = el(`<button class="slot num" data-t="${time}" aria-pressed="false">${time}</button>`);
+    b.addEventListener('click', () => {
+      if (b.disabled) return;
       $$('.slot', slots).forEach(s => s.setAttribute('aria-pressed', s === b));
       B.time = time; sync();
     });
@@ -1772,7 +1845,6 @@ select.input{
     const isToday = B.date === iso(now);
     const cutoff = now.getHours() * 60 + now.getMinutes();
     $$('.slot', slots).forEach(s => {
-      if (BUSY.includes(s.dataset.t)) return;
       const [h, m] = s.dataset.t.split(':').map(Number);
       const past = isToday && h * 60 + m <= cutoff;
       s.disabled = past;
@@ -1801,6 +1873,7 @@ select.input{
   };
 
   function sync(){
+    $('#s-format').textContent = `${fmtName()} · ${FMT[B.format]}`;
     $('#s-date').textContent = fmtDate(B.date);
     $('#s-time').textContent = B.time || '—';
     $('#s-guests').textContent = B.guests;
@@ -1812,19 +1885,50 @@ select.input{
 
   $('#f-guests').addEventListener('change', e => { B.guests = e.target.value; sync(); });
 
+  // Бэкенда нет: бронь уходит готовым сообщением в телеграм заведения, где хозяин
+  // её видит и подтверждает. Это честно (в отличие от формы, которая раньше
+  // рисовала «стол за вами», а заявку никуда не отправляла) и работает без сервера.
+  function bookingMsg(){
+    const t = T();
+    const rows = [t.msg_hi, '',
+      `${t.sum_format}: ${fmtName()} (${FMT[B.format]})`,
+      `${t.sum_date}: ${fmtDate(B.date)}`,
+      `${t.sum_time}: ${B.time}`,
+      `${t.sum_guests}: ${B.guests}`];
+    const add = (label, v) => { const s = v.trim(); if (s) rows.push(`${label}: ${s}`); };
+    add(t.f_name, $('#f-name').value);
+    add(t.f_phone, $('#f-phone').value);
+    add(t.f_note, $('#f-note').value);
+    return rows.join('\n');
+  }
+
   // Аргументы последних подтверждений храним, чтобы перерисовать их на новом языке
   let lastBook = null, lastB2B = null;
 
   $('#submit').addEventListener('click', () => {
-    // Обещаем перезвонить — без телефона заявка бессмысленна
-    const phone = $('#f-phone').value.trim();
-    if (!phone){ $('#f-phone').focus(); return; }
-    lastBook = { name: $('#f-name').value.trim(), date: B.date, time: B.time, n: +B.guests };
-    $('#done-text').textContent = T().doneText(lastBook.name, fmtDate(lastBook.date), lastBook.time, lastBook.n);
+    if (!B.date || !B.time) return;
+    // encodeURIComponent сам ставит %0A на перевод строки и %20 на пробел —
+    // телеграм разворачивает это в готовый текст, гостю остаётся нажать «Отправить»
+    window.open('https://t.me/chainyamsk?text=' + encodeURIComponent(bookingMsg()), '_blank', 'noopener');
+    lastBook = { name: $('#f-name').value.trim(), format: B.format, date: B.date, time: B.time, n: +B.guests };
+    renderDone();
     $('#book-form').hidden = true;
     $('#book-done').hidden = false;
     scrollTo({ top:0, behavior:'instant' });
   });
+
+  // Экран подтверждения зависит от языка (название формата, формат даты) —
+  // собираем его через хелпер, чтобы перерисовать при переключении языка
+  function renderDone(){
+    if (!lastBook) return;
+    $('#done-text').textContent = T().doneText({
+      name: lastBook.name,
+      fmt: lastBook.format === 'master' ? T().fmt_master : T().fmt_self,
+      dateStr: fmtDate(lastBook.date),
+      time: lastBook.time,
+      n: lastBook.n,
+    });
+  }
 
   $('#b2b-submit').addEventListener('click', () => {
     const phone = $('#b-phone').value.trim();
@@ -1854,8 +1958,7 @@ select.input{
     closeTea();
     sync();
     // Экраны подтверждения могут быть на виду — перерисуем их на новом языке
-    if (lastBook && !$('#book-done').hidden)
-      $('#done-text').textContent = T().doneText(lastBook.name, fmtDate(lastBook.date), lastBook.time, lastBook.n);
+    if (lastBook && !$('#book-done').hidden) renderDone();
     if (lastB2B && !$('#b2b-done').hidden)
       $('#b2b-done-text').textContent = T().b2bDoneText(lastB2B.name);
     try{ localStorage.setItem('chaynya-lang', LANG); }catch(e){}

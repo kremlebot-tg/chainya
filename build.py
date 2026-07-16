@@ -46,8 +46,8 @@ OG_SRC = root / "src-assets" / "og.jpg"
 OG_NAME = f"og.{hashlib.sha256(OG_SRC.read_bytes()).hexdigest()[:8]}.jpg"
 
 HEAD_EXTRA = f"""<meta name="description" content="{DESC}">
-<meta name="theme-color" content="#1C0E10" media="(prefers-color-scheme: dark)">
-<meta name="theme-color" content="#F4EBE8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#141110" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#E7E6DF" media="(prefers-color-scheme: light)">
 <meta property="og:type" content="website">
 <meta property="og:title" content="{TITLE}">
 <meta property="og:description" content="{DESC}">

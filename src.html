@@ -1,0 +1,1871 @@
+<style>
+/*@FONTS@*/
+
+/* ─────────────────────────  ТОКЕНЫ  ───────────────────────── */
+:root{
+  /* Светлая тема — бумага чайной карты: прохладная, серо-зелёная */
+  --bg:        #E7E6DF;
+  --bg-2:      #DEDDD4;
+  --bg-3:      #F2F1EC;
+  --line:      #CBCABF;
+  --line-soft: #DCDBD1;
+  --text:      #191715;
+  --text-2:    #454239;
+  --text-3:    #615E54;
+  --accent:    #3C6449;
+  --accent-2:  #547D60;
+  --accent-hover: #325541;
+  --on-accent: #F2F1EC;
+  color-scheme: light;
+  --blend:     multiply;
+  --grain:     .035;
+  /* На тёмном фоне текст визуально худеет (иррадиация) — там вес чуть выше */
+  --w-body:    410;
+
+  /* Цвет настоя — это данные, а не декор. Одинаков в обеих темах. */
+  --lq-white:  #E3DCA6;
+  --lq-green:  #C7CE72;
+  --lq-oolong: #D9A441;
+  --lq-red:    #A63D24;
+  --lq-puer:   #4A2418;
+  --lq-other:  #8A7B5C;
+
+  --pad:  clamp(20px, 5vw, 72px);
+  --maxw: 1240px;
+  --r:    4px;
+  --ease: cubic-bezier(.22,.61,.36,1);
+}
+
+/* Тёмная тема — сам зал: лампа, глина, тёплый уголь */
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:        #141110;
+    --bg-2:      #1B1817;
+    --bg-3:      #232020;
+    --line:      #332E2B;
+    --line-soft: #262221;
+    --text:      #F1EDE6;
+    --text-2:    #B6AFA6;
+    --text-3:    #948C83;
+    --accent:    #6E9178;
+    --accent-2:  #8FAF98;
+    --accent-hover: #8FAF98;
+    --on-accent: #101614;
+    color-scheme: dark;
+    --blend:     screen;
+    --grain:     .05;
+    --w-body:    440;
+  }
+}
+:root[data-theme="light"]{
+  --bg:#E7E6DF; --bg-2:#DEDDD4; --bg-3:#F2F1EC; --line:#CBCABF; --line-soft:#DCDBD1;
+  --text:#191715; --text-2:#454239; --text-3:#615E54;
+  --accent:#3C6449; --accent-2:#547D60; --accent-hover:#325541; --on-accent:#F2F1EC;
+  --blend:multiply; --grain:.035; --w-body:410; color-scheme:light;
+}
+:root[data-theme="dark"]{
+  --bg:#141110; --bg-2:#1B1817; --bg-3:#232020; --line:#332E2B; --line-soft:#262221;
+  --text:#F1EDE6; --text-2:#B6AFA6; --text-3:#948C83;
+  --accent:#6E9178; --accent-2:#8FAF98; --accent-hover:#8FAF98; --on-accent:#101614;
+  --blend:screen; --grain:.05; --w-body:440; color-scheme:dark;
+}
+
+/* ─────────────────────────  БАЗА  ───────────────────────── */
+*{ box-sizing:border-box; }
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  font-family:'Golos Text', system-ui, sans-serif;
+  font-size:17px; font-weight:var(--w-body);
+  line-height:1.62; letter-spacing:-.005em;
+  -webkit-font-smoothing:antialiased;
+}
+img{ max-width:100%; display:block; }
+button{ font:inherit; color:inherit; background:none; border:0; cursor:pointer; }
+input, select, textarea{ font:inherit; color:inherit; }
+a{ color:inherit; text-decoration:none; }
+:focus-visible{ outline:2px solid var(--accent); outline-offset:3px; border-radius:2px; }
+
+/* Китайский: у Prata и Golos нет CJK, иероглифы отдаём системным шрифтам.
+   Заголовкам — сунти (аналог дидона), тексту — системный гротеск. */
+:lang(zh) body{ letter-spacing:0; }
+:lang(zh) .display, :lang(zh) .tea__name, :lang(zh) .hall h3, :lang(zh) .summary h3,
+:lang(zh) .sheet__head h2, :lang(zh) .done-card h2, :lang(zh) .svc__p{
+  font-family:'Songti SC','Noto Serif SC','SimSun',serif; letter-spacing:.02em;
+}
+:lang(zh) .label{ letter-spacing:.2em; }
+
+.wrap{ max-width:var(--maxw); margin-inline:auto; padding-inline:var(--pad); }
+
+.display{
+  font-family:'Prata', Georgia, serif; font-weight:400;
+  line-height:1.02; letter-spacing:-.02em; text-wrap:balance;
+}
+.label{
+  font-size:11.5px; font-weight:600; letter-spacing:.13em; text-transform:uppercase;
+  color:var(--text-3); line-height:1.4;
+}
+.lead{ font-size:clamp(1.02rem,1.35vw,1.2rem); line-height:1.6; color:var(--text-2); }
+.num{ font-variant-numeric:tabular-nums; }
+
+/* Зерно — очень слабое, чтобы плоскости не выглядели пластиковыми */
+.grain{
+  position:fixed; inset:0; z-index:1; pointer-events:none; opacity:var(--grain);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  mix-blend-mode:var(--blend);
+}
+
+/* ─────────────────────────  НАВИГАЦИЯ  ───────────────────────── */
+.nav{
+  position:sticky; top:0; z-index:40;
+  background:color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter:blur(14px) saturate(1.3);
+  border-bottom:1px solid var(--line-soft);
+}
+.nav__in{
+  max-width:var(--maxw); margin-inline:auto; padding:0 var(--pad);
+  height:66px; display:flex; align-items:center; gap:clamp(16px,3vw,44px);
+}
+.brand{
+  display:flex; align-items:center; gap:11px; margin-right:auto;
+  font-family:'Prata', Georgia, serif; font-size:19px; letter-spacing:.22em;
+  text-transform:uppercase; white-space:nowrap;
+}
+/* Знак «ЧНЯ»: белая плашка. На светлой теме её надо обвести, иначе сольётся */
+.brand__mark{ height:32px; width:auto; display:block; border-radius:2px; }
+:root[data-theme="light"] .brand__mark,
+:root:not([data-theme]) .brand__mark{ box-shadow:0 0 0 1px var(--line); }
+@media (prefers-color-scheme: dark){ :root:not([data-theme]) .brand__mark{ box-shadow:none; } }
+:root[data-theme="dark"] .brand__mark{ box-shadow:none; }
+.brand sup{ font-family:'Golos Text',sans-serif; font-size:9.5px; font-weight:600; letter-spacing:.1em; color:var(--text-2); top:-.85em; }
+.nav__links{ display:flex; gap:clamp(12px,2vw,30px); }
+.nav__link{
+  padding:6px 0; font-size:15px; font-weight:500; color:var(--text-2);
+  transition:color .2s var(--ease); white-space:nowrap;
+}
+.nav__link:hover{ color:var(--text); }
+.nav__link[aria-current="page"]{ color:var(--accent); }
+.nav__tools{ display:flex; align-items:center; gap:8px; }
+.lang{ display:flex; gap:2px; padding:2px; border:1px solid var(--line); border-radius:100px; }
+.lang button{
+  padding:4px 9px; border-radius:100px; font-size:11.5px; font-weight:600;
+  letter-spacing:.03em; color:var(--text-3); transition:all .18s var(--ease);
+  white-space:nowrap;   /* иначе «中文» ломается на две строки на узком экране */
+}
+.lang button:hover{ color:var(--text); }
+.lang button[aria-pressed="true"]{ background:var(--text); color:var(--bg); }
+.icon-btn{
+  width:36px; height:36px; display:grid; place-items:center; border-radius:50%;
+  color:var(--text-2); transition:background .2s var(--ease), color .2s var(--ease);
+}
+.icon-btn:hover{ background:var(--bg-2); color:var(--text); }
+.icon-btn svg{ width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
+
+/* ─────────────────────────  КНОПКИ  ───────────────────────── */
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:9px;
+  padding:13px 26px; border-radius:var(--r); font-size:15px; font-weight:530;
+  letter-spacing:.01em; transition:all .22s var(--ease); white-space:nowrap;
+}
+.btn--solid{ background:var(--accent); color:var(--on-accent); }
+.btn--solid:not(:disabled):hover{ background:var(--accent-hover); transform:translateY(-1px); }
+.btn--ghost{ border:1px solid var(--line); color:var(--text); }
+.btn--ghost:not(:disabled):hover{ border-color:var(--text-3); background:var(--bg-2); }
+/* Выключенная кнопка несёт подсказку — она обязана читаться */
+.btn:disabled{ background:var(--bg-2); color:var(--text-2); cursor:not-allowed; transform:none; }
+.btn--wide{ width:100%; }
+
+.link-arrow{
+  display:inline-flex; align-items:center; gap:7px; font-size:14.5px; color:var(--accent);
+  border-bottom:1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  padding-bottom:2px; transition:gap .22s var(--ease), border-color .22s var(--ease);
+}
+.link-arrow:hover{ gap:12px; border-color:var(--accent); }
+
+/* ─────────────────────────  ПЕРЕКЛЮЧЕНИЕ ЭКРАНОВ  ───────────────────────── */
+.view{ display:none; }
+.view.is-active{ display:block; animation:rise .5s var(--ease) both; }
+@keyframes rise{ from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:none; } }
+
+/* ─────────────────────────  ГЕРОЙ  ─────────────────────────
+   Фото мастера здесь не ставим: он работает ниже, в карточке услуги.
+   Вместо него сама коллекция — стена листа из тех же снимков, что в магазине.
+   Дрейф нарочно медленный (полторы минуты на круг): это покой, а не бегущая строка. */
+.hero{
+  position:relative; overflow:hidden;
+  min-height:min(86vh, 760px); display:flex; align-items:center;
+}
+.hero__wall{
+  --wall-gap:clamp(8px,.9vw,14px);
+  position:absolute; top:-10%; bottom:-10%; right:0; width:46%;
+  display:flex; gap:var(--wall-gap); pointer-events:none; z-index:0;
+  opacity:.72; filter:saturate(.92);   /* стена — фон, а не соперник заголовку */
+}
+/* align-self:start обязателен: иначе колонка растянется по высоте стены,
+   а translateY(-50%) считался бы от неё, а не от длины ленты, и петля дёрнулась бы.
+   padding-bottom добавляет 14-й зазор: у 14 картинок промежутков только 13,
+   и без него половина высоты не совпадает с шагом петли на ползазора. */
+.hero__col{
+  flex:1; align-self:flex-start; display:flex; flex-direction:column;
+  gap:var(--wall-gap); padding-bottom:var(--wall-gap); will-change:transform;
+}
+.hero__col img{ width:100%; aspect-ratio:1; object-fit:cover; border-radius:var(--r); }
+.hero__col--0{ animation:drift-up 96s linear infinite; }
+.hero__col--1{ animation:drift-down 124s linear infinite; }
+@keyframes drift-up  { from{ transform:translateY(0); }     to{ transform:translateY(-50%); } }
+@keyframes drift-down{ from{ transform:translateY(-50%); }  to{ transform:translateY(0); } }
+/* Ширма поверх стены: слева гасит её под текст, сверху и снизу растворяет в фоне */
+.hero::after{
+  content:''; position:absolute; inset:0; z-index:1; pointer-events:none;
+  background:
+    linear-gradient(to right, var(--bg) 46%, color-mix(in srgb, var(--bg) 50%, transparent) 68%, transparent 82%),
+    linear-gradient(to bottom, var(--bg), transparent 16%, transparent 80%, var(--bg));
+}
+.hero__in{
+  position:relative; z-index:2; width:100%;
+  max-width:var(--maxw); margin-inline:auto;
+  padding:clamp(56px,8vw,104px) var(--pad);
+}
+/* Текст держим в левой половине: правая отдана стене целиком */
+.hero__copy{ max-width:min(54%, 660px); }
+.hero h1{ font-size:clamp(2.7rem,5.6vw,4.6rem); margin:18px 0 0; }
+.hero h1 em{ font-style:normal; color:var(--accent-2); }
+.hero__lead{ margin:26px 0 0; max-width:44ch; }
+.hero__cta{ display:flex; flex-wrap:wrap; gap:12px; margin-top:30px; }
+
+.facts{ border-top:1px solid var(--line-soft); background:var(--bg-2); }
+.facts__in{
+  max-width:var(--maxw); margin-inline:auto; padding:0 var(--pad);
+  display:grid; grid-template-columns:repeat(4,1fr);
+}
+.fact{ padding:22px 0; border-left:1px solid var(--line-soft); padding-left:22px; }
+.fact:first-child{ border-left:0; padding-left:0; }
+/* Значения набраны Golos'ом: дидон в мелком кегле становится нитками */
+.fact__v{ font-size:1.16rem; font-weight:600; letter-spacing:-.01em; margin-top:6px; }
+.fact__v small{ font-size:13px; font-weight:var(--w-body); color:var(--text-3); }
+
+/* ─────────────────────────  СЕКЦИИ  ───────────────────────── */
+/* padding-block, а НЕ шорткат «padding: X 0»: шорткат обнулял padding-inline
+   у .wrap (он объявлен выше и проигрывает по порядку), и на мобиле весь
+   контент упирался в края экрана. На десктопе это не видно — там отступ
+   даёт margin:auto от max-width. */
+.sec{ padding-block:clamp(56px,8vw,110px); }
+.sec--line{ border-top:1px solid var(--line-soft); }
+.sec__head{
+  display:grid; grid-template-columns:minmax(0,1fr) minmax(0,.62fr);
+  gap:clamp(20px,4vw,56px); align-items:end; margin-bottom:clamp(32px,4vw,52px);
+}
+.sec__head h2{ font-size:clamp(1.9rem,3.6vw,3rem); margin:14px 0 0; }
+.sec__head p{ margin:0; }
+
+/* ── Услуги: две карточки, чем платит гость ── */
+.svcs{ display:grid; grid-template-columns:1fr 1fr; gap:clamp(14px,1.6vw,20px); }
+.svc{
+  border:1px solid var(--line-soft); border-radius:var(--r); overflow:hidden;
+  background:var(--bg-3); display:flex; flex-direction:column;
+}
+.svc__art{ aspect-ratio:16/10; overflow:hidden; background:var(--bg-2); }
+.svc__art img{ width:100%; height:100%; object-fit:cover; }
+.svc__body{ padding:clamp(20px,2.4vw,30px); display:flex; flex-direction:column; flex:1; }
+.svc h3{ font-size:1.15rem; font-weight:600; margin:0; letter-spacing:-.01em; }
+.svc p{ margin:10px 0 0; font-size:14.5px; color:var(--text-2); line-height:1.6; }
+.svc__foot{
+  margin-top:auto; padding-top:18px; display:flex; align-items:baseline;
+  justify-content:space-between; gap:12px;
+}
+.svc__p{ font-family:'Prata',Georgia,serif; font-size:1.6rem; font-variant-numeric:tabular-nums; }
+.svc__t{ font-size:13px; color:var(--text-3); }
+
+/* ── Философия ── */
+.credo{
+  display:grid; grid-template-columns:minmax(0,.62fr) minmax(0,1fr);
+  gap:clamp(28px,4vw,64px); align-items:center;
+}
+.credo__art{ border-radius:var(--r); overflow:hidden; background:var(--bg-2); aspect-ratio:3/4; }
+.credo__art img{ width:100%; height:100%; object-fit:cover; object-position:50% 35%; }
+.credo__q{
+  margin:16px 0 0; font-size:clamp(1.5rem,2.6vw,2.3rem); line-height:1.16;
+  border-left:2px solid var(--accent); padding-left:clamp(16px,2vw,26px);
+}
+.credo__p{ margin:22px 0 0; font-size:15.5px; line-height:1.66; color:var(--text-2); max-width:56ch; }
+
+/* ── Шаги: нумерация настоящая, проливы идут по порядку ── */
+.steps{ display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--line-soft); border:1px solid var(--line-soft); }
+.step{ background:var(--bg); padding:26px 22px 30px; transition:background .3s var(--ease); }
+.step:hover{ background:var(--bg-3); }
+.steps--3{ grid-template-columns:repeat(3,1fr); }
+.step__n{ font-family:'Prata',Georgia,serif; font-size:2.4rem; color:var(--accent); line-height:1; opacity:.75; }
+.step h3{ font-size:1.08rem; font-weight:600; margin:16px 0 8px; letter-spacing:-.01em; }
+.step p{ margin:0; font-size:15px; color:var(--text-2); line-height:1.6; }
+
+/* ── Карточка чая ── */
+.tea-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(232px,1fr)); gap:clamp(14px,1.6vw,20px); }
+.tea{
+  position:relative; background:var(--bg-3); border:1px solid var(--line-soft);
+  border-radius:var(--r); overflow:hidden; display:flex; flex-direction:column;
+  cursor:pointer; text-align:left;
+  transition:border-color .25s var(--ease), transform .25s var(--ease);
+}
+.tea:hover{ border-color:var(--line); transform:translateY(-2px); }
+.tea__art{ aspect-ratio:4/3; overflow:hidden; background:var(--bg-2); position:relative; }
+.tea__art img{ width:100%; height:100%; object-fit:cover; transition:transform .5s var(--ease); }
+.tea:hover .tea__art img{ transform:scale(1.03); }
+/* Точка = тип чая. Та же легенда, что в фильтрах. */
+.tea__dot{
+  position:absolute; top:10px; left:10px; width:10px; height:10px; border-radius:50%;
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--bg) 75%, transparent), inset 0 0 0 1px rgba(0,0,0,.25);
+}
+.tea__body{ padding:16px 18px 18px; display:flex; flex-direction:column; flex:1; }
+.tea__name{ font-family:'Prata',Georgia,serif; font-size:1.18rem; line-height:1.2; letter-spacing:-.01em; }
+.tea__orig{ margin-top:5px; font-size:12.5px; color:var(--text-3); }
+.tea__foot{
+  margin-top:auto; padding-top:14px; display:flex; align-items:baseline;
+  justify-content:space-between; gap:10px;
+}
+.price{ font-family:'Prata',Georgia,serif; font-size:1.22rem; font-variant-numeric:tabular-nums; }
+.price small{ font-family:'Golos Text',sans-serif; font-size:12px; color:var(--text-3); margin-left:4px; }
+.tea__more{
+  font-size:12.5px; color:var(--text-3); display:inline-flex; align-items:center; gap:5px;
+  transition:color .2s var(--ease), gap .2s var(--ease);
+}
+.tea:hover .tea__more{ color:var(--accent); gap:9px; }
+.shop__foot{
+  margin:clamp(32px,4vw,48px) 0 0; padding-top:22px; border-top:1px solid var(--line-soft);
+  font-size:13.5px; color:var(--text-3); line-height:1.6; max-width:70ch;
+}
+/* Фасовка в паспорте чая */
+.packs{ display:flex; gap:6px; margin:0 0 14px; }
+.pack{
+  flex:1; padding:9px 0 8px; border:1px solid var(--line); border-radius:3px;
+  text-align:center; color:var(--text-2); transition:all .18s var(--ease);
+}
+.pack:hover{ border-color:var(--text-3); }
+.pack[aria-pressed="true"]{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
+.pack b{ display:block; font-size:13.5px; font-weight:600; font-variant-numeric:tabular-nums; }
+.pack span{ display:block; font-size:11.5px; opacity:.75; font-variant-numeric:tabular-nums; margin-top:1px; }
+
+/* ── Фильтры карты ── */
+.chips{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:28px; }
+.chip{
+  display:inline-flex; align-items:center; gap:8px; padding:8px 15px;
+  border:1px solid var(--line); border-radius:100px; font-size:13.5px; color:var(--text-2);
+  transition:all .2s var(--ease);
+}
+.chip:hover{ border-color:var(--text-3); color:var(--text); }
+.chip[aria-pressed="true"]{ background:var(--text); border-color:var(--text); color:var(--bg); }
+.chip[aria-pressed="true"] .dot{ box-shadow:inset 0 0 0 1px rgba(255,255,255,.35); }
+.dot{ width:9px; height:9px; border-radius:50%; box-shadow:inset 0 0 0 1px rgba(0,0,0,.2); }
+
+/* ── Зал ── */
+.hall{
+  display:grid; grid-template-columns:1.1fr 1fr;
+  border:1px solid var(--line-soft); border-radius:var(--r);
+  overflow:hidden; background:var(--bg-3);
+}
+.hall__art{ position:relative; min-height:280px; }
+.hall__art img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.hall__body{ padding:clamp(26px,3.5vw,48px); display:flex; flex-direction:column; }
+.hall h3{ font-family:'Prata',Georgia,serif; font-weight:400; font-size:clamp(1.5rem,2.3vw,1.95rem); margin:0; letter-spacing:-.01em; }
+.hall p{ margin:14px 0 0; font-size:15px; color:var(--text-2); line-height:1.65; max-width:52ch; }
+.hall__meta{
+  margin-top:auto; padding-top:24px; display:flex; flex-wrap:wrap; gap:8px 22px;
+  font-size:13px; color:var(--text-3); font-variant-numeric:tabular-nums;
+}
+.gallery{ display:grid; grid-template-columns:repeat(3,1fr); gap:clamp(10px,1.2vw,16px); margin-top:clamp(14px,1.6vw,20px); }
+.gallery img{
+  width:100%; aspect-ratio:3/2; object-fit:cover;
+  border:1px solid var(--line-soft); border-radius:var(--r);
+}
+
+/* ── Панель: паспорт чая ── */
+.scrim{
+  position:fixed; inset:0; z-index:50; background:rgba(10,8,7,.5);
+  opacity:0; visibility:hidden; transition:opacity .3s var(--ease), visibility .3s;
+}
+.scrim.on{ opacity:1; visibility:visible; }
+.sheet{
+  position:fixed; top:0; right:0; bottom:0; z-index:51; width:min(410px,100%);
+  background:var(--bg); border-left:1px solid var(--line);
+  transform:translateX(100%); transition:transform .38s var(--ease);
+  display:flex; flex-direction:column;
+}
+.sheet.on{ transform:none; }
+.sheet__head{
+  padding:22px var(--pad); display:flex; align-items:center; justify-content:space-between;
+  gap:14px; border-bottom:1px solid var(--line-soft);
+}
+.sheet__head h2{ font-family:'Prata',Georgia,serif; font-weight:400; font-size:1.4rem; margin:0; line-height:1.2; }
+.sheet__body{ flex:1; overflow-y:auto; padding:0 var(--pad) 20px; }
+.sheet__art{ margin:16px 0 18px; border-radius:var(--r); overflow:hidden; aspect-ratio:4/3; background:var(--bg-2); }
+.sheet__art img{ width:100%; height:100%; object-fit:cover; }
+.ts-orig{ margin:0; font-size:13.5px; color:var(--text-3); }
+.ts-desc{ margin:14px 0 0; font-size:15px; line-height:1.62; color:var(--text-2); }
+.sheet__foot{ padding:18px var(--pad) 26px; border-top:1px solid var(--line); }
+.sheet__sum{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px; }
+.sheet__sum b{ font-family:'Prata',Georgia,serif; font-weight:400; font-size:1.5rem; font-variant-numeric:tabular-nums; }
+.sheet__note{ margin:12px 0 0; font-size:11.5px; color:var(--text-3); line-height:1.5; text-align:center; }
+
+/* ─────────────────────────  ФОРМЫ  ───────────────────────── */
+/* minmax(0,…), а не 1fr: у элементов грида min-width:auto, и лента дней
+   шириной в 1000+ px растянула бы колонку, уведя всю страницу вбок */
+.book{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,.78fr); gap:clamp(28px,4vw,64px); align-items:start; }
+.book > *{ min-width:0; }
+.field{ margin-bottom:22px; }
+.field > .label{ display:block; margin-bottom:9px; }
+.input, select.input{
+  width:100%; padding:12px 14px; background:var(--bg-3);
+  border:1px solid var(--line); border-radius:3px; font-size:15px;
+  transition:border-color .2s var(--ease);
+  -webkit-appearance:none; appearance:none;
+}
+.input:focus{ outline:none; border-color:var(--accent); }
+.input::placeholder{ color:var(--text-3); opacity:1; }
+textarea.input{ min-height:84px; resize:vertical; line-height:1.5; }
+select.input{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23807D74' stroke-width='1.5'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 14px center;
+}
+.row2{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+/* Дни лентой вместо календаря: год в чайной брони не нужен, он всегда текущий */
+.days{ display:flex; gap:7px; overflow-x:auto; padding-bottom:6px; scrollbar-width:thin; }
+.day{
+  flex:none; min-width:70px; padding:9px 12px 10px; border:1px solid var(--line);
+  border-radius:3px; text-align:center; color:var(--text-2);
+  transition:all .18s var(--ease);
+}
+.day:hover{ border-color:var(--text-3); color:var(--text); }
+.day[aria-pressed="true"]{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
+.day b{ display:block; font-size:15px; font-weight:600; font-variant-numeric:tabular-nums; }
+.day span{ display:block; font-size:11px; opacity:.8; margin-top:1px; text-transform:lowercase; }
+.slots{ display:grid; grid-template-columns:repeat(auto-fill,minmax(74px,1fr)); gap:7px; }
+.slot{
+  padding:9px 0; border:1px solid var(--line); border-radius:3px; font-size:13.5px;
+  text-align:center; color:var(--text-2); font-variant-numeric:tabular-nums;
+  transition:all .18s var(--ease);
+}
+.slot:hover:not(:disabled){ border-color:var(--text-3); color:var(--text); }
+.slot[aria-pressed="true"],
+.slot:hover[aria-pressed="true"]{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
+/* Занятое время должно оставаться читаемым: по нему выбирают соседний слот */
+.slot:disabled{
+  color:var(--text-3); border-color:var(--line-soft); cursor:not-allowed;
+  text-decoration:line-through; text-decoration-thickness:1px;
+}
+
+.summary{
+  position:sticky; top:90px; background:var(--bg-3);
+  border:1px solid var(--line-soft); border-radius:var(--r); padding:26px;
+}
+.summary h3{ font-family:'Prata',Georgia,serif; font-weight:400; font-size:1.5rem; margin:0 0 4px; }
+.summary__sub{ font-size:13px; color:var(--text-3); margin:0 0 20px; }
+.srow{ display:flex; justify-content:space-between; gap:14px; padding:11px 0; border-top:1px solid var(--line-soft); font-size:14px; }
+.srow span:first-child{ color:var(--text-3); }
+.srow span:last-child{ text-align:right; font-variant-numeric:tabular-nums; }
+.srow.muted span:last-child{ color:var(--text-3); }
+.summary .btn{ margin-top:22px; }
+.summary__note{ margin:14px 0 0; font-size:11.5px; color:var(--text-3); line-height:1.5; }
+.or{
+  display:flex; align-items:center; gap:12px; margin:18px 0 0;
+  font-size:12px; color:var(--text-3);
+}
+.or::before, .or::after{ content:''; flex:1; height:1px; background:var(--line-soft); }
+
+.done-card{ text-align:center; padding:clamp(48px,8vw,90px) 24px; border:1px solid var(--line-soft); border-radius:var(--r); background:var(--bg-3); }
+.done-card__ring{
+  width:58px; height:58px; margin:0 auto 22px; border-radius:50%;
+  border:1px solid var(--accent); display:grid; place-items:center; color:var(--accent);
+}
+.done-card__ring svg{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
+.done-card h2{ font-family:'Prata',Georgia,serif; font-weight:400; font-size:2rem; margin:0 0 10px; }
+.done-card p{ margin:0 auto; max-width:42ch; color:var(--text-2); font-size:15px; }
+
+/* ── Опт ── */
+.bsteps{ display:grid; grid-template-columns:repeat(3,1fr); gap:clamp(12px,1.4vw,18px); }
+.bstep{
+  background:var(--bg-3); border:1px solid var(--line-soft); border-radius:var(--r);
+  overflow:hidden; display:flex; flex-direction:column;
+  transition:border-color .25s var(--ease), transform .25s var(--ease);
+}
+.bstep:hover{ border-color:var(--line); transform:translateY(-2px); }
+.bstep__art{ aspect-ratio:4/3; overflow:hidden; background:var(--bg-2); }
+.bstep__art img{ width:100%; height:100%; object-fit:cover; transition:transform .5s var(--ease); }
+.bstep:hover .bstep__art img{ transform:scale(1.03); }
+.bstep__body{ padding:20px 20px 24px; }
+.bstep__body .step__n{ font-size:1.7rem; }
+.bstep h3{ font-size:1.05rem; font-weight:600; margin:10px 0 8px; letter-spacing:-.01em; }
+.bstep p{ margin:0; font-size:14.5px; color:var(--text-2); line-height:1.6; }
+
+/* Ассортимент показываем листом, а не списком слов */
+.brange{ margin-top:clamp(32px,4vw,52px); }
+/* Грид, а не флекс: во флексе восемь картинок ужимались в полоски по 40px */
+.brange__strip{ display:grid; grid-template-columns:repeat(8,1fr); gap:8px; margin-top:14px; }
+.brange__strip img{ width:100%; aspect-ratio:1; object-fit:cover; border-radius:var(--r); }
+.brange__note{ margin:14px 0 0; font-size:14.5px; color:var(--text-2); line-height:1.6; max-width:62ch; }
+
+.tiers{ border-top:1px solid var(--line-soft); margin-top:clamp(32px,4vw,52px); }
+.tier{
+  display:grid; grid-template-columns:150px 1fr; gap:18px; align-items:baseline;
+  padding:20px 0; border-bottom:1px solid var(--line-soft);
+}
+.tier__q{ font-family:'Prata',Georgia,serif; font-size:1.3rem; }
+.tier__d{ font-size:14.5px; color:var(--text-2); line-height:1.6; }
+
+/* ─────────────────────────  ПОДВАЛ  ───────────────────────── */
+.foot{ border-top:1px solid var(--line-soft); background:var(--bg-2); padding:clamp(48px,6vw,76px) 0 34px; }
+.foot__grid{ display:grid; grid-template-columns:1.4fr 1fr 1fr 1fr; gap:clamp(24px,3vw,44px); }
+.foot h4{ font-size:12px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--text-3); margin:0 0 14px; }
+.foot ul{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:9px; }
+.foot li, .foot p{ font-size:14px; color:var(--text-2); margin:0; }
+.foot a{ transition:color .2s var(--ease); }
+.foot a:hover{ color:var(--accent); }
+.foot__logo{ margin-bottom:18px; }
+.foot__logo img{ height:86px; width:auto; display:block; border-radius:2px; }
+:root[data-theme="light"] .foot__logo img,
+:root:not([data-theme]) .foot__logo img{ box-shadow:0 0 0 1px var(--line); }
+@media (prefers-color-scheme: dark){ :root:not([data-theme]) .foot__logo img{ box-shadow:none; } }
+:root[data-theme="dark"] .foot__logo img{ box-shadow:none; }
+.foot__brand{ font-family:'Prata',Georgia,serif; font-size:22px; letter-spacing:.2em; text-transform:uppercase; }
+.foot__bot{
+  margin-top:clamp(36px,5vw,56px); padding-top:22px; border-top:1px solid var(--line-soft);
+  display:flex; flex-wrap:wrap; gap:14px; justify-content:space-between; align-items:baseline;
+  font-size:12px; color:var(--text-3);
+}
+/* Подпись студии: по условиям для портфолио она есть, но не лезет в глаза */
+.foot__by{ color:color-mix(in srgb, var(--text-3) 62%, transparent); transition:color .2s var(--ease); }
+.foot__by a{ border-bottom:1px solid transparent; }
+.foot__by:hover{ color:var(--text-3); }
+.foot__by:hover a{ border-bottom-color:color-mix(in srgb, var(--text-3) 45%, transparent); }
+.todo{ color:var(--accent); }
+
+/* ─────────────────────────  АДАПТИВ  ───────────────────────── */
+@media (max-width:1000px){
+  .hero{ min-height:0; }
+  .hero__copy{ max-width:none; }
+  /* На узком экране стена уходит в фон целиком и гасится сильнее: текст важнее */
+  .hero__wall{ width:100%; opacity:.3; }
+  .hero::after{
+    background:
+      linear-gradient(to bottom, color-mix(in srgb, var(--bg) 72%, transparent), var(--bg) 62%),
+      linear-gradient(to bottom, var(--bg), transparent 14%);
+  }
+  .sec__head{ grid-template-columns:1fr; align-items:start; }
+  .steps{ grid-template-columns:1fr 1fr; }
+  .svcs{ grid-template-columns:1fr; }
+  .hall{ grid-template-columns:1fr; }
+  .hall__art{ min-height:210px; }
+  .credo{ grid-template-columns:1fr; gap:26px; }
+  .credo__art{ aspect-ratio:4/3; }
+  .credo__art img{ object-position:50% 30%; }
+  .book{ grid-template-columns:minmax(0,1fr); }
+  .summary{ position:static; }
+  .foot__grid{ grid-template-columns:1fr 1fr; }
+  .facts__in{ grid-template-columns:1fr 1fr; }
+  .fact:nth-child(3){ border-left:0; padding-left:0; }
+  .fact{ border-top:1px solid var(--line-soft); }
+  .fact:nth-child(-n+2){ border-top:0; }
+}
+@media (max-width:620px){
+  body{ font-size:16px; }
+  .nav__in{ height:56px; gap:8px; }
+  .brand{ font-size:15px; letter-spacing:.14em; gap:8px; min-height:44px; }
+  .brand__mark{ height:28px; }
+  .nav__links{ display:none; }
+  /* Тач-зоны: пальцу нужно 44px, мышке хватало 26. Ниже — только мобильные размеры */
+  .lang{ padding:2px; }
+  .lang button{ min-height:40px; padding:0 11px; font-size:12px; }
+  @media (max-width:360px){
+    .brand span{ display:none; }        /* совсем узко: оставляем один знак */
+    .lang button{ padding:0 8px; }
+  }
+  .icon-btn{ width:44px; height:44px; }
+  .nav--mob{
+    display:flex; gap:6px; overflow-x:auto; padding:0 var(--pad) 10px;
+    border-bottom:1px solid var(--line-soft); scrollbar-width:none;
+    -webkit-overflow-scrolling:touch; scroll-snap-type:x proximity;
+  }
+  .nav--mob::-webkit-scrollbar{ display:none; }
+  .nav--mob .nav__link{
+    display:flex; align-items:center; min-height:44px; padding:0 16px;
+    border:1px solid var(--line); border-radius:100px; font-size:14px;
+    scroll-snap-align:start;
+  }
+  .nav--mob .nav__link[aria-current="page"]{ background:var(--text); border-color:var(--text); color:var(--bg); }
+  .link-arrow{ min-height:44px; }
+  .chip{ min-height:44px; padding:0 16px; }
+  .slot, .day, .pack{ min-height:46px; }
+  .day{ padding:0 12px; display:flex; flex-direction:column; justify-content:center; }
+  .pack{ padding:0; display:flex; flex-direction:column; justify-content:center; }
+  .btn{ min-height:50px; }
+  .foot ul{ gap:2px; }
+  .foot li a{ display:inline-flex; align-items:center; min-height:44px; }
+  .steps{ grid-template-columns:1fr; }
+  .facts__in{ grid-template-columns:1fr; }
+  .fact{ border-left:0; padding-left:0; border-top:1px solid var(--line-soft); }
+  .fact:first-child{ border-top:0; }
+  .foot__grid{ grid-template-columns:1fr; }
+  .row2{ grid-template-columns:1fr; }
+  .hero__cta .btn{ flex:1; }
+  .tier{ grid-template-columns:1fr; gap:6px; }
+  .gallery{ grid-template-columns:1fr 1fr; }
+  .brange__strip{ grid-template-columns:repeat(4,1fr); }
+  .bsteps{ grid-template-columns:1fr; }
+  .bstep__art{ aspect-ratio:16/9; }
+  .packs{ gap:8px; }
+  /* Сетка слотов: 74px даёт четыре в ряд и жмёт цифры, три ряднее */
+  .slots{ grid-template-columns:repeat(3,1fr); gap:8px; }
+}
+.nav--mob{ display:none; }
+@media (max-width:620px){ .nav--mob{ display:flex; } }
+
+/* На тач-экране :hover срабатывает после тапа и залипает, пока не ткнёшь
+   в другое место: поднятая карточка так и остаётся поднятой. Сдвиги и
+   масштаб отключаем, обратную связь даёт :active. */
+@media (hover:none){
+  .tea:hover, .bstep:hover, .prod:hover{ transform:none; }
+  .tea:hover .tea__art img, .bstep:hover .bstep__art img{ transform:none; }
+  .btn--solid:not(:disabled):hover{ transform:none; background:var(--accent); }
+  .btn--ghost:not(:disabled):hover{ background:transparent; border-color:var(--line); }
+  .link-arrow:hover{ gap:7px; }
+  .tea:hover .tea__more{ color:var(--text-3); gap:5px; }
+  .icon-btn:hover{ background:none; color:var(--text-2); }
+  .tea:active{ transform:scale(.99); }
+  .btn:not(:disabled):active{ transform:scale(.985); }
+}
+
+@media (prefers-reduced-motion:reduce){
+  *, *::before, *::after{ animation-duration:.01ms !important; transition-duration:.01ms !important; }
+  /* Стена в герое — бесконечная петля: мгновенная «анимация» бросила бы её
+     в конечное состояние translateY(-50%) и обрезала бы половину картинок. */
+  .hero__col{ animation:none !important; transform:none !important; }
+}
+</style>
+
+<div class="grain" aria-hidden="true"></div>
+
+<header class="nav">
+  <div class="nav__in">
+    <a class="brand" href="#" data-go="home">
+      <img class="brand__mark" src="{{img:logo-mark}}" alt="" data-i18n-alt="alt_logo" width="186" height="377">
+      <span><span data-i18n="brand">Чайня</span><sup data-i18n="brand_sup">МСК</sup></span>
+    </a>
+    <nav class="nav__links">
+      <a class="nav__link" href="#" data-go="home" data-i18n="nav_home" aria-current="page">Чайная</a>
+      <a class="nav__link" href="#" data-go="shop" data-i18n="nav_shop">Купить чай</a>
+      <a class="nav__link" href="#" data-go="b2b" data-i18n="nav_b2b">Для бизнеса</a>
+      <a class="nav__link" href="#" data-go="book" data-i18n="nav_book">Бронь</a>
+    </nav>
+    <div class="nav__tools">
+      <div class="lang" role="group" data-i18n-aria="a_lang" aria-label="Язык">
+        <button data-lang="ru" aria-pressed="true">РУ</button>
+        <button data-lang="en" aria-pressed="false">EN</button>
+        <button data-lang="zh" aria-pressed="false">中文</button>
+      </div>
+      <button class="icon-btn" id="theme" data-i18n-aria="a_theme" aria-label="Сменить тему">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
+      </button>
+    </div>
+  </div>
+  <nav class="nav--mob">
+    <a class="nav__link" href="#" data-go="home" data-i18n="nav_home" aria-current="page">Чайная</a>
+    <a class="nav__link" href="#" data-go="shop" data-i18n="nav_shop">Купить чай</a>
+    <a class="nav__link" href="#" data-go="b2b" data-i18n="nav_b2b">Для бизнеса</a>
+    <a class="nav__link" href="#" data-go="book" data-i18n="nav_book">Бронь</a>
+  </nav>
+</header>
+
+<main>
+<!-- ══════════════════  ЧАЙНАЯ  ══════════════════ -->
+<section class="view is-active" id="view-home">
+  <div class="hero">
+    <div class="hero__wall" id="hero-wall" aria-hidden="true"></div>
+    <div class="hero__in">
+      <div class="hero__copy">
+        <p class="label" data-i18n="hero_label">Москва · Острякова, 3 · чайная</p>
+        <h1 class="display" data-i18n="hero_h">Два часа,<br>два чая<br>и <em>мастер напротив</em></h1>
+        <p class="lead hero__lead" data-i18n="hero_lead"></p>
+        <div class="hero__cta">
+          <button class="btn btn--solid" data-go="book" data-i18n="cta_book">Забронировать стол</button>
+          <button class="btn btn--ghost" data-go="shop" data-i18n="cta_menu">Купить чай</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="facts">
+      <div class="facts__in">
+        <div class="fact">
+          <p class="label" data-i18n="fact1_k">Где</p>
+          <p class="fact__v"><span data-i18n="fact1_v">Острякова, 3</span><br><small data-i18n="fact1_s">помещение 114, метро Аэропорт</small></p>
+        </div>
+        <div class="fact">
+          <p class="label" data-i18n="fact2_k">Церемония с мастером</p>
+          <p class="fact__v num"><span data-i18n="fact2_v">1500 ₽</span><br><small data-i18n="fact2_s">два часа, мастер за вашим столом</small></p>
+        </div>
+        <div class="fact">
+          <p class="label" data-i18n="fact3_k">Завариваете сами</p>
+          <p class="fact__v num"><span data-i18n="fact3_v">1200 ₽</span><br><small data-i18n="fact3_s">два часа, посуду и воду даём</small></p>
+        </div>
+        <div class="fact">
+          <p class="label" data-i18n="fact4_k">Чай за столом</p>
+          <p class="fact__v num"><span data-i18n="fact4_v">2 на выбор</span><br><small data-i18n="fact4_s">уже входят в стоимость стола</small></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Две услуги: это и есть модель заведения -->
+  <div class="sec wrap">
+    <div class="sec__head">
+      <div>
+        <p class="label" data-i18n="svc_label">Как это устроено</p>
+        <h2 class="display" data-i18n="svc_h">Стол на два часа<br>плюс чай по выбору</h2>
+      </div>
+      <p class="lead" data-i18n="svc_lead"></p>
+    </div>
+    <div class="svcs">
+      <article class="svc">
+        <div class="svc__art"><img src="{{img:hero-master}}" alt="" data-i18n-alt="alt_master" loading="lazy"></div>
+        <div class="svc__body">
+          <h3 data-i18n="svc1_h">Церемония с мастером</h3>
+          <p data-i18n="svc1_p"></p>
+          <div class="svc__foot">
+            <span class="svc__p num" data-i18n="svc1_price">1500 ₽</span>
+            <span class="svc__t" data-i18n="svc_time">2 часа</span>
+          </div>
+        </div>
+      </article>
+      <article class="svc">
+        <div class="svc__art"><img src="{{img:ceremony-self}}" alt="" data-i18n-alt="alt_self" loading="lazy"></div>
+        <div class="svc__body">
+          <h3 data-i18n="svc2_h">Самостоятельная церемония</h3>
+          <p data-i18n="svc2_p"></p>
+          <div class="svc__foot">
+            <span class="svc__p num" data-i18n="svc2_price">1200 ₽</span>
+            <span class="svc__t" data-i18n="svc_time">2 часа</span>
+          </div>
+        </div>
+      </article>
+    </div>
+  </div>
+
+  <!-- Философия: слова владельца из канала, не мой пересказ -->
+  <div class="sec sec--line wrap">
+    <div class="credo">
+      <div class="credo__art"><img src="{{img:master-pour}}" alt="" data-i18n-alt="alt_pour" loading="lazy"></div>
+      <div class="credo__body">
+        <p class="label" data-i18n="credo_label">Зачем мы это делаем</p>
+        <blockquote class="credo__q display" data-i18n="credo_q"></blockquote>
+        <p class="credo__p" data-i18n="credo_p1"></p>
+        <p class="credo__p" data-i18n="credo_p2"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Нумерация настоящая: проливы идут по порядку -->
+  <div class="sec sec--line wrap">
+    <div class="sec__head">
+      <div>
+        <p class="label" data-i18n="how_label">За столом</p>
+        <h2 class="display" data-i18n="how_h">Четыре шага<br>до первого глотка</h2>
+      </div>
+      <p class="lead" data-i18n="how_lead"></p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="step__n num">01</div>
+        <h3 data-i18n="step1_h">Разговор</h3>
+        <p data-i18n="step1_p"></p>
+      </div>
+      <div class="step">
+        <div class="step__n num">02</div>
+        <h3 data-i18n="step2_h">Выбор</h3>
+        <p data-i18n="step2_p"></p>
+      </div>
+      <div class="step">
+        <div class="step__n num">03</div>
+        <h3 data-i18n="step3_h">Проливы</h3>
+        <p data-i18n="step3_p"></p>
+      </div>
+      <div class="step">
+        <div class="step__n num">04</div>
+        <h3 data-i18n="step4_h">Донышко</h3>
+        <p data-i18n="step4_p"></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec sec--line wrap">
+    <div class="sec__head">
+      <div>
+        <p class="label" data-i18n="fromcard_label">Что налить</p>
+        <h2 class="display" data-i18n="fromcard_h">Что стоит<br>попробовать</h2>
+      </div>
+      <p class="lead" data-i18n="fromcard_lead"></p>
+    </div>
+    <div class="tea-grid" id="home-teas"></div>
+    <div style="margin-top:30px">
+      <button class="link-arrow" data-go="shop"><span data-i18n="fromcard_link">Все 24 чая</span>
+        <svg width="14" height="10" viewBox="0 0 14 10" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M1 5h11M8.5 1.5L12 5l-3.5 3.5"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="sec sec--line wrap">
+    <div class="sec__head">
+      <div>
+        <p class="label" data-i18n="hall_label">Зал</p>
+        <h2 class="display" data-i18n="hall_h">Где сесть</h2>
+      </div>
+      <p class="lead" data-i18n="hall_lead"></p>
+    </div>
+    <div class="hall">
+      <div class="hall__art"><img src="{{img:hall-room}}" alt="" data-i18n-alt="alt_room" loading="lazy"></div>
+      <div class="hall__body">
+        <h3 data-i18n="hall_h3">Один зал, девять мест</h3>
+        <p data-i18n="hall_p1"></p>
+        <p data-i18n="hall_p2"></p>
+        <div class="hall__meta"><span data-i18n="hall_m1">9 мест</span><span data-i18n="hall_m2">без депозита</span><span data-i18n="hall_m3">чай навынос с полки</span></div>
+      </div>
+    </div>
+    <div class="gallery">
+      <img src="{{img:hall-table}}" alt="" data-i18n-alt="alt_table" loading="lazy">
+      <img src="{{img:hall-bar}}" alt="" data-i18n-alt="alt_bar" loading="lazy">
+      <img src="{{img:hall-shelf}}" alt="" data-i18n-alt="alt_shelf" loading="lazy">
+    </div>
+    <div style="margin-top:36px">
+      <button class="btn btn--solid" data-go="book" data-i18n="hall_cta">Выбрать время</button>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════  КУПИТЬ ЧАЙ  ══════════════════ -->
+<section class="view" id="view-shop">
+  <div class="sec wrap">
+    <div class="sec__head">
+      <div>
+        <p class="label" data-i18n="shop_label">Купить чай</p>
+        <h2 class="display" data-i18n="shop_h">Тот же лист,<br>что и в зале</h2>
+      </div>
+      <p class="lead" data-i18n="shop_lead"></p>
+    </div>
+    <div class="chips" id="filters"></div>
+    <div class="tea-grid" id="menu-teas"></div>
+    <p class="shop__foot" data-i18n="shop_foot"></p>
+  </div>
+</section>
+
+<!-- ══════════════════  ДЛЯ БИЗНЕСА  ══════════════════ -->
+<section class="view" id="view-b2b">
+  <div class="sec wrap">
+    <div id="b2b-form-wrap">
+      <div class="sec__head">
+        <div>
+          <p class="label" data-i18n="b2b_label">Для бизнеса</p>
+          <h2 class="display" data-i18n="b2b_h">Наш лист<br>в вашей карте</h2>
+        </div>
+        <p class="lead" data-i18n="b2b_lead"></p>
+      </div>
+
+      <div class="book">
+        <div>
+          <!-- Шаги с фотографиями: чистый текст тут читался как объявление -->
+          <div class="bsteps">
+            <article class="bstep">
+              <div class="bstep__art"><img src="{{img:hero-master}}" alt="" data-i18n-alt="alt_master" loading="lazy"></div>
+              <div class="bstep__body">
+                <div class="step__n num">01</div>
+                <h3 data-i18n="bstep1_h">Дегустация</h3>
+                <p data-i18n="bstep1_p"></p>
+              </div>
+            </article>
+            <article class="bstep">
+              <div class="bstep__art"><img src="{{img:hall-shelf}}" alt="" data-i18n-alt="alt_shelf" loading="lazy"></div>
+              <div class="bstep__body">
+                <div class="step__n num">02</div>
+                <h3 data-i18n="bstep2_h">Подбор</h3>
+                <p data-i18n="bstep2_p"></p>
+              </div>
+            </article>
+            <article class="bstep">
+              <div class="bstep__art"><img src="{{img:hall-bar}}" alt="" data-i18n-alt="alt_bar" loading="lazy"></div>
+              <div class="bstep__body">
+                <div class="step__n num">03</div>
+                <h3 data-i18n="bstep3_h">Поставки</h3>
+                <p data-i18n="bstep3_p"></p>
+              </div>
+            </article>
+          </div>
+
+          <!-- Что именно возим: показываем лист, а не перечисляем словами -->
+          <div class="brange">
+            <p class="label" data-i18n="brange_label">Что возим</p>
+            <div class="brange__strip" id="brange"></div>
+            <p class="brange__note" data-i18n="brange_note"></p>
+          </div>
+
+          <div class="tiers">
+            <div class="tier">
+              <div class="tier__q" data-i18n="tier1_q">Кому</div>
+              <div class="tier__d" data-i18n="tier1_d"></div>
+            </div>
+            <div class="tier">
+              <div class="tier__q" data-i18n="tier3_q">Цена</div>
+              <div class="tier__d" data-i18n="tier3_d"></div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="summary">
+          <h3 data-i18n="b2b_form_h">Оставить заявку</h3>
+          <p class="summary__sub" data-i18n="b2b_form_sub">Ответим в течение рабочего дня</p>
+          <div class="field">
+            <label class="label" for="b-company" data-i18n="b_company">Заведение</label>
+            <input class="input" type="text" id="b-company" data-i18n-ph="b_company_ph">
+          </div>
+          <div class="field">
+            <label class="label" for="b-name" data-i18n="b_name">Как вас зовут</label>
+            <input class="input" type="text" id="b-name" autocomplete="given-name">
+          </div>
+          <div class="field">
+            <label class="label" for="b-phone" data-i18n="b_phone">Телефон или телеграм</label>
+            <input class="input" type="text" id="b-phone" data-i18n-ph="b_phone_ph">
+          </div>
+          <div class="field">
+            <label class="label" for="b-note" data-i18n="b_note">Что наливаете сейчас</label>
+            <textarea class="input" id="b-note" data-i18n-ph="b_note_ph"></textarea>
+          </div>
+          <button class="btn btn--solid btn--wide" id="b2b-submit" data-i18n="b2b_send">Отправить</button>
+          <p class="summary__note" data-i18n="b2b_form_note"></p>
+        </aside>
+      </div>
+    </div>
+
+    <div id="b2b-done" hidden>
+      <div class="done-card">
+        <div class="done-card__ring"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <h2 data-i18n="b2b_done_h">Заявка у нас</h2>
+        <p id="b2b-done-text"></p>
+        <div style="margin-top:28px"><button class="btn btn--ghost" data-go="shop" data-i18n="b2b_done_back">Посмотреть чаи</button></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════  БРОНЬ  ══════════════════ -->
+<section class="view" id="view-book">
+  <div class="sec wrap">
+    <div id="book-form">
+      <div class="sec__head">
+        <div>
+          <p class="label" data-i18n="book_label">Бронь</p>
+          <h2 class="display" data-i18n="book_h">Занять стол</h2>
+        </div>
+        <p class="lead" data-i18n="book_lead"></p>
+      </div>
+
+      <div class="book">
+        <div>
+          <div class="field">
+            <span class="label" data-i18n="f_date">Дата</span>
+            <div class="days" id="days"></div>
+          </div>
+          <div class="field">
+            <span class="label" data-i18n="f_time">Время посадки</span>
+            <div class="slots" id="slots"></div>
+          </div>
+          <div class="field">
+            <span class="label" data-i18n="f_guests">Гостей</span>
+            <select class="input" id="f-guests"></select>
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label class="label" for="f-name" data-i18n="f_name">Имя</label>
+              <input class="input" type="text" id="f-name" data-i18n-ph="f_name_ph" autocomplete="given-name">
+            </div>
+            <div class="field">
+              <label class="label" for="f-phone" data-i18n="f_phone">Телефон</label>
+              <input class="input" type="tel" id="f-phone" placeholder="+7 (___) ___-__-__" autocomplete="tel">
+            </div>
+          </div>
+          <div class="field">
+            <label class="label" for="f-note" data-i18n="f_note">Пожелания</label>
+            <textarea class="input" id="f-note" data-i18n-ph="f_note_ph"></textarea>
+          </div>
+        </div>
+
+        <aside class="summary">
+          <h3 data-i18n="sum_h">Ваша бронь</h3>
+          <p class="summary__sub" data-i18n="sum_sub">Чайня · Острякова, 3</p>
+          <div class="srow"><span data-i18n="sum_date">Дата</span><span id="s-date">—</span></div>
+          <div class="srow"><span data-i18n="sum_time">Время</span><span id="s-time">—</span></div>
+          <div class="srow"><span data-i18n="sum_guests">Гостей</span><span id="s-guests" class="num">2</span></div>
+          <div class="srow muted"><span data-i18n="sum_session">Стол</span><span data-i18n="sum_session_v">2 часа</span></div>
+          <button class="btn btn--solid btn--wide" id="submit" disabled data-i18n="book_btn_wait">Выберите дату и время</button>
+          <p class="or"><span data-i18n="or">или</span></p>
+          <a class="btn btn--ghost btn--wide" id="tg-link" href="#" style="margin-top:14px">
+            <span data-i18n="tg_write">Написать в телеграм</span>
+          </a>
+          <p class="summary__note" data-i18n="sum_note"></p>
+        </aside>
+      </div>
+    </div>
+
+    <div id="book-done" hidden>
+      <div class="done-card">
+        <div class="done-card__ring"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <h2 data-i18n="done_h">Стол за вами</h2>
+        <p id="done-text">—</p>
+        <div style="margin-top:28px"><button class="btn btn--ghost" data-go="home" data-i18n="done_back">На главную</button></div>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot__grid">
+      <div>
+        <div class="foot__logo"><img src="{{img:logo-mark}}" alt="" data-i18n-alt="alt_logo" loading="lazy" width="186" height="377"></div>
+        <p class="foot__brand" data-i18n="brand">Чайня</p>
+        <p style="margin-top:12px; max-width:32ch" data-i18n="foot_desc"></p>
+      </div>
+      <div>
+        <h4 data-i18n="foot_addr_h">Адрес</h4>
+        <ul>
+          <li data-i18n="foot_addr1">Москва, ул. Острякова, 3</li>
+          <li data-i18n="foot_addr2">первый этаж, помещение 114</li>
+          <li data-i18n="foot_addr3">метро Аэропорт</li>
+        </ul>
+      </div>
+      <div>
+        <h4 data-i18n="foot_contact_h">Связь</h4>
+        <ul>
+          <li><a href="https://t.me/chainyamsk" target="_blank" rel="noopener" data-i18n="foot_tg">Телеграм: @chainyamsk</a></li>
+          <li><a href="tel:+79055908801" data-i18n="foot_phone">+7 (905) 590-88-01</a></li>
+          <li><a href="https://yandex.ru/maps/org/chaynya/" target="_blank" rel="noopener" data-i18n="foot_ya">Мы на Яндекс.Картах</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4 data-i18n="foot_hours_h">Часы</h4>
+        <ul>
+          <li class="num" data-i18n="foot_hours1">Ежедневно · 12:00–22:00</li>
+          <li style="color:var(--text-3)" data-i18n="foot_hours2">Последняя посадка в 20:00</li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot__bot">
+      <span data-i18n="foot_c">© 2026 Чайня</span>
+      <span data-i18n="foot_proto">Прототип · зелёным отмечено то, чего у меня пока нет</span>
+      <span class="foot__by"><a href="https://rednd.ru" target="_blank" rel="noopener">rednd.ru</a></span>
+    </div>
+  </div>
+</footer>
+
+<div class="scrim" id="scrim"></div>
+<aside class="sheet" id="tea-sheet" tabindex="-1" role="dialog" aria-modal="true" data-i18n-aria="a_tea" aria-label="О чае">
+  <div class="sheet__head">
+    <h2 id="ts-name">—</h2>
+    <button class="icon-btn" id="ts-close" data-i18n-aria="a_close" aria-label="Закрыть" style="flex:none">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div class="sheet__body">
+    <!-- без src: пустой атрибут заставляет браузер грузить саму страницу -->
+    <div class="sheet__art"><img id="ts-img" alt=""></div>
+    <p class="ts-orig" id="ts-orig"></p>
+    <p class="ts-desc" id="ts-desc"></p>
+  </div>
+  <!-- Фасовка живёт в футере, а не в теле: тело скроллится, и на коротком
+       экране кнопки 50/100 г уезжали за край — человек не знал, что они есть -->
+  <div class="sheet__foot">
+    <div class="packs" id="ts-packs"></div>
+    <div class="sheet__sum"><span id="ts-unit"></span><b class="num" id="ts-price">—</b></div>
+    <a class="btn btn--solid btn--wide" id="ts-buy" href="#" target="_blank" rel="noopener" data-i18n="ts_buy">Купить с доставкой</a>
+    <p class="sheet__note" data-i18n="ts_note"></p>
+  </div>
+</aside>
+
+<script>
+(() => {
+  'use strict';
+
+  /* Цвет по типу чая — легенда фильтров и точки на карточке */
+  const LQ = {
+    white:  '#E3DCA6',
+    green:  '#C7CE72',
+    oolong: '#D9A441',
+    red:    '#A63D24',
+    puer:   '#4A2418',
+    other:  '#8A7B5C',
+  };
+  const TYPE_IDS = ['all','white','green','red','oolong','puer','other'];
+
+  /* Языконезависимое: тип, цена, фото. Цены с Яндекс.Карт, порция 10 г. */
+  const TEA_META = [
+    { id:'chongshicha', t:'other',  p:350, unit:'g',  img:'{{img:tea-chongshicha}}' },
+    { id:'baihao',      t:'white',  p:175, unit:'g',  img:'{{img:tea-baihao}}' },
+    { id:'baimudan',    t:'white',  p:165, unit:'g',  img:'{{img:tea-baimudan}}' },
+    { id:'longjing',    t:'green',  p:160, unit:'g',  img:'{{img:tea-longjing}}' },
+    { id:'molimaojian', t:'green',  p:115, unit:'g',  img:'{{img:tea-molimaojian}}' },
+    { id:'biluogold',   t:'red',    p:245, unit:'g',  img:'{{img:tea-biluogold}}' },
+    { id:'xiaozhong',   t:'red',    p:150, unit:'g',  img:'{{img:tea-xiaozhong}}' },
+    { id:'longjinghong',t:'red',    p:150, unit:'g',  img:'{{img:tea-longjinghong}}' },
+    { id:'dianhong',    t:'red',    p:130, unit:'g',  img:'{{img:tea-dianhong}}' },
+    { id:'dancong',     t:'oolong', p:210, unit:'g',  img:'{{img:tea-dancong}}' },
+    { id:'gabahoney',   t:'oolong', p:195, unit:'g',  img:'{{img:tea-gaba-honey}}' },
+    { id:'gabaruby',    t:'oolong', p:190, unit:'g',  img:'{{img:tea-gaba-ruby}}' },
+    { id:'huangjingui', t:'oolong', p:185, unit:'g',  img:'{{img:tea-huangjingui}}' },
+    { id:'dahongpao',   t:'oolong', p:165, unit:'g',  img:'{{img:tea-dahongpao}}' },
+    { id:'maoxie',      t:'oolong', p:140, unit:'g',  img:'{{img:tea-maoxie}}' },
+    { id:'gabamaocha',  t:'oolong', p:135, unit:'g',  img:'{{img:tea-gaba-maocha}}' },
+    { id:'ginseng',     t:'oolong', p:110, unit:'g',  img:'{{img:tea-ginseng}}' },
+    { id:'mandarin',    t:'puer',   p:320, unit:'pc', img:'{{img:tea-mandarin}}' },
+    { id:'laochatou',   t:'puer',   p:140, unit:'g',  img:'{{img:tea-laochatou}}' },
+    { id:'peacock',     t:'puer',   p:130, unit:'g',  img:'{{img:tea-peacock}}' },
+    { id:'bingdao',     t:'puer',   p:115, unit:'g',  img:'{{img:tea-bingdao}}' },
+    { id:'nuomixiang',  t:'puer',   p:95,  unit:'pc', img:'{{img:tea-nuomixiang}}' },
+    { id:'jinhuawang',  t:'other',  p:140, unit:'g',  img:'{{img:tea-jinhuawang}}' },
+    { id:'herbal',      t:'other',  p:120, unit:'g',  img:'{{img:tea-herbal}}' },
+  ];
+  /* Что показываем на главной: редкость, флагман и понятный вход */
+  const FEATURED = ['chongshicha', 'dancong', 'gabahoney'];
+
+  /* ─────────────────────────  СЛОВАРЬ  ───────────────────────── */
+  const I18N = {
+
+  ru: {
+    locale:'ru-RU',
+    title:'Чайня · чайная на Острякова',
+    a_lang:'Язык', a_theme:'Сменить тему', a_close:'Закрыть', a_tea:'О чае',
+    alt_master:'Чайный мастер разливает настой из чахая по чашкам',
+    alt_logo:'Знак Чайни: буквы Ч, Н, Я, сложенные под иероглиф',
+    alt_pour:'Мастер наливает настой в чахай',
+    credo_label:'Зачем мы это делаем', credo_q:'Чай — это не только строгая церемония, но и повод поэкспериментировать',
+    credo_p1:'Чайня — камерное пространство для тех, кто хочет не просто попробовать китайский чай и приятно провести вечер, а покопаться в нём. Спросить, почему этот лист пахнет сиренью, а тот хлебом. Сравнить два чая рядом и понять, что вам ближе.',
+    credo_p2:'Поэтому мы не читаем лекцию по канону и не требуем тишины. Хотите заварить непривычно — заварим непривычно. Хотите чаочжоускую церемонию, где чайник набивают доверху и пьют маленькими пиалами, — скажите, проведём и её.',
+    alt_self:'Чайный стол сверху: чабань, гайвань, чахай и чаши',
+    alt_room:'Зал чайной: низкие столы, ротанговые лампы, окно во двор',
+    alt_table:'Стол на двоих с чабанью и чайником',
+    alt_bar:'Стойка с сифоном и полки с чаем',
+    alt_shelf:'Полки с чаем в красных коробках и блины пуэра',
+    brand:'Чайня', brand_sup:'МСК',
+    nav_home:'Чайная', nav_shop:'Купить чай', nav_b2b:'Для бизнеса', nav_book:'Бронь',
+    hero_label:'Москва · Острякова, 3 · чайная',
+    hero_h:'Два часа,<br>два чая<br>и <em>мастер напротив</em>',
+    hero_lead:'Мастер садится за ваш стол и заваривает сам: подбирает лист под настроение, ведёт его через восемь-двенадцать проливов и по ходу объясняет, что происходит в чашке. Два чая на выбор уже в цене. Опыт не нужен, готовиться не надо.',
+    cta_book:'Забронировать стол', cta_menu:'Купить чай',
+    fact1_k:'Где', fact1_v:'Острякова, 3', fact1_s:'помещение 114, метро Аэропорт',
+    fact2_k:'Церемония с мастером', fact2_v:'1500 ₽', fact2_s:'два часа, мастер за вашим столом',
+    fact3_k:'Завариваете сами', fact3_v:'1200 ₽', fact3_s:'два часа, посуду и воду даём',
+    fact4_k:'Чай за столом', fact4_v:'2 на выбор', fact4_s:'уже входят в стоимость стола',
+    svc_label:'Как это устроено', svc_h:'Два часа за столом<br>и два чая на выбор',
+    svc_lead:'В обе цены уже входят два чая из нашей коллекции: выбираете любые, мастер заваривает. Захотите третий, доплатите на месте. Больше ничего считать не нужно.',
+    svc1_h:'Церемония с мастером', svc1_price:'1500 ₽',
+    svc1_p:'Мастер весь стол работает на вас: греет посуду, следит за временем, наливает и объясняет. Берите, если пришли впервые или хотите разобраться всерьёз.',
+    svc2_h:'Самостоятельная церемония', svc2_price:'1200 ₽',
+    svc2_p:'Даём стол, посуду, воду нужной температуры и подсказку на старте. Дальше завариваете сами и никто не мешает. Для тех, кто уже в теме.',
+    svc_time:'2 часа · 2 чая',
+    how_label:'За столом', how_h:'Четыре шага<br>до первого глотка',
+    how_lead:'Если никогда не пили чай проливами, готовиться не нужно. Мастер ведёт стол сам и объясняет по ходу.',
+    step1_h:'Разговор', step1_p:'Мастер спросит, зачем вы пришли: взбодриться или, наоборот, выдохнуть. Принесёт несколько сухих листов понюхать.',
+    step2_h:'Выбор', step2_p:'Выбираете два чая из коллекции. Обычно берут разные: сначала что-то светлое, ближе к концу тёмное и плотное.',
+    step3_h:'Проливы', step3_p:'Дальше по кругу: короткий залив, слив в чахай, разлив по чашам. С каждым проливом выдержка растёт, и вкус меняется.',
+    step4_h:'Донышко', step4_p:'Когда лист отдал всё, его разворачивают на блюдце. По листу видно, где он рос и как его делали.',
+    fromcard_label:'Что налить', fromcard_h:'Что стоит<br>попробовать',
+    fromcard_lead:'Точка в углу карточки показывает тип чая. Вся коллекция читается по ней: от белого до пуэра. Любой из этих чаёв можно и выпить за столом, и забрать домой.',
+    fromcard_link:'Все 24 чая',
+    hall_label:'Зал', hall_h:'Где сесть',
+    hall_lead:'Стол бронируется на сессию целиком. Мы не подсаживаем гостей и не торопим, даже если вы засиделись.',
+    hall_h3:'Один зал, девять мест',
+    hall_p1:'Низкие столы, тёплые лампы, окно во двор. Компания до девяти человек занимает зал целиком: так тут проходят дни рождения и спокойные встречи.',
+    hall_p2:'Если вас больше девяти, позвоните заранее, что-нибудь придумаем.',
+    hall_m1:'9 мест', hall_m2:'без депозита', hall_m3:'чай навынос с полки',
+    hall_cta:'Выбрать время',
+    shop_label:'Купить чай', shop_h:'Тот же лист,<br>что и в зале',
+    shop_lead:'Здесь чай продаётся домой: фасуем в пакеты 25, 50 и 100 г и отправляем доставкой. Если вы пришли к нам за стол, платить за чай не нужно: два на выбор уже входят в стоимость.',
+    shop_foot:'Цены на пакеты считаются от цены за 10 г. Прессованное продаём целиком: мандарин и квадратик поштучно, блины по запросу.',
+    types:['Все','Белый','Зелёный','Красный','Улун','Пуэр','Особое'],
+    more:'о чае', per_pc:'за штуку', per_pack25:'за 25 г', gram:'г',
+    unit_pc:'Одна штука', unit_pack:'Пакет {g} г',
+    ts_buy:'Купить с доставкой',
+    ts_note:'За столом этот чай можно выпить бесплатно: два на выбор входят в стоимость стола.',
+    b2b_label:'Для бизнеса', b2b_h:'Наш лист<br>в вашей карте',
+    b2b_lead:'Возим чай из Китая сами и отдаём его оптом кофейням, ресторанам и офисам. Лист тот же, что наливаем в зале.',
+    brange_label:'Что возим', brange_note:'Любую позицию из нашей карты: белый, зелёный, красные, улуны, пуэр, прессовки. Тот же лист, что наливаем в зале, из той же поставки. Ароматизаторов и пересорта не будет.',
+    tier1_q:'Кому', tier1_d:'Кофейням, ресторанам, чайным и офисам. Возьмём и небольшую партию: сначала лучше проверить, как ваш гость реагирует на живой лист.',
+    tier3_q:'Цена', tier3_d:'Зависит от сорта и объёма. Напишите, что вам интересно, и мы пришлём прайс.',
+    bstep1_h:'Дегустация', bstep1_p:'Приезжаем к вам с сетом под ваш формат и завариваем при вас. Бесплатно, займёт около часа.',
+    bstep2_h:'Подбор', bstep2_p:'Собираем карту под кухню и цены. Считаем себестоимость чашки и чайника, чтобы вы понимали маржу.',
+    bstep3_h:'Поставки', bstep3_p:'Возим партии по графику. Если сорт закончился раньше срока, довозим отдельно.',
+    b2b_form_h:'Оставить заявку', b2b_form_sub:'Ответим в течение рабочего дня',
+    b_company:'Заведение', b_company_ph:'Кофейня «Утро», Москва',
+    b_name:'Как вас зовут', b_phone:'Телефон или телеграм', b_phone_ph:'+7 или @ник',
+    b_note:'Что наливаете сейчас', b_note_ph:'Пакетированный чёрный, хотим перейти на листовой. Расход около 2 кг в месяц.',
+    b2b_send:'Отправить',
+    b2b_form_note:'Прототип: заявка пока никуда не уходит. На живом сайте она будет падать в телеграм.',
+    b2b_done_h:'Заявка у нас', b2b_done_back:'Посмотреть чаи',
+    b2bDoneText:(name) => `${name ? name + ', с' : 'С'}пишемся в течение рабочего дня.`,
+    book_label:'Бронь', book_h:'Занять стол',
+    book_lead:'Бронь бесплатная и ни к чему не обязывает. Если планы поменяются, просто напишите нам, мы не обидимся.',
+    f_date:'Дата', today:'сегодня', tomorrow:'завтра', f_time:'Время посадки', f_guests:'Гостей',
+    f_name:'Имя', f_name_ph:'Как к вам обращаться', f_phone:'Телефон',
+    f_note:'Пожелания', f_note_ph:'Первый раз на чайной церемонии, хотим что-нибудь бодрящее. Или: у нас день рождения, нужна свеча.',
+    sum_h:'Ваша бронь', sum_sub:'Чайня · Острякова, 3',
+    sum_date:'Дата', sum_time:'Время', sum_guests:'Гостей', sum_session:'Стол', sum_session_v:'2 часа',
+    book_btn_wait:'Выберите дату и время', book_btn_go:'Забронировать',
+    or:'или', tg_write:'Написать в телеграм',
+    sum_note:'Платить сейчас ничего не нужно. Мы перезвоним и подтвердим. Если время к тому моменту займут, предложим соседнее.',
+    done_h:'Стол за вами', done_back:'На главную',
+    guests:['1 гость','2 гостя','3 гостя','4 гостя','5 гостей','6 гостей','7 гостей','8 гостей','9 гостей, весь зал'],
+    doneText:(name, date, time, n) => {
+      const NA = ['на одного','на двоих','на троих','на четверых','на пятерых','на шестерых','на семерых','на восьмерых','на девятерых'];
+      return `${name ? name + ', ждём вас' : 'Ждём вас'} ${date} в ${time}, стол ${NA[n - 1]}. Перезвоним и всё подтвердим.`;
+    },
+    foot_desc:'Чайная на Острякова. Китайский лист, чайный мастер и никакой спешки.',
+    foot_addr_h:'Адрес', foot_addr1:'Москва, ул. Острякова, 3', foot_addr2:'первый этаж, помещение 114', foot_addr3:'метро Аэропорт',
+    foot_contact_h:'Связь', foot_tg:'Телеграм: @chainyamsk', foot_phone:'+7 (905) 590-88-01', foot_ya:'Мы на Яндекс.Картах',
+    foot_hours_h:'Часы', foot_hours1:'Ежедневно · 12:00–22:00', foot_hours2:'Последняя посадка в 20:00',
+    foot_c:'© 2026 Чайня', foot_proto:'Прототип · зелёным отмечено то, чего у меня пока нет',
+    teas:{
+      chongshicha:{ n:'Чон Ши Ча', o:'Особое · Гуанси', d:'Самый странный чай в карте, и делают его не из листа. Лист складывают слоями, личинки чайной моли его съедают, а в дело идёт то, что остаётся после них. Фекального запаха нет совсем: настой тёмно-красный, сладковатый, с древесной нотой. Прежде чем заказывать, поговорите с мастером.' },
+      baihao:{ n:'Бай Хао Инь Чжень', o:'Белый · Юньнань · только почки', d:'«Серебряные иглы с белым ворсом»: одни почки, без листа. Белый чай почти не обрабатывают. В аромате луговые травы, крапива и клевер, во вкусе свежесть с лёгкой кислинкой. Спокойный чай для неспешного разговора и для жары. Завариваем на 70–75°, не горячее.' },
+      baimudan:{ n:'Бай Му Дань', o:'Белый · Фудин · почка и первый лист', d:'В отличие от игл здесь идут не только почки, но и первый лист. В аромате цветочно-травяная свежесть с ярким оттенком герани, во вкусе луговые цветы и нектар. Очень стойкий к завариванию: держит много проливов. Хорош днём или ранним вечером.' },
+      longjing:{ n:'Лунцзин Хуан Доу', o:'Зелёный · Чжэцзян · крупный плоский лист', d:'Аромат раскрывается на удивление многогранно: каштан, варёная кукуруза, семечки и характерная бульонность с цветочными нотами. Во вкусе свежая трава, жареные орехи, каштан. Мягко тонизирует, хорошо идёт под работу. Если знакомитесь с зелёным китайским чаем, начните отсюда.' },
+      molimaojian:{ n:'Мо Ли Мао Цзянь', o:'Зелёный · с жасмином', d:'Жасминовым чаем наложницы ублажали императора. Технология тонкая: бутон высушивают раскрытым на шестьдесят процентов при постоянных тридцати пяти градусах. В аромате жасмин и цветы магнолии, во вкусе свежая трава и явная сладость. Тем, кто не пьёт чай без сахара, но хочет попробовать настоящий китайский.' },
+      biluogold:{ n:'Дянь Хун Би Ло Голд', o:'Красный · Юньнань · золотые почки', d:'По-китайски это «золотая улитка»: лист скатывают в спираль приёмом, взятым у Би Ло Чуня, и золотой ворс выходит наружу. Из одних почек. Мёд, курага, тёплая сдоба.' },
+      xiaozhong:{ n:'Сяочжун кат. А', o:'Красный · копчёный · он же Лапсанг Сушонг', d:'Копчёный чай, на европейский манер Лапсанг Сушонг. Считается, что он появился случайно в семнадцатом веке: крестьяне забыли листья на солнце, те перебродили и потемнели, и вместо того чтобы выбросить, их подсушили над сосновыми ветками. В аромате жжёная карамель, печёные фрукты и бородинский хлеб; во вкусе мягкость, компотная сладость и хлебное послевкусие. Окутывает и согревает.' },
+      longjinghong:{ n:'Лунцзин Хун Ча', o:'Красный · Чжэцзян', d:'Красный чай с тех же кустов, что и зелёный Лунцзин. Его делают из листа, который снимают уже после короткого весеннего сезона, когда премиальный зелёный не выйдет. Форма скрученная, не плоская, а ореховая нота Лунцзина остаётся.' },
+      dianhong:{ n:'Дянь Хун Юньнань', o:'Красный · Юньнань', d:'Если вы искали классический красный чай на каждый день, то это он. В аромате жареные семечки и тёмный изюм, во вкусе орехи и сухофрукты с цветочным сладковатым шлейфом. Максимально понятный и простой чай, долго рассказывать про него нечего.' },
+      dancong:{ n:'Фэн Хуан Дань Цун Гаошань Цин Сян', o:'Улун · Гуандун · одинокий куст с горы Феникс', d:'Одинокий куст с горы Феникс. В аромате весна и цветы: жимолость, нарциссы, гиацинты с пряной цикориевой нотой. Во вкусе характерная для дань цунов горчинка, которая переходит в сладость. Из Чаочжоу родом и особая церемония, где чайник набивают доверху и пьют маленькими пиалами: её у нас тоже можно попросить.' },
+      gabahoney:{ n:'Габа «Дикий Мёд»', o:'Улун · Тайвань · год в диком мёде', d:'Та же габа, но с одним поворотом: этот чай год выдерживали в диком мёде, и это видно невооружённым глазом: лист буквально блестит от медовой корочки. Первые проливы идут медовые ноты без приторности, дальше мёд отступает и остаётся габа с чуть большей кислинкой. Чай скорее вкусовой, чем «состоянческий».' },
+      gabaruby:{ n:'Габа «Рубин»', o:'Улун · Тайвань · габа', d:'Скрученные в жемчужину янтарные побеги. В аромате печёные фрукты, фруктовый пирог, пастила и тропические ноты; во вкусе компот, выпечка, папайя и лёгкая ягодная кислинка. По эффекту один из самых ярких чаёв: за счёт ГАМК, кофеина и L-теанина даёт «сосредоточенное спокойствие», когда энергии много, но суеты нет.' },
+      huangjingui:{ n:'Хуан Цзин Гуй', o:'Улун · Аньси, деревня Луоян', d:'Появился при императоре Сяньфэне, в 1850-60-х, в деревне Луоян уезда Аньси. Из этого же сорта делают красный и зелёный чай. Аромат невероятно свежий и изящный, с оттенками османтуса и спелого персика; во вкусе полнотелая травянисто-цветочная ароматика и ягодная кислинка. Успокаивает и умиротворяет: чай для вечера после рабочей недели.' },
+      dahongpao:{ n:'Да Хун Пао Жоу Гуй Цин Сян', o:'Улун · Уишань · культивар Жоу Гуй', d:'Сбор с материнских кустов запретили в 2006 году, последнюю партию отправили в музей Гугун в Пекине, так что настоящий Да Хун Пао сегодня не попробовать ни за какие деньги. Всё, что продаётся под этим именем, выращено из их черенков. Культиваров четыре, наш называется Жоу Гуй, «корица». В аромате хлебная корочка, жареные орехи, цитрус и перечная пряность.' },
+      maoxie:{ n:'Тегуаньинь Мао Се', o:'Улун · Аньси · Железная богиня милосердия', d:'Тегуаньинь известна с двенадцатого века. По легенде чаевод Вэй Цинь каждый день подносил богине Гуаньинь три пиалы чая, и однажды увидел во сне дерево с чудесным ароматом. Наутро нашёл его на горе, отщипнул черенок и посадил в железную кастрюлю. Отличительная нота сирени и во вкусе, и в запахе, лёгкая кислинка. Эффект мягкий, приземляющий.' },
+      gabamaocha:{ n:'Габа Мао Ча', o:'Улун · Тайвань · черенки куста', d:'Это не лист и не почки, а черенки чайного куста. В Китае черенковый чай считают самым дешёвым и особо не ценят, поэтому его там немного, а в Москве такого нет больше нигде. При этом габа мощная и многогранная: в аромате свежая выпечка и хлеб, во вкусе сладкий хлеб, печёное яблоко и сухофрукты с карамелью. Тонизирует и сосредотачивает.' },
+      ginseng:{ n:'Женьшень улун', o:'Улун · женьшень и солодка', d:'В Китае считают, что у чая энергия инь, а у женьшеня ян: чтобы их уравновесить, и сделали женьшень улун. Лист похож на камушки, потому что на этапе скрутки в него добавляют порошок корня женьшеня и солодки. В аромате сладость и тропические фрукты, во вкусе яркая сладость, будто в чай положили сахар. Первые проливы ведёт женьшень, дальше он уходит и раскрывается сам улун.' },
+      mandarin:{ n:'Шу Пуэр в мандарине', o:'Пуэр · мандарин целиком', d:'Мандарин выпотрошили, набили шу пуэром и высушили вместе. Заваривается целиком, прямо в корке. Цитрус поверх земли, а к концу сессии корка отдаёт горчинку.' },
+      laochatou:{ n:'Да Лао Ча Тоу', o:'Пуэр · Мэнхай · чайные головы', d:'При влажном скирдовании самые сочные листья слипаются в комки. Их не разбивают, а собирают со дна кучи и продают отдельно. Держат десять проливов и не разваливаются: патока и чернослив.' },
+      peacock:{ n:'Шу Пуэр «Дикий Павлин»', o:'Пуэр · Линьцан · блин 357 г', d:'Блин из Линьцана, сырьё со старых деревьев. Настой почти чёрный и густой: земля, влажное дерево, немного шоколада. Скорее успокаивает, чем бодрит.' },
+      bingdao:{ n:'Шу Пуэр Гунтин Биндао ГуШу', o:'Пуэр · Биндао · старые деревья', d:'Гунтин значит «дворцовый»: самая мелкая и чистая почка. Биндао — это деревня в Линьцане, чьё имя на упаковке стоит так дорого, что часто стоит там незаслуженно. Мягкий, сладкий, без единой земляной ноты.' },
+      nuomixiang:{ n:'Квадратик Ноу Ми Сян', o:'Пуэр · плитка на одну заварку', d:'Риса тут нет и в помине: аромат даёт трава номи сян из Сишуанбаньны, её прессуют вместе с пуэром. Не ароматизатор, а живой лист. Разворачиваете фольгу и кидаете плитку целиком.' },
+      jinhuawang:{ n:'Цзинь Хуа Ван 2002', o:'Хэй Ча · Аньхуа · выдержка', d:'Аньхуаский хэй ча 2002 года. «Золотые цветки» — это гриб, который в этом чае выращивают нарочно: он даёт сухофруктовый аромат и тот самый вкус погреба и старой библиотеки.' },
+      herbal:{ n:'Травяной сбор «Тонизирующий»', o:'Без кофеина · травы и шиповник', d:'Травы, цветки и шиповник, чайного листа нет вовсе. Кофеина ноль, но бодрит за счёт трав. Берут те, кому нельзя чай или для кого уже поздно.' },
+    },
+  },
+
+  en: {
+    locale:'en-GB',
+    title:'Chaynya · a tea house on Ostryakova',
+    a_lang:'Language', a_theme:'Theme', a_close:'Close', a_tea:'About the tea',
+    alt_master:'A tea master pouring the liquor from a pitcher into cups',
+    alt_logo:'The Chaynya mark: the letters Ч, Н, Я stacked like a Chinese character',
+    alt_pour:'The master pouring the liquor into a cha hai',
+    credo_label:'Why we do this', credo_q:'Tea is not only a strict ceremony. It is also a reason to experiment',
+    credo_p1:'Chaynya is a small room for people who want more than a taste of Chinese tea and a pleasant evening: they want to dig into it. To ask why this leaf smells of lilac and that one of bread. To put two teas side by side and work out which one is theirs.',
+    credo_p2:'So we do not lecture you on the canon and we do not ask for silence. Want it brewed in an unusual way? We will brew it that way. Want the Chaozhou ceremony, where the pot is packed full and the tea drunk from tiny bowls? Say so and we will run it.',
+    alt_self:'A tea table from above: tray, gaiwan, pitcher and cups',
+    alt_room:'The tea room: low tables, rattan lamps, a window onto the courtyard',
+    alt_table:'A table for two with a tea tray and a kettle',
+    alt_bar:'The counter with a siphon and shelves of tea',
+    alt_shelf:'Shelves of tea in red boxes and pressed pu-erh cakes',
+    brand:'Chaynya', brand_sup:'MSK',
+    nav_home:'Tea house', nav_shop:'Buy tea', nav_b2b:'For business', nav_book:'Booking',
+    hero_label:'Moscow · Ostryakova 3 · tea house',
+    hero_h:'Two hours,<br>two teas<br>and <em>a master across the table</em>',
+    hero_lead:'The master sits down at your table and does the brewing: picks a leaf to match your mood, takes it through eight to twelve pours, and explains what is happening in the cup as it happens. Two teas of your choice are already in the price. No experience needed, nothing to prepare.',
+    cta_book:'Book a table', cta_menu:'Buy tea',
+    fact1_k:'Where', fact1_v:'Ostryakova 3', fact1_s:'unit 114, Aeroport metro',
+    fact2_k:'With a master', fact2_v:'1500 ₽', fact2_s:'two hours, the master stays at your table',
+    fact3_k:'Brew it yourself', fact3_v:'1200 ₽', fact3_s:'two hours, teaware and water included',
+    fact4_k:'Tea at the table', fact4_v:'2 of your choice', fact4_s:'already included in the price',
+    svc_label:'How it works', svc_h:'Two hours at a table<br>and two teas of your choice',
+    svc_lead:'Both prices already include two teas from our collection: pick any, the master brews them. Want a third? Pay for it on the spot. Nothing else to work out.',
+    svc1_h:'Ceremony with a master', svc1_price:'1500 ₽',
+    svc1_p:'The master works your table the whole time: warms the ware, watches the clock, pours and explains. Take this if it is your first time or you want to get into it properly.',
+    svc2_h:'Brew it yourself', svc2_price:'1200 ₽',
+    svc2_p:'We give you the table, the ware, water at the right temperature and a nudge to start. After that you brew and nobody hovers. For people already at home with tea.',
+    svc_time:'2 hours · 2 teas',
+    how_label:'At the table', how_h:'Four steps<br>to the first sip',
+    how_lead:'New to brewing in pours? Nothing to prepare. The master runs the table and explains as you go.',
+    step1_h:'Talk', step1_p:'The master asks what brought you in: waking up or winding down. Then brings a few dry leaves to smell.',
+    step2_h:'Choice', step2_p:'You pick two teas from the collection. Most people take contrasting ones: something light to open with, something dark and dense towards the end.',
+    step3_h:'Pours', step3_p:'Then round after round: a short steep, decant into the pitcher, pour into cups. Each round steeps longer, and the taste keeps shifting.',
+    step4_h:'The spent leaf', step4_p:'Once the leaf has given everything, it gets unfolded on a saucer. It shows where the tea grew and how it was made.',
+    fromcard_label:'What to pour', fromcard_h:'Worth<br>a try',
+    fromcard_lead:'The dot in the corner of each card marks the type of tea. The whole collection reads by it, from white to pu-erh. Any of these you can drink at the table or take home.',
+    fromcard_link:'All 24 teas',
+    hall_label:'The room', hall_h:'Where you sit',
+    hall_lead:'A table is booked for the whole session. We never seat strangers together and never hurry you out.',
+    hall_h3:'One room, nine seats',
+    hall_p1:'Low tables, warm lamps, a window onto the courtyard. A party of up to nine takes the whole room: birthdays and quiet meetings both happen here.',
+    hall_p2:'If there are more than nine of you, call ahead and we will figure something out.',
+    hall_m1:'9 seats', hall_m2:'no deposit', hall_m3:'tea to take home, off the shelf',
+    hall_cta:'Pick a time',
+    shop_label:'Buy tea', shop_h:'The same leaf<br>we serve inside',
+    shop_lead:'This is tea to take home: we pack it into 25, 50 and 100 g bags and ship it. If you are coming to sit at a table, you pay nothing for tea here: two of your choice are already in the price.',
+    shop_foot:'Bag prices are worked out from the per-10 g price. Pressed tea goes whole: the mandarin and the mini brick are sold by the piece, cakes on request.',
+    types:['All','White','Green','Black','Oolong','Pu-erh','Unusual'],
+    more:'more', per_pc:'each', per_pack25:'for 25 g', gram:'g',
+    unit_pc:'One piece', unit_pack:'A {g} g bag',
+    ts_buy:'Buy with delivery',
+    ts_note:'At the table this tea costs you nothing: two of your choice come with the table.',
+    b2b_label:'For business', b2b_h:'Our leaf<br>on your menu',
+    b2b_lead:'We bring tea from China ourselves and wholesale it to cafés, restaurants and offices. The leaf is the same we serve in the room.',
+    brange_label:'What we ship', brange_note:'Anything on our menu: white, green, black, oolongs, pu-erh, pressed cakes. The same leaf we serve in the room, out of the same delivery. No flavourings, no second-rate batches.',
+    tier1_q:'Who for', tier1_d:'Cafés, restaurants, tea rooms and offices. A small first batch is fine: better to see how your guests take to a real leaf before committing.',
+    tier3_q:'Price', tier3_d:'Depends on the tea and the volume. Tell us what interests you and we will send a price list.',
+    bstep1_h:'Tasting', bstep1_p:'We come to you with a set matched to your format and brew it on the spot. Free, takes about an hour.',
+    bstep2_h:'Selection', bstep2_p:'We build a menu around your kitchen and prices, and cost out a cup and a pot so you know your margin.',
+    bstep3_h:'Supply', bstep3_p:'Deliveries on a schedule. If a tea runs out early, we bring more separately.',
+    b2b_form_h:'Make an enquiry', b2b_form_sub:'We reply within one working day',
+    b_company:'Venue', b_company_ph:'Utro coffee shop, Moscow',
+    b_name:'Your name', b_phone:'Phone or Telegram', b_phone_ph:'+7 or @handle',
+    b_note:'What tea do you serve now', b_note_ph:'Bagged black tea; we want to switch to loose leaf. About 2 kg a month.',
+    b2b_send:'Send',
+    b2b_form_note:'Prototype: the enquiry goes nowhere yet. On the live site it will land in Telegram.',
+    b2b_done_h:'Enquiry received', b2b_done_back:'See the teas',
+    b2bDoneText:(name) => `${name ? name + ', we' : 'We'}’ll get back to you within one working day.`,
+    book_label:'Booking', book_h:'Take a table',
+    book_lead:'Booking is free, no strings attached. If plans change, just drop us a line; no hard feelings.',
+    f_date:'Date', today:'today', tomorrow:'tomorrow', f_time:'Seating time', f_guests:'Guests',
+    f_name:'Name', f_name_ph:'What should we call you', f_phone:'Phone',
+    f_note:'Special requests', f_note_ph:'First tea ceremony, something invigorating please. Or: it’s a birthday, we need a candle.',
+    sum_h:'Your booking', sum_sub:'Chaynya · Ostryakova 3',
+    sum_date:'Date', sum_time:'Time', sum_guests:'Guests', sum_session:'Table', sum_session_v:'2 hours',
+    book_btn_wait:'Pick a date and time', book_btn_go:'Book',
+    or:'or', tg_write:'Message us on Telegram',
+    sum_note:'Nothing to pay now. We’ll call to confirm; if the slot has gone by then, we’ll offer the nearest one.',
+    done_h:'The table is yours', done_back:'Back to home',
+    guests:['1 guest','2 guests','3 guests','4 guests','5 guests','6 guests','7 guests','8 guests','9 guests, the whole room'],
+    doneText:(name, date, time, n) => {
+      const W = ['one','two','three','four','five','six','seven','eight','nine'];
+      return `${name ? name + ', we' : 'We'} look forward to seeing you on ${date} at ${time}, a table for ${W[n - 1]}. We’ll call to confirm.`;
+    },
+    foot_desc:'A tea house on Ostryakova. Chinese leaf, a tea master, and no hurry whatsoever.',
+    foot_addr_h:'Address', foot_addr1:'Moscow, Ostryakova St 3', foot_addr2:'ground floor, unit 114', foot_addr3:'Aeroport metro',
+    foot_contact_h:'Contact', foot_tg:'Telegram: @chainyamsk', foot_phone:'+7 (905) 590-88-01', foot_ya:'Find us on Yandex Maps',
+    foot_hours_h:'Hours', foot_hours1:'Daily · 12:00–22:00', foot_hours2:'Last seating at 20:00',
+    foot_c:'© 2026 Chaynya', foot_proto:'Prototype · green marks what I still don’t have',
+    teas:{
+      chongshicha:{ n:'Chong Shi Cha', o:'Unusual · Guangxi', d:'The strangest tea here, and it is not made from the leaf. Leaves are stacked in layers, moth larvae eat through them, and what the larvae leave behind is what gets brewed. There is no faecal smell at all: the liquor is dark red, faintly sweet, with a woody note. Have a word with the master before you order it.' },
+      baihao:{ n:'Bai Hao Yin Zhen', o:'White · Yunnan · buds only', d:'“Silver needles with white down”: buds alone, no leaf. White tea is barely processed at all. The nose is meadow herbs, nettle and clover; the taste is fresh with a faint sourness. A calm tea for unhurried talk and for hot weather. We brew it at 70–75°C, no hotter.' },
+      baimudan:{ n:'Bai Mu Dan', o:'White · Fuding · bud and first leaf', d:'Unlike the needles, this picking takes the first leaf as well as the bud. The nose is a floral, grassy freshness with a bright note of geranium; the taste brings meadow flowers and nectar. It stands up to brewing remarkably well and keeps going for many pours. Good in the afternoon or the early evening.' },
+      longjing:{ n:'Longjing Huang Dou', o:'Green · Zhejiang · large flat leaf', d:'The aroma opens up surprisingly wide: chestnut, boiled sweetcorn, sunflower seeds and a characteristic brothiness with floral notes. The taste is fresh grass, roasted nuts, chestnut. It lifts you gently and sits well with work. If you are getting to know Chinese green tea, start here.' },
+      molimaojian:{ n:'Mo Li Mao Jian', o:'Green · with jasmine', d:'Concubines once served jasmine tea to the emperor. The method is delicate: the bud is dried when it has opened sixty per cent, at a steady thirty-five degrees. The nose is jasmine and magnolia blossom; the taste is fresh grass with an obvious sweetness. For anyone who cannot drink tea without sugar but wants to try the real Chinese thing.' },
+      biluogold:{ n:'Dian Hong Bi Luo Gold', o:'Black · Yunnan · golden buds', d:'In Chinese it is the “golden snail”: the leaf is rolled into a spiral by a technique borrowed from Bi Luo Chun, which brings the golden down to the surface. Buds only. Honey, dried apricot, warm pastry.' },
+      xiaozhong:{ n:'Xiaozhong grade A', o:'Black · smoked · Lapsang Souchong', d:'A smoked tea, Lapsang Souchong in the European manner. The story goes that it appeared by accident in the seventeenth century: peasants left the leaves out in the sun, they fermented and darkened, and rather than throw them away someone dried them over pine branches. The nose is burnt caramel, baked fruit and rye bread; the taste is soft but dense, with a compote sweetness and a bready finish. It wraps around you and warms.' },
+      longjinghong:{ n:'Longjing Hong Cha', o:'Black · Zhejiang', d:'A black tea from the same bushes as green Longjing. It is made from leaf picked after the short spring season, once a premium green is no longer on the cards. The shape is twisted rather than flat, and the nutty Longjing note survives.' },
+      dianhong:{ n:'Dian Hong Yunnan', o:'Black · Yunnan', d:'If you were after a classic everyday black tea, this is it. The nose is roasted seeds and dark raisin; the taste brings nuts and dried fruit with a sweet floral trail. A thoroughly straightforward tea, and there is not much more to say about it.' },
+      dancong:{ n:'Feng Huang Dan Cong Gaoshan Qing Xiang', o:'Oolong · Guangdong · a lone bush on Phoenix mountain', d:'A lone bush on Phoenix mountain. The nose is spring and flowers: honeysuckle, narcissus, hyacinth, with a spicy chicory note. The taste carries the bitterness typical of Dan Congs, which turns into sweetness. Chaozhou also has a ceremony of its own, where the pot is packed full and the tea drunk from tiny bowls: ask and we will run it for you.' },
+      gabahoney:{ n:'GABA “Wild Honey”', o:'Oolong · Taiwan · a year in wild honey', d:'The same GABA with one twist: this tea spent a year ageing in wild honey, and you can see it with the naked eye, the leaf literally glints with a honey crust. The first pours are honeyed without being cloying, then the honey steps back and the GABA remains, a touch tarter. More a tea for the taste than for the state.' },
+      gabaruby:{ n:'GABA “Ruby”', o:'Oolong · Taiwan · GABA', d:'Amber shoots rolled into pearls. The nose is baked fruit, fruit pie, pastila and tropical notes; the taste follows with compote, pastry and papaya, plus a light berry tartness. One of the strongest teas here for effect: between the GABA, the caffeine and the L-theanine it gives a “focused calm”, plenty of energy with none of the fuss.' },
+      huangjingui:{ n:'Huang Jin Gui', o:'Oolong · Anxi, Luoyan village', d:'It appeared under the Xianfeng emperor, in the 1850s and 60s, in the village of Luoyan in Anxi county. The same cultivar also goes into black and green tea. The aroma is remarkably fresh and elegant, with osmanthus and ripe peach; the taste is a full-bodied grassy-floral thing with a berry tartness. It calms and settles you: a tea for the evening after a working week.' },
+      dahongpao:{ n:'Da Hong Pao Rou Gui Qing Xiang', o:'Oolong · Wuyishan · Rou Gui cultivar', d:'Picking from the mother bushes was banned in 2006 and the last harvest went to the Gugong museum in Beijing, so no amount of money will buy you a real Da Hong Pao today. Everything sold under the name is grown from their cuttings; there are four cultivars, and ours is Rou Gui, “cinnamon”. The nose is bread crust, roasted nuts, citrus and peppery spice.' },
+      maoxie:{ n:'Tieguanyin Mao Xie', o:'Oolong · Anxi · the Iron Goddess of Mercy', d:'Tieguanyin has been known since the twelfth century. The legend says the grower Wei Qin offered the goddess Guanyin three bowls of tea every day, and one night dreamt of a tree with a wonderful scent. In the morning he found it on the mountain, took a cutting and planted it in an iron pot. The signature note is lilac, in both the nose and the taste, with a light tartness. The effect is soft and grounding.' },
+      gabamaocha:{ n:'GABA Mao Cha', o:'Oolong · Taiwan · stem cuttings', d:'Not leaf and not buds, but the cuttings of the tea bush. In China stem tea is considered the cheapest and is not much valued, so there is little of it about, and nowhere else in Moscow has this at all. It is a powerful, many-sided GABA all the same: the nose is fresh baking and bread, the taste sweet bread, baked apple and dried fruit with caramel. It lifts and focuses at once.' },
+      ginseng:{ n:'Ginseng oolong', o:'Oolong · ginseng and liquorice', d:'In China tea is held to carry yin energy and ginseng yang; ginseng oolong was made to balance the two. The leaf looks like little pebbles because ginseng root and liquorice powder are added at the rolling stage. The nose is sweetness and tropical fruit; the taste is sweet enough to seem sugared. The first pours are led by ginseng, then it steps back and the oolong itself comes through.' },
+      mandarin:{ n:'Shu pu-erh in a mandarin', o:'Pu-erh · a whole mandarin', d:'A mandarin was hollowed out, packed with shu pu-erh and dried together with it. You brew it whole, peel and all. Citrus over earth, and by the end of the session the peel turns slightly bitter.' },
+      laochatou:{ n:'Da Lao Cha Tou', o:'Pu-erh · Menghai · tea nuggets', d:'In wet piling the juiciest leaves stick together into lumps. Nobody breaks them up; they are gathered from the bottom of the heap and sold on their own. Ten pours and they still hold: molasses and prunes.' },
+      peacock:{ n:'Shu pu-erh “Wild Peacock”', o:'Pu-erh · Lincang · 357 g cake', d:'A cake from Lincang, made from old-tree material. The liquor is nearly black and thick: earth, wet wood, a little chocolate. Calms rather than wakes.' },
+      bingdao:{ n:'Shu pu-erh Gongting Bingdao Gushu', o:'Pu-erh · Bingdao · old trees', d:'Gongting means “imperial”: the smallest and cleanest bud. Bingdao is a village in Lincang whose name on a wrapper is worth so much that it often ends up there undeserved. Soft and sweet, without a single earthy note.' },
+      nuomixiang:{ n:'Nuo Mi Xiang mini brick', o:'Pu-erh · single-serve brick', d:'There is no rice in it whatsoever: the scent comes from the nuo mi xiang herb of Xishuangbanna, pressed together with the pu-erh. A real leaf, not a flavouring. Unwrap the foil and drop the brick in whole.' },
+      jinhuawang:{ n:'Jin Hua Wang 2002', o:'Hei cha · Anhua · aged', d:'Anhua hei cha from 2002. The “golden flowers” are a fungus grown in this tea deliberately: it gives the dried-fruit aroma and that cellar-and-old-library taste.' },
+      herbal:{ n:'“Tonic” herbal blend', o:'Caffeine-free · herbs and rosehip', d:'Herbs, flowers and rosehip, with no tea leaf at all. Zero caffeine, yet it picks you up. For people who cannot drink tea, or for whom it is already too late in the day.' },
+    },
+  },
+
+  zh: {
+    locale:'zh-CN',
+    title:'Chaynya · 莫斯科茶馆',
+    a_lang:'语言', a_theme:'主题', a_close:'关闭', a_tea:'茶叶详情',
+    alt_master:'茶艺师正把茶汤从茶海分入茶杯',
+    alt_logo:'Chaynya的标记：Ч、Н、Я三个字母叠成汉字的样子',
+    alt_pour:'茶艺师把茶汤注入茶海',
+    credo_label:'我们为什么做这件事', credo_q:'茶不只是严谨的仪轨，它也是一个可以动手实验的由头',
+    credo_p1:'Chaynya是一间小小的茶室，面向那些不满足于「尝一口中国茶、度过一个愉快夜晚」的人：他们想再往里挖一挖。想问清楚为什么这片叶子有丁香味，那片却是面包味。想把两款茶并排摆着，弄明白哪一款才是自己的。',
+    credo_p2:'所以我们不会照本宣科地讲规矩，也不要求您保持安静。想用不常见的方式泡？那就那样泡。想试潮州的泡法——壶里塞满茶，用小盏喝？说一声，我们就给您泡。',
+    alt_self:'茶席俯视：茶盘、盖碗、茶海与茶杯',
+    alt_room:'茶室：矮桌、藤编吊灯、朝向院子的窗',
+    alt_table:'双人茶桌，配茶盘与水壶',
+    alt_bar:'吧台上的虹吸壶与茶叶货架',
+    alt_shelf:'红色茶盒货架与普洱茶饼',
+    brand:'Chaynya', brand_sup:'莫斯科',
+    nav_home:'茶馆', nav_shop:'买茶', nav_b2b:'企业合作', nav_book:'订座',
+    hero_label:'莫斯科 · 奥斯特里亚科娃街3号 · 茶馆',
+    hero_h:'两小时，<br>两款茶，<br><em>茶艺师就在对面</em>',
+    hero_lead:'茶艺师坐到您的桌前，亲手冲泡：按您的状态挑茶，一路冲到八至十二泡，边泡边讲杯中正在发生什么。两款茶任选，已含在价内。不需要经验，也不用提前准备。',
+    cta_book:'订座', cta_menu:'买茶',
+    fact1_k:'地址', fact1_v:'奥斯特里亚科娃街3号', fact1_s:'114号铺，机场地铁站',
+    fact2_k:'茶艺师陪泡', fact2_v:'1500 ₽', fact2_s:'两小时，茶艺师全程在您桌旁',
+    fact3_k:'自己冲泡', fact3_v:'1200 ₽', fact3_s:'两小时，茶具与热水由我们提供',
+    fact4_k:'席上的茶', fact4_v:'任选2款', fact4_s:'已包含在茶席价格里',
+    svc_label:'怎么算钱', svc_h:'两小时茶席<br>外加任选两款茶',
+    svc_lead:'两种价格都已包含我们收藏中的两款茶：随您挑，茶艺师来泡。想喝第三款，现场补差价即可。别的不用再算。',
+    svc1_h:'茶艺师陪泡', svc1_price:'1500 ₽',
+    svc1_p:'茶艺师全程为您服务：温杯、控时、分汤、讲解。第一次来，或者想认真了解，选这个。',
+    svc2_h:'自己冲泡', svc2_price:'1200 ₽',
+    svc2_p:'我们提供茶席、茶具、合适水温的热水，开场稍作指点。之后您自己泡，没人打扰。适合已经懂茶的客人。',
+    svc_time:'2小时 · 2款茶',
+    how_label:'茶席之上', how_h:'从落座到第一口<br>只需四步',
+    how_lead:'没喝过工夫茶也不用准备什么，茶艺师会边泡边讲。',
+    step1_h:'聊几句', step1_p:'茶艺师先问您想要什么：提神，还是放松。然后拿几种干茶给您闻。',
+    step2_h:'选茶', step2_p:'从我们的茶里挑两款。多数客人会选反差大的：先来清淡的，收尾用浓厚的。',
+    step3_h:'冲泡', step3_p:'接着一轮一轮来：快注快出，倒入茶海，再分到各杯。每一泡时间渐长，味道不断变化。',
+    step4_h:'看叶底', step4_p:'茶叶泡尽后，摊在碟子上细看。叶底能看出茶树长在哪里、工艺如何。',
+    fromcard_label:'泡点什么', fromcard_h:'值得<br>一试',
+    fromcard_lead:'卡片角上的圆点标示茶类。整个收藏都照它来读：从白茶到普洱。这些茶既可以在席上喝，也可以带回家。',
+    fromcard_link:'全部24款茶',
+    hall_label:'茶室', hall_h:'坐在哪里',
+    hall_lead:'订座即包下整场茶席。我们不拼桌，也绝不催客。',
+    hall_h3:'一间茶室，九个座位',
+    hall_p1:'矮桌、暖灯、朝院子的窗。九人以内可以包下整间：生日聚会和安静的会面都在这里进行。',
+    hall_p2:'超过九位请提前来电，我们想办法。',
+    hall_m1:'9个座位', hall_m2:'无订金', hall_m3:'货架上的茶可带走',
+    hall_cta:'选时间',
+    shop_label:'买茶', shop_h:'与店里<br>同一份茶叶',
+    shop_lead:'这里的茶是带回家的：按25、50、100克分装，快递寄出。若您是来店里坐茶席，茶不必另付：两款任选已含在价内。',
+    shop_foot:'分装价格按每10克的价格折算。紧压茶整件出售：小青柑和小金砖论个，茶饼可另询。',
+    types:['全部','白茶','绿茶','红茶','乌龙','普洱','特别'],
+    more:'详情', per_pc:'每个', per_pack25:'25克装', gram:'克',
+    unit_pc:'一个', unit_pack:'{g}克装',
+    ts_buy:'下单配送',
+    ts_note:'在店里喝这款茶不另收费：茶席已含任选两款。',
+    b2b_label:'企业合作', b2b_h:'把我们的茶<br>放上您的菜单',
+    b2b_lead:'我们自己从中国进货，批发给咖啡馆、餐厅和办公室。茶叶与店里泡的完全相同。',
+    brange_label:'供什么', brange_note:'我们茶单上的任何一款：白茶、绿茶、红茶、乌龙、普洱、紧压茶。与店里所泡的是同一份茶叶，同一批到货。不加香精，没有次货。',
+    tier1_q:'面向谁', tier1_d:'咖啡馆、餐厅、茶馆和办公室。小批量也可以：先看看您的客人对原叶茶的反应，再决定不迟。',
+    tier3_q:'价格', tier3_d:'取决于品类和数量。告诉我们您感兴趣的部分，我们发报价单。',
+    bstep1_h:'试茶', bstep1_p:'我们带一套适合您业态的茶样上门现泡。免费，大约一小时。',
+    bstep2_h:'选品', bstep2_p:'按您的菜品和价位搭配茶单，核算每杯每壶的成本，让您清楚利润。',
+    bstep3_h:'供货', bstep3_p:'按约定周期送货。哪款提前喝完，我们单独补上。',
+    b2b_form_h:'提交申请', b2b_form_sub:'一个工作日内回复',
+    b_company:'场所', b_company_ph:'莫斯科“清晨”咖啡馆',
+    b_name:'怎么称呼您', b_phone:'电话或Telegram', b_phone_ph:'+7 或 @用户名',
+    b_note:'现在用什么茶', b_note_ph:'袋泡红茶，想换成散茶。每月约2公斤。',
+    b2b_send:'发送',
+    b2b_form_note:'原型：申请暂时不会发出。正式上线后会直达Telegram。',
+    b2b_done_h:'申请已收到', b2b_done_back:'看茶',
+    b2bDoneText:(name) => `${name ? name + '，' : ''}我们将在一个工作日内回复。`,
+    book_label:'订座', book_h:'订一张茶桌',
+    book_lead:'订座免费，随时可以取消。计划有变，给我们留言即可，我们不会介意。',
+    f_date:'日期', today:'今天', tomorrow:'明天', f_time:'入座时间', f_guests:'人数',
+    f_name:'称呼', f_name_ph:'怎么称呼您', f_phone:'电话',
+    f_note:'备注', f_note_ph:'第一次喝工夫茶，想要提神的。或者：过生日，需要一支蜡烛。',
+    sum_h:'您的预订', sum_sub:'Chaynya · 奥斯特里亚科娃街3号',
+    sum_date:'日期', sum_time:'时间', sum_guests:'人数', sum_session:'茶席', sum_session_v:'2小时',
+    book_btn_wait:'请选择日期和时间', book_btn_go:'确认订座',
+    or:'或者', tg_write:'用Telegram联系我们',
+    sum_note:'现在无需付款。我们会致电确认；若届时该时段已满，将为您推荐前后的时段。',
+    done_h:'茶桌已为您留好', done_back:'回首页',
+    guests:['1位','2位','3位','4位','5位','6位','7位','8位','9位（包场）'],
+    doneText:(name, date, time, n) =>
+      `${name ? name + '，' : ''}您的茶席已订好：${date} ${time}，${n}位。我们将致电确认。`,
+    foot_desc:'奥斯特里亚科娃街上的茶馆。中国茶叶、茶艺师，从不催客。',
+    foot_addr_h:'地址', foot_addr1:'莫斯科，奥斯特里亚科娃街3号', foot_addr2:'一层114号铺', foot_addr3:'机场地铁站',
+    foot_contact_h:'联系', foot_tg:'Telegram：@chainyamsk', foot_phone:'+7 (905) 590-88-01', foot_ya:'在Yandex地图上找到我们',
+    foot_hours_h:'营业时间', foot_hours1:'每天 · 12:00–22:00', foot_hours2:'最晚入座 20:00',
+    foot_c:'© 2026 Chaynya', foot_proto:'原型 · 绿色标出的是我暂时还没有的信息',
+    teas:{
+      chongshicha:{ n:'虫屎茶', o:'特别 · 广西', d:'茶单上最奇特的一款，而且它不是用茶叶泡的。茶叶层层堆放，让蛾类幼虫吃过，留下来的东西才是冲泡的原料。完全没有异味：汤色深红，微甜，带木质气息。点单之前，先和茶艺师聊两句。' },
+      baihao:{ n:'白毫银针', o:'白茶 · 云南 · 只取芽头', d:'「白毫银针」：只用芽头，不带叶。白茶几乎不做加工。香气是草地上的野草、荨麻与三叶草，滋味清鲜，带一点点酸。性子安静，适合慢慢聊天，也适合热天。我们用70–75度冲，不能更烫。' },
+      baimudan:{ n:'白牡丹', o:'白茶 · 福鼎 · 一芽一叶', d:'与银针不同，这里除了芽还带第一片叶。香气是花草的清新，带明显的天竺葵气息；滋味有草地野花与花蜜感。极耐冲泡，能撑很多水。白天或傍晚喝正好。' },
+      longjing:{ n:'龙井黄豆', o:'绿茶 · 浙江 · 扁平大叶', d:'香气意外地丰富：板栗、煮玉米、瓜子，还有那股独特的汤感与花香。滋味是青草、炒坚果、板栗。提神但温和，适合配着工作喝。想认识中国绿茶，从这里开始。' },
+      molimaojian:{ n:'茉莉毛尖', o:'绿茶 · 窨制茉莉', d:'从前妃子用茉莉花茶侍奉皇帝。工艺很细：花苞开到六成时，在恒定的三十五度下烘干。香气是茉莉与玉兰，滋味是青草与明显的甜。适合喝茶必须加糖、却又想尝尝真正中国茶的人。' },
+      biluogold:{ n:'滇红金螺', o:'红茶 · 云南 · 金芽', d:'中文叫「金螺」：借碧螺春的手法把茶叶揉成螺形，金毫因此显在外面。纯芽头。蜜香、杏干，还有暖烘焙的气息。' },
+      xiaozhong:{ n:'小种（无烟）', o:'红茶 · 烟熏 · 即正山小种', d:'烟熏茶，西方叫它Lapsang Souchong。据说它是十七世纪偶然出现的：农人把茶叶忘在太阳底下，叶子发酵变深，与其扔掉，不如架在松枝上烘干——于是有了它。香气是焦糖、烤水果和黑麦面包；滋味柔和而厚实，有果茶的甜，尾韵带面包气。它把人裹住，让人暖起来。' },
+      longjinghong:{ n:'龙井红茶', o:'红茶 · 浙江', d:'与绿龙井同一批茶树做的红茶。用的是短暂春季之后采下的叶子，那时已做不出高档绿茶。外形是卷曲的，不扁平，而龙井的板栗香还在。' },
+      dianhong:{ n:'滇红（云南）', o:'红茶 · 云南', d:'如果您想找一款日常喝的经典红茶，就是它了。香气是炒瓜子与黑葡萄干，滋味是坚果、果脯，尾巴上拖着一缕花香的甜。一款再直白不过的茶，没什么可多说的。' },
+      dancong:{ n:'凤凰单丛 高山清香', o:'乌龙 · 广东 · 凤凰山的单株', d:'凤凰山上的一棵独立老树。香气如春，满是花意：忍冬、水仙、风信子，还有一缕菊苣的辛香。滋味带着单丛特有的苦，随即转甜。潮州还有自己的一套泡法：壶里塞满茶，快冲快出，用小盏喝——想试的话跟我们说一声。' },
+      gabahoney:{ n:'GABA「野蜜」', o:'乌龙 · 台湾 · 在野蜜里陈放一年', d:'同样是GABA，只多了一道工序：这款茶在野蜂蜜里陈放了一年，肉眼就能看见——叶子上结着蜜壳，闪着光。前几泡是蜜香，不腻；之后蜜退到后面，留下GABA本身，酸度略高一些。这是一款重味道多过重状态的茶。' },
+      gabaruby:{ n:'GABA「红宝石」', o:'乌龙 · 台湾 · GABA', d:'琥珀色的茶芽揉成珠状。香气是烤水果、水果派、苹果软糕和热带气息；滋味延续下去：果茶、烘焙、木瓜，还有一点浆果的酸。论效果是这里最强的几款之一：GABA、咖啡因与L-茶氨酸一起，给出所谓「专注的平静」——精力充沛，却一点也不慌。' },
+      huangjingui:{ n:'黄金桂', o:'乌龙 · 安溪罗岩村', d:'出现在清咸丰年间（1850–60年代），安溪县罗岩村。同一个品种也用来做红茶和绿茶。香气清新雅致，带桂花与熟桃；滋味饱满，草木花香之外还有一丝浆果的酸。安神、松弛，是忙完一周之后的晚间茶。' },
+      dahongpao:{ n:'大红袍 肉桂清香', o:'乌龙 · 武夷山 · 肉桂品种', d:'母树的采摘在2006年被禁止，最后一批送进了北京故宫博物院——所以今天花多少钱也喝不到真正的大红袍。市面上叫这个名字的，都是母树扦插的后代；常见品种有四个，我们这款是肉桂。香气是面包皮、炒坚果、柑橘与胡椒的辛香。' },
+      maoxie:{ n:'铁观音 毛蟹', o:'乌龙 · 安溪 · 铁观音', d:'铁观音自十二世纪便为人所知。传说茶农魏钦每日供奉观音三杯茶，一夜梦见山上有株异香的茶树。天亮上山果然寻得，掐下枝条，栽在铁锅里。它的标志是丁香的气息，香与味中都有，还带一点微酸。效果柔和、落地。' },
+      gabamaocha:{ n:'GABA毛茶', o:'乌龙 · 台湾 · 茶树枝梗', d:'不是叶，也不是芽，而是茶树的枝梗。在中国，梗茶被视为最便宜的东西，没什么人看得上，所以数量也不多；而在莫斯科，这款别处根本没有。可它偏偏是一款厚实又多层次的GABA：香气一上来就是新出炉的面包与烤水果，滋味是甜面包、烤苹果、带焦糖的果脯。提神，同时让人集中。' },
+      ginseng:{ n:'人参乌龙', o:'乌龙 · 人参与甘草', d:'中国人认为茶属阴、人参属阳，为求两者平衡，才有了人参乌龙。茶叶像小石子，是因为在揉捻阶段加入了人参根与甘草的粉末。香气甜润，带热带水果；滋味的甜非常直白，像往茶里放了糖。前几泡是人参当家，之后它退到后面，乌龙自己显出来。' },
+      mandarin:{ n:'小青柑（熟普）', o:'普洱 · 整颗柑', d:'把柑掏空，填入熟普，再一起晒干。连皮整颗冲泡。柑香浮在土气之上，喝到后段柑皮会透出一丝苦。' },
+      laochatou:{ n:'大老茶头', o:'普洱 · 勐海 · 茶头', d:'渥堆时最多汁的叶子会粘结成块。没人去把它敲散，而是从堆底收起来单独卖。十泡不散：糖蜜与话梅。' },
+      peacock:{ n:'熟普「野生孔雀」', o:'普洱 · 临沧 · 357克茶饼', d:'临沧的茶饼，老树原料。汤色近黑而浓稠：泥土、湿木头，还有一点巧克力。安神多于提神。' },
+      bingdao:{ n:'熟普 宫廷冰岛古树', o:'普洱 · 冰岛 · 古树', d:'宫廷指最细最净的芽头。冰岛是临沧的一个村子，这三个字印在棉纸上太值钱，所以常常印得并不名副其实。柔和回甘，没有一丝土味。' },
+      nuomixiang:{ n:'糯香小金砖', o:'普洱 · 单泡小砖', d:'里面没有一粒米：香气来自西双版纳的糯米香叶，与普洱一同压制。是真叶子，不是香精。剥开锡纸，整块投入即可。' },
+      jinhuawang:{ n:'金花王 2002', o:'黑茶 · 安化 · 陈化', d:'2002年的安化黑茶。「金花」是特意在茶里养出来的菌：它带来果脯般的香气，也带来那股地窖与旧图书馆的味道。' },
+      herbal:{ n:'草本「提神」茶', o:'无咖啡因 · 草药与蔷薇果', d:'草药、花与蔷薇果，完全不含茶叶。零咖啡因，却照样提神。适合不能喝茶的客人，或已经太晚不宜喝茶的时候。' },
+    },
+  },
+
+  };
+
+  let LANG = 'ru';
+  try{ const s = localStorage.getItem('chaynya-lang'); if (I18N[s]) LANG = s; }catch(e){}
+  const T = () => I18N[LANG];
+
+  const rub = n => n.toLocaleString('ru-RU') + ' ₽';
+  // Цена пакета считается от цены за 10 г и округляется до пятёрки:
+  // «437,5 ₽» на ценнике не пишут.
+  const packPrice = (per10, grams) => Math.round(per10 * grams / 10 / 5) * 5;
+  const el  = (h) => { const d = document.createElement('div'); d.innerHTML = h.trim(); return d.firstElementChild; };
+  const $   = (s, r=document) => r.querySelector(s);
+  const $$  = (s, r=document) => [...r.querySelectorAll(s)];
+
+  /* ─────────────  ТЕМА  ───────────── */
+  const root = document.documentElement;
+  const isDark = () => (root.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')) === 'dark';
+  $('#theme').addEventListener('click', () => { root.dataset.theme = isDark() ? 'light' : 'dark'; });
+
+  /* ─────────────  НАВИГАЦИЯ  ───────────── */
+  function go(view){
+    $$('.view').forEach(v => v.classList.toggle('is-active', v.id === 'view-' + view));
+    $$('.nav__link').forEach(a => {
+      if (a.dataset.go === view) a.setAttribute('aria-current','page');
+      else a.removeAttribute('aria-current');
+    });
+    closeTea();
+    scrollTo({ top:0, behavior:'instant' });
+  }
+  document.addEventListener('click', e => {
+    const t = e.target.closest('[data-go]');
+    if (!t) return;
+    e.preventDefault();
+    go(t.dataset.go);
+  });
+
+  /* ─────────────  КАРТОЧКА ЧАЯ  ─────────────
+     На карточке показываем цену минимального пакета (25 г), а не «за 10 г»:
+     покупателю важно, сколько он отдаст на кассе. */
+  const priceOf = m => m.unit === 'pc'
+    ? rub(m.p) + `<small>${T().per_pc}</small>`
+    : rub(packPrice(m.p, PACKS[0])) + `<small>${T().per_pack25}</small>`;
+
+  function teaCard(m){
+    const txt = T().teas[m.id];
+    const node = el(`
+      <article class="tea" data-type="${m.t}" tabindex="0" role="button" aria-label="${txt.n}">
+        <div class="tea__art">
+          <img src="${m.img}" alt="${txt.n}" loading="lazy" width="360" height="360">
+          <span class="tea__dot" style="background:${LQ[m.t]}"></span>
+        </div>
+        <div class="tea__body">
+          <h3 class="tea__name">${txt.n}</h3>
+          <p class="tea__orig">${txt.o}</p>
+          <div class="tea__foot">
+            <span class="price num">${priceOf(m)}</span>
+            <span class="tea__more">${T().more}
+              <svg width="11" height="8" viewBox="0 0 14 10" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M1 5h11M8.5 1.5L12 5l-3.5 3.5"/></svg>
+            </span>
+          </div>
+        </div>
+      </article>`);
+    node.addEventListener('click', () => { lastCard = node; openTea(m); });
+    node.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); lastCard = node; openTea(m); }
+    });
+    return node;
+  }
+
+  /* Полоса ассортимента на вкладке опта: по одному чаю каждого типа */
+  function buildRange(){
+    const strip = $('#brange');
+    if (strip.childElementCount) return;
+    const seen = new Set(), pick = [];
+    for (const m of TEA_META){
+      if (seen.has(m.t)) continue;
+      seen.add(m.t); pick.push(m);
+    }
+    // добиваем до восьми, чтобы полоса не выглядела куцей
+    for (const m of TEA_META){
+      if (pick.length >= 8) break;
+      if (!pick.includes(m)) pick.push(m);
+    }
+    pick.forEach(m => strip.append(el(`<img src="${m.img}" alt="" loading="lazy">`)));
+  }
+
+  /* Стена чая в герое. Собираем из тех же TEA_META, что и магазин:
+     data-URI переиспользуется как строка, файл от этого не толстеет. */
+  function buildHeroWall(){
+    const wall = $('#hero-wall');
+    if (wall.childElementCount) return;   // картинки не зависят от языка, хватит одного раза
+    const COLS = 2, PER = 7;
+    for (let c = 0; c < COLS; c++){
+      const col = el(`<div class="hero__col hero__col--${c}"></div>`);
+      const pics = TEA_META.filter((_, i) => i % COLS === c).slice(0, PER);
+      // список дублируется: на этом держится бесшовная петля translateY(-50%)
+      [...pics, ...pics].forEach(m => col.append(el(`<img src="${m.img}" alt="" loading="lazy">`)));
+      wall.append(col);
+    }
+  }
+
+  let lastCard = null;   // куда вернуть фокус после закрытия панели
+  let curFilter = 'all';
+  function buildTeaGrids(){
+    const home = $('#home-teas'), menu = $('#menu-teas');
+    home.innerHTML = ''; menu.innerHTML = '';
+    home.append(...FEATURED.map(id => teaCard(TEA_META.find(m => m.id === id))));
+    menu.append(...TEA_META.map(teaCard));
+    applyFilter();
+  }
+  function applyFilter(){
+    $$('#menu-teas .tea').forEach(c => {
+      c.style.display = (curFilter === 'all' || c.dataset.type === curFilter) ? '' : 'none';
+    });
+  }
+  function buildFilters(){
+    const f = $('#filters');
+    f.innerHTML = '';
+    TYPE_IDS.forEach((id, i) => {
+      const c = id === 'all' ? null : LQ[id];
+      const b = el(`<button class="chip" aria-pressed="${id === curFilter}" data-t="${id}">
+        ${c ? `<span class="dot" style="background:${c}"></span>` : ''}${T().types[i]}
+      </button>`);
+      b.addEventListener('click', () => {
+        curFilter = id;
+        $$('.chip', f).forEach(x => x.setAttribute('aria-pressed', x === b));
+        applyFilter();
+      });
+      f.append(b);
+    });
+  }
+
+  /* ─────────────  ПАСПОРТ ЧАЯ  ─────────────
+     Фасовка: цена считается пропорционально цене за 10 г. Если у чайной есть
+     скидка за объём — заменить PACKS на настоящий прайс. */
+  const PACKS = [25, 50, 100];
+  const sheet = $('#tea-sheet');
+
+  /* Блокировка фона под открытой панелью.
+     overflow:hidden на iOS не держит, поэтому фиксируем body и запоминаем скролл. */
+  let lockedY = 0;
+  function lockScroll(){
+    lockedY = scrollY;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${lockedY}px`;
+    document.body.style.width = '100%';
+  }
+  function unlockScroll(){
+    if (!document.body.style.position) return;
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    scrollTo(0, lockedY);
+  }
+
+  function openTea(m){
+    const txt = T().teas[m.id];
+    $('#ts-name').textContent = txt.n;
+    $('#ts-orig').textContent = txt.o;
+    $('#ts-desc').textContent = txt.d;
+    $('#ts-img').src = m.img;
+    $('#ts-img').alt = txt.n;
+    $('#ts-buy').href = m.buy || '#';
+
+    const packs = $('#ts-packs');
+    packs.innerHTML = '';
+    if (m.unit === 'pc'){
+      // Мандарин и квадратик продаются штуками, взвешивать нечего
+      packs.hidden = true;
+      $('#ts-unit').textContent = T().unit_pc;
+      $('#ts-price').textContent = rub(m.p);
+    } else {
+      packs.hidden = false;
+      const setPack = (g, btn) => {
+        $$('.pack', packs).forEach(x => x.setAttribute('aria-pressed', x === btn));
+        $('#ts-unit').textContent = T().unit_pack.replace('{g}', g);
+        $('#ts-price').textContent = rub(packPrice(m.p, g));
+      };
+      PACKS.forEach((g, i) => {
+        const b = el(`<button class="pack" aria-pressed="${i === 0}">
+          <b>${g} ${T().gram}</b><span>${rub(packPrice(m.p, g))}</span>
+        </button>`);
+        b.addEventListener('click', () => setPack(g, b));
+        packs.append(b);
+      });
+      setPack(PACKS[0], $('.pack', packs));
+    }
+
+    sheet.classList.add('on');
+    $('#scrim').classList.add('on');
+    lockScroll();
+    sheet.focus({ preventScroll:true });
+  }
+  function closeTea(){
+    if (!sheet.classList.contains('on')) return;
+    sheet.classList.remove('on');
+    $('#scrim').classList.remove('on');
+    unlockScroll();
+    if (lastCard){ lastCard.focus({ preventScroll:true }); lastCard = null; }
+  }
+  $('#ts-close').addEventListener('click', closeTea);
+  $('#scrim').addEventListener('click', closeTea);
+  addEventListener('keydown', e => { if (e.key === 'Escape') closeTea(); });
+
+  /* На телефоне панель занимает всю ширину: мимо неё не ткнёшь, и крестик
+     остаётся единственным выходом. Даём закрыть свайпом вправо. */
+  let swipeX = 0, swipeY = 0, swiping = false;
+  sheet.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) return;
+    swipeX = e.touches[0].clientX; swipeY = e.touches[0].clientY; swiping = true;
+    sheet.style.transition = 'none';
+  }, { passive:true });
+  sheet.addEventListener('touchmove', e => {
+    if (!swiping) return;
+    const dx = e.touches[0].clientX - swipeX;
+    const dy = e.touches[0].clientY - swipeY;
+    // вертикальный жест отдаём прокрутке содержимого
+    if (Math.abs(dy) > Math.abs(dx)){ swiping = false; sheet.style.transition = ''; return; }
+    if (dx > 0) sheet.style.transform = `translateX(${dx}px)`;
+  }, { passive:true });
+  sheet.addEventListener('touchend', e => {
+    if (!swiping) return;
+    swiping = false;
+    sheet.style.transition = '';
+    const dx = (e.changedTouches[0].clientX - swipeX);
+    sheet.style.transform = '';
+    if (dx > sheet.offsetWidth * 0.3) closeTea();
+  });
+
+  /* ─────────────  БРОНЬ  ───────────── */
+  const B = { date:'', time:'', guests:'2' };
+
+  // Не toISOString: он отдаёт UTC, и после полуночи по Москве «сегодня» становится вчера
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  /* Дни лентой вместо календаря: год в брони не нужен, он всегда текущий.
+     Показываем две недели вперёд — на большее в чайную не записываются. */
+  const DAYS_AHEAD = 14;
+  function buildDays(){
+    const box = $('#days');
+    box.innerHTML = '';
+    const now = new Date();
+    for (let i = 0; i < DAYS_AHEAD; i++){
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+      const key = iso(d);
+      const label = i === 0 ? T().today : i === 1 ? T().tomorrow
+        : d.toLocaleDateString(T().locale, { weekday:'short' });
+      const b = el(`<button class="day" data-d="${key}" aria-pressed="${B.date === key}">
+        <b class="num">${d.getDate()}</b><span>${label}</span>
+      </button>`);
+      b.addEventListener('click', () => {
+        B.date = key;
+        $$('.day', box).forEach(x => x.setAttribute('aria-pressed', x === b));
+        refreshSlots(); sync();
+      });
+      box.append(b);
+    }
+  }
+
+  const slots = $('#slots');
+  // Прототип: занятость выдумана. Часы настоящие: 12:00–22:00, последняя посадка в 20:00
+  const BUSY = ['14:30','15:00','19:00','19:30'];
+  for (let m = 12 * 60; m <= 20 * 60; m += 30){
+    const time = `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+    const busy = BUSY.includes(time);
+    const b = el(`<button class="slot num" data-t="${time}" aria-pressed="false" ${busy ? 'disabled' : ''}>${time}</button>`);
+    if (!busy) b.addEventListener('click', () => {
+      $$('.slot', slots).forEach(s => s.setAttribute('aria-pressed', s === b));
+      B.time = time; sync();
+    });
+    slots.append(b);
+  }
+
+  // На сегодняшнюю дату прошедшее время выбрать нельзя
+  function refreshSlots(){
+    const now = new Date();
+    const isToday = B.date === iso(now);
+    const cutoff = now.getHours() * 60 + now.getMinutes();
+    $$('.slot', slots).forEach(s => {
+      if (BUSY.includes(s.dataset.t)) return;
+      const [h, m] = s.dataset.t.split(':').map(Number);
+      const past = isToday && h * 60 + m <= cutoff;
+      s.disabled = past;
+      if (past && s.getAttribute('aria-pressed') === 'true'){
+        s.setAttribute('aria-pressed', 'false');
+        B.time = '';
+      }
+    });
+  }
+
+  function buildGuests(){
+    const sel = $('#f-guests');
+    sel.innerHTML = '';
+    T().guests.forEach((label, i) => sel.append(el(`<option value="${i + 1}">${label}</option>`)));
+    sel.value = B.guests;
+  }
+
+  const fmtDate = s => {
+    if (!s) return '—';
+    const d = new Date(s + 'T00:00');
+    const loc = T().locale;
+    // «19 июля (сб)», а не «сб, 19 июля»: внутри фразы день недели впереди читается коряво
+    const dm = d.toLocaleDateString(loc, { day:'numeric', month:'long' });
+    const wd = d.toLocaleDateString(loc, { weekday:'short' });
+    return LANG === 'zh' ? `${dm}（${wd}）` : `${dm} (${wd})`;
+  };
+
+  function sync(){
+    $('#s-date').textContent = fmtDate(B.date);
+    $('#s-time').textContent = B.time || '—';
+    $('#s-guests').textContent = B.guests;
+    const ok = B.date && B.time;
+    const btn = $('#submit');
+    btn.disabled = !ok;
+    btn.textContent = ok ? T().book_btn_go : T().book_btn_wait;
+  }
+
+  $('#f-guests').addEventListener('change', e => { B.guests = e.target.value; sync(); });
+
+  // Аргументы последних подтверждений храним, чтобы перерисовать их на новом языке
+  let lastBook = null, lastB2B = null;
+
+  $('#submit').addEventListener('click', () => {
+    // Обещаем перезвонить — без телефона заявка бессмысленна
+    const phone = $('#f-phone').value.trim();
+    if (!phone){ $('#f-phone').focus(); return; }
+    lastBook = { name: $('#f-name').value.trim(), date: B.date, time: B.time, n: +B.guests };
+    $('#done-text').textContent = T().doneText(lastBook.name, fmtDate(lastBook.date), lastBook.time, lastBook.n);
+    $('#book-form').hidden = true;
+    $('#book-done').hidden = false;
+    scrollTo({ top:0, behavior:'instant' });
+  });
+
+  $('#b2b-submit').addEventListener('click', () => {
+    const phone = $('#b-phone').value.trim();
+    if (!phone){ $('#b-phone').focus(); return; }
+    lastB2B = { name: $('#b-name').value.trim() };
+    $('#b2b-done-text').textContent = T().b2bDoneText(lastB2B.name);
+    $('#b2b-form-wrap').hidden = true;
+    $('#b2b-done').hidden = false;
+    scrollTo({ top:0, behavior:'instant' });
+  });
+
+  /* ─────────────  ЯЗЫК  ───────────── */
+  function applyLang(){
+    document.documentElement.lang = LANG;
+    document.title = T().title;
+    $$('.lang button').forEach(b => b.setAttribute('aria-pressed', b.dataset.lang === LANG));
+    $$('[data-i18n]').forEach(n => { const v = T()[n.dataset.i18n]; if (v != null) n.innerHTML = v; });
+    $$('[data-i18n-ph]').forEach(n => { const v = T()[n.dataset.i18nPh]; if (v != null) n.placeholder = v; });
+    $$('[data-i18n-aria]').forEach(n => { const v = T()[n.dataset.i18nAria]; if (v != null) n.setAttribute('aria-label', v); });
+    $$('[data-i18n-alt]').forEach(n => { const v = T()[n.dataset.i18nAlt]; if (v != null) n.alt = v; });
+    buildHeroWall();
+    buildRange();
+    buildFilters();
+    buildTeaGrids();
+    buildDays();
+    buildGuests();
+    closeTea();
+    sync();
+    // Экраны подтверждения могут быть на виду — перерисуем их на новом языке
+    if (lastBook && !$('#book-done').hidden)
+      $('#done-text').textContent = T().doneText(lastBook.name, fmtDate(lastBook.date), lastBook.time, lastBook.n);
+    if (lastB2B && !$('#b2b-done').hidden)
+      $('#b2b-done-text').textContent = T().b2bDoneText(lastB2B.name);
+    try{ localStorage.setItem('chaynya-lang', LANG); }catch(e){}
+  }
+  $$('.lang button').forEach(b => b.addEventListener('click', () => {
+    if (b.dataset.lang === LANG) return;
+    LANG = b.dataset.lang;
+    applyLang();
+  }));
+
+  applyLang();
+})();
+</script>

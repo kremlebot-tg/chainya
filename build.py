@@ -1,0 +1,125 @@
+#!/usr/bin/env python3
+"""Сборка сайта «Чайня» из src.html.
+
+Два режима:
+
+  python3 build.py          один файл: шрифты и картинки вшиты в HTML
+                            → index.html      (локальный просмотр)
+                            → artifact.html   (публикация артефактом)
+                            Удобно пересылать, но браузер не кэширует
+                            картинки отдельно и качает всё заново.
+
+  python3 build.py --web    раздельные файлы для хостинга
+                            → dist/index.html + dist/img/ + dist/fonts/
+                            HTML прилетает мгновенно, ассеты кэшируются.
+
+Картинки подставляются по маркеру {{img:имя}} (файл img/имя.webp).
+"""
+import base64
+import pathlib
+import re
+import shutil
+import sys
+
+root = pathlib.Path(__file__).parent
+web = "--web" in sys.argv
+
+src = (root / "src.html").read_text(encoding="utf-8")
+assert "/*@FONTS@*/" in src, "маркер /*@FONTS@*/ пропал из src.html"
+
+# Тот же заголовок, что в словаре I18N.ru: JS перепишет его при старте,
+# но краулерам и первой отрисовке достаётся статический.
+TITLE = "Чайня · чайная на Острякова"
+DESC = ("Камерная чайная у метро Аэропорт. Чайная церемония с мастером, два чая "
+        "на выбор уже в стоимости. Китайский чай прямого привоза и доставка по России.")
+
+HEAD_EXTRA = f"""<meta name="description" content="{DESC}">
+<meta name="theme-color" content="#141110" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#E7E6DF" media="(prefers-color-scheme: light)">
+<meta property="og:type" content="website">
+<meta property="og:title" content="{TITLE}">
+<meta property="og:description" content="{DESC}">
+<meta property="og:locale" content="ru_RU">
+<meta property="og:image" content="og.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="favicon.png">"""
+
+
+def font_css(inline: bool) -> str:
+    """CSS со шрифтами: либо base64 внутри, либо ссылками на файлы."""
+    if inline:
+        return (root / "fonts" / "fonts-inline.css").read_text(encoding="utf-8")
+    css = (root / "fonts" / "fonts-inline.css").read_text(encoding="utf-8")
+    # меняем data:-строки обратно на пути к файлам, порядок объявлений сохраняется
+    names = ["prata-cyr", "prata-lat", "golos-cyr", "golos-lat"]
+    parts = re.split(r"url\(data:font/woff2;base64,[^)]+\)", css)
+    assert len(parts) == len(names) + 1, "не совпало число @font-face со списком файлов"
+    out = parts[0]
+    for name, tail in zip(names, parts[1:]):
+        out += f"url(fonts/{name}.woff2)" + tail
+    return out
+
+
+used, missing = set(), set()
+
+
+def img_ref(m):
+    name = m.group(1)
+    f = root / "img" / f"{name}.webp"
+    if not f.exists():
+        missing.add(name)
+        return ""
+    used.add(name)
+    if web:
+        return f"img/{name}.webp"
+    return "data:image/webp;base64," + base64.b64encode(f.read_bytes()).decode()
+
+
+content = src.replace("/*@FONTS@*/", font_css(inline=not web))
+content = re.sub(r"\{\{img:([a-z0-9\-]+)\}\}", img_ref, content)
+
+if missing:
+    raise SystemExit("НЕТ КАРТИНОК: " + ", ".join(sorted(missing)))
+
+have = {p.stem for p in (root / "img").glob("*.webp")}
+if unused := have - used:
+    print("не используются:", ", ".join(sorted(unused)))
+
+
+def document(body: str, extra_head: str = "") -> str:
+    return (
+        '<!doctype html>\n<html lang="ru">\n<head>\n'
+        '<meta charset="utf-8">\n'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
+        f"<title>{TITLE}</title>\n"
+        f"{extra_head}\n"
+        "<style>*{margin:0}</style>\n"
+        "</head>\n<body>\n" + body + "\n</body>\n</html>\n"
+    )
+
+
+if web:
+    dist = root / "dist"
+    shutil.rmtree(dist, ignore_errors=True)
+    (dist / "img").mkdir(parents=True)
+    (dist / "fonts").mkdir()
+    for name in sorted(used):
+        shutil.copy(root / "img" / f"{name}.webp", dist / "img" / f"{name}.webp")
+    for f in ("prata-cyr", "prata-lat", "golos-cyr", "golos-lat"):
+        shutil.copy(root / "fonts" / f"{f}.woff2", dist / "fonts" / f"{f}.woff2")
+    for f in ("favicon.png", "og.jpg"):
+        shutil.copy(root / "src-assets" / f, dist / f)
+    (dist / "index.html").write_text(document(content, HEAD_EXTRA), encoding="utf-8")
+
+    html_kb = round((dist / "index.html").stat().st_size / 1024)
+    assets = sum(f.stat().st_size for f in dist.rglob("*") if f.is_file()) - (dist / "index.html").stat().st_size
+    print(f"dist/index.html   {html_kb} KB   (прилетает сразу)")
+    print(f"dist/img + fonts  {round(assets / 1024)} KB  в {len(used) + 4} файлах (кэшируются)")
+    print(f"итого             {round((html_kb * 1024 + assets) / 1024)} KB")
+else:
+    (root / "artifact.html").write_text(content, encoding="utf-8")
+    (root / "index.html").write_text(document(content), encoding="utf-8")
+    print(f"картинок вшито: {len(used)}")
+    for f in ("index.html", "artifact.html"):
+        print(f"{f:16} {round((root / f).stat().st_size / 1024)} KB")

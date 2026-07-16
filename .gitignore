@@ -1,0 +1,13 @@
+# Результат сборки: пересобирается из src.html командой build.py
+dist/
+
+# Собранные одностраничники (тоже результат сборки)
+index.html
+artifact.html
+
+# Служебное
+.claude/
+.DS_Store
+__pycache__/
+*.pyc
+mobile-test.html

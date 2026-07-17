@@ -461,6 +461,35 @@ a{ color:inherit; text-decoration:none; }
 .sheet__sum b{ font-family:'Prata',Georgia,serif; font-weight:400; font-size:1.5rem; font-variant-numeric:tabular-nums; }
 .sheet__note{ margin:12px 0 0; font-size:11.5px; color:var(--text-3); line-height:1.5; text-align:center; }
 
+/* ─────────  КОРЗИНА  ───────── */
+.cart-btn{ position:relative; }
+.cart-badge{
+  position:absolute; top:-4px; right:-4px; min-width:17px; height:17px; padding:0 4px;
+  border-radius:9px; background:var(--accent); color:#1a1206; font-size:10.5px; font-weight:700;
+  line-height:17px; text-align:center; font-variant-numeric:tabular-nums; box-shadow:0 0 0 2px var(--bg-1);
+}
+.cart-empty{ text-align:center; color:var(--text-3); padding:34px 8px; line-height:1.6; }
+.citem{ display:flex; align-items:center; gap:12px; padding:14px 0; border-bottom:1px solid var(--line); }
+.citem__img{ width:52px; height:52px; flex:none; border-radius:10px; object-fit:cover; background:var(--bg-2); }
+.citem__info{ flex:1; min-width:0; }
+.citem__name{ font-size:14.5px; line-height:1.25; }
+.citem__pack{ font-size:12.5px; color:var(--text-3); margin-top:3px; font-variant-numeric:tabular-nums; }
+.qty{ display:flex; align-items:center; gap:2px; flex:none; }
+.qty__b{
+  width:30px; height:30px; border:1px solid var(--line); background:transparent; color:var(--text-1);
+  border-radius:8px; font-size:17px; line-height:1; cursor:pointer; transition:.15s;
+}
+.qty__b:hover{ border-color:var(--accent); color:var(--accent); }
+.qty__n{ min-width:26px; text-align:center; font-variant-numeric:tabular-nums; font-size:14px; }
+.citem__rm{
+  flex:none; width:28px; height:28px; border:none; background:transparent; color:var(--text-3);
+  cursor:pointer; font-size:20px; line-height:1; transition:.15s;
+}
+.citem__rm:hover{ color:var(--accent); }
+.cart-co{ margin-top:20px; }
+.cart-co__h{ font-family:'Prata',Georgia,serif; font-weight:400; font-size:1.15rem; margin:0 0 14px; }
+.cart-note{ margin:10px 0 0; font-size:11.5px; color:var(--text-3); line-height:1.5; text-align:center; }
+
 /* ─────────────────────────  ФОРМЫ  ───────────────────────── */
 /* minmax(0,…), а не 1fr: у элементов грида min-width:auto, и лента дней
    шириной в 1000+ px растянула бы колонку, уведя всю страницу вбок */
@@ -745,6 +774,10 @@ select.input{
         <button data-lang="en" aria-pressed="false">EN</button>
         <button data-lang="zh" aria-pressed="false">中文</button>
       </div>
+      <button class="icon-btn cart-btn" id="cart-open" data-i18n-aria="a_cart" aria-label="Корзина">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4H6zM3 6h18M16 10a4 4 0 0 1-8 0"/></svg>
+        <span class="cart-badge" id="cart-count" hidden>0</span>
+      </button>
       <button class="icon-btn" id="theme" data-i18n-aria="a_theme" aria-label="Сменить тему">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
       </button>
@@ -1189,8 +1222,50 @@ select.input{
   <div class="sheet__foot">
     <div class="packs" id="ts-packs"></div>
     <div class="sheet__sum"><span id="ts-unit"></span><b class="num" id="ts-price">—</b></div>
-    <a class="btn btn--solid btn--wide" id="ts-buy" href="#" target="_blank" rel="noopener" data-i18n="ts_buy">Купить с доставкой</a>
+    <button class="btn btn--solid btn--wide" id="ts-add" data-i18n="ts_add">В корзину</button>
     <p class="sheet__note" data-i18n="ts_note"></p>
+  </div>
+</aside>
+
+<aside class="sheet cart" id="cart-sheet" tabindex="-1" role="dialog" aria-modal="true" data-i18n-aria="a_cart" aria-label="Корзина">
+  <div class="sheet__head">
+    <h2 style="flex:1; min-width:0" data-i18n="cart_h">Корзина</h2>
+    <button class="icon-btn" id="cart-close" data-i18n-aria="a_close" aria-label="Закрыть" style="flex:none">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div class="sheet__body">
+    <div id="cart-items"></div>
+    <div class="cart-co" id="cart-co" hidden>
+      <h3 class="cart-co__h" data-i18n="cart_co_h">Оформление</h3>
+      <div class="row2">
+        <div class="field">
+          <label class="label" for="c-name" data-i18n="f_name">Имя</label>
+          <input class="input" type="text" id="c-name" data-i18n-ph="f_name_ph" autocomplete="given-name">
+        </div>
+        <div class="field">
+          <label class="label" for="c-phone" data-i18n="f_phone">Телефон</label>
+          <input class="input" type="tel" id="c-phone" placeholder="+7 (___) ___-__-__" autocomplete="tel">
+        </div>
+      </div>
+      <div class="field">
+        <label class="label" for="c-dlv" data-i18n="cart_dlv">Доставка</label>
+        <select class="input" id="c-dlv"></select>
+      </div>
+      <div class="field" id="c-addr-field">
+        <label class="label" for="c-addr" data-i18n="cart_addr">Адрес</label>
+        <input class="input" type="text" id="c-addr" data-i18n-ph="cart_addr_ph" autocomplete="street-address">
+      </div>
+      <div class="field">
+        <label class="label" for="c-note" data-i18n="f_note">Пожелания</label>
+        <textarea class="input" id="c-note" data-i18n-ph="cart_note_ph"></textarea>
+      </div>
+    </div>
+  </div>
+  <div class="sheet__foot">
+    <div class="sheet__sum"><span data-i18n="cart_total">Итого</span><b class="num" id="cart-total">—</b></div>
+    <button class="btn btn--solid btn--wide" id="cart-submit" data-i18n="cart_submit">Оформить заказ</button>
+    <p class="cart-note" data-i18n="cart_pay"></p>
   </div>
 </aside>
 
@@ -1383,6 +1458,14 @@ select.input{
     taste_h:'Вкусовой профиль', in_stock:'в наличии', oos:'нет в наличии',
     unit_pc:'Одна штука', unit_pack:'Пакет {g} г',
     ts_buy:'Купить с доставкой', order_prefill:'Здравствуйте! Хочу заказать с доставкой: ',
+    a_cart:'Корзина', ts_add:'В корзину', ts_added:'Добавлено ✓',
+    cart_h:'Корзина', cart_empty:'Пусто. Загляните в «Купить чай» и добавьте сорт.',
+    cart_remove:'Убрать', cart_total:'Итого', cart_co_h:'Оформление',
+    cart_dlv:'Доставка', cart_addr:'Адрес', cart_addr_ph:'Город, улица, дом, квартира',
+    cart_note_ph:'Комментарий к заказу', cart_submit:'Оформить заказ',
+    cart_pay:'Оплата переводом или при получении. Свяжемся, подтвердим и посчитаем доставку.',
+    dlv:{ pickup:'Самовывоз · Острякова, 3', courier:'Курьер по Москве', post:'СДЭК / Почта по России' },
+    order_head:'🛒 Заказ чая — Чайня', order_done:'Спасибо! Заказ откроется в чате — нажмите «Отправить». Свяжемся и подтвердим.',
     ts_note:'За столом этот чай можно выпить бесплатно: два на выбор входят в стоимость стола.',
     b2b_label:'Для бизнеса', b2b_h:'Наш лист<br>в вашей карте',
     b2b_lead:'Возим чай из Китая сами и отдаём его оптом кофейням, ресторанам и офисам. Лист тот же, что наливаем в зале.',
@@ -1517,6 +1600,14 @@ select.input{
     taste_h:'Flavour profile', in_stock:'in stock', oos:'out of stock',
     unit_pc:'One piece', unit_pack:'A {g} g bag',
     ts_buy:'Buy with delivery', order_prefill:'Hello! I’d like to order with delivery: ',
+    a_cart:'Cart', ts_add:'Add to cart', ts_added:'Added ✓',
+    cart_h:'Cart', cart_empty:'Empty. Open “Buy tea” and add a sort.',
+    cart_remove:'Remove', cart_total:'Total', cart_co_h:'Checkout',
+    cart_dlv:'Delivery', cart_addr:'Address', cart_addr_ph:'City, street, building, flat',
+    cart_note_ph:'Order comment', cart_submit:'Place order',
+    cart_pay:'Pay by transfer or on delivery. We’ll confirm and calculate shipping.',
+    dlv:{ pickup:'Pickup · Ostryakova 3', courier:'Courier in Moscow', post:'CDEK / Post across Russia' },
+    order_head:'🛒 Tea order — Chainya', order_done:'Thanks! The order opens in chat — tap “Send”. We’ll confirm.',
     ts_note:'At the table this tea costs you nothing: two of your choice come with the table.',
     b2b_label:'For business', b2b_h:'Our leaf<br>on your menu',
     b2b_lead:'We bring tea from China ourselves and wholesale it to cafés, restaurants and offices. The leaf is the same one we serve in the room.',
@@ -1651,6 +1742,14 @@ select.input{
     taste_h:'风味特征', in_stock:'现货', oos:'暂时售罄',
     unit_pc:'一个', unit_pack:'{g}克装',
     ts_buy:'下单配送', order_prefill:'您好！我想下单配送：',
+    a_cart:'购物车', ts_add:'加入购物车', ts_added:'已加入 ✓',
+    cart_h:'购物车', cart_empty:'空的。到「买茶」里添加茶品吧。',
+    cart_remove:'移除', cart_total:'合计', cart_co_h:'结算',
+    cart_dlv:'配送', cart_addr:'地址', cart_addr_ph:'城市、街道、门牌、房间',
+    cart_note_ph:'订单备注', cart_submit:'提交订单',
+    cart_pay:'转账或货到付款。我们会确认并计算运费。',
+    dlv:{ pickup:'自取 · Ostryakova 3', courier:'莫斯科市内快递', post:'CDEK / 俄罗斯邮政' },
+    order_head:'🛒 茶订单 — Chainya', order_done:'谢谢！订单将在聊天中打开，请点「发送」。我们会确认。',
     ts_note:'在店里喝这款茶不另收费：茶席已含任选两款。',
     b2b_label:'企业合作', b2b_h:'把我们的茶<br>放上您的菜单',
     b2b_lead:'我们自己从中国进货，批发给咖啡馆、餐厅和办公室。茶叶与店里泡的完全相同。',
@@ -1968,20 +2067,18 @@ select.input{
     scrollTo(0, lockedY);
   }
 
-  // Куда ведёт «Купить с доставкой». Если у чая задан свой магазинный URL (m.buy)
-  // — на него. Иначе (пока нет бэкенда магазина) открываем чат @chainyamsk с уже
-  // вписанным названием чая — заказ оформляется вручную, как и бронь.
-  const orderLink = m => m.buy
-    || 'https://t.me/chainyamsk?text=' + encodeURIComponent(T().order_prefill + T().teas[m.id].n);
+  // Что сейчас открыто в паспорте — чтобы «В корзину» знал, что и в какой фасовке
+  // добавить. curPack: граммовка (25/50/100) или 'pc' для штучных (мандарин).
+  let curTea = null, curPack = null;
 
   function openTea(m){
     const txt = T().teas[m.id];
+    curTea = m;
     $('#ts-name').textContent = txt.n;
     $('#ts-orig').textContent = txt.o;
     $('#ts-desc').textContent = txt.d;
     $('#ts-img').src = m.img;
     $('#ts-img').alt = txt.n;
-    $('#ts-buy').href = orderLink(m);
     const sf = $('#ts-fav');
     sf.dataset.id = m.id;
     sf.setAttribute('aria-pressed', isFav(m.id));
@@ -1997,11 +2094,13 @@ select.input{
     if (m.unit === 'pc'){
       // Мандарин и квадратик продаются штуками, взвешивать нечего
       packs.hidden = true;
+      curPack = 'pc';
       $('#ts-unit').textContent = T().unit_pc;
       $('#ts-price').textContent = rub(m.p);
     } else {
       packs.hidden = false;
       const setPack = (g, btn) => {
+        curPack = g;
         $$('.pack', packs).forEach(x => x.setAttribute('aria-pressed', x === btn));
         $('#ts-unit').textContent = T().unit_pack.replace('{g}', g);
         $('#ts-price').textContent = rub(packPrice(m.p, g));
@@ -2059,6 +2158,143 @@ select.input{
     sheet.style.transform = '';
     if (dx > sheet.offsetWidth * 0.3) closeTea();
   });
+
+  /* ─────────────  КОРЗИНА  ─────────────
+     Чистый фронт: позиции {id, pack, qty} в localStorage. Оформление собирает
+     заказ и шлёт его боту (sendData в мини-аппе) или готовым сообщением в чат
+     @chainyamsk (обычный браузер) — оплата и подтверждение вручную, как бронь.
+     Когда появится бэкенд магазина — сюда встанет отправка на его эндпоинт. */
+  const CART_KEY = 'chaynya-cart';
+  const cartSheet = $('#cart-sheet');
+  const teaById = id => TEA_META.find(m => m.id === id);
+  const packLabel = it => it.pack === 'pc' ? T().unit_pc.trim() : `${it.pack} ${T().gram}`;
+  const linePrice = it => { const m = teaById(it.id); if (!m) return 0; return it.pack === 'pc' ? m.p : packPrice(m.p, it.pack); };
+
+  function getCart(){ try{ return JSON.parse(localStorage.getItem(CART_KEY) || '[]'); }catch(e){ return []; } }
+  function setCart(c){ try{ localStorage.setItem(CART_KEY, JSON.stringify(c)); }catch(e){} updateCartBadge(); }
+  function cartCount(){ return getCart().reduce((s, it) => s + it.qty, 0); }
+  function cartTotal(){ return getCart().reduce((s, it) => s + linePrice(it) * it.qty, 0); }
+  function updateCartBadge(){ const n = cartCount(), b = $('#cart-count'); b.textContent = n; b.hidden = n === 0; }
+
+  function cartAdd(id, pack){
+    const c = getCart(), it = c.find(x => x.id === id && x.pack === pack);
+    if (it) it.qty++; else c.push({ id, pack, qty:1 });
+    setCart(c);
+  }
+  function cartStep(id, pack, d){
+    const c = getCart(), it = c.find(x => x.id === id && x.pack === pack);
+    if (!it) return;
+    it.qty += d;
+    setCart(it.qty <= 0 ? c.filter(x => x !== it) : c);
+    renderCart();
+  }
+  function cartRemove(id, pack){ setCart(getCart().filter(x => !(x.id === id && x.pack === pack))); renderCart(); }
+
+  function renderCart(){
+    const c = getCart(), wrap = $('#cart-items');
+    wrap.innerHTML = '';
+    if (!c.length){
+      wrap.append(el(`<div class="cart-empty">${T().cart_empty}</div>`));
+      $('#cart-co').hidden = true; $('#cart-submit').disabled = true; $('#cart-total').textContent = '—';
+      return;
+    }
+    c.forEach(it => {
+      const m = teaById(it.id); if (!m) return;
+      const row = el(`<div class="citem">
+        <img class="citem__img" src="${m.img}" alt="" loading="lazy">
+        <div class="citem__info">
+          <div class="citem__name">${T().teas[it.id].n}</div>
+          <div class="citem__pack">${packLabel(it)} · ${rub(linePrice(it))}</div>
+        </div>
+        <div class="qty">
+          <button class="qty__b" data-d="-1" aria-label="−">−</button>
+          <span class="qty__n">${it.qty}</span>
+          <button class="qty__b" data-d="1" aria-label="+">+</button>
+        </div>
+        <button class="citem__rm" aria-label="${T().cart_remove}">×</button>
+      </div>`);
+      row.querySelectorAll('.qty__b').forEach(b => b.addEventListener('click', () => cartStep(it.id, it.pack, +b.dataset.d)));
+      row.querySelector('.citem__rm').addEventListener('click', () => cartRemove(it.id, it.pack));
+      wrap.append(row);
+    });
+    $('#cart-co').hidden = false; $('#cart-submit').disabled = false;
+    $('#cart-total').textContent = rub(cartTotal());
+  }
+
+  const DLV = ['pickup', 'courier', 'post'];
+  function buildDlv(){
+    const sel = $('#c-dlv'), cur = sel.value || 'pickup';
+    sel.innerHTML = '';
+    DLV.forEach(code => sel.append(el(`<option value="${code}">${T().dlv[code]}</option>`)));
+    sel.value = cur;
+    toggleAddr();
+  }
+  function toggleAddr(){ $('#c-addr-field').hidden = $('#c-dlv').value === 'pickup'; }
+  function syncCart(){ updateCartBadge(); buildDlv(); if (cartSheet.classList.contains('on')) renderCart(); }
+
+  function openCart(){
+    closeTea();
+    renderCart();
+    cartSheet.classList.add('on'); $('#scrim').classList.add('on');
+    lockScroll(); cartSheet.focus({ preventScroll:true }); tgSyncBack();
+  }
+  function closeCart(){
+    if (!cartSheet.classList.contains('on')) return;
+    cartSheet.classList.remove('on'); $('#scrim').classList.remove('on');
+    unlockScroll(); tgSyncBack();
+  }
+
+  function orderMsg(){
+    const c = getCart();
+    const lines = c.map(it => `• ${T().teas[it.id].n} — ${packLabel(it)} ×${it.qty} — ${rub(linePrice(it) * it.qty)}`);
+    const dlv = $('#c-dlv').value;
+    const p = [T().order_head, ...lines, `${T().cart_total}: ${rub(cartTotal())}`, `${T().cart_dlv}: ${T().dlv[dlv]}`];
+    const name = $('#c-name').value.trim(), phone = $('#c-phone').value.trim(),
+          addr = $('#c-addr').value.trim(), note = $('#c-note').value.trim();
+    if (name) p.push(`${T().f_name}: ${name}`);
+    if (phone) p.push(`${T().f_phone}: ${phone}`);
+    if (dlv !== 'pickup' && addr) p.push(`${T().cart_addr}: ${addr}`);
+    if (note) p.push(`${T().f_note}: ${note}`);
+    return p.join('\n');
+  }
+
+  $('#cart-open').addEventListener('click', openCart);
+  $('#cart-close').addEventListener('click', closeCart);
+  $('#scrim').addEventListener('click', closeCart);
+  addEventListener('keydown', e => { if (e.key === 'Escape') closeCart(); });
+  $('#c-dlv').addEventListener('change', toggleAddr);
+  $('#ts-add').addEventListener('click', () => {
+    if (!curTea || curPack == null) return;
+    cartAdd(curTea.id, curPack);
+    const b = $('#ts-add');
+    b.textContent = T().ts_added;
+    setTimeout(() => { b.textContent = T().ts_add; }, 1100);
+  });
+  $('#cart-submit').addEventListener('click', () => {
+    const c = getCart();
+    if (!c.length) return;
+    if (!$('#c-phone').value.trim()){ $('#c-phone').focus(); return; }        // телефон обязателен
+    if ($('#c-dlv').value !== 'pickup' && !$('#c-addr').value.trim()){ $('#c-addr').focus(); return; }
+    const payload = {
+      type:'order',
+      items: c.map(it => ({ id:it.id, name:T().teas[it.id].n, pack:it.pack, qty:it.qty, sum:linePrice(it) * it.qty })),
+      total: cartTotal(),
+      delivery: $('#c-dlv').value, delivery_name: T().dlv[$('#c-dlv').value],
+      name: $('#c-name').value.trim(), phone: $('#c-phone').value.trim(),
+      address: $('#c-addr').value.trim(), note: $('#c-note').value.trim(),
+    };
+    if (IN_TG){ try { TG.sendData(JSON.stringify(payload)); return; } catch(e){} }
+    window.open('https://t.me/chainyamsk?text=' + encodeURIComponent(orderMsg()), '_blank', 'noopener');
+    localStorage.removeItem(CART_KEY); updateCartBadge();
+    $('#cart-items').innerHTML = ''; $('#cart-items').append(el(`<div class="cart-empty">${T().order_done}</div>`));
+    $('#cart-co').hidden = true; $('#cart-submit').disabled = true; $('#cart-total').textContent = '—';
+  });
+
+  /* свайп вправо закрывает корзину (как паспорт) */
+  let cswX = 0, cswY = 0, csw = false;
+  cartSheet.addEventListener('touchstart', e => { if (e.touches.length !== 1) return; cswX = e.touches[0].clientX; cswY = e.touches[0].clientY; csw = true; cartSheet.style.transition = 'none'; }, { passive:true });
+  cartSheet.addEventListener('touchmove', e => { if (!csw) return; const dx = e.touches[0].clientX - cswX, dy = e.touches[0].clientY - cswY; if (Math.abs(dy) > Math.abs(dx)){ csw = false; cartSheet.style.transition = ''; return; } if (dx > 0) cartSheet.style.transform = `translateX(${dx}px)`; }, { passive:true });
+  cartSheet.addEventListener('touchend', e => { if (!csw) return; csw = false; cartSheet.style.transition = ''; const dx = e.changedTouches[0].clientX - cswX; cartSheet.style.transform = ''; if (dx > cartSheet.offsetWidth * 0.3) closeCart(); });
 
   /* ─────────────  БРОНЬ  ───────────── */
   const B = { format:'master', date:'', time:'', guests:'2' };
@@ -2247,6 +2483,7 @@ select.input{
     buildDays();
     buildGuests();
     closeTea();
+    syncCart();
     sync();
     // Экраны подтверждения могут быть на виду — перерисуем их на новом языке
     if (lastBook && !$('#book-done').hidden) renderDone();

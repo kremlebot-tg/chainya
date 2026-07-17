@@ -186,6 +186,24 @@ a{ color:inherit; text-decoration:none; }
 .view.is-active{ display:block; animation:rise .5s var(--ease) both; }
 @keyframes rise{ from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:none; } }
 
+/* Появление блоков при прокрутке (IntersectionObserver добавляет .in) */
+.reveal{ opacity:0; transform:translateY(22px); transition:opacity .7s var(--ease), transform .7s var(--ease); }
+.reveal.in{ opacity:1; transform:none; }
+
+/* Значок корзины подпрыгивает при добавлении; кнопка «В корзину» — короткий отклик */
+@keyframes badge-pop{ 0%{ transform:scale(1); } 35%{ transform:scale(1.45); } 100%{ transform:scale(1); } }
+.cart-badge.pop{ animation:badge-pop .4s var(--ease); }
+@keyframes tap{ 0%{ transform:scale(1); } 45%{ transform:scale(.965); } 100%{ transform:scale(1); } }
+.btn.tapped{ animation:tap .32s var(--ease); }
+
+/* Диаграмма вкуса «прорастает» из центра при открытии паспорта */
+@keyframes radar-grow{ from{ opacity:0; transform:scale(.12); } to{ opacity:1; transform:none; } }
+@keyframes radar-fade{ from{ opacity:0; } to{ opacity:1; } }
+#ts-radar .area{ transform-box:view-box; transform-origin:160px 116px; animation:radar-grow .6s var(--ease) both; }
+#ts-radar .grid, #ts-radar .spoke{ animation:radar-fade .5s var(--ease) both; }
+#ts-radar .dot{ animation:radar-fade .4s var(--ease) both .34s; }
+#ts-radar .lbl{ animation:radar-fade .55s var(--ease) both .18s; }
+
 /* ─────────────────────────  ГЕРОЙ  ─────────────────────────
    Фото мастера здесь не ставим: он работает ниже, в карточке услуги.
    Вместо него сама коллекция — стена листа из тех же снимков, что в магазине.
@@ -477,7 +495,7 @@ a{ color:inherit; text-decoration:none; }
 .qty{ display:flex; align-items:center; gap:2px; flex:none; }
 .qty__b{
   width:30px; height:30px; border:1px solid var(--line); background:transparent; color:var(--text-1);
-  border-radius:8px; font-size:17px; line-height:1; cursor:pointer; transition:.15s;
+  border-radius:8px; font-size:17px; line-height:1; cursor:pointer; transition:.15s var(--ease);
 }
 .qty__b:hover{ border-color:var(--accent); color:var(--accent); }
 .qty__n{ min-width:26px; text-align:center; font-variant-numeric:tabular-nums; font-size:14px; }
@@ -751,6 +769,8 @@ select.input{
   /* Стена в герое — бесконечная петля: мгновенная «анимация» бросила бы её
      в конечное состояние translateY(-50%) и обрезала бы половину картинок. */
   .hero__col{ animation:none !important; transform:none !important; }
+  /* Появление при скролле не должно прятать контент от тех, кто отключил анимации */
+  .reveal{ opacity:1 !important; transform:none !important; }
 }
 </style>
 
@@ -1176,7 +1196,8 @@ select.input{
       <div>
         <h4 data-i18n="foot_contact_h">Связь</h4>
         <ul>
-          <li><a href="https://t.me/chainyamsk" target="_blank" rel="noopener" data-i18n="foot_tg">Телеграм: @chainyamsk</a></li>
+          <li><a href="https://t.me/chainyabot" target="_blank" rel="noopener" data-i18n="foot_bot">Бот: @chainyabot</a></li>
+          <li><a href="https://t.me/chainyamsk" target="_blank" rel="noopener" data-i18n="foot_tg">Канал: @chainyamsk</a></li>
           <li><a href="tel:+79055908801" data-i18n="foot_phone">+7 (905) 590-88-01</a></li>
           <li><a href="https://yandex.ru/maps/org/chaynya/" target="_blank" rel="noopener" data-i18n="foot_ya">Мы на Яндекс.Картах</a></li>
         </ul>
@@ -1465,7 +1486,7 @@ select.input{
     cart_note_ph:'Комментарий к заказу', cart_submit:'Оформить заказ',
     cart_pay:'Оплата переводом или при получении. Свяжемся, подтвердим и посчитаем доставку.',
     dlv:{ pickup:'Самовывоз · Острякова, 3', courier:'Курьер по Москве', post:'СДЭК / Почта по России' },
-    order_head:'🛒 Заказ чая — Чайня', order_done:'Спасибо! Заказ откроется в чате — нажмите «Отправить». Свяжемся и подтвердим.',
+    order_head:'🛒 Заказ чая — Чайня', order_done:'Спасибо! Завершите заказ в нашем боте @chainyabot или позвоните +7 905 590-88-01 — подтвердим и посчитаем доставку.',
     ts_note:'За столом этот чай можно выпить бесплатно: два на выбор входят в стоимость стола.',
     b2b_label:'Для бизнеса', b2b_h:'Наш лист<br>в вашей карте',
     b2b_lead:'Возим чай из Китая сами и отдаём его оптом кофейням, ресторанам и офисам. Лист тот же, что наливаем в зале.',
@@ -1501,10 +1522,10 @@ select.input{
     done_h:'Почти готово', done_back:'На главную',
     guests:['1 гость','2 гостя','3 гостя','4 гостя','5 гостей','6 гостей','7 гостей','8 гостей','9 гостей, весь зал'],
     doneText:({ name, dateStr, time }) =>
-      `${name ? name + ', бронь' : 'Бронь'} на ${dateStr} в ${time} уже набрана в телеграме — осталось нажать «Отправить», и мы подтвердим время. Не открылся телеграм? Напишите @chainyamsk или позвоните +7 905 590-88-01.`,
+      `${name ? name + ', бронь' : 'Бронь'} на ${dateStr} в ${time}: завершите её в нашем боте @chainyabot (открылся рядом) или позвоните +7 905 590-88-01 — подтвердим время.`,
     foot_desc:'Чайная на Острякова. Китайский лист, чайный мастер и никакой спешки.',
     foot_addr_h:'Адрес', foot_addr1:'Москва, ул. Острякова, 3', foot_addr2:'первый этаж, помещение 114', foot_addr3:'метро Аэропорт',
-    foot_contact_h:'Связь', foot_tg:'Телеграм: @chainyamsk', foot_phone:'+7 (905) 590-88-01', foot_ya:'Мы на Яндекс.Картах',
+    foot_contact_h:'Связь', foot_bot:'Бот: @chainyabot', foot_tg:'Канал: @chainyamsk', foot_phone:'+7 (905) 590-88-01', foot_ya:'Мы на Яндекс.Картах',
     foot_hours_h:'Часы', foot_hours1:'Ежедневно · 12:00–22:00', foot_hours2:'Последняя посадка в 20:00',
     foot_c:'© 2026 Чайня',
     teas:{
@@ -1607,7 +1628,7 @@ select.input{
     cart_note_ph:'Order comment', cart_submit:'Place order',
     cart_pay:'Pay by transfer or on delivery. We’ll confirm and calculate shipping.',
     dlv:{ pickup:'Pickup · Ostryakova 3', courier:'Courier in Moscow', post:'CDEK / Post across Russia' },
-    order_head:'🛒 Tea order — Chainya', order_done:'Thanks! The order opens in chat — tap “Send”. We’ll confirm.',
+    order_head:'🛒 Tea order — Chainya', order_done:'Thanks! Finish your order in our bot @chainyabot or call +7 905 590-88-01 — we’ll confirm and calculate shipping.',
     ts_note:'At the table this tea costs you nothing: two of your choice come with the table.',
     b2b_label:'For business', b2b_h:'Our leaf<br>on your menu',
     b2b_lead:'We bring tea from China ourselves and wholesale it to cafés, restaurants and offices. The leaf is the same one we serve in the room.',
@@ -1643,10 +1664,10 @@ select.input{
     done_h:'Almost there', done_back:'Back to home',
     guests:['1 guest','2 guests','3 guests','4 guests','5 guests','6 guests','7 guests','8 guests','9 guests, the whole room'],
     doneText:({ name, dateStr, time }) =>
-      `${name ? name + ', your' : 'Your'} booking for ${dateStr} at ${time} is already typed out in Telegram — just hit send and we’ll confirm the time. Telegram didn’t open? Message @chainyamsk or call +7 905 590-88-01.`,
+      `${name ? name + ', your' : 'Your'} booking for ${dateStr} at ${time}: finish it in our bot @chainyabot (just opened) or call +7 905 590-88-01 — we’ll confirm the time.`,
     foot_desc:'A tea house on Ostryakova. Chinese leaf, a tea master, and no hurry whatsoever.',
     foot_addr_h:'Address', foot_addr1:'Moscow, 3 Ostryakova St', foot_addr2:'ground floor, unit 114', foot_addr3:'Aeroport metro',
-    foot_contact_h:'Contact', foot_tg:'Telegram: @chainyamsk', foot_phone:'+7 (905) 590-88-01', foot_ya:'Find us on Yandex Maps',
+    foot_contact_h:'Contact', foot_bot:'Bot: @chainyabot', foot_tg:'Channel: @chainyamsk', foot_phone:'+7 (905) 590-88-01', foot_ya:'Find us on Yandex Maps',
     foot_hours_h:'Hours', foot_hours1:'Daily · 12:00–22:00', foot_hours2:'Last seating at 20:00',
     foot_c:'© 2026 Chaynya',
     teas:{
@@ -1749,7 +1770,7 @@ select.input{
     cart_note_ph:'订单备注', cart_submit:'提交订单',
     cart_pay:'转账或货到付款。我们会确认并计算运费。',
     dlv:{ pickup:'自取 · Ostryakova 3', courier:'莫斯科市内快递', post:'CDEK / 俄罗斯邮政' },
-    order_head:'🛒 茶订单 — Chainya', order_done:'谢谢！订单将在聊天中打开，请点「发送」。我们会确认。',
+    order_head:'🛒 茶订单 — Chainya', order_done:'谢谢！请在我们的机器人 @chainyabot 中完成订单，或致电 +7 905 590-88-01，我们会确认并计算运费。',
     ts_note:'在店里喝这款茶不另收费：茶席已含任选两款。',
     b2b_label:'企业合作', b2b_h:'把我们的茶<br>放上您的菜单',
     b2b_lead:'我们自己从中国进货，批发给咖啡馆、餐厅和办公室。茶叶与店里泡的完全相同。',
@@ -1785,10 +1806,10 @@ select.input{
     done_h:'就差一步', done_back:'回首页',
     guests:['1位','2位','3位','4位','5位','6位','7位','8位','9位（包场）'],
     doneText:({ name, dateStr, time }) =>
-      `${name ? name + '，' : ''}${dateStr} ${time}的预订已在Telegram中填好，点击「发送」即可，我们会确认时间。Telegram没有打开？请联系 @chainyamsk 或致电 +7 905 590-88-01。`,
+      `${name ? name + '，' : ''}${dateStr} ${time}的预订：请在我们的机器人 @chainyabot 中完成，或致电 +7 905 590-88-01，我们会确认时间。`,
     foot_desc:'奥斯特里亚科娃街上的茶馆。中国茶叶、茶艺师，从不催客。',
     foot_addr_h:'地址', foot_addr1:'莫斯科，奥斯特里亚科娃街3号', foot_addr2:'一层114号铺', foot_addr3:'机场地铁站',
-    foot_contact_h:'联系', foot_tg:'Telegram：@chainyamsk', foot_phone:'+7 (905) 590-88-01', foot_ya:'在Yandex地图上找到我们',
+    foot_contact_h:'联系', foot_bot:'机器人：@chainyabot', foot_tg:'频道：@chainyamsk', foot_phone:'+7 (905) 590-88-01', foot_ya:'在Yandex地图上找到我们',
     foot_hours_h:'营业时间', foot_hours1:'每天 · 12:00–22:00', foot_hours2:'最晚入座 20:00',
     foot_c:'© 2026 Chaynya',
     teas:{
@@ -1849,6 +1870,8 @@ select.input{
      выключено и сайт работает как обычно. */
   const TG = window.Telegram && window.Telegram.WebApp;
   const IN_TG = !!(TG && TG.platform && TG.platform !== 'unknown');
+  // @chainyamsk — это КАНАЛ (писать нельзя). Живой контакт из браузера — наш бот.
+  const BOT_URL = 'https://t.me/chainyabot';
   // Нативная «назад»: видна, когда мы не на главной или открыт паспорт чая
   function tgSyncBack(){
     if (!IN_TG) return;
@@ -1877,6 +1900,7 @@ select.input{
     $('#b2b-form-wrap').hidden = false; $('#b2b-done').hidden = true;
     closeTea();
     scrollTo({ top:0, behavior:'instant' });
+    scheduleReveal();   // раскрыть блоки нового раздела, попавшие в кадр
     tgSyncBack();
   }
   document.addEventListener('click', e => {
@@ -2162,8 +2186,8 @@ select.input{
 
   /* ─────────────  КОРЗИНА  ─────────────
      Чистый фронт: позиции {id, pack, qty} в localStorage. Оформление собирает
-     заказ и шлёт его боту (sendData в мини-аппе) или готовым сообщением в чат
-     @chainyamsk (обычный браузер) — оплата и подтверждение вручную, как бронь.
+     заказ и шлёт его боту (sendData в мини-аппе) или открывает бота @chainyabot
+     (обычный браузер) — оплата и подтверждение вручную, как бронь.
      Когда появится бэкенд магазина — сюда встанет отправка на его эндпоинт. */
   const CART_KEY = 'chaynya-cart';
   const cartSheet = $('#cart-sheet');
@@ -2180,7 +2204,13 @@ select.input{
   function setCart(c){ try{ localStorage.setItem(CART_KEY, JSON.stringify(c)); }catch(e){} updateCartBadge(); }
   function cartCount(){ return getCart().reduce((s, it) => s + it.qty, 0); }
   function cartTotal(){ return getCart().reduce((s, it) => s + linePrice(it) * it.qty, 0); }
-  function updateCartBadge(){ const n = cartCount(), b = $('#cart-count'); b.textContent = n; b.hidden = n === 0; }
+  let _cartN = -1;
+  function updateCartBadge(){
+    const n = cartCount(), b = $('#cart-count');
+    b.textContent = n; b.hidden = n === 0;
+    if (_cartN >= 0 && n > _cartN){ b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop'); }
+    _cartN = n;
+  }
 
   function cartAdd(id, pack){
     const c = getCart(), it = c.find(x => x.id === id && x.pack === pack);
@@ -2274,6 +2304,7 @@ select.input{
     cartAdd(curTea.id, curPack);
     const b = $('#ts-add');
     b.textContent = T().ts_added;
+    b.classList.remove('tapped'); void b.offsetWidth; b.classList.add('tapped');
     setTimeout(() => { b.textContent = T().ts_add; }, 1100);
   });
   $('#cart-submit').addEventListener('click', () => {
@@ -2296,7 +2327,8 @@ select.input{
       $('#cart-co').hidden = true; $('#cart-submit').disabled = true; $('#cart-total').textContent = '—';
     };
     if (IN_TG){ try { TG.sendData(JSON.stringify(payload)); clearCart(); return; } catch(e){} }
-    window.open('https://t.me/chainyamsk?text=' + encodeURIComponent(orderMsg()), '_blank', 'noopener');
+    // обычный браузер: канал не чат — отправляем в бота, там заказ оформляется нативно
+    window.open(BOT_URL, '_blank', 'noopener');
     clearCart();
   });
 
@@ -2432,7 +2464,7 @@ select.input{
     // В телеграм-мини-аппе шлём бронь прямо боту (он перешлёт её заведению и
     // подтвердит), а не открываем чат. sendData работает, когда мини-апп открыт
     // кнопкой «Забронировать» из бота; если нет (полный веб-апп/обычный браузер)
-    // — падаем на готовое сообщение в чат @chainyamsk.
+    // — открываем бота @chainyabot (@chainyamsk — канал, писать туда нельзя).
     if (IN_TG){
       try {
         TG.sendData(JSON.stringify({
@@ -2444,9 +2476,9 @@ select.input{
         return; // телеграм закроет мини-апп сам
       } catch (e){ /* не тот контекст запуска — уходим на запасной путь ниже */ }
     }
-    // encodeURIComponent сам ставит %0A на перевод строки и %20 на пробел —
-    // телеграм разворачивает это в готовый текст, гостю остаётся нажать «Отправить»
-    window.open('https://t.me/chainyamsk?text=' + encodeURIComponent(bookingMsg()), '_blank', 'noopener');
+    // обычный браузер: @chainyamsk — канал, писать нельзя; открываем бота, где
+    // бронь оформляется нативно (в мини-аппе выше бронь уходит владельцу напрямую)
+    window.open(BOT_URL, '_blank', 'noopener');
     lastBook = { name: $('#f-name').value.trim(), format: B.format, date: B.date, time: B.time, n: +B.guests };
     renderDone();
     $('#book-form').hidden = true;
@@ -2478,6 +2510,33 @@ select.input{
   });
 
   /* ─────────────  ЯЗЫК  ───────────── */
+  /* ─────────────  ПОЯВЛЕНИЕ ПРИ СКРОЛЛЕ  ─────────────
+     На scroll/resize (rAF-throttle) помечаем вошедшие в кадр блоки классом .in.
+     Без IntersectionObserver: он молчит в фоновой вкладке — а так контент точно
+     не «залипнет» невидимым. Скрытые вью (display:none) дают нулевой rect и не
+     раскрываются раньше времени. */
+  const REVEAL_SEL = '.sec__head, .step, .tea, .bstep, .svc, .tier, .hall';
+  let _revScheduled = false;
+  function revealCheck(){
+    _revScheduled = false;
+    const h = innerHeight;
+    document.querySelectorAll('.reveal:not(.in)').forEach(el => {
+      const r = el.getBoundingClientRect();
+      if (r.bottom > 4 && r.top < h * 0.92) el.classList.add('in');
+    });
+  }
+  function scheduleReveal(){ if (!_revScheduled){ _revScheduled = true; requestAnimationFrame(revealCheck); } }
+  function setupReveals(){
+    document.querySelectorAll(REVEAL_SEL).forEach(el => {
+      if (!el.classList.contains('reveal') && !el.classList.contains('in')) el.classList.add('reveal');
+    });
+    scheduleReveal();
+    setTimeout(revealCheck, 600);   // страховка: если rAF придушен (фон-вкладка) — блоки всё равно проявятся
+  }
+  addEventListener('scroll', scheduleReveal, { passive: true });
+  addEventListener('resize', scheduleReveal, { passive: true });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) scheduleReveal(); });
+
   function applyLang(){
     document.documentElement.lang = LANG;
     document.title = T().title;
@@ -2494,6 +2553,7 @@ select.input{
     buildGuests();
     closeTea();
     syncCart();
+    setupReveals();
     sync();
     // Экраны подтверждения могут быть на виду — перерисуем их на новом языке
     if (lastBook && !$('#book-done').hidden) renderDone();

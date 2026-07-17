@@ -1298,20 +1298,27 @@ select.input{
 (() => {
   'use strict';
 
-  /* Цвет по типу чая — легенда фильтров и точки на карточке */
+  /* Цвет настоя по типу — легенда фильтров и точка на карточке.
+     Категории и порядок взяты из кассы чайной (раскладку прислал владелец):
+     улуны разведены по регионам, габа и шу/шэн пуэр — отдельно. */
   const LQ = {
-    white:  '#E3DCA6',
-    green:  '#C7CE72',
-    oolong: '#D9A441',
-    red:    '#A63D24',
-    puer:   '#4A2418',
-    other:  '#8A7B5C',
+    white:   '#E3DCA6',
+    green:   '#C7CE72',
+    gaba:    '#C4703A',
+    fujian:  '#D6C558',
+    dancong: '#D9A441',
+    wuyi:    '#A9662B',
+    red:     '#A63D24',
+    sheng:   '#C9B24E',
+    shu:     '#4A2418',
+    heicha:  '#6B3A22',
+    herbs:   '#8A7B5C',
   };
-  const TYPE_IDS = ['all','white','green','red','oolong','puer','other'];
+  const TYPE_IDS = ['all','white','green','gaba','fujian','dancong','wuyi','red','sheng','shu','heicha','herbs'];
 
-  /* Языконезависимое: тип, цена, фото. Цены с Яндекс.Карт, порция 10 г. */
+  /* Языконезависимое: тип, цена, фото. Цена — за 10 г (на кассе она за грамм). */
   const TEA_META = [
-    { id:'chongshicha', t:'other',  p:350, unit:'g',  img:'{{img:tea-chongshicha}}' },
+    { id:'chongshicha', t:'herbs',  p:350, unit:'g',  img:'{{img:tea-chongshicha}}' },
     { id:'baihao',      t:'white',  p:175, unit:'g',  img:'{{img:tea-baihao}}' },
     { id:'baimudan',    t:'white',  p:165, unit:'g',  img:'{{img:tea-baimudan}}' },
     { id:'longjing',    t:'green',  p:160, unit:'g',  img:'{{img:tea-longjing}}' },
@@ -1320,29 +1327,29 @@ select.input{
     { id:'xiaozhong',   t:'red',    p:150, unit:'g',  img:'{{img:tea-xiaozhong}}' },
     { id:'longjinghong',t:'red',    p:150, unit:'g',  img:'{{img:tea-longjinghong}}' },
     { id:'dianhong',    t:'red',    p:130, unit:'g',  img:'{{img:tea-dianhong}}' },
-    { id:'dancong',     t:'oolong', p:210, unit:'g',  img:'{{img:tea-dancong}}' },
-    { id:'gabahoney',   t:'oolong', p:195, unit:'g',  img:'{{img:tea-gaba-honey}}' },
-    { id:'gabaruby',    t:'oolong', p:190, unit:'g',  img:'{{img:tea-gaba-ruby}}' },
-    { id:'huangjingui', t:'oolong', p:185, unit:'g',  img:'{{img:tea-huangjingui}}' },
-    { id:'dahongpao',   t:'oolong', p:165, unit:'g',  img:'{{img:tea-dahongpao}}' },
-    { id:'maoxie',      t:'oolong', p:140, unit:'g',  img:'{{img:tea-maoxie}}' },
-    { id:'gabamaocha',  t:'oolong', p:135, unit:'g',  img:'{{img:tea-gaba-maocha}}' },
-    { id:'ginseng',     t:'oolong', p:110, unit:'g',  img:'{{img:tea-ginseng}}' },
-    { id:'mandarin',    t:'puer',   p:320, unit:'pc', img:'{{img:tea-mandarin}}' },
-    { id:'laochatou',   t:'puer',   p:140, unit:'g',  img:'{{img:tea-laochatou}}' },
-    { id:'peacock',     t:'puer',   p:130, unit:'g',  img:'{{img:tea-peacock}}' },
-    { id:'bingdao',     t:'puer',   p:115, unit:'g',  img:'{{img:tea-bingdao}}' },
-    { id:'nuomixiang',  t:'puer',   p:95,  unit:'pc', img:'{{img:tea-nuomixiang}}' },
-    { id:'jinhuawang',  t:'other',  p:140, unit:'g',  img:'{{img:tea-jinhuawang}}' },
-    { id:'herbal',      t:'other',  p:120, unit:'g',  img:'{{img:tea-herbal}}' },
+    { id:'dancong',     t:'dancong',p:210, unit:'g',  img:'{{img:tea-dancong}}' },
+    { id:'gabahoney',   t:'gaba',   p:195, unit:'g',  img:'{{img:tea-gaba-honey}}' },
+    { id:'gabaruby',    t:'gaba',   p:190, unit:'g',  img:'{{img:tea-gaba-ruby}}' },
+    { id:'huangjingui', t:'fujian', p:185, unit:'g',  img:'{{img:tea-huangjingui}}' },
+    { id:'dahongpao',   t:'wuyi',   p:165, unit:'g',  img:'{{img:tea-dahongpao}}' },
+    { id:'maoxie',      t:'fujian', p:140, unit:'g',  img:'{{img:tea-maoxie}}' },
+    { id:'gabamaocha',  t:'gaba',   p:135, unit:'g',  img:'{{img:tea-gaba-maocha}}' },
+    { id:'ginseng',     t:'fujian', p:125, unit:'g',  img:'{{img:tea-ginseng}}' },
+    { id:'mandarin',    t:'shu',    p:320, unit:'pc', img:'{{img:tea-mandarin}}' },
+    { id:'laochatou',   t:'shu',    p:140, unit:'g',  img:'{{img:tea-laochatou}}' },
+    { id:'peacock',     t:'shu',    p:130, unit:'g',  img:'{{img:tea-peacock}}' },
+    { id:'bingdao',     t:'shu',    p:115, unit:'g',  img:'{{img:tea-bingdao}}' },
+    { id:'nuomixiang',  t:'shu',    p:95,  unit:'pc', img:'{{img:tea-nuomixiang}}' },
+    { id:'jinhuawang',  t:'heicha', p:140, unit:'g',  img:'{{img:tea-jinhuawang}}' },
+    { id:'herbal',      t:'herbs',  p:120, unit:'g',  img:'{{img:tea-herbal}}' },
     { id:'molisiaobaiya', t:'green', p:170, unit:'g',  img:'{{img:tea-molisiaobaiya}}' },
     { id:'biluochun', t:'green', p:175, unit:'g',  img:'{{img:tea-biluochun}}' },
-    { id:'dancongmilan', t:'oolong', p:230, unit:'g',  img:'{{img:tea-dancongmilan}}' },
-    { id:'dancongtongtian', t:'oolong', p:240, unit:'g',  img:'{{img:tea-dancongtongtian}}' },
+    { id:'dancongmilan', t:'dancong', p:230, unit:'g',  img:'{{img:tea-dancongmilan}}' },
+    { id:'dancongtongtian', t:'dancong', p:240, unit:'g',  img:'{{img:tea-dancongtongtian}}' },
     { id:'yeshenghong', t:'red', p:235, unit:'g',  img:'{{img:tea-yeshenghong}}' },
-    { id:'shengchenxiang', t:'puer', p:130, unit:'g',  img:'{{img:tea-shengchenxiang}}' },
-    { id:'osmanthus', t:'other', p:370, unit:'g',  img:'{{img:tea-osmanthus}}' },
-    { id:'vitamin', t:'other', p:120, unit:'g',  img:'{{img:tea-vitamin}}' },
+    { id:'shengchenxiang', t:'sheng', p:130, unit:'g',  img:'{{img:tea-shengchenxiang}}' },
+    { id:'osmanthus', t:'herbs', p:370, unit:'g',  img:'{{img:tea-osmanthus}}' },
+    { id:'vitamin', t:'herbs', p:120, unit:'g',  img:'{{img:tea-vitamin}}' },
   ];
 
   /* Вкусовой профиль (0–5 по 9 осям). Оценки проставлены по описаниям +
@@ -1477,7 +1484,7 @@ select.input{
     shop_label:'Купить чай', shop_h:'Тот же лист,<br>что и в зале',
     shop_lead:'Здесь чай продаётся домой: фасуем в пакеты 25, 50 и 100 г и отправляем доставкой. Если вы пришли к нам за стол, платить за чай не нужно: два на выбор уже входят в стоимость.',
     shop_foot:'Цены на пакеты считаются от цены за 10 г. Прессованное продаём целиком: мандарин и квадратик поштучно, блины по запросу.',
-    types:['Все','Белый','Зелёный','Красный','Улун','Пуэр','Особое'],
+    types:['Все','Белый','Зелёный','Габа','Улуны Фуцзяни','Улуны Гуандуна','Улуны Уишаня','Красный','Шэн Пуэр','Шу Пуэр','Хэй Ча','Травы и добавки'],
     more:'о чае', per_pc:'за штуку', per_pack25:'за 25 г', gram:'г',
     fav_label:'В избранное', filter_fav:'Избранное', fav_empty:'Здесь появится то, что вы отметите сердечком.',
     taste_h:'Вкусовой профиль', in_stock:'в наличии', oos:'нет в наличии',
@@ -1489,14 +1496,14 @@ select.input{
     cart_dlv:'Доставка', cart_addr:'Адрес', cart_addr_ph:'Город, улица, дом, квартира',
     cart_note_ph:'Комментарий к заказу', cart_submit:'Оформить заказ',
     cart_pay:'Оплата переводом или при получении. Свяжемся, подтвердим и посчитаем доставку.',
-    dlv:{ pickup:'Самовывоз · Острякова, 3', courier:'Курьер по Москве', post:'СДЭК / Почта по России' },
+    dlv:{ pickup:'Самовывоз · Острякова, 3', cdek:'СДЭК по России' },
     order_head:'🛒 Заказ чая — Чайня', order_done:'Спасибо! Завершите заказ в нашем боте @chainyabot или позвоните +7 905 590-88-01 — подтвердим и посчитаем доставку.',
     ts_note:'За столом этот чай можно выпить бесплатно: два на выбор входят в стоимость стола.',
     b2b_label:'Для бизнеса', b2b_h:'Наш лист<br>в вашей карте',
-    b2b_lead:'Возим чай из Китая сами и отдаём его оптом кофейням, ресторанам и офисам. Лист тот же, что наливаем в зале.',
-    brange_label:'Что возим', brange_note:'Любую позицию из нашей карты: белый, зелёный, красные, улуны, пуэр, прессовки. Тот же лист, что наливаем в зале, из той же поставки. Ароматизаторов и пересорта не будет.',
+    b2b_lead:'Возим чай из Китая сами и отдаём его оптом кофейням, ресторанам и офисам. Тот же лист, что наливаем в зале, — и любой другой под заказ.',
+    brange_label:'Что возим', brange_note:'Любую позицию из нашей карты: белый, зелёный, габа, улуны, красные, пуэр, прессовки. Оптом возьмём и то, чего сейчас нет в зале, — привезём под заказ. Тот же лист, из той же поставки: ароматизаторов и пересорта не будет.',
     tier1_q:'Кому', tier1_d:'Кофейням, ресторанам, чайным и офисам. Возьмём и небольшую партию: сначала лучше проверить, как ваш гость реагирует на живой лист.',
-    tier3_q:'Цена', tier3_d:'Зависит от сорта и объёма. Напишите, что вам интересно, и мы пришлём прайс.',
+    tier3_q:'Цена', tier3_d:'Обговариваем индивидуально: зависит от сорта и объёма. Скажите, что интересно, — посчитаем.',
     bstep1_h:'Дегустация', bstep1_p:'Приезжаем к вам с сетом под ваш формат и завариваем при вас. Бесплатно, займёт около часа.',
     bstep2_h:'Подбор', bstep2_p:'Собираем карту под кухню и цены. Считаем себестоимость чашки и чайника, чтобы вы понимали маржу.',
     bstep3_h:'Поставки', bstep3_p:'Возим партии по графику. Если сорт закончился раньше срока, довозим отдельно.',
@@ -1619,7 +1626,7 @@ select.input{
     shop_label:'Buy tea', shop_h:'The same leaf<br>we serve inside',
     shop_lead:'This is tea to take home: we pack it into 25, 50 and 100 g bags and ship it. If you are coming to sit at a table, you pay nothing for tea here: two of your choice are already in the price.',
     shop_foot:'Bag prices are worked out from the per-10 g price. Pressed tea goes whole: the mandarin and the mini brick are sold by the piece, cakes on request.',
-    types:['All','White','Green','Black','Oolong','Pu-erh','Unusual'],
+    types:['All','White','Green','GABA','Fujian oolong','Guangdong oolong','Wuyi oolong','Black','Sheng pu-erh','Shou pu-erh','Hei cha','Herbs & extras'],
     more:'more', per_pc:'each', per_pack25:'for 25 g', gram:'g',
     fav_label:'Add to favourites', filter_fav:'Favourites', fav_empty:'Teas you heart will show up here.',
     taste_h:'Flavour profile', in_stock:'in stock', oos:'out of stock',
@@ -1631,14 +1638,14 @@ select.input{
     cart_dlv:'Delivery', cart_addr:'Address', cart_addr_ph:'City, street, building, flat',
     cart_note_ph:'Order comment', cart_submit:'Place order',
     cart_pay:'Pay by transfer or on delivery. We’ll confirm and calculate shipping.',
-    dlv:{ pickup:'Pickup · Ostryakova 3', courier:'Courier in Moscow', post:'CDEK / Post across Russia' },
+    dlv:{ pickup:'Pickup · Ostryakova 3', cdek:'CDEK across Russia' },
     order_head:'🛒 Tea order — Chainya', order_done:'Thanks! Finish your order in our bot @chainyabot or call +7 905 590-88-01 — we’ll confirm and calculate shipping.',
     ts_note:'At the table this tea costs you nothing: two of your choice come with the table.',
     b2b_label:'For business', b2b_h:'Our leaf<br>on your menu',
-    b2b_lead:'We bring tea from China ourselves and wholesale it to cafés, restaurants and offices. The leaf is the same one we serve in the room.',
-    brange_label:'What we ship', brange_note:'Anything on our menu: white, green, black, oolongs, pu-erh, pressed cakes. The same leaf we serve in the room, out of the same delivery. No flavourings, no second-rate batches.',
+    b2b_lead:'We bring tea from China ourselves and wholesale it to cafés, restaurants and offices. The same leaf we serve in the room — and any other one to order.',
+    brange_label:'What we ship', brange_note:'Anything on our menu: white, green, GABA, oolongs, blacks, pu-erh, pressed cakes. Wholesale also covers what is not in the room right now — we bring it to order. The same leaf, out of the same delivery: no flavourings, no second-rate batches.',
     tier1_q:'Who for', tier1_d:'Cafés, restaurants, tea rooms and offices. A small first batch is fine: better to see how your guests take to a real leaf before committing.',
-    tier3_q:'Price', tier3_d:'Depends on the tea and the volume. Tell us what interests you and we will send a price list.',
+    tier3_q:'Price', tier3_d:'Agreed individually: depends on the tea and the volume. Tell us what interests you and we will price it.',
     bstep1_h:'Tasting', bstep1_p:'We come to you with a set matched to your format and brew it on the spot. Free, takes about an hour.',
     bstep2_h:'Selection', bstep2_p:'We build a menu around your kitchen and prices, and cost out a cup and a pot so you know your margin.',
     bstep3_h:'Supply', bstep3_p:'Deliveries on a schedule. If a tea runs out early, we bring more separately.',
@@ -1761,7 +1768,7 @@ select.input{
     shop_label:'买茶', shop_h:'与店里<br>同一份茶叶',
     shop_lead:'这里的茶是带回家的：按25、50、100克分装，快递寄出。若您是来店里坐茶席，茶不必另付：两款任选已含在价内。',
     shop_foot:'分装价格按每10克的价格折算。紧压茶整件出售：小青柑和小金砖论个，茶饼可另询。',
-    types:['全部','白茶','绿茶','红茶','乌龙','普洱','特别'],
+    types:['全部','白茶','绿茶','佳叶龙茶','闽南乌龙','广东乌龙','武夷岩茶','红茶','生普洱','熟普洱','黑茶','花草与配料'],
     more:'详情', per_pc:'每个', per_pack25:'25克装', gram:'克',
     fav_label:'加入收藏', filter_fav:'收藏', fav_empty:'您用爱心标记的茶会显示在这里。',
     taste_h:'风味特征', in_stock:'现货', oos:'暂时售罄',
@@ -1773,14 +1780,14 @@ select.input{
     cart_dlv:'配送', cart_addr:'地址', cart_addr_ph:'城市、街道、门牌、房间',
     cart_note_ph:'订单备注', cart_submit:'提交订单',
     cart_pay:'转账或货到付款。我们会确认并计算运费。',
-    dlv:{ pickup:'自取 · Ostryakova 3', courier:'莫斯科市内快递', post:'CDEK / 俄罗斯邮政' },
+    dlv:{ pickup:'自取 · Ostryakova 3', cdek:'CDEK 寄送全俄' },
     order_head:'🛒 茶订单 — Chainya', order_done:'谢谢！请在我们的机器人 @chainyabot 中完成订单，或致电 +7 905 590-88-01，我们会确认并计算运费。',
     ts_note:'在店里喝这款茶不另收费：茶席已含任选两款。',
     b2b_label:'企业合作', b2b_h:'把我们的茶<br>放上您的菜单',
-    b2b_lead:'我们自己从中国进货，批发给咖啡馆、餐厅和办公室。茶叶与店里泡的完全相同。',
-    brange_label:'供什么', brange_note:'我们茶单上的任何一款：白茶、绿茶、红茶、乌龙、普洱、紧压茶。与店里所泡的是同一份茶叶，同一批到货。不加香精，没有次货。',
+    b2b_lead:'我们自己从中国进货，批发给咖啡馆、餐厅和办公室。与店里所泡的是同一份茶叶——其他品类也可订货。',
+    brange_label:'供什么', brange_note:'我们茶单上的任何一款：白茶、绿茶、佳叶龙茶、乌龙、红茶、普洱、紧压茶。批发不限库存：店里暂时没有的也能为您订货。同一份茶叶，同一批到货，不加香精，没有次货。',
     tier1_q:'面向谁', tier1_d:'咖啡馆、餐厅、茶馆和办公室。小批量也可以：先看看您的客人对原叶茶的反应，再决定不迟。',
-    tier3_q:'价格', tier3_d:'取决于品类和数量。告诉我们您感兴趣的部分，我们发报价单。',
+    tier3_q:'价格', tier3_d:'个别商定：取决于品类和数量。告诉我们您感兴趣的部分，我们来核算。',
     bstep1_h:'试茶', bstep1_p:'我们带一套适合您业态的茶样上门现泡。免费，大约一小时。',
     bstep2_h:'选品', bstep2_p:'按您的菜品和价位搭配茶单，核算每杯每壶的成本，让您清楚利润。',
     bstep3_h:'供货', bstep3_p:'按约定周期送货。哪款提前喝完，我们单独补上。',
@@ -2044,6 +2051,10 @@ select.input{
     });
     // подсказка, когда в избранном пусто
     $('#fav-empty').hidden = !(curFilter === 'fav' && shown === 0);
+    // Фильтр поднимает наверх карточки, которые лежали за кадром и потому ещё не
+    // «проявились»: без этого они показывались бы прозрачными до первого скролла.
+    // Зовём напрямую, а не через rAF: клик — разовое действие, ждать кадр незачем.
+    revealCheck();
   }
   function buildFilters(){
     const f = $('#filters');
@@ -2261,7 +2272,7 @@ select.input{
     $('#cart-total').textContent = rub(cartTotal());
   }
 
-  const DLV = ['pickup', 'courier', 'post'];
+  const DLV = ['pickup', 'cdek'];   // владелец: «И самовывоз и доставка. Но доставка СДЭК»
   function buildDlv(){
     const sel = $('#c-dlv'), cur = sel.value || 'pickup';
     sel.innerHTML = '';

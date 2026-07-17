@@ -136,10 +136,38 @@ d.text((X, y + 24), "Чайная · метро Аэропорт", font=golos(35
 cov.save(root / "src-assets" / "bot-cover.jpg", "JPEG", quality=90, progressive=True)
 print("bot-cover.jpg:", cov.size)
 
+
+# ─────────────  КАРТИНКА ОПИСАНИЯ (экран ДО «Запустить»)  ─────────────
+# Отдельная от обложки /start, иначе гость видит одно и то же дважды. Здесь —
+# тёплое фото «садись и пей», без офферного текста, только маленький логотип.
+TEA_SRC = pathlib.Path.home() / "Desktop" / "чайная"
+DW, DH = 1280, 720
+photo = Image.open(TEA_SRC / "IMG_3094.JPG").convert("RGB")  # накрытый стол на двоих
+r = max(DW / photo.width, DH / photo.height)
+photo = photo.resize((round(photo.width * r), round(photo.height * r)), Image.LANCZOS)
+ox, oy = (photo.width - DW) // 2, (photo.height - DH) // 2
+photo = photo.crop((ox, oy, ox + DW, oy + DH))
+photo = ImageEnhance.Brightness(photo).enhance(1.12)
+photo = ImageEnhance.Color(photo).enhance(1.06)
+# нижний градиент, чтобы логотип читался поверх фото
+grad = Image.new("L", (DW, DH), 0)
+gd = ImageDraw.Draw(grad)
+for yy in range(DH):
+    gd.line([(0, yy), (DW, yy)], fill=(int(210 * ((yy - (DH - 240)) / 240) ** 1.6) if yy > DH - 240 else 0))
+photo.paste(Image.new("RGB", (DW, DH), (8, 6, 5)), (0, 0), grad)
+dd = ImageDraw.Draw(photo)
+dmh = 58
+dmk = mark(dmh)
+photo.paste(dmk, (66, DH - 70 - dmh), dmk)
+dd.text((66 + dmk.width + 20, DH - 70 - dmh // 2), "Чайня", font=prata(50), fill=INK, anchor="lm")
+photo.save(root / "src-assets" / "bot-desc.jpg", "JPEG", quality=90, progressive=True)
+print("bot-desc.jpg:", photo.size)
+
 # копии на Desktop, чтобы удобно залить через @BotFather
 import shutil
 dst = pathlib.Path.home() / "Desktop" / "chainya-bot-ассеты"
 dst.mkdir(exist_ok=True)
 shutil.copy(root / "src-assets" / "bot-avatar.png", dst / "avatar.png")
 shutil.copy(root / "src-assets" / "bot-cover.jpg", dst / "cover.jpg")
+shutil.copy(root / "src-assets" / "bot-desc.jpg", dst / "description-picture.jpg")
 print("копии:", dst)

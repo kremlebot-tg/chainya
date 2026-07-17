@@ -17,7 +17,7 @@ prata = lambda s: ImageFont.truetype(str(FONTS / "prata.ttf"), s)
 INK = (243, 239, 232)
 RED = (214, 96, 88)
 GOLD = (206, 176, 92)
-BG_IN, BG_OUT = (32, 26, 24), (12, 10, 9)
+BG_IN, BG_OUT = (19, 16, 14), (13, 11, 10)   # почти плоский фон, чуть темнее к краям
 
 W, H = 1920, 1080          # рендер ×3 → финал 640×360
 
@@ -43,12 +43,14 @@ def radial(size, inner, outer, power=1.4):
     return g
 
 
-img = radial(420, BG_IN, BG_OUT).resize((W, H), Image.BILINEAR).convert("RGBA")
+img = radial(420, BG_IN, BG_OUT, power=1.7).resize((W, H), Image.BILINEAR)
+# плёночное зерно поверх фона — дизерит градиент, убирает бандинг/«плохое качество»
+img = ImageChops.overlay(img, Image.effect_noise((W, H), 22).convert("RGB")).convert("RGBA")
 
 # ── радар-«характер» справа, БЕЗ подписей, толстыми штрихами ──
 SC = [1, 5, 4, 2, 0, 2, 1, 1, 0]     # профиль габы «Рубин» (яркий фруктово-сухофруктовый)
 n = len(SC)
-cx, cy, Rr = 1430, 560, 300
+cx, cy, Rr = 1540, 560, 268          # правее и компактнее — не наезжает на текст
 ang = lambda i: math.radians(-90 + i * 360 / n)
 pt = lambda i, r: (cx + r * math.cos(ang(i)), cy + r * math.sin(ang(i)))
 
@@ -74,10 +76,10 @@ mk = mark(mh)
 img.paste(mk, (X, 150), mk)
 d.text((X + mk.width + 26, 150 + mh // 2), "Ч А Й Н Я", font=prata(50), fill=GOLD, anchor="lm")
 
-fh = prata(140)
-d.text((X, 402), "У каждого чая", font=fh, fill=INK)
-d.text((X, 576), "свой характер", font=fh, fill=RED)
-d.line([(X + 4, 772), (X + 250, 772)], fill=GOLD, width=5)
+fh = prata(126)
+d.text((X, 410), "У каждого чая", font=fh, fill=INK)
+d.text((X, 578), "свой характер", font=fh, fill=RED)
+d.line([(X + 4, 766), (X + 240, 766)], fill=GOLD, width=5)
 
 out = root / "src-assets" / "bot-desc.jpg"
 img = img.resize((640, 360), Image.LANCZOS)

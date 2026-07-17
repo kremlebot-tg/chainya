@@ -131,7 +131,7 @@ for text, color in lines:
     d.text((X, y), text, font=f_h, fill=color)
     y += 94
 # одна крупная подпись (мелкие строки убраны — их дублирует подпись под фото)
-d.text((X, y + 24), "Камерная чайная · метро Аэропорт", font=golos(35), fill=(198, 191, 182))
+d.text((X, y + 24), "Чайная · метро Аэропорт", font=golos(35), fill=(198, 191, 182))
 
 cov.save(root / "src-assets" / "bot-cover.jpg", "JPEG", quality=90, progressive=True)
 print("bot-cover.jpg:", cov.size)

@@ -98,6 +98,9 @@ d.text((X, 488), "бронь стола и чай навынос.", font=golos(2
 d.text((X, 524), "Всё в этом боте.", font=golos(26), fill=(190, 183, 174))
 
 out = root / "src-assets" / "bot-desc.jpg"
+# @BotFather требует картинку описания РОВНО 640×360. Рисуем в 1280×720 и
+# уменьшаем вдвое (супер-сэмплинг = чётче, чем рисовать сразу мелко).
+img = img.resize((640, 360), Image.LANCZOS)
 img.save(out, "JPEG", quality=92, progressive=True)
 print("bot-desc.jpg:", img.size)
 

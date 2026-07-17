@@ -17,6 +17,7 @@
 """
 import base64
 import hashlib
+import json
 import pathlib
 import re
 import shutil
@@ -59,7 +60,33 @@ HEAD_EXTRA = f"""<meta name="description" content="{DESC}">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="canonical" href="{SITE}">
 <link rel="icon" href="favicon.png" type="image/png">
-<link rel="apple-touch-icon" href="favicon.png">"""
+<link rel="apple-touch-icon" href="favicon.png">
+{json.dumps({
+    "@context": "https://schema.org",
+    "@type": ["CafeOrCoffeeShop", "Store"],
+    "name": "Чайня",
+    "description": DESC,
+    "url": SITE,
+    "image": SITE + OG_NAME,
+    "telephone": "+7 905 590-88-01",
+    "priceRange": "₽₽",
+    "currenciesAccepted": "RUB",
+    "servesCuisine": "Чай",
+    "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "улица Острякова, 3, помещение 114",
+        "addressLocality": "Москва",
+        "addressCountry": "RU",
+    },
+    "openingHoursSpecification": {
+        "@type": "OpeningHoursSpecification",
+        "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+        "opens": "12:00",
+        "closes": "22:00",
+    },
+    "hasMap": "https://yandex.ru/maps/org/chaynya/",
+    "sameAs": ["https://t.me/chainyamsk", "https://yandex.ru/maps/org/chaynya/"],
+}, ensure_ascii=False).join(('<script type="application/ld+json">', '</script>'))}"""
 
 
 def font_css(inline: bool) -> str:

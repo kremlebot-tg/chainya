@@ -33,8 +33,9 @@ ssh "$HOST" '
   rm -f /tmp/site.tgz
   chown -R www-data:www-data '"$DIR"'
   nginx -t >/dev/null 2>&1 || { echo "✗ конфиг nginx сломан — reload не делаю"; exit 1; }
-  code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 -H "Host: chainya.ru" http://127.0.0.1/)
-  echo "  локальная проверка: HTTP $code, файлов: $(find '"$DIR"' -type f | wc -l)"
+  # проверяем по https: http теперь 301→https, старая проверка на http падала
+  code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 -k -H "Host: chainya.ru" https://127.0.0.1/)
+  echo "  локальная проверка: HTTPS $code, файлов: $(find '"$DIR"' -type f | wc -l)"
   [ "$code" = "200" ] || exit 1
 '
 

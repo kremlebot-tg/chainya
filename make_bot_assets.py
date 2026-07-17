@@ -8,7 +8,7 @@
 шрифты Prata/Golos, красный акцент. Результат в src-assets/, копии на Desktop.
 """
 import pathlib
-from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter, ImageFont
 
 root = pathlib.Path(__file__).parent
 FONTS = root / "src-assets" / "fonts-full"
@@ -26,9 +26,13 @@ MUTE = (148, 140, 131)
 # плашка тёмной) и режем маской по альфе плашки, чтобы за её краями было пусто.
 mark_src = Image.open(root / "src-assets" / "logo-mark.png").convert("RGBA")
 _gray = mark_src.convert("RGB").convert("L")
-_letters = ImageChops.multiply(ImageChops.invert(_gray), mark_src.split()[3])  # альфа букв, гладкая
-# гасим слабые значения — призрак рамки плашки, оставляем только сами буквы
-_letters = _letters.point(lambda v: 0 if v < 150 else 255)
+_letters = ImageChops.multiply(ImageChops.invert(_gray), mark_src.split()[3])  # альфа букв
+_letters = _letters.point(lambda v: 255 if v > 135 else 0)                     # бинаризуем
+# морфологическое открытие (эрозия→дилатация): убирает ТОНКУЮ рамку плашки,
+# толстые штрихи букв переживают. Так знак остаётся чистым, без призрака.
+_letters = _letters.filter(ImageFilter.MinFilter(5)).filter(ImageFilter.MaxFilter(5))
+# лёгкое размытие вернёт сглаженные края после бинаризации
+_letters = _letters.filter(ImageFilter.GaussianBlur(0.6))
 
 
 def mark(height, color=INK):
@@ -38,15 +42,30 @@ def mark(height, color=INK):
     return glyph
 
 
-# ─────────────  АВАТАРКА 640×640  ─────────────
-A = 640
-av = Image.new("RGB", (A, A), BG)
+# ─────────────  АВАТАРКА 1024×1024  ─────────────
+A = 1024
+
+
+def radial(size, inner, outer, power=1.5):
+    g = Image.new("RGB", (size, size))
+    px = g.load()
+    c = size / 2
+    for y in range(size):
+        for x in range(size):
+            d = min(1.0, ((x - c) ** 2 + (y - c) ** 2) ** 0.5 / c)
+            t = d ** power
+            px[x, y] = tuple(round(inner[i] * (1 - t) + outer[i] * t) for i in range(3))
+    return g
+
+
+# тёплый радиальный фон: центр чуть светлее краёв — глубина, не плоский квадрат
+av = radial(320, (36, 30, 27), (10, 8, 7)).resize((A, A), Image.BILINEAR)
 ad = ImageDraw.Draw(av)
-# красный ободок — после круглого кропа телеграма читается как рамка
-ad.ellipse([26, 26, A - 26, A - 26], outline=RED, width=9)
-# знак по центру
-m = mark(300)
-av.paste(m, ((A - m.width) // 2, (A - m.height) // 2 - 6), m)
+# тонкий красный ободок с запасом от края (круглый кроп телеграма его не срежет)
+ad.ellipse([72, 72, A - 72, A - 72], outline=RED, width=13)
+# знак ЧНЯ по центру: кремовый, крупный, чистый (рамка плашки убрана)
+m = mark(478)
+av.paste(m, ((A - m.width) // 2, (A - m.height) // 2 - 8), m)
 av.save(root / "src-assets" / "bot-avatar.png")
 print("bot-avatar.png:", av.size)
 
@@ -74,7 +93,7 @@ for i, name in enumerate(TEAS):
 cov.paste(wall, (WALL_X, -40))
 
 # ширма: гасим стену слева (под текстом), мягко открываем к правому краю
-TEXT_R = 640
+TEXT_R = 700
 scrim = Image.new("L", (W, H), 0)
 sd = ImageDraw.Draw(scrim)
 for x in range(W):
@@ -98,22 +117,21 @@ for y in range(H):
 cov.paste(Image.new("RGB", (W, H), BG), (0, 0), edge)
 
 d = ImageDraw.Draw(cov)
-X = 84
-# знак + слово ЧАЙНЯ
-mh = 70
+X = 92
+# знак + слово ЧАЙНЯ — крупнее
+mh = 88
 mk = mark(mh)
-cov.paste(mk, (X, 96), mk)
-d.text((X + mk.width + 22, 96 + mh // 2), "Ч А Й Н Я", font=prata(34), fill=INK, anchor="lm")
-# заголовок-оффер, последняя строка красным
-f_h = prata(60)
+cov.paste(mk, (X, 74), mk)
+d.text((X + mk.width + 26, 74 + mh // 2), "Ч А Й Н Я", font=prata(50), fill=INK, anchor="lm")
+# заголовок-оффер крупным кеглем, последняя строка красным
+f_h = prata(72)
 lines = [("Два часа,", INK), ("два чая", INK), ("и мастер напротив", JADE_RED)]
-y = 250
+y = 236
 for text, color in lines:
     d.text((X, y), text, font=f_h, fill=color)
-    y += 74
-# подпись
-d.text((X, 500), "Камерная чайная у метро Аэропорт", font=golos(24), fill=MUTE)
-d.text((X, 540), "Меню · бронь стола · чай навынос — в этом боте", font=golos(24), fill=(182, 175, 166))
+    y += 94
+# одна крупная подпись (мелкие строки убраны — их дублирует подпись под фото)
+d.text((X, y + 24), "Камерная чайная · метро Аэропорт", font=golos(35), fill=(198, 191, 182))
 
 cov.save(root / "src-assets" / "bot-cover.jpg", "JPEG", quality=90, progressive=True)
 print("bot-cover.jpg:", cov.size)

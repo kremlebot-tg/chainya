@@ -1852,7 +1852,8 @@ select.input{
   // Нативная «назад»: видна, когда мы не на главной или открыт паспорт чая
   function tgSyncBack(){
     if (!IN_TG) return;
-    const sub = ($('.view.is-active') || {}).id !== 'view-home' || $('#tea-sheet').classList.contains('on');
+    const sub = ($('.view.is-active') || {}).id !== 'view-home'
+      || $('#tea-sheet').classList.contains('on') || $('#cart-sheet').classList.contains('on');
     sub ? TG.BackButton.show() : TG.BackButton.hide();
   }
 
@@ -2170,7 +2171,12 @@ select.input{
   const packLabel = it => it.pack === 'pc' ? T().unit_pc.trim() : `${it.pack} ${T().gram}`;
   const linePrice = it => { const m = teaById(it.id); if (!m) return 0; return it.pack === 'pc' ? m.p : packPrice(m.p, it.pack); };
 
-  function getCart(){ try{ return JSON.parse(localStorage.getItem(CART_KEY) || '[]'); }catch(e){ return []; } }
+  function getCart(){
+    let a; try{ a = JSON.parse(localStorage.getItem(CART_KEY) || '[]'); }catch(e){ return []; }
+    // самолечение: выкидываем позиции с неизвестным id (меню могли отредактировать
+    // после того, как гость собрал корзину) — иначе оформление падало бы на них
+    return Array.isArray(a) ? a.filter(it => it && it.qty > 0 && teaById(it.id)) : [];
+  }
   function setCart(c){ try{ localStorage.setItem(CART_KEY, JSON.stringify(c)); }catch(e){} updateCartBadge(); }
   function cartCount(){ return getCart().reduce((s, it) => s + it.qty, 0); }
   function cartTotal(){ return getCart().reduce((s, it) => s + linePrice(it) * it.qty, 0); }
@@ -2275,19 +2281,23 @@ select.input{
     if (!c.length) return;
     if (!$('#c-phone').value.trim()){ $('#c-phone').focus(); return; }        // телефон обязателен
     if ($('#c-dlv').value !== 'pickup' && !$('#c-addr').value.trim()){ $('#c-addr').focus(); return; }
+    // компактный payload: id/pack/qty. Названия, цены и итог бот считает из своей
+    // же базы — меньше байт для sendData (лимит 4096) и цена не зависит от клиента.
     const payload = {
       type:'order',
-      items: c.map(it => ({ id:it.id, name:T().teas[it.id].n, pack:it.pack, qty:it.qty, sum:linePrice(it) * it.qty })),
-      total: cartTotal(),
-      delivery: $('#c-dlv').value, delivery_name: T().dlv[$('#c-dlv').value],
+      items: c.map(it => ({ id:it.id, pack:it.pack, qty:it.qty })),
+      delivery: $('#c-dlv').value,
       name: $('#c-name').value.trim(), phone: $('#c-phone').value.trim(),
       address: $('#c-addr').value.trim(), note: $('#c-note').value.trim(),
     };
-    if (IN_TG){ try { TG.sendData(JSON.stringify(payload)); return; } catch(e){} }
+    const clearCart = () => {
+      localStorage.removeItem(CART_KEY); updateCartBadge();
+      $('#cart-items').innerHTML = ''; $('#cart-items').append(el(`<div class="cart-empty">${T().order_done}</div>`));
+      $('#cart-co').hidden = true; $('#cart-submit').disabled = true; $('#cart-total').textContent = '—';
+    };
+    if (IN_TG){ try { TG.sendData(JSON.stringify(payload)); clearCart(); return; } catch(e){} }
     window.open('https://t.me/chainyamsk?text=' + encodeURIComponent(orderMsg()), '_blank', 'noopener');
-    localStorage.removeItem(CART_KEY); updateCartBadge();
-    $('#cart-items').innerHTML = ''; $('#cart-items').append(el(`<div class="cart-empty">${T().order_done}</div>`));
-    $('#cart-co').hidden = true; $('#cart-submit').disabled = true; $('#cart-total').textContent = '—';
+    clearCart();
   });
 
   /* свайп вправо закрывает корзину (как паспорт) */
@@ -2512,7 +2522,8 @@ select.input{
     tgTheme();
     TG.onEvent('themeChanged', tgTheme);
     TG.BackButton.onClick(() => {
-      if ($('#tea-sheet').classList.contains('on')) closeTea();
+      if ($('#cart-sheet').classList.contains('on')) closeCart();
+      else if ($('#tea-sheet').classList.contains('on')) closeTea();
       else if (($('.view.is-active') || {}).id !== 'view-home') go('home');
       else TG.close();
     });

@@ -84,6 +84,9 @@ button{ font:inherit; color:inherit; background:none; border:0; cursor:pointer; 
 input, select, textarea{ font:inherit; color:inherit; }
 a{ color:inherit; text-decoration:none; }
 :focus-visible{ outline:2px solid var(--accent); outline-offset:3px; border-radius:2px; }
+/* Скип-линк: спрятан за верхним краем, выезжает при фокусе (первый Tab) */
+.skip{ position:fixed; left:12px; top:-64px; z-index:100; padding:10px 16px; background:var(--accent); color:#1a1206; border-radius:8px; font-weight:600; transition:top .2s var(--ease); }
+.skip:focus{ top:12px; }
 
 /* Китайский: у Prata и Golos нет CJK, иероглифы отдаём системным шрифтам.
    Заголовкам — сунти (аналог дидона), тексту — системный гротеск. */
@@ -431,10 +434,12 @@ a{ color:inherit; text-decoration:none; }
 .sheet{
   position:fixed; top:0; right:0; bottom:0; z-index:51; width:min(500px,100%);
   background:var(--bg); border-left:1px solid var(--line);
-  transform:translateX(100%); transition:transform .38s var(--ease);
-  display:flex; flex-direction:column;
+  transform:translateX(100%); display:flex; flex-direction:column;
+  /* visibility:hidden убирает закрытую панель из tab-order и дерева доступности
+     (иначе клавиатура «проваливалась» в невидимую панель); прячем ПОСЛЕ ухода */
+  visibility:hidden; transition:transform .38s var(--ease), visibility 0s linear .38s;
 }
-.sheet.on{ transform:none; }
+.sheet.on{ transform:none; visibility:visible; transition:transform .38s var(--ease); }
 .sheet__head{
   padding:22px var(--pad); display:flex; align-items:center; justify-content:space-between;
   gap:14px; border-bottom:1px solid var(--line-soft);
@@ -526,6 +531,7 @@ a{ color:inherit; text-decoration:none; }
   -webkit-appearance:none; appearance:none;
 }
 .input:focus{ outline:none; border-color:var(--accent); }
+.input:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
 .input::placeholder{ color:var(--text-3); opacity:1; }
 textarea.input{ min-height:84px; resize:vertical; line-height:1.5; }
 select.input{
@@ -693,6 +699,11 @@ select.input{
 }
 @media (max-width:620px){
   body{ font-size:16px; }
+  /* поля 16px — иначе iOS Safari при фокусе автоматически зумит страницу */
+  .input{ font-size:16px; }
+  /* тач-зоны корзины и языков до 44px (пальцу нужно 44, на десктопе было меньше) */
+  .qty__b{ width:44px; height:44px; }
+  .citem__rm{ width:44px; height:44px; }
   .nav__in{ height:56px; gap:8px; }
   .brand{ font-size:15px; letter-spacing:.14em; gap:8px; min-height:44px; min-width:0; }
   /* «МСК» — декоративная приписка: на телефоне она упиралась в переключатель
@@ -702,7 +713,7 @@ select.input{
   .nav__links{ display:none; }
   /* Тач-зоны: пальцу нужно 44px, мышке хватало 26. Ниже — только мобильные размеры */
   .lang{ padding:2px; }
-  .lang button{ min-height:40px; padding:0 11px; font-size:12px; }
+  .lang button{ min-height:44px; padding:0 11px; font-size:12px; }
   /* На 375px название почти упиралось в языки — поджимаем языки пораньше */
   @media (max-width:400px){ .lang button{ padding:0 8px; } }
   @media (max-width:360px){
@@ -789,17 +800,29 @@ select.input{
 
 <div class="grain" aria-hidden="true"></div>
 
+<a class="skip" href="#main" data-i18n="skip">Перейти к содержимому</a>
+
+<noscript>
+  <div style="max-width:640px;margin:48px auto;padding:0 22px;line-height:1.6;color:#e8e4dc;font-family:system-ui,sans-serif">
+    <h1>Чайня — чайная у метро Аэропорт</h1>
+    <p>Москва, ул. Острякова, 3, помещение 114 (метро Аэропорт). Ежедневно 12:00–22:00.</p>
+    <p>Чайная церемония с мастером и китайский чай навынос с доставкой по России.</p>
+    <p>Телефон <a href="tel:+79055908801">+7 905 590-88-01</a> · канал <a href="https://t.me/chainyamsk">@chainyamsk</a> · бот <a href="https://t.me/chainyabot">@chainyabot</a>.</p>
+    <p>Для каталога чая, брони и корзины включите, пожалуйста, JavaScript.</p>
+  </div>
+</noscript>
+
 <header class="nav">
   <div class="nav__in">
     <a class="brand" href="#" data-go="home">
       <img class="brand__mark" src="{{img:logo-mark}}" alt="" data-i18n-alt="alt_logo" width="186" height="377">
       <span><span data-i18n="brand">Чайня</span><sup data-i18n="brand_sup">МСК</sup></span>
     </a>
-    <nav class="nav__links">
-      <a class="nav__link" href="#" data-go="home" data-i18n="nav_home" aria-current="page">Чайная</a>
-      <a class="nav__link" href="#" data-go="shop" data-i18n="nav_shop">Купить чай</a>
-      <a class="nav__link" href="#" data-go="b2b" data-i18n="nav_b2b">Для бизнеса</a>
-      <a class="nav__link" href="#" data-go="book" data-i18n="nav_book">Бронь</a>
+    <nav class="nav__links" data-i18n-aria="a_nav" aria-label="Разделы сайта">
+      <a class="nav__link" href="#home" data-go="home" data-i18n="nav_home" aria-current="page">Чайная</a>
+      <a class="nav__link" href="#shop" data-go="shop" data-i18n="nav_shop">Купить чай</a>
+      <a class="nav__link" href="#b2b" data-go="b2b" data-i18n="nav_b2b">Для бизнеса</a>
+      <a class="nav__link" href="#book" data-go="book" data-i18n="nav_book">Бронь</a>
     </nav>
     <div class="nav__tools">
       <div class="lang" role="group" data-i18n-aria="a_lang" aria-label="Язык">
@@ -816,15 +839,15 @@ select.input{
       </button>
     </div>
   </div>
-  <nav class="nav--mob">
-    <a class="nav__link" href="#" data-go="home" data-i18n="nav_home" aria-current="page">Чайная</a>
-    <a class="nav__link" href="#" data-go="shop" data-i18n="nav_shop">Купить чай</a>
-    <a class="nav__link" href="#" data-go="b2b" data-i18n="nav_b2b">Для бизнеса</a>
-    <a class="nav__link" href="#" data-go="book" data-i18n="nav_book">Бронь</a>
+  <nav class="nav--mob" aria-label="Разделы сайта (мобильное меню)">
+    <a class="nav__link" href="#home" data-go="home" data-i18n="nav_home" aria-current="page">Чайная</a>
+    <a class="nav__link" href="#shop" data-go="shop" data-i18n="nav_shop">Купить чай</a>
+    <a class="nav__link" href="#b2b" data-go="b2b" data-i18n="nav_b2b">Для бизнеса</a>
+    <a class="nav__link" href="#book" data-go="book" data-i18n="nav_book">Бронь</a>
   </nav>
 </header>
 
-<main>
+<main id="main">
 <!-- ══════════════════  ЧАЙНАЯ  ══════════════════ -->
 <section class="view is-active" id="view-home">
   <div class="hero">
@@ -1141,7 +1164,7 @@ select.input{
             <div class="slots" id="slots"></div>
           </div>
           <div class="field">
-            <span class="label" data-i18n="f_guests">Гостей</span>
+            <label class="label" for="f-guests" data-i18n="f_guests">Гостей</label>
             <select class="input" id="f-guests"></select>
           </div>
           <div class="row2">
@@ -1449,7 +1472,7 @@ select.input{
   ru: {
     locale:'ru-RU',
     title:'Чайня · чайная на Острякова',
-    a_lang:'Язык', a_theme:'Сменить тему', a_close:'Закрыть', a_tea:'О чае',
+    a_lang:'Язык', a_theme:'Сменить тему', a_close:'Закрыть', a_tea:'О чае', a_nav:'Разделы сайта', skip:'Перейти к содержимому',
     alt_master:'Чайный мастер разливает настой из чахая по чашкам',
     alt_logo:'Знак Чайни: буквы Ч, Н, Я, сложенные под иероглиф',
     alt_pour:'Мастер наливает настой в чахай',
@@ -1486,7 +1509,7 @@ select.input{
     step4_h:'Донышко', step4_p:'Когда лист отдал всё, его разворачивают на блюдце. По листу видно, где он рос и как его делали.',
     fromcard_label:'Что налить', fromcard_h:'Что стоит<br>попробовать',
     fromcard_lead:'Точка в углу карточки показывает тип чая. Вся коллекция читается по ней: от белого до пуэра. Любой из этих чаёв можно и выпить за столом, и забрать домой.',
-    fromcard_link:'Все 24 чая',
+    fromcard_link:'Все '+TEA_META.length+' чая',
     hall_label:'Зал', hall_h:'Где сесть',
     hall_lead:'Стол бронируется на сессию целиком. Мы не подсаживаем гостей и не торопим, даже если вы засиделись.',
     hall_h3:'Один зал, девять мест',
@@ -1592,7 +1615,7 @@ select.input{
   en: {
     locale:'en-GB',
     title:'Chaynya · a tea house on Ostryakova',
-    a_lang:'Language', a_theme:'Theme', a_close:'Close', a_tea:'About the tea',
+    a_lang:'Language', a_theme:'Theme', a_close:'Close', a_tea:'About the tea', a_nav:'Site sections', skip:'Skip to content',
     alt_master:'A tea master pouring the liquor from a pitcher into cups',
     alt_logo:'The Chaynya mark: the letters Ч, Н, Я stacked like a Chinese character',
     alt_pour:'The master pouring the liquor into a cha hai',
@@ -1629,7 +1652,7 @@ select.input{
     step4_h:'The spent leaf', step4_p:'Once the leaf has given everything, it gets unfolded on a saucer. It shows where the tea grew and how it was made.',
     fromcard_label:'What to pour', fromcard_h:'Worth<br>a try',
     fromcard_lead:'The dot in the corner of each card marks the type of tea. The whole collection reads by it, from white to pu-erh. Any of these you can drink at the table or take home.',
-    fromcard_link:'All 24 teas',
+    fromcard_link:'All '+TEA_META.length+' teas',
     hall_label:'The room', hall_h:'Where you sit',
     hall_lead:'A table is booked for the whole session. We never seat strangers together and never hurry you out.',
     hall_h3:'One room, nine seats',
@@ -1647,13 +1670,13 @@ select.input{
     unit_pc:'One piece', unit_pack:'A {g} g bag',
     ts_buy:'Buy with delivery', order_prefill:'Hello! I’d like to order with delivery: ',
     a_cart:'Cart', ts_add:'Add to cart', ts_added:'Added ✓',
-    cart_h:'Cart', cart_empty:'Empty. Open “Buy tea” and add a sort.',
+    cart_h:'Cart', cart_empty:'Empty. Open “Buy tea” and pick a few.',
     cart_remove:'Remove', cart_total:'Total', cart_co_h:'Checkout',
     cart_dlv:'Delivery', cart_addr:'Address', cart_addr_ph:'City, street, building, flat',
     cart_note_ph:'Order comment', cart_submit:'Place order',
     cart_pay:'Pay by transfer or on delivery. We’ll confirm and calculate shipping.',
     dlv:{ pickup:'Pickup · Ostryakova 3', cdek:'CDEK across Russia' },
-    order_head:'🛒 Tea order — Chainya', order_done:'Thanks! Finish your order in our bot @chainyabot or call +7 905 590-88-01 — we’ll confirm and calculate shipping.',
+    order_head:'🛒 Tea order — Chaynya', order_done:'Thanks! Finish your order in our bot @chainyabot or call +7 905 590-88-01 — we’ll confirm and calculate shipping.',
     ts_note:'At the table this tea costs you nothing: two of your choice come with the table.',
     b2b_label:'For business', b2b_h:'Our leaf<br>on your menu',
     b2b_lead:'We bring tea from China ourselves and wholesale it to cafés, restaurants and offices. The same leaf we serve in the room — and any other one to order.',
@@ -1735,7 +1758,7 @@ select.input{
   zh: {
     locale:'zh-CN',
     title:'Chaynya · 莫斯科茶馆',
-    a_lang:'语言', a_theme:'主题', a_close:'关闭', a_tea:'茶叶详情',
+    a_lang:'语言', a_theme:'主题', a_close:'关闭', a_tea:'茶叶详情', a_nav:'网站栏目', skip:'跳到内容',
     alt_master:'茶艺师正把茶汤从茶海分入茶杯',
     alt_logo:'Chaynya的标记：Ч、Н、Я三个字母叠成汉字的样子',
     alt_pour:'茶艺师把茶汤注入茶海',
@@ -1772,7 +1795,7 @@ select.input{
     step4_h:'看叶底', step4_p:'茶叶泡尽后，摊在碟子上细看。叶底能看出茶树长在哪里、工艺如何。',
     fromcard_label:'泡点什么', fromcard_h:'值得<br>一试',
     fromcard_lead:'卡片角上的圆点标示茶类。整个收藏都照它来读：从白茶到普洱。这些茶既可以在席上喝，也可以带回家。',
-    fromcard_link:'全部24款茶',
+    fromcard_link:'全部'+TEA_META.length+'款茶',
     hall_label:'茶室', hall_h:'坐在哪里',
     hall_lead:'订座即包下整场茶席。我们不拼桌，也绝不催客。',
     hall_h3:'一间茶室，九个座位',
@@ -1792,11 +1815,11 @@ select.input{
     a_cart:'购物车', ts_add:'加入购物车', ts_added:'已加入 ✓',
     cart_h:'购物车', cart_empty:'空的。到「买茶」里添加茶品吧。',
     cart_remove:'移除', cart_total:'合计', cart_co_h:'结算',
-    cart_dlv:'配送', cart_addr:'地址', cart_addr_ph:'城市、街道、门牌、房间',
+    cart_dlv:'配送', cart_addr:'地址', cart_addr_ph:'城市、街道、门牌号、公寓',
     cart_note_ph:'订单备注', cart_submit:'提交订单',
     cart_pay:'转账或货到付款。我们会确认并计算运费。',
-    dlv:{ pickup:'自取 · Ostryakova 3', cdek:'CDEK 寄送全俄' },
-    order_head:'🛒 茶订单 — Chainya', order_done:'谢谢！请在我们的机器人 @chainyabot 中完成订单，或致电 +7 905 590-88-01，我们会确认并计算运费。',
+    dlv:{ pickup:'自取 · 奥斯特里亚科娃街3号', cdek:'CDEK 寄送全俄' },
+    order_head:'🛒 茶订单 — Chaynya', order_done:'谢谢！请在我们的机器人 @chainyabot 中完成订单，或致电 +7 905 590-88-01，我们会确认并计算运费。',
     ts_note:'在店里喝这款茶不另收费：茶席已含任选两款。',
     b2b_label:'企业合作', b2b_h:'把我们的茶<br>放上您的菜单',
     b2b_lead:'我们自己从中国进货，批发给咖啡馆、餐厅和办公室。与店里所泡的是同一份茶叶——其他品类也可订货。',
@@ -2024,7 +2047,11 @@ select.input{
     }
   }
 
-  let lastCard = null;   // куда вернуть фокус после закрытия панели
+  let lastCard = null, lastCartTrigger = null;   // куда вернуть фокус после закрытия панели
+  // Фон инертен, пока открыта выдвижная панель: и ловушка фокуса (Tab не уходит
+  // под скрим), и скрытие фона от скринридера. Панели — <aside> после </main>/
+  // <footer>, поэтому сами остаются активными.
+  function bgInert(on){ document.querySelectorAll('header, main, footer').forEach(n => { n.inert = on; }); }
   /* ─────────────  ИЗБРАННОЕ  ─────────────
      Чистый фронт: список id в localStorage, сердце на карточке и в паспорте,
      отдельный чип-фильтр. Сервер не нужен. */
@@ -2174,6 +2201,7 @@ select.input{
     sheet.classList.add('on');
     $('#scrim').classList.add('on');
     lockScroll();
+    bgInert(true);
     sheet.focus({ preventScroll:true });
     tgSyncBack();
   }
@@ -2182,6 +2210,7 @@ select.input{
     sheet.classList.remove('on');
     $('#scrim').classList.remove('on');
     unlockScroll();
+    bgInert(false);
     if (lastCard){ lastCard.focus({ preventScroll:true }); lastCard = null; }
     tgSyncBack();
   }
@@ -2239,6 +2268,9 @@ select.input{
   function updateCartBadge(){
     const n = cartCount(), b = $('#cart-count');
     b.textContent = n; b.hidden = n === 0;
+    // aria-label кнопки перекрывает число внутри неё — дописываем количество сами,
+    // чтобы скринридер объявил «Корзина: 3». Идёт после i18n-прохода в applyLang.
+    $('#cart-open').setAttribute('aria-label', T().a_cart + (n > 0 ? ': ' + n : ''));
     if (_cartN >= 0 && n > _cartN){ b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop'); }
     _cartN = n;
   }
@@ -2300,15 +2332,18 @@ select.input{
   function syncCart(){ updateCartBadge(); buildDlv(); if (cartSheet.classList.contains('on')) renderCart(); }
 
   function openCart(){
+    lastCartTrigger = document.activeElement;   // куда вернуть фокус при закрытии
     closeTea();
     renderCart();
     cartSheet.classList.add('on'); $('#scrim').classList.add('on');
-    lockScroll(); cartSheet.focus({ preventScroll:true }); tgSyncBack();
+    lockScroll(); bgInert(true); cartSheet.focus({ preventScroll:true }); tgSyncBack();
   }
   function closeCart(){
     if (!cartSheet.classList.contains('on')) return;
     cartSheet.classList.remove('on'); $('#scrim').classList.remove('on');
-    unlockScroll(); tgSyncBack();
+    unlockScroll(); bgInert(false);
+    if (lastCartTrigger){ lastCartTrigger.focus({ preventScroll:true }); lastCartTrigger = null; }
+    tgSyncBack();
   }
 
   function orderMsg(){

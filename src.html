@@ -1742,6 +1742,21 @@ select.input{
   const $   = (s, r=document) => r.querySelector(s);
   const $$  = (s, r=document) => [...r.querySelectorAll(s)];
 
+  /* ─────────────  TELEGRAM MINI APP  ─────────────
+     Тот же сайт, открытый ботом внутри телеграма. Если мы там — синхронизируем
+     тему, разворачиваем на весь экран, ведём нативную кнопку «назад» и шлём
+     бронь прямо в бота (sendData), а не открываем чат. В обычном браузере
+     window.Telegram.WebApp тоже есть, но platform='unknown' — тогда всё это
+     выключено и сайт работает как обычно. */
+  const TG = window.Telegram && window.Telegram.WebApp;
+  const IN_TG = !!(TG && TG.platform && TG.platform !== 'unknown');
+  // Нативная «назад»: видна, когда мы не на главной или открыт паспорт чая
+  function tgSyncBack(){
+    if (!IN_TG) return;
+    const sub = ($('.view.is-active') || {}).id !== 'view-home' || $('#tea-sheet').classList.contains('on');
+    sub ? TG.BackButton.show() : TG.BackButton.hide();
+  }
+
   /* ─────────────  ТЕМА  ───────────── */
   const root = document.documentElement;
   const isDark = () => (root.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')) === 'dark';
@@ -1762,6 +1777,7 @@ select.input{
     $('#b2b-form-wrap').hidden = false; $('#b2b-done').hidden = true;
     closeTea();
     scrollTo({ top:0, behavior:'instant' });
+    tgSyncBack();
   }
   document.addEventListener('click', e => {
     const t = e.target.closest('[data-go]');
@@ -1993,6 +2009,7 @@ select.input{
     $('#scrim').classList.add('on');
     lockScroll();
     sheet.focus({ preventScroll:true });
+    tgSyncBack();
   }
   function closeTea(){
     if (!sheet.classList.contains('on')) return;
@@ -2000,6 +2017,7 @@ select.input{
     $('#scrim').classList.remove('on');
     unlockScroll();
     if (lastCard){ lastCard.focus({ preventScroll:true }); lastCard = null; }
+    tgSyncBack();
   }
   $('#ts-close').addEventListener('click', closeTea);
   $('#ts-fav').addEventListener('click', () => { const id = $('#ts-fav').dataset.id; if (id) toggleFav(id); });
@@ -2154,6 +2172,21 @@ select.input{
 
   $('#submit').addEventListener('click', () => {
     if (!B.date || !B.time) return;
+    // В телеграм-мини-аппе шлём бронь прямо боту (он перешлёт её заведению и
+    // подтвердит), а не открываем чат. sendData работает, когда мини-апп открыт
+    // кнопкой «Забронировать» из бота; если нет (полный веб-апп/обычный браузер)
+    // — падаем на готовое сообщение в чат @chainyamsk.
+    if (IN_TG){
+      try {
+        TG.sendData(JSON.stringify({
+          type: 'booking',
+          format: B.format, format_name: fmtName(), price: FMT[B.format],
+          date: B.date, date_h: fmtDate(B.date), time: B.time, guests: +B.guests,
+          name: $('#f-name').value.trim(), phone: $('#f-phone').value.trim(), note: $('#f-note').value.trim(),
+        }));
+        return; // телеграм закроет мини-апп сам
+      } catch (e){ /* не тот контекст запуска — уходим на запасной путь ниже */ }
+    }
     // encodeURIComponent сам ставит %0A на перевод строки и %20 на пробел —
     // телеграм разворачивает это в готовый текст, гостю остаётся нажать «Отправить»
     window.open('https://t.me/chainyamsk?text=' + encodeURIComponent(bookingMsg()), '_blank', 'noopener');
@@ -2218,5 +2251,24 @@ select.input{
 
   applyLang();
   goFromHash();
+
+  // Инициализация мини-аппа: только когда сайт реально открыт внутри телеграма
+  if (IN_TG){
+    TG.ready();
+    TG.expand();
+    const brandBg = () => (TG.colorScheme === 'light' ? '#E7E6DF' : '#141110');
+    const tgTheme = () => {
+      document.documentElement.setAttribute('data-theme', TG.colorScheme === 'light' ? 'light' : 'dark');
+      try { TG.setHeaderColor(brandBg()); TG.setBackgroundColor(brandBg()); } catch(e){}
+    };
+    tgTheme();
+    TG.onEvent('themeChanged', tgTheme);
+    TG.BackButton.onClick(() => {
+      if ($('#tea-sheet').classList.contains('on')) closeTea();
+      else if (($('.view.is-active') || {}).id !== 'view-home') go('home');
+      else TG.close();
+    });
+    tgSyncBack();
+  }
 })();
 </script>

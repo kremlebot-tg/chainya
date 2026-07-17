@@ -109,6 +109,9 @@ def document(body: str, extra_head: str = "") -> str:
         '<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
         f"<title>{TITLE}</title>\n"
+        # Telegram Mini App SDK: даёт window.Telegram.WebApp внутри телеграма.
+        # В обычном браузере platform='unknown' и вся мини-апп-логика молчит.
+        '<script src="https://telegram.org/js/telegram-web-app.js"></script>\n'
         f"{extra_head}\n"
         "<style>*{margin:0}</style>\n"
         "</head>\n<body>\n" + body + "\n</body>\n</html>\n"

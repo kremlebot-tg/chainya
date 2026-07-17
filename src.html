@@ -690,15 +690,19 @@ select.input{
 @media (max-width:620px){
   body{ font-size:16px; }
   .nav__in{ height:56px; gap:8px; }
-  .brand{ font-size:15px; letter-spacing:.14em; gap:8px; min-height:44px; }
+  .brand{ font-size:15px; letter-spacing:.14em; gap:8px; min-height:44px; min-width:0; }
+  /* «МСК» — декоративная приписка: на телефоне она упиралась в переключатель
+     языка (шапка и так плотная: знак + название + языки + корзина + тема) */
+  .brand sup{ display:none; }
   .brand__mark{ height:28px; }
   .nav__links{ display:none; }
   /* Тач-зоны: пальцу нужно 44px, мышке хватало 26. Ниже — только мобильные размеры */
   .lang{ padding:2px; }
   .lang button{ min-height:40px; padding:0 11px; font-size:12px; }
+  /* На 375px название почти упиралось в языки — поджимаем языки пораньше */
+  @media (max-width:400px){ .lang button{ padding:0 8px; } }
   @media (max-width:360px){
     .brand span{ display:none; }        /* совсем узко: оставляем один знак */
-    .lang button{ padding:0 8px; }
   }
   .icon-btn{ width:44px; height:44px; }
   .nav--mob{
@@ -2519,10 +2523,13 @@ select.input{
   let _revScheduled = false;
   function revealCheck(){
     _revScheduled = false;
-    const h = innerHeight;
+    // 1.25h — «заглядываем» на четверть экрана ВНИЗ за кадр: блок успевает
+    // проявиться до того, как читатель до него доскроллит, и не мигает у него
+    // перед носом. Ниже 1.0 было поздно.
+    const h = innerHeight, look = h * 1.25;
     document.querySelectorAll('.reveal:not(.in)').forEach(el => {
       const r = el.getBoundingClientRect();
-      if (r.bottom > 4 && r.top < h * 0.92) el.classList.add('in');
+      if (r.bottom > 4 && r.top < look) el.classList.add('in');
     });
   }
   function scheduleReveal(){ if (!_revScheduled){ _revScheduled = true; requestAnimationFrame(revealCheck); } }

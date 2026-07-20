@@ -156,6 +156,7 @@ if web:
         shutil.copy(root / "fonts" / f"{f}.woff2", dist / "fonts" / f"{f}.woff2")
     shutil.copy(root / "src-assets" / "favicon.png", dist / "favicon.png")
     shutil.copy(OG_SRC, dist / OG_NAME)
+    shutil.copy(root / "privacy.html", dist / "privacy.html")
     # CNAME подключает домен на GitHub Pages: файл в артефакте = кастомный домен
     (dist / "CNAME").write_text("chainya.ru\n", encoding="utf-8")
     (dist / "index.html").write_text(document(content, HEAD_EXTRA), encoding="utf-8")

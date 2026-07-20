@@ -516,6 +516,7 @@ a{ color:inherit; text-decoration:none; }
 .cart-co{ margin-top:20px; }
 .cart-co__h{ font-family:'Prata',Georgia,serif; font-weight:400; font-size:1.15rem; margin:0 0 14px; }
 .cart-note{ margin:10px 0 0; font-size:11.5px; color:var(--text-3); line-height:1.5; text-align:center; }
+.consent{display:flex;align-items:flex-start;gap:10px;margin:14px 0;color:var(--text-3);font-size:12px;line-height:1.45}.consent input{width:18px;height:18px;margin:0;flex:none;accent-color:var(--accent)}.consent a{color:var(--text-2);border-bottom:1px solid var(--line)}
 
 /* ─────────────────────────  ФОРМЫ  ───────────────────────── */
 /* minmax(0,…), а не 1fr: у элементов грида min-width:auto, и лента дней
@@ -1108,6 +1109,7 @@ select.input{
             <label class="label" for="b-note" data-i18n="b_note">Что наливаете сейчас</label>
             <textarea class="input" id="b-note" data-i18n-ph="b_note_ph"></textarea>
           </div>
+          <label class="consent"><input type="checkbox" id="b-privacy"><span><span data-i18n="privacy_accept">Согласен на обработку данных согласно</span> <a href="/privacy.html" target="_blank" data-i18n="privacy_link">политике конфиденциальности</a></span></label>
           <button class="btn btn--solid btn--wide" id="b2b-submit" data-i18n="b2b_send">Отправить</button>
           <p class="summary__note" data-i18n="b2b_form_note"></p>
         </aside>
@@ -1248,6 +1250,7 @@ select.input{
     </div>
     <div class="foot__bot">
       <span data-i18n="foot_c">© 2026 Чайня</span>
+      <a href="/privacy.html" data-i18n="privacy_link">Политика конфиденциальности</a>
       <span class="foot__by"><a href="https://rednd.ru" target="_blank" rel="noopener">rednd.ru</a></span>
     </div>
   </div>
@@ -1332,6 +1335,7 @@ select.input{
         <label class="label" for="c-note" data-i18n="f_note">Пожелания</label>
         <textarea class="input" id="c-note" data-i18n-ph="cart_note_ph"></textarea>
       </div>
+      <label class="consent"><input type="checkbox" id="c-privacy"><span><span data-i18n="privacy_accept">Согласен на обработку данных согласно</span> <a href="/privacy.html" target="_blank" data-i18n="privacy_link">политике конфиденциальности</a></span></label>
     </div>
   </div>
   <div class="sheet__foot">
@@ -1551,6 +1555,7 @@ select.input{
     pay_card:'Банковская карта', pay_sbp:'СБП',
     cart_note_ph:'Комментарий к заказу', cart_submit:'Оформить заказ',
     cart_pay:'Тестовый режим: деньги не списываются, цены СДЭК демонстрационные.',
+    privacy_accept:'Согласен на обработку данных согласно', privacy_link:'политике конфиденциальности', privacy_required:'Подтвердите согласие на обработку данных',
     dlv:{ pickup:'Самовывоз · Острякова, 3', cdek_pvz:'СДЭК · пункт выдачи', cdek_courier:'СДЭК · курьер' },
     order_head:'🛒 Заказ чая — Чайня', order_done:'Спасибо! Завершите заказ в нашем боте @chainyabot или позвоните +7 905 590-88-01 — подтвердим и посчитаем доставку.',
     ts_note:'За столом этот чай можно выпить бесплатно: два на выбор входят в стоимость стола.',
@@ -1697,6 +1702,7 @@ select.input{
     pay_card:'Bank card', pay_sbp:'SBP',
     cart_note_ph:'Order comment', cart_submit:'Place order',
     cart_pay:'Test mode: no money is charged; CDEK prices are placeholders.',
+    privacy_accept:'I consent to data processing under the', privacy_link:'privacy policy', privacy_required:'Please accept the data processing terms',
     dlv:{ pickup:'Pickup · Ostryakova 3', cdek_pvz:'CDEK · pickup point', cdek_courier:'CDEK · courier' },
     order_head:'🛒 Tea order — Chaynya', order_done:'Thanks! Finish your order in our bot @chainyabot or call +7 905 590-88-01 — we’ll confirm and calculate shipping.',
     ts_note:'At the table this tea costs you nothing: two of your choice come with the table.',
@@ -1843,6 +1849,7 @@ select.input{
     pay_card:'银行卡', pay_sbp:'快速支付系统（SBP）',
     cart_note_ph:'订单备注', cart_submit:'提交订单',
     cart_pay:'测试模式：不会扣款，CDEK运费为演示价格。',
+    privacy_accept:'我同意按照以下条款处理个人数据：', privacy_link:'隐私政策', privacy_required:'请同意个人数据处理条款',
     dlv:{ pickup:'自取 · 奥斯特里亚科娃街3号', cdek_pvz:'CDEK · 自提点', cdek_courier:'CDEK · 快递员' },
     order_head:'🛒 茶订单 — Chaynya', order_done:'谢谢！请在我们的机器人 @chainyabot 中完成订单，或致电 +7 905 590-88-01，我们会确认并计算运费。',
     ts_note:'在店里喝这款茶不另收费：茶席已含任选两款。',
@@ -2413,6 +2420,7 @@ select.input{
     const c = getCart();
     if (!c.length) return;
     if (!$('#c-phone').value.trim()){ $('#c-phone').focus(); return; }        // телефон обязателен
+    if (!$('#c-privacy').checked){ $('#cart-status').textContent = T().privacy_required; $('#c-privacy').focus(); return; }
     const dlv = $('#c-dlv').value;
     if (dlv !== 'pickup' && !$('#c-city').value.trim()){ $('#c-city').focus(); return; }
     if (dlv === 'cdek_pvz' && !$('#c-pvz').value.trim()){ $('#c-pvz').focus(); return; }
@@ -2426,6 +2434,7 @@ select.input{
       name: $('#c-name').value.trim(), phone: $('#c-phone').value.trim(),
       city: $('#c-city').value.trim(), address: $('#c-addr').value.trim(),
       pvz_code: $('#c-pvz').value.trim(), note: $('#c-note').value.trim(),
+      privacy_accepted: true,
     };
     const clearCart = () => {
       localStorage.removeItem(CART_KEY); updateCartBadge();
@@ -2627,6 +2636,10 @@ select.input{
   $('#b2b-submit').addEventListener('click', async () => {
     const phone = $('#b-phone').value.trim();
     if (!phone){ $('#b-phone').focus(); return; }
+    if (!$('#b-privacy').checked){
+      document.querySelector('#b2b-form-wrap .summary__note').textContent = T().privacy_required;
+      $('#b-privacy').focus(); return;
+    }
     const submit = $('#b2b-submit');
     submit.disabled = true;
     try {
@@ -2634,7 +2647,7 @@ select.input{
         method:'POST', headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
           company:$('#b-company').value.trim(), name:$('#b-name').value.trim(),
-          contact:phone, note:$('#b-note').value.trim(),
+          contact:phone, note:$('#b-note').value.trim(), privacy_accepted:true,
         }),
       });
       const result = await response.json();

@@ -82,6 +82,7 @@ class CreateOrder(BaseModel):
     address: str = Field(default="", max_length=300)
     pvz_code: str = Field(default="", max_length=80)
     note: str = Field(default="", max_length=1000)
+    privacy_accepted: Literal[True]
 
     @field_validator("phone")
     @classmethod
@@ -96,6 +97,7 @@ class CreateBusinessLead(BaseModel):
     name: str = Field(default="", max_length=120)
     contact: str = Field(min_length=3, max_length=120)
     note: str = Field(default="", max_length=1000)
+    privacy_accepted: Literal[True]
 
     @field_validator("contact")
     @classmethod

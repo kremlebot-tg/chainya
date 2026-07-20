@@ -20,6 +20,7 @@ def payload(**changes):
         "name": "Тест",
         "phone": "+7 999 123-45-67",
         "city": "", "address": "", "pvz_code": "", "note": "",
+        "privacy_accepted": True,
     }
     data.update(changes)
     return data
@@ -64,6 +65,13 @@ def test_requires_pvz_details(tmp_path, monkeypatch):
         assert response.status_code == 422
 
 
+def test_requires_privacy_consent(tmp_path, monkeypatch):
+    client, _ = app_client(tmp_path, monkeypatch)
+    with client:
+        assert client.post("/api/orders", json=payload(privacy_accepted=False)).status_code == 422
+        assert client.post("/api/business-leads", json={"contact": "@guest", "privacy_accepted": False}).status_code == 422
+
+
 def test_business_lead_is_saved_and_notified(tmp_path, monkeypatch):
     client, module = app_client(tmp_path, monkeypatch)
     sent = []
@@ -71,7 +79,7 @@ def test_business_lead_is_saved_and_notified(tmp_path, monkeypatch):
     with client:
         response = client.post("/api/business-leads", json={
             "company": "Кофейня Утро", "name": "Анна",
-            "contact": "@anna", "note": "Нужно 2 кг в месяц",
+            "contact": "@anna", "note": "Нужно 2 кг в месяц", "privacy_accepted": True,
         })
         assert response.status_code == 202
         assert response.json()["accepted"] is True

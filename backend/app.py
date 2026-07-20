@@ -24,7 +24,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
@@ -37,6 +37,7 @@ DB_PATH = DATA_DIR / "orders.sqlite3"
 CATALOG_PATH = Path(os.getenv("CHAINYA_CATALOG_PATH", PROJECT / "telegram-bot" / "teas.json"))
 TEST_MODE = os.getenv("CHAINYA_TEST_MODE", "1") == "1"
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
+ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "").strip()
 OWNER_CHAT_IDS = [
     value for value in re.split(r"[\s,]+", os.getenv("OWNER_CHAT_ID", "").strip()) if value
 ]
@@ -106,6 +107,10 @@ class CreateBusinessLead(BaseModel):
         if len(value) < 3:
             raise ValueError("укажите телефон или Telegram")
         return value
+
+
+class UpdateOrderStatus(BaseModel):
+    status: Literal["paid", "confirmed", "packing", "shipped", "completed", "cancelled"]
 
 
 def now_iso() -> str:
@@ -239,6 +244,19 @@ def require_order_token(row: sqlite3.Row, token: str) -> None:
         raise HTTPException(403, "Недействительная ссылка заказа")
 
 
+def require_admin(authorization: str) -> None:
+    supplied = authorization.removeprefix("Bearer ").strip()
+    if not ADMIN_TOKEN or not supplied or not secrets.compare_digest(supplied, ADMIN_TOKEN):
+        raise HTTPException(401, "Требуется доступ владельца", headers={"WWW-Authenticate": "Bearer"})
+
+
+def admin_order(row: sqlite3.Row) -> dict:
+    result = public_order(row)
+    result["updated_at"] = row["updated_at"]
+    result["customer"] = json.loads(row["customer_json"])
+    return result
+
+
 def paid_notification(row: sqlite3.Row) -> str:
     customer = json.loads(row["customer_json"])
     items = json.loads(row["items_json"])
@@ -310,6 +328,31 @@ def notify_business_lead(lead: dict) -> None:
 @app.get("/api/health")
 def health():
     return {"ok": True, "test_mode": TEST_MODE, "catalog_items": len(load_catalog())}
+
+
+@app.get("/api/admin/orders")
+def admin_orders(authorization: str = Header(default=""), status: str = ""):
+    require_admin(authorization)
+    allowed = {"pending_payment", "paid", "confirmed", "packing", "shipped", "completed", "cancelled"}
+    if status and status not in allowed:
+        raise HTTPException(422, "Неизвестный статус")
+    with db() as con:
+        if status:
+            rows = con.execute("SELECT * FROM orders WHERE status = ? ORDER BY created_at DESC LIMIT 200", (status,)).fetchall()
+        else:
+            rows = con.execute("SELECT * FROM orders ORDER BY created_at DESC LIMIT 200").fetchall()
+    return {"orders": [admin_order(row) for row in rows]}
+
+
+@app.patch("/api/admin/orders/{order_id}")
+def admin_update_order(order_id: str, payload: UpdateOrderStatus, authorization: str = Header(default="")):
+    require_admin(authorization)
+    row = order_row(order_id)
+    if row["status"] == "pending_payment" and payload.status not in {"paid", "cancelled"}:
+        raise HTTPException(409, "Сначала заказ должен быть оплачен или отменён")
+    with db() as con:
+        con.execute("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?", (payload.status, now_iso(), order_id))
+    return admin_order(order_row(order_id))
 
 
 @app.get("/api/delivery/quote")
@@ -402,6 +445,11 @@ def test_payment_page(order_id: str, token: str):
     row = order_row(order_id)
     require_order_token(row, token)
     return FileResponse(ROOT / "backend" / "test-payment.html")
+
+
+@app.get("/admin/orders")
+def admin_page():
+    return FileResponse(ROOT / "backend" / "admin.html")
 
 
 # В локальной разработке backend одновременно раздаёт собранный сайт.

@@ -16,9 +16,9 @@ COPYFILE_DISABLE=1 tar czf "$TMP/shop.tgz" \
   --exclude='backend/data' --exclude='backend/__pycache__' --exclude='backend/tests/__pycache__' \
   backend ops -C "$BOT_ROOT" teas.json
 
-scp -q "$TMP/shop.tgz" "$HOST:/tmp/chainya-shop.tgz"
-scp -q ops/chainya-shop.service "$HOST:/tmp/chainya-shop.service"
-scp -q ops/nginx-chainya.ru "$HOST:/tmp/nginx-chainya.ru"
+rsync -az "$TMP/shop.tgz" "$HOST:/tmp/chainya-shop.tgz"
+rsync -az ops/chainya-shop.service "$HOST:/tmp/chainya-shop.service"
+rsync -az ops/nginx-chainya.ru "$HOST:/tmp/nginx-chainya.ru"
 
 ssh "$HOST" '
   set -e
@@ -31,7 +31,11 @@ ssh "$HOST" '
   sudo install -m 0644 /tmp/chainya-shop.service /etc/systemd/system/chainya-shop.service
   sudo install -m 0644 /tmp/nginx-chainya.ru /etc/nginx/sites-available/chainya.ru
   sudo grep -E "^(BOT_TOKEN|OWNER_CHAT_ID)=" /opt/chainya-bot/.env | sudo tee /etc/chainya-shop.env >/dev/null
+  if ! sudo test -s /etc/chainya-shop-admin.env; then
+    printf "ADMIN_TOKEN=%s\n" "$(openssl rand -hex 24)" | sudo tee /etc/chainya-shop-admin.env >/dev/null
+  fi
   sudo chmod 600 /etc/chainya-shop.env
+  sudo chmod 600 /etc/chainya-shop-admin.env
   sudo systemctl daemon-reload
   sudo systemctl enable chainya-shop
   sudo systemctl restart chainya-shop

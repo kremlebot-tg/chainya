@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 def app_client(tmp_path, monkeypatch):
     monkeypatch.setenv("CHAINYA_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("CHAINYA_TEST_MODE", "1")
+    monkeypatch.setenv("ADMIN_TOKEN", "test-admin-token")
     import backend.app as module
     module = importlib.reload(module)
     return TestClient(module.app), module
@@ -87,3 +88,24 @@ def test_business_lead_is_saved_and_notified(tmp_path, monkeypatch):
         with module.db() as con:
             stored = con.execute("SELECT * FROM business_leads").fetchone()
         assert stored["company"] == "Кофейня Утро"
+
+
+def test_admin_lists_and_updates_orders(tmp_path, monkeypatch):
+    client, _ = app_client(tmp_path, monkeypatch)
+    auth = {"Authorization": "Bearer test-admin-token"}
+    with client:
+        created = client.post("/api/orders", json=payload()).json()["order"]
+        assert client.get("/api/admin/orders").status_code == 401
+        listing = client.get("/api/admin/orders", headers=auth)
+        assert listing.status_code == 200
+        assert listing.json()["orders"][0]["customer"]["phone"] == "+7 999 123-45-67"
+        blocked = client.patch(
+            f"/api/admin/orders/{created['id']}", headers=auth, json={"status": "confirmed"}
+        )
+        assert blocked.status_code == 409
+        paid = client.patch(f"/api/admin/orders/{created['id']}", headers=auth, json={"status": "paid"})
+        assert paid.status_code == 200
+        confirmed = client.patch(
+            f"/api/admin/orders/{created['id']}", headers=auth, json={"status": "confirmed"}
+        )
+        assert confirmed.json()["status"] == "confirmed"

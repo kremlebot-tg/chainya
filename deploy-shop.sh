@@ -30,7 +30,7 @@ ssh "$HOST" '
   sudo chown -R www-data:www-data /var/lib/chainya-shop
   sudo install -m 0644 /tmp/chainya-shop.service /etc/systemd/system/chainya-shop.service
   sudo install -m 0644 /tmp/nginx-chainya.ru /etc/nginx/sites-available/chainya.ru
-  sudo sh -c 'grep -E "^(BOT_TOKEN|OWNER_CHAT_ID)=" /opt/chainya-bot/.env > /etc/chainya-shop.env'
+  sudo grep -E "^(BOT_TOKEN|OWNER_CHAT_ID)=" /opt/chainya-bot/.env | sudo tee /etc/chainya-shop.env >/dev/null
   sudo chmod 600 /etc/chainya-shop.env
   sudo systemctl daemon-reload
   sudo systemctl enable --now chainya-shop

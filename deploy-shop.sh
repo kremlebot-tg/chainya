@@ -33,7 +33,8 @@ ssh "$HOST" '
   sudo grep -E "^(BOT_TOKEN|OWNER_CHAT_ID)=" /opt/chainya-bot/.env | sudo tee /etc/chainya-shop.env >/dev/null
   sudo chmod 600 /etc/chainya-shop.env
   sudo systemctl daemon-reload
-  sudo systemctl enable --now chainya-shop
+  sudo systemctl enable chainya-shop
+  sudo systemctl restart chainya-shop
   sudo nginx -t
   sudo systemctl reload nginx
   rm -f /tmp/chainya-shop.tgz /tmp/chainya-shop.service /tmp/nginx-chainya.ru

@@ -7,5 +7,5 @@
 const id=location.pathname.split('/').pop(),token=new URLSearchParams(location.search).get('token')||'',pay=document.querySelector('#pay'),status=document.querySelector('#status'),back=document.querySelector('#back');
 const showPaid=d=>{status.textContent=`Заказ ${d.id} оплачен в тестовом режиме. Уведомление отправлено владельцу.`;pay.hidden=true;back.hidden=false};
 pay.onclick=async()=>{pay.disabled=true;status.textContent='Обрабатываем…';try{const r=await fetch(`/api/orders/${id}/test-pay?token=${encodeURIComponent(token)}`,{method:'POST'});const d=await r.json();if(!r.ok)throw new Error(d.detail||'Ошибка');showPaid(d)}catch(e){status.textContent=e.message;pay.disabled=false}};
-fetch(`/api/orders/${id}`).then(r=>r.json()).then(d=>{if(d.status==='paid')showPaid(d)}).catch(()=>{});
+fetch(`/api/orders/${id}?token=${encodeURIComponent(token)}`).then(r=>r.json()).then(d=>{if(d.status==='paid')showPaid(d)}).catch(()=>{});
 </script></body></html>

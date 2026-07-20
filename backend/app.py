@@ -13,10 +13,13 @@ import os
 import re
 import secrets
 import sqlite3
+import threading
+import time
 import urllib.parse
 import urllib.request
 import uuid
-from contextlib import contextmanager
+from collections import defaultdict, deque
+from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
@@ -45,7 +48,15 @@ DELIVERY_LABELS = {
     "cdek_courier": "СДЭК · курьер",
 }
 
-app = FastAPI(title="Chainya checkout", version="0.1.0")
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    init_db()
+    yield
+
+
+app = FastAPI(title="Chainya checkout", version="0.1.0", lifespan=lifespan)
+_rate_buckets: dict[str, deque[float]] = defaultdict(deque)
+_rate_lock = threading.Lock()
 
 
 class OrderItem(BaseModel):
@@ -97,6 +108,19 @@ class CreateBusinessLead(BaseModel):
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def rate_limit(request: Request, bucket: str, limit: int, window: int) -> None:
+    """Небольшой per-IP лимит для одного процесса checkout."""
+    address = request.client.host if request.client else "unknown"
+    key, now = f"{bucket}:{address}", time.monotonic()
+    with _rate_lock:
+        hits = _rate_buckets[key]
+        while hits and hits[0] <= now - window:
+            hits.popleft()
+        if len(hits) >= limit:
+            raise HTTPException(429, "Слишком много запросов. Попробуйте немного позже.")
+        hits.append(now)
 
 
 def load_catalog() -> dict[str, dict]:
@@ -152,11 +176,6 @@ def init_db() -> None:
         """)
 
 
-@app.on_event("startup")
-def startup():
-    init_db()
-
-
 def pack_price(per_10g: int, grams: int) -> int:
     return round(per_10g * grams / 10 / 5) * 5
 
@@ -205,6 +224,19 @@ def public_order(row: sqlite3.Row) -> dict:
     }
 
 
+def order_row(order_id: str) -> sqlite3.Row:
+    with db() as con:
+        row = con.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+    if not row:
+        raise HTTPException(404, "Заказ не найден")
+    return row
+
+
+def require_order_token(row: sqlite3.Row, token: str) -> None:
+    if not row["payment_token"] or not secrets.compare_digest(token, row["payment_token"]):
+        raise HTTPException(403, "Недействительная ссылка заказа")
+
+
 def paid_notification(row: sqlite3.Row) -> str:
     customer = json.loads(row["customer_json"])
     items = json.loads(row["items_json"])
@@ -232,23 +264,33 @@ def paid_notification(row: sqlite3.Row) -> str:
     return "\n".join(lines)
 
 
-def notify_owners(row: sqlite3.Row) -> None:
-    """Отправляет владельцам сообщение; сбой Telegram не отменяет оплату."""
+def send_to_owners(text: str, label: str) -> None:
     if not BOT_TOKEN or not OWNER_CHAT_IDS:
         logging.info("Telegram-уведомление отключено: BOT_TOKEN/OWNER_CHAT_ID не заданы")
         return
-    text = paid_notification(row)
     for chat_id in OWNER_CHAT_IDS:
-        try:
-            body = urllib.parse.urlencode({"chat_id": chat_id, "text": text}).encode()
-            request = urllib.request.Request(
-                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage", data=body, method="POST"
-            )
-            with urllib.request.urlopen(request, timeout=8) as response:
-                if response.status != 200:
-                    raise RuntimeError(f"Telegram HTTP {response.status}")
-        except Exception:
-            logging.exception("Не удалось отправить уведомление владельцу %s", chat_id)
+        for attempt, pause in enumerate((0, 1, 3), start=1):
+            if pause:
+                time.sleep(pause)
+            try:
+                body = urllib.parse.urlencode({"chat_id": chat_id, "text": text}).encode()
+                telegram_request = urllib.request.Request(
+                    f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage", data=body, method="POST"
+                )
+                with urllib.request.urlopen(telegram_request, timeout=5) as response:
+                    if response.status != 200:
+                        raise RuntimeError(f"Telegram HTTP {response.status}")
+                break
+            except Exception:
+                if attempt == 3:
+                    logging.exception("Не удалось отправить %s владельцу %s после 3 попыток", label, chat_id)
+                else:
+                    logging.warning("Повтор Telegram %s для %s, попытка %s", label, chat_id, attempt + 1)
+
+
+def notify_owners(row: sqlite3.Row) -> None:
+    """Отправляет владельцам оплаченный заказ с короткими повторами при сбое."""
+    send_to_owners(paid_notification(row), "заказ")
 
 
 def notify_business_lead(lead: dict) -> None:
@@ -260,20 +302,7 @@ def notify_business_lead(lead: dict) -> None:
         f"Связь: {lead['contact']}",
         f"Комментарий: {lead['note']}" if lead["note"] else "",
     ]))
-    if not BOT_TOKEN or not OWNER_CHAT_IDS:
-        logging.info("Telegram-уведомление о B2B-заявке отключено")
-        return
-    for chat_id in OWNER_CHAT_IDS:
-        try:
-            body = urllib.parse.urlencode({"chat_id": chat_id, "text": text}).encode()
-            request = urllib.request.Request(
-                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage", data=body, method="POST"
-            )
-            with urllib.request.urlopen(request, timeout=8) as response:
-                if response.status != 200:
-                    raise RuntimeError(f"Telegram HTTP {response.status}")
-        except Exception:
-            logging.exception("Не удалось отправить B2B-уведомление владельцу %s", chat_id)
+    send_to_owners(text, "B2B-заявку")
 
 
 @app.get("/api/health")
@@ -293,6 +322,7 @@ def delivery_quote(method: Literal["pickup", "cdek_pvz", "cdek_courier"]):
 
 @app.post("/api/orders", status_code=201)
 def create_order(payload: CreateOrder, request: Request):
+    rate_limit(request, "create-order", 12, 600)
     validate_delivery(payload)
     lines, subtotal = price_order(payload)
     delivery_price = DELIVERY_PRICES[payload.delivery]
@@ -313,7 +343,7 @@ def create_order(payload: CreateOrder, request: Request):
         )
     base = str(request.base_url).rstrip("/")
     return {
-        "order": get_order(order_id),
+        "order": public_order(order_row(order_id)),
         "payment": {
             "mode": "test" if TEST_MODE else "unconfigured",
             "url": f"{base}/test-payment/{order_id}?token={payment_token}" if TEST_MODE else None,
@@ -322,7 +352,8 @@ def create_order(payload: CreateOrder, request: Request):
 
 
 @app.post("/api/business-leads", status_code=202)
-def create_business_lead(payload: CreateBusinessLead, background_tasks: BackgroundTasks):
+def create_business_lead(payload: CreateBusinessLead, background_tasks: BackgroundTasks, request: Request):
+    rate_limit(request, "business-lead", 5, 600)
     lead = {"id": uuid.uuid4().hex[:12].upper(), "created_at": now_iso(), **payload.model_dump()}
     with db() as con:
         con.execute(
@@ -334,25 +365,23 @@ def create_business_lead(payload: CreateBusinessLead, background_tasks: Backgrou
 
 
 @app.get("/api/orders/{order_id}")
-def get_order(order_id: str):
-    with db() as con:
-        row = con.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
-    if not row:
-        raise HTTPException(404, "Заказ не найден")
+def get_order(order_id: str, token: str):
+    row = order_row(order_id)
+    require_order_token(row, token)
     return public_order(row)
 
 
 @app.post("/api/orders/{order_id}/test-pay")
-def test_pay(order_id: str, token: str, background_tasks: BackgroundTasks):
+def test_pay(order_id: str, token: str, background_tasks: BackgroundTasks, request: Request):
     if not TEST_MODE:
         raise HTTPException(404, "Тестовая оплата отключена")
+    rate_limit(request, "test-pay", 20, 60)
     should_notify = False
     with db() as con:
         row = con.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
         if not row:
             raise HTTPException(404, "Заказ не найден")
-        if not row["payment_token"] or not secrets.compare_digest(token, row["payment_token"]):
-            raise HTTPException(403, "Недействительная ссылка оплаты")
+        require_order_token(row, token)
         if row["status"] == "pending_payment":
             con.execute(
                 "UPDATE orders SET status = 'paid', updated_at = ?, provider_payment_id = ? WHERE id = ?",
@@ -363,12 +392,13 @@ def test_pay(order_id: str, token: str, background_tasks: BackgroundTasks):
         with db() as con:
             paid_row = con.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
         background_tasks.add_task(notify_owners, paid_row)
-    return get_order(order_id)
+    return public_order(order_row(order_id))
 
 
 @app.get("/test-payment/{order_id}")
-def test_payment_page(order_id: str):
-    get_order(order_id)
+def test_payment_page(order_id: str, token: str):
+    row = order_row(order_id)
+    require_order_token(row, token)
     return FileResponse(ROOT / "backend" / "test-payment.html")
 
 

@@ -38,6 +38,9 @@ def test_server_prices_order_and_mock_payment(tmp_path, monkeypatch):
         assert order["total"] == 880
         assert order["status"] == "pending_payment"
         payment_token = parse_qs(urlparse(body["payment"]["url"]).query)["token"][0]
+        assert client.get(f"/api/orders/{order['id']}").status_code == 422
+        assert client.get(f"/api/orders/{order['id']}", params={"token": "wrong"}).status_code == 403
+        assert client.get(f"/api/orders/{order['id']}", params={"token": payment_token}).status_code == 200
         assert client.post(f"/api/orders/{order['id']}/test-pay", params={"token": "wrong"}).status_code == 403
         paid = client.post(f"/api/orders/{order['id']}/test-pay", params={"token": payment_token})
         assert paid.status_code == 200

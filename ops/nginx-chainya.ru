@@ -54,6 +54,19 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
+    # HTML содержит весь JavaScript приложения, поэтому его нельзя оставлять в
+    # браузере после релиза. Фото и шрифты ниже по-прежнему кэшируются отдельно.
+    location = / {
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        expires -1;
+        try_files /index.html =404;
+    }
+
+    location = /index.html {
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        expires -1;
+    }
+
     location / { try_files $uri $uri/ /index.html; }
 
     location ~* \.(woff2?|ttf)$ {

@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import re
+import secrets
 import sqlite3
 import urllib.parse
 import urllib.request
@@ -20,7 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
@@ -79,6 +80,21 @@ class CreateOrder(BaseModel):
         return value.strip()
 
 
+class CreateBusinessLead(BaseModel):
+    company: str = Field(default="", max_length=160)
+    name: str = Field(default="", max_length=120)
+    contact: str = Field(min_length=3, max_length=120)
+    note: str = Field(default="", max_length=1000)
+
+    @field_validator("contact")
+    @classmethod
+    def valid_contact(cls, value):
+        value = value.strip()
+        if len(value) < 3:
+            raise ValueError("укажите телефон или Telegram")
+        return value
+
+
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -119,6 +135,19 @@ def init_db() -> None:
                 customer_json TEXT NOT NULL,
                 items_json TEXT NOT NULL,
                 provider_payment_id TEXT
+            )
+        """)
+        columns = {row["name"] for row in con.execute("PRAGMA table_info(orders)")}
+        if "payment_token" not in columns:
+            con.execute("ALTER TABLE orders ADD COLUMN payment_token TEXT")
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS business_leads (
+                id TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL,
+                company TEXT NOT NULL,
+                name TEXT NOT NULL,
+                contact TEXT NOT NULL,
+                note TEXT NOT NULL
             )
         """)
 
@@ -222,6 +251,31 @@ def notify_owners(row: sqlite3.Row) -> None:
             logging.exception("Не удалось отправить уведомление владельцу %s", chat_id)
 
 
+def notify_business_lead(lead: dict) -> None:
+    text = "\n".join(filter(None, [
+        "🏢 Новая заявка для бизнеса",
+        f"№ {lead['id']}",
+        f"Заведение: {lead['company']}" if lead["company"] else "",
+        f"Имя: {lead['name']}" if lead["name"] else "",
+        f"Связь: {lead['contact']}",
+        f"Комментарий: {lead['note']}" if lead["note"] else "",
+    ]))
+    if not BOT_TOKEN or not OWNER_CHAT_IDS:
+        logging.info("Telegram-уведомление о B2B-заявке отключено")
+        return
+    for chat_id in OWNER_CHAT_IDS:
+        try:
+            body = urllib.parse.urlencode({"chat_id": chat_id, "text": text}).encode()
+            request = urllib.request.Request(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage", data=body, method="POST"
+            )
+            with urllib.request.urlopen(request, timeout=8) as response:
+                if response.status != 200:
+                    raise RuntimeError(f"Telegram HTTP {response.status}")
+        except Exception:
+            logging.exception("Не удалось отправить B2B-уведомление владельцу %s", chat_id)
+
+
 @app.get("/api/health")
 def health():
     return {"ok": True, "test_mode": TEST_MODE, "catalog_items": len(load_catalog())}
@@ -245,21 +299,38 @@ def create_order(payload: CreateOrder, request: Request):
     order_id = uuid.uuid4().hex[:12].upper()
     created = now_iso()
     customer = payload.model_dump(exclude={"items", "payment_method", "delivery"})
+    payment_token = uuid.uuid4().hex
     with db() as con:
         con.execute(
-            "INSERT INTO orders VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            """INSERT INTO orders
+               (id, status, created_at, updated_at, subtotal, delivery_price, total,
+                payment_method, delivery, customer_json, items_json, provider_payment_id, payment_token)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (order_id, "pending_payment", created, created, subtotal, delivery_price,
              subtotal + delivery_price, payload.payment_method, payload.delivery,
-             json.dumps(customer, ensure_ascii=False), json.dumps(lines, ensure_ascii=False), None),
+             json.dumps(customer, ensure_ascii=False), json.dumps(lines, ensure_ascii=False), None,
+             payment_token),
         )
     base = str(request.base_url).rstrip("/")
     return {
         "order": get_order(order_id),
         "payment": {
             "mode": "test" if TEST_MODE else "unconfigured",
-            "url": f"{base}/test-payment/{order_id}" if TEST_MODE else None,
+            "url": f"{base}/test-payment/{order_id}?token={payment_token}" if TEST_MODE else None,
         },
     }
+
+
+@app.post("/api/business-leads", status_code=202)
+def create_business_lead(payload: CreateBusinessLead, background_tasks: BackgroundTasks):
+    lead = {"id": uuid.uuid4().hex[:12].upper(), "created_at": now_iso(), **payload.model_dump()}
+    with db() as con:
+        con.execute(
+            "INSERT INTO business_leads VALUES (?, ?, ?, ?, ?, ?)",
+            (lead["id"], lead["created_at"], lead["company"], lead["name"], lead["contact"], lead["note"]),
+        )
+    background_tasks.add_task(notify_business_lead, lead)
+    return {"id": lead["id"], "accepted": True}
 
 
 @app.get("/api/orders/{order_id}")
@@ -272,7 +343,7 @@ def get_order(order_id: str):
 
 
 @app.post("/api/orders/{order_id}/test-pay")
-def test_pay(order_id: str):
+def test_pay(order_id: str, token: str, background_tasks: BackgroundTasks):
     if not TEST_MODE:
         raise HTTPException(404, "Тестовая оплата отключена")
     should_notify = False
@@ -280,6 +351,8 @@ def test_pay(order_id: str):
         row = con.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
         if not row:
             raise HTTPException(404, "Заказ не найден")
+        if not row["payment_token"] or not secrets.compare_digest(token, row["payment_token"]):
+            raise HTTPException(403, "Недействительная ссылка оплаты")
         if row["status"] == "pending_payment":
             con.execute(
                 "UPDATE orders SET status = 'paid', updated_at = ?, provider_payment_id = ? WHERE id = ?",
@@ -289,7 +362,7 @@ def test_pay(order_id: str):
     if should_notify:
         with db() as con:
             paid_row = con.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
-        notify_owners(paid_row)
+        background_tasks.add_task(notify_owners, paid_row)
     return get_order(order_id)
 
 

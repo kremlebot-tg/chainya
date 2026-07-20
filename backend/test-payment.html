@@ -4,8 +4,8 @@
 <style>body{font:16px system-ui;background:#141110;color:#eee;display:grid;place-items:center;min-height:100vh;margin:0}.card{width:min(420px,calc(100% - 48px));padding:32px;border:1px solid #554b40;border-radius:18px;background:#211d1a}button,.back{display:block;box-sizing:border-box;width:100%;padding:14px;border:0;border-radius:10px;background:#c99a4b;color:#17110a;text-align:center;text-decoration:none;font:inherit;font-weight:700;cursor:pointer}.back{margin-top:18px}.muted{color:#aaa;line-height:1.5}#status{line-height:1.5}</style></head>
 <body><main class="card"><h1>Тестовая оплата</h1><p class="muted">Деньги не списываются. Кнопка только переводит заказ в статус «оплачен».</p><button id="pay">Имитировать успешную оплату</button><p id="status" aria-live="polite"></p><a class="back" id="back" href="/#shop" hidden>Вернуться в магазин</a></main>
 <script>
-const id=location.pathname.split('/').pop(),pay=document.querySelector('#pay'),status=document.querySelector('#status'),back=document.querySelector('#back');
+const id=location.pathname.split('/').pop(),token=new URLSearchParams(location.search).get('token')||'',pay=document.querySelector('#pay'),status=document.querySelector('#status'),back=document.querySelector('#back');
 const showPaid=d=>{status.textContent=`Заказ ${d.id} оплачен в тестовом режиме. Уведомление отправлено владельцу.`;pay.hidden=true;back.hidden=false};
-pay.onclick=async()=>{pay.disabled=true;status.textContent='Обрабатываем…';try{const r=await fetch(`/api/orders/${id}/test-pay`,{method:'POST'});const d=await r.json();if(!r.ok)throw new Error(d.detail||'Ошибка');showPaid(d)}catch(e){status.textContent=e.message;pay.disabled=false}};
+pay.onclick=async()=>{pay.disabled=true;status.textContent='Обрабатываем…';try{const r=await fetch(`/api/orders/${id}/test-pay?token=${encodeURIComponent(token)}`,{method:'POST'});const d=await r.json();if(!r.ok)throw new Error(d.detail||'Ошибка');showPaid(d)}catch(e){status.textContent=e.message;pay.disabled=false}};
 fetch(`/api/orders/${id}`).then(r=>r.json()).then(d=>{if(d.status==='paid')showPaid(d)}).catch(()=>{});
 </script></body></html>

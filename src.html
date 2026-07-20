@@ -1567,7 +1567,7 @@ select.input{
     b_name:'Как вас зовут', b_phone:'Телефон или телеграм', b_phone_ph:'+7 или @ник',
     b_note:'Что наливаете сейчас', b_note_ph:'Пакетированный чёрный, хотим перейти на листовой. Расход около 2 кг в месяц.',
     b2b_send:'Отправить',
-    b2b_form_note:'Прототип: заявка пока никуда не уходит. На живом сайте она будет падать в телеграм.',
+    b2b_form_note:'Заявка придёт владельцам в Telegram. Ответим в течение рабочего дня.',
     b2b_done_h:'Заявка у нас', b2b_done_back:'Посмотреть чаи',
     b2bDoneText:(name) => `${name ? name + ', с' : 'С'}пишемся в течение рабочего дня.`,
     book_label:'Бронь', book_h:'Занять стол',
@@ -1713,7 +1713,7 @@ select.input{
     b_name:'Your name', b_phone:'Phone or Telegram', b_phone_ph:'+7 or @handle',
     b_note:'What tea do you serve now', b_note_ph:'Bagged black tea; we want to switch to loose leaf. About 2 kg a month.',
     b2b_send:'Send',
-    b2b_form_note:'Prototype: the enquiry goes nowhere yet. On the live site it will land in Telegram.',
+    b2b_form_note:'The owners will receive your enquiry in Telegram. We reply within one working day.',
     b2b_done_h:'Enquiry received', b2b_done_back:'See the teas',
     b2bDoneText:(name) => `${name ? name + ', we' : 'We'}’ll get back to you within one working day.`,
     book_label:'Booking', book_h:'Take a table',
@@ -1859,7 +1859,7 @@ select.input{
     b_name:'怎么称呼您', b_phone:'电话或Telegram', b_phone_ph:'+7 或 @用户名',
     b_note:'现在用什么茶', b_note_ph:'袋泡红茶，想换成散茶。每月约2公斤。',
     b2b_send:'发送',
-    b2b_form_note:'原型：申请暂时不会发出。正式上线后会直达Telegram。',
+    b2b_form_note:'申请将通过 Telegram 发送给店主。我们将在一个工作日内回复。',
     b2b_done_h:'申请已收到', b2b_done_back:'看茶',
     b2bDoneText:(name) => `${name ? name + '，' : ''}我们将在一个工作日内回复。`,
     book_label:'订座', book_h:'订一张茶桌',
@@ -2289,6 +2289,8 @@ select.input{
   function setCart(c){ try{ localStorage.setItem(CART_KEY, JSON.stringify(c)); }catch(e){} updateCartBadge(); }
   function cartCount(){ return getCart().reduce((s, it) => s + it.qty, 0); }
   function cartTotal(){ return getCart().reduce((s, it) => s + linePrice(it) * it.qty, 0); }
+  const DLV_PRICE = { pickup:0, cdek_pvz:490, cdek_courier:790 };
+  function checkoutTotal(){ return cartTotal() + (DLV_PRICE[$('#c-dlv').value] || 0); }
   let _cartN = -1;
   function updateCartBadge(){
     const n = cartCount(), b = $('#cart-count');
@@ -2342,7 +2344,7 @@ select.input{
       wrap.append(row);
     });
     $('#cart-co').hidden = false; $('#cart-submit').disabled = false;
-    $('#cart-total').textContent = rub(cartTotal());
+    $('#cart-total').textContent = rub(checkoutTotal());
   }
 
   const DLV = ['pickup', 'cdek_pvz', 'cdek_courier'];
@@ -2361,6 +2363,7 @@ select.input{
     $('#c-city-field').hidden = dlv === 'pickup';
     $('#c-pvz-field').hidden = dlv !== 'cdek_pvz';
     $('#c-addr-field').hidden = dlv !== 'cdek_courier';
+    if (getCart().length) $('#cart-total').textContent = rub(checkoutTotal());
   }
   function syncCart(){ updateCartBadge(); buildDlv(); if (cartSheet.classList.contains('on')) renderCart(); }
 
@@ -2621,9 +2624,27 @@ select.input{
     });
   }
 
-  $('#b2b-submit').addEventListener('click', () => {
+  $('#b2b-submit').addEventListener('click', async () => {
     const phone = $('#b-phone').value.trim();
     if (!phone){ $('#b-phone').focus(); return; }
+    const submit = $('#b2b-submit');
+    submit.disabled = true;
+    try {
+      const response = await fetch('/api/business-leads', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          company:$('#b-company').value.trim(), name:$('#b-name').value.trim(),
+          contact:phone, note:$('#b-note').value.trim(),
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.detail || 'Не удалось отправить заявку');
+    } catch (e) {
+      submit.disabled = false;
+      const note = document.querySelector('#b2b-form-wrap .summary__note');
+      note.textContent = e.message || 'Не удалось отправить заявку';
+      return;
+    }
     lastB2B = { name: $('#b-name').value.trim() };
     $('#b2b-done-text').textContent = T().b2bDoneText(lastB2B.name);
     $('#b2b-form-wrap').hidden = true;

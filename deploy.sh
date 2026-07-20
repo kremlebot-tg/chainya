@@ -11,26 +11,18 @@ set -euo pipefail
 
 HOST="liable-copper"
 DIR="/var/www/chainya"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
-
 cd "$(dirname "$0")"
 
 echo "→ сборка (build.py --web)"
 python3 build.py --web >/dev/null
 [ -f dist/index.html ] || { echo "✗ dist/index.html не собрался"; exit 1; }
 
-echo "→ упаковка ($(du -sh dist | cut -f1))"
-COPYFILE_DISABLE=1 tar czf "$TMP/site.tgz" -C dist --exclude=CNAME .
-
-echo "→ заливка на $HOST"
-scp -q "$TMP/site.tgz" "$HOST:/tmp/site.tgz"
+echo "→ синхронизация ($(du -sh dist | cut -f1))"
+COPYFILE_DISABLE=1 rsync -az --exclude=CNAME dist/ "$HOST:$DIR/"
 
 echo "→ раскладка + проверка"
 ssh "$HOST" '
   set -e
-  tar xzf /tmp/site.tgz -C '"$DIR"'
-  rm -f /tmp/site.tgz
   chown -R www-data:www-data '"$DIR"'
   nginx -t >/dev/null 2>&1 || { echo "✗ конфиг nginx сломан — reload не делаю"; exit 1; }
   # проверяем по https: http теперь 301→https, старая проверка на http падала

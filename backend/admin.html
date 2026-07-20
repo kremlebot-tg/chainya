@@ -5,7 +5,7 @@
 <header><h1>Заказы</h1><div class="tools"><select id="filter"><option value="">Все статусы</option><option value="pending_payment">Ожидает оплаты</option><option value="paid">Оплачен</option><option value="confirmed">Подтверждён</option><option value="packing">Собирается</option><option value="shipped">Передан в доставку</option><option value="completed">Завершён</option><option value="cancelled">Отменён</option></select><button id="reload">Обновить</button></div></header>
 <main class="wrap"><div id="message" class="empty">Загружаем…</div><div class="orders" id="orders"></div></main>
 <script>
-const fragment=location.hash.slice(1);if(fragment){sessionStorage.setItem('chainya-admin-token',fragment);history.replaceState(null,'',location.pathname)}const token=fragment||sessionStorage.getItem('chainya-admin-token')||'',ordersEl=document.querySelector('#orders'),message=document.querySelector('#message');
+const fragment=location.hash.slice(1);if(fragment)sessionStorage.setItem('chainya-admin-token',fragment);const token=fragment||sessionStorage.getItem('chainya-admin-token')||'',ordersEl=document.querySelector('#orders'),message=document.querySelector('#message');
 const labels={pending_payment:'Ожидает оплаты',paid:'Оплачен',confirmed:'Подтверждён',packing:'Собирается',shipped:'Передан в доставку',completed:'Завершён',cancelled:'Отменён'};
 const statuses=['paid','confirmed','packing','shipped','completed','cancelled'];const rub=n=>new Intl.NumberFormat('ru-RU').format(n)+' ₽';
 const auth=()=>({Authorization:`Bearer ${token}`});

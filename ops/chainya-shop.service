@@ -11,6 +11,7 @@ WorkingDirectory=/opt/chainya-shop
 Environment=CHAINYA_TEST_MODE=1
 Environment=CHAINYA_DATA_DIR=/var/lib/chainya-shop
 Environment=CHAINYA_CATALOG_PATH=/opt/chainya-shop/teas.json
+EnvironmentFile=-/etc/chainya-shop.env
 ExecStart=/opt/chainya-shop/.venv/bin/uvicorn backend.app:app --host 127.0.0.1 --port 8077 --proxy-headers --forwarded-allow-ips=127.0.0.1
 Restart=always
 RestartSec=3

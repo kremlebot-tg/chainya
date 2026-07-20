@@ -8,9 +8,12 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import sqlite3
+import urllib.parse
+import urllib.request
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -29,6 +32,10 @@ DATA_DIR = Path(os.getenv("CHAINYA_DATA_DIR", ROOT / "backend" / "data"))
 DB_PATH = DATA_DIR / "orders.sqlite3"
 CATALOG_PATH = Path(os.getenv("CHAINYA_CATALOG_PATH", PROJECT / "telegram-bot" / "teas.json"))
 TEST_MODE = os.getenv("CHAINYA_TEST_MODE", "1") == "1"
+BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
+OWNER_CHAT_IDS = [
+    value for value in re.split(r"[\s,]+", os.getenv("OWNER_CHAT_ID", "").strip()) if value
+]
 
 DELIVERY_PRICES = {"pickup": 0, "cdek_pvz": 490, "cdek_courier": 790}
 DELIVERY_LABELS = {
@@ -169,6 +176,52 @@ def public_order(row: sqlite3.Row) -> dict:
     }
 
 
+def paid_notification(row: sqlite3.Row) -> str:
+    customer = json.loads(row["customer_json"])
+    items = json.loads(row["items_json"])
+    lines = [
+        "🧪 Тестовый заказ оплачен",
+        f"№ {row['id']}",
+        "",
+        *[
+            f"• {item['name']} — {'шт' if item['pack'] == 'pc' else str(item['pack']) + ' г'} "
+            f"×{item['qty']} — {item['total']} ₽"
+            for item in items
+        ],
+        "",
+        f"Товары: {row['subtotal']} ₽",
+        f"Доставка: {DELIVERY_LABELS.get(row['delivery'], row['delivery'])} — {row['delivery_price']} ₽",
+        f"Итого: {row['total']} ₽",
+        f"Оплата: {'СБП' if row['payment_method'] == 'sbp' else 'банковская карта'}",
+    ]
+    for key, label in (
+        ("name", "Имя"), ("phone", "Телефон"), ("city", "Город"),
+        ("pvz_code", "ПВЗ"), ("address", "Адрес"), ("note", "Комментарий"),
+    ):
+        if customer.get(key):
+            lines.append(f"{label}: {customer[key]}")
+    return "\n".join(lines)
+
+
+def notify_owners(row: sqlite3.Row) -> None:
+    """Отправляет владельцам сообщение; сбой Telegram не отменяет оплату."""
+    if not BOT_TOKEN or not OWNER_CHAT_IDS:
+        logging.info("Telegram-уведомление отключено: BOT_TOKEN/OWNER_CHAT_ID не заданы")
+        return
+    text = paid_notification(row)
+    for chat_id in OWNER_CHAT_IDS:
+        try:
+            body = urllib.parse.urlencode({"chat_id": chat_id, "text": text}).encode()
+            request = urllib.request.Request(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage", data=body, method="POST"
+            )
+            with urllib.request.urlopen(request, timeout=8) as response:
+                if response.status != 200:
+                    raise RuntimeError(f"Telegram HTTP {response.status}")
+        except Exception:
+            logging.exception("Не удалось отправить уведомление владельцу %s", chat_id)
+
+
 @app.get("/api/health")
 def health():
     return {"ok": True, "test_mode": TEST_MODE, "catalog_items": len(load_catalog())}
@@ -222,6 +275,7 @@ def get_order(order_id: str):
 def test_pay(order_id: str):
     if not TEST_MODE:
         raise HTTPException(404, "Тестовая оплата отключена")
+    should_notify = False
     with db() as con:
         row = con.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
         if not row:
@@ -231,6 +285,11 @@ def test_pay(order_id: str):
                 "UPDATE orders SET status = 'paid', updated_at = ?, provider_payment_id = ? WHERE id = ?",
                 (now_iso(), f"mock_{uuid.uuid4().hex}", order_id),
             )
+            should_notify = True
+    if should_notify:
+        with db() as con:
+            paid_row = con.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+        notify_owners(paid_row)
     return get_order(order_id)
 
 

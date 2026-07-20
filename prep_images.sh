@@ -2,8 +2,9 @@
 # Готовит webp-ассеты из исходных фото чайной.
 # Лист снят вертикально (3750x5000) — для карточек берём квадрат из центра.
 set -e
-SRC="$HOME/Desktop/чайная"
-OUT="$HOME/Desktop/tea-house/img"
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+SRC="$ROOT/../source-materials/tea-house"
+OUT="$ROOT/img"
 mkdir -p "$OUT"
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
@@ -79,7 +80,7 @@ wide   photo_2026-07-16_07-59-34.jpg master-pour 1100 85   # мастер нал
 # extract_logo.py (нужен Pillow, у нас он в venv скретчпада), исходник лежит
 # в src-assets/logo-mark.png. Пересобирать нужно, только если пришлют новый логотип.
 echo "— знак (готовый PNG с альфой)"
-cwebp -quiet -q 90 -alpha_q 100 "$HOME/Desktop/tea-house/src-assets/logo-mark.png" -o "$OUT/logo-mark.webp"
+cwebp -quiet -q 90 -alpha_q 100 "$ROOT/src-assets/logo-mark.png" -o "$OUT/logo-mark.webp"
 wide   IMG_3093.JPG hall-room     1600 85   # зал целиком
 wide   IMG_3094.JPG hall-table    1300 85   # стол на двоих
 wide   IMG_3098.JPG hall-bar      1300 85   # стойка, сифон, полки

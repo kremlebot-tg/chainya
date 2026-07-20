@@ -1,0 +1,24 @@
+[Unit]
+Description=Chainya test checkout backend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/chainya-shop
+Environment=CHAINYA_TEST_MODE=1
+Environment=CHAINYA_DATA_DIR=/var/lib/chainya-shop
+Environment=CHAINYA_CATALOG_PATH=/opt/chainya-shop/teas.json
+ExecStart=/opt/chainya-shop/.venv/bin/uvicorn backend.app:app --host 127.0.0.1 --port 8077 --proxy-headers --forwarded-allow-ips=127.0.0.1
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/chainya-shop
+
+[Install]
+WantedBy=multi-user.target

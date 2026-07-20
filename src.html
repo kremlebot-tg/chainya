@@ -1309,9 +1309,24 @@ select.input{
         <label class="label" for="c-dlv" data-i18n="cart_dlv">Доставка</label>
         <select class="input" id="c-dlv"></select>
       </div>
+      <div class="field" id="c-city-field" hidden>
+        <label class="label" for="c-city" data-i18n="cart_city">Город</label>
+        <input class="input" type="text" id="c-city" data-i18n-ph="cart_city_ph" autocomplete="address-level2">
+      </div>
+      <div class="field" id="c-pvz-field" hidden>
+        <label class="label" for="c-pvz" data-i18n="cart_pvz">Пункт выдачи СДЭК</label>
+        <input class="input" type="text" id="c-pvz" data-i18n-ph="cart_pvz_ph">
+      </div>
       <div class="field" id="c-addr-field">
         <label class="label" for="c-addr" data-i18n="cart_addr">Адрес</label>
         <input class="input" type="text" id="c-addr" data-i18n-ph="cart_addr_ph" autocomplete="street-address">
+      </div>
+      <div class="field">
+        <label class="label" for="c-payment" data-i18n="cart_payment">Оплата</label>
+        <select class="input" id="c-payment">
+          <option value="bank_card" data-i18n="pay_card">Банковская карта</option>
+          <option value="sbp" data-i18n="pay_sbp">СБП</option>
+        </select>
       </div>
       <div class="field">
         <label class="label" for="c-note" data-i18n="f_note">Пожелания</label>
@@ -1323,6 +1338,7 @@ select.input{
     <div class="sheet__sum"><span data-i18n="cart_total">Итого</span><b class="num" id="cart-total">—</b></div>
     <button class="btn btn--solid btn--wide" id="cart-submit" data-i18n="cart_submit">Оформить заказ</button>
     <p class="cart-note" data-i18n="cart_pay"></p>
+    <p class="cart-note" id="cart-status" aria-live="polite"></p>
   </div>
 </aside>
 
@@ -1529,10 +1545,13 @@ select.input{
     a_cart:'Корзина', ts_add:'В корзину', ts_added:'Добавлено ✓',
     cart_h:'Корзина', cart_empty:'Пусто. Загляните в «Купить чай» и добавьте сорт.',
     cart_remove:'Убрать', cart_total:'Итого', cart_co_h:'Оформление',
-    cart_dlv:'Доставка', cart_addr:'Адрес', cart_addr_ph:'Город, улица, дом, квартира',
+    cart_dlv:'Получение', cart_city:'Город', cart_city_ph:'Например, Москва',
+    cart_pvz:'Пункт выдачи СДЭК', cart_pvz_ph:'Код или адрес пункта',
+    cart_addr:'Адрес', cart_addr_ph:'Улица, дом, квартира', cart_payment:'Оплата',
+    pay_card:'Банковская карта', pay_sbp:'СБП',
     cart_note_ph:'Комментарий к заказу', cart_submit:'Оформить заказ',
-    cart_pay:'Оплата переводом или при получении. Свяжемся, подтвердим и посчитаем доставку.',
-    dlv:{ pickup:'Самовывоз · Острякова, 3', cdek:'СДЭК по России' },
+    cart_pay:'Тестовый режим: деньги не списываются, цены СДЭК демонстрационные.',
+    dlv:{ pickup:'Самовывоз · Острякова, 3', cdek_pvz:'СДЭК · пункт выдачи', cdek_courier:'СДЭК · курьер' },
     order_head:'🛒 Заказ чая — Чайня', order_done:'Спасибо! Завершите заказ в нашем боте @chainyabot или позвоните +7 905 590-88-01 — подтвердим и посчитаем доставку.',
     ts_note:'За столом этот чай можно выпить бесплатно: два на выбор входят в стоимость стола.',
     b2b_label:'Для бизнеса', b2b_h:'Наш лист<br>в вашей карте',
@@ -1672,10 +1691,13 @@ select.input{
     a_cart:'Cart', ts_add:'Add to cart', ts_added:'Added ✓',
     cart_h:'Cart', cart_empty:'Empty. Open “Buy tea” and pick a few.',
     cart_remove:'Remove', cart_total:'Total', cart_co_h:'Checkout',
-    cart_dlv:'Delivery', cart_addr:'Address', cart_addr_ph:'City, street, building, flat',
+    cart_dlv:'Delivery', cart_city:'City', cart_city_ph:'For example, Moscow',
+    cart_pvz:'CDEK pickup point', cart_pvz_ph:'Point code or address',
+    cart_addr:'Address', cart_addr_ph:'Street, building, flat', cart_payment:'Payment',
+    pay_card:'Bank card', pay_sbp:'SBP',
     cart_note_ph:'Order comment', cart_submit:'Place order',
-    cart_pay:'Pay by transfer or on delivery. We’ll confirm and calculate shipping.',
-    dlv:{ pickup:'Pickup · Ostryakova 3', cdek:'CDEK across Russia' },
+    cart_pay:'Test mode: no money is charged; CDEK prices are placeholders.',
+    dlv:{ pickup:'Pickup · Ostryakova 3', cdek_pvz:'CDEK · pickup point', cdek_courier:'CDEK · courier' },
     order_head:'🛒 Tea order — Chaynya', order_done:'Thanks! Finish your order in our bot @chainyabot or call +7 905 590-88-01 — we’ll confirm and calculate shipping.',
     ts_note:'At the table this tea costs you nothing: two of your choice come with the table.',
     b2b_label:'For business', b2b_h:'Our leaf<br>on your menu',
@@ -1815,10 +1837,13 @@ select.input{
     a_cart:'购物车', ts_add:'加入购物车', ts_added:'已加入 ✓',
     cart_h:'购物车', cart_empty:'空的。到「买茶」里添加茶品吧。',
     cart_remove:'移除', cart_total:'合计', cart_co_h:'结算',
-    cart_dlv:'配送', cart_addr:'地址', cart_addr_ph:'城市、街道、门牌号、公寓',
+    cart_dlv:'配送', cart_city:'城市', cart_city_ph:'例如：莫斯科',
+    cart_pvz:'CDEK自提点', cart_pvz_ph:'网点代码或地址',
+    cart_addr:'地址', cart_addr_ph:'街道、门牌号、公寓', cart_payment:'支付',
+    pay_card:'银行卡', pay_sbp:'快速支付系统（SBP）',
     cart_note_ph:'订单备注', cart_submit:'提交订单',
-    cart_pay:'转账或货到付款。我们会确认并计算运费。',
-    dlv:{ pickup:'自取 · 奥斯特里亚科娃街3号', cdek:'CDEK 寄送全俄' },
+    cart_pay:'测试模式：不会扣款，CDEK运费为演示价格。',
+    dlv:{ pickup:'自取 · 奥斯特里亚科娃街3号', cdek_pvz:'CDEK · 自提点', cdek_courier:'CDEK · 快递员' },
     order_head:'🛒 茶订单 — Chaynya', order_done:'谢谢！请在我们的机器人 @chainyabot 中完成订单，或致电 +7 905 590-88-01，我们会确认并计算运费。',
     ts_note:'在店里喝这款茶不另收费：茶席已含任选两款。',
     b2b_label:'企业合作', b2b_h:'把我们的茶<br>放上您的菜单',
@@ -2320,7 +2345,10 @@ select.input{
     $('#cart-total').textContent = rub(cartTotal());
   }
 
-  const DLV = ['pickup', 'cdek'];   // владелец: «И самовывоз и доставка. Но доставка СДЭК»
+  const DLV = ['pickup', 'cdek_pvz', 'cdek_courier'];
+  // Тестовый backend включён только на локальном порту разработки. На живом
+  // сайте до подключения эквайринга сохраняется прежний безопасный путь в бот.
+  const CHECKOUT_API = ['127.0.0.1', 'localhost', 'chainya.ru', 'www.chainya.ru'].includes(location.hostname);
   function buildDlv(){
     const sel = $('#c-dlv'), cur = sel.value || 'pickup';
     sel.innerHTML = '';
@@ -2328,7 +2356,12 @@ select.input{
     sel.value = cur;
     toggleAddr();
   }
-  function toggleAddr(){ $('#c-addr-field').hidden = $('#c-dlv').value === 'pickup'; }
+  function toggleAddr(){
+    const dlv = $('#c-dlv').value;
+    $('#c-city-field').hidden = dlv === 'pickup';
+    $('#c-pvz-field').hidden = dlv !== 'cdek_pvz';
+    $('#c-addr-field').hidden = dlv !== 'cdek_courier';
+  }
   function syncCart(){ updateCartBadge(); buildDlv(); if (cartSheet.classList.contains('on')) renderCart(); }
 
   function openCart(){
@@ -2373,25 +2406,48 @@ select.input{
     b.classList.remove('tapped'); void b.offsetWidth; b.classList.add('tapped');
     setTimeout(() => { b.textContent = T().ts_add; }, 1100);
   });
-  $('#cart-submit').addEventListener('click', () => {
+  $('#cart-submit').addEventListener('click', async () => {
     const c = getCart();
     if (!c.length) return;
     if (!$('#c-phone').value.trim()){ $('#c-phone').focus(); return; }        // телефон обязателен
-    if ($('#c-dlv').value !== 'pickup' && !$('#c-addr').value.trim()){ $('#c-addr').focus(); return; }
+    const dlv = $('#c-dlv').value;
+    if (dlv !== 'pickup' && !$('#c-city').value.trim()){ $('#c-city').focus(); return; }
+    if (dlv === 'cdek_pvz' && !$('#c-pvz').value.trim()){ $('#c-pvz').focus(); return; }
+    if (dlv === 'cdek_courier' && !$('#c-addr').value.trim()){ $('#c-addr').focus(); return; }
     // компактный payload: id/pack/qty. Названия, цены и итог бот считает из своей
     // же базы — меньше байт для sendData (лимит 4096) и цена не зависит от клиента.
     const payload = {
       type:'order',
       items: c.map(it => ({ id:it.id, pack:it.pack, qty:it.qty })),
-      delivery: $('#c-dlv').value,
+      delivery: dlv, payment_method: $('#c-payment').value,
       name: $('#c-name').value.trim(), phone: $('#c-phone').value.trim(),
-      address: $('#c-addr').value.trim(), note: $('#c-note').value.trim(),
+      city: $('#c-city').value.trim(), address: $('#c-addr').value.trim(),
+      pvz_code: $('#c-pvz').value.trim(), note: $('#c-note').value.trim(),
     };
     const clearCart = () => {
       localStorage.removeItem(CART_KEY); updateCartBadge();
       $('#cart-items').innerHTML = ''; $('#cart-items').append(el(`<div class="cart-empty">${T().order_done}</div>`));
       $('#cart-co').hidden = true; $('#cart-submit').disabled = true; $('#cart-total').textContent = '—';
     };
+    if (CHECKOUT_API){
+      const submit = $('#cart-submit'), status = $('#cart-status');
+      submit.disabled = true; status.textContent = 'Создаём тестовый заказ…';
+      try {
+        const response = await fetch('/api/orders', {
+          method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify(payload),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail || 'Не удалось создать заказ');
+        clearCart();
+        status.textContent = `Заказ ${result.order.id} создан. Переходим к тестовой оплате…`;
+        location.href = result.payment.url;
+        return;
+      } catch (e) {
+        status.textContent = e.message || 'Не удалось создать заказ';
+        submit.disabled = false;
+        return;
+      }
+    }
     if (IN_TG){ try { TG.sendData(JSON.stringify(payload)); clearCart(); return; } catch(e){} }
     // обычный браузер: канал не чат — отправляем в бота, там заказ оформляется нативно
     window.open(BOT_URL, '_blank', 'noopener');

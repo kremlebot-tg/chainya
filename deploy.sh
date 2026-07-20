@@ -21,7 +21,7 @@ python3 build.py --web >/dev/null
 [ -f dist/index.html ] || { echo "✗ dist/index.html не собрался"; exit 1; }
 
 echo "→ упаковка ($(du -sh dist | cut -f1))"
-tar czf "$TMP/site.tgz" -C dist --exclude=CNAME .
+COPYFILE_DISABLE=1 tar czf "$TMP/site.tgz" -C dist --exclude=CNAME .
 
 echo "→ заливка на $HOST"
 scp -q "$TMP/site.tgz" "$HOST:/tmp/site.tgz"

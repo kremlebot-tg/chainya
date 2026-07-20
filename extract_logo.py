@@ -9,10 +9,11 @@
 Запускать только если пришлют новый логотип.
 """
 from PIL import Image, ImageFilter
-import os
+from pathlib import Path
 
-SRC = os.path.expanduser('~/Desktop/чайная/photo_2026-07-16_07-59-35.jpg')
-DST = os.path.join(os.path.dirname(__file__), 'src-assets', 'logo-mark.png')
+ROOT = Path(__file__).resolve().parent
+SRC = ROOT.parent / 'source-materials' / 'tea-house' / 'photo_2026-07-16_07-59-35.jpg'
+DST = ROOT / 'src-assets' / 'logo-mark.png'
 
 im = Image.open(SRC).convert('RGB')
 W, H = im.size

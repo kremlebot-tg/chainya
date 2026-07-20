@@ -113,6 +113,10 @@ class UpdateOrderStatus(BaseModel):
     status: Literal["paid", "confirmed", "packing", "shipped", "completed", "cancelled"]
 
 
+class UpdateLeadStatus(BaseModel):
+    status: Literal["new", "contacted", "closed"]
+
+
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -178,9 +182,16 @@ def init_db() -> None:
                 company TEXT NOT NULL,
                 name TEXT NOT NULL,
                 contact TEXT NOT NULL,
-                note TEXT NOT NULL
+                note TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'new',
+                updated_at TEXT NOT NULL DEFAULT ''
             )
         """)
+        lead_columns = {row["name"] for row in con.execute("PRAGMA table_info(business_leads)")}
+        if "status" not in lead_columns:
+            con.execute("ALTER TABLE business_leads ADD COLUMN status TEXT NOT NULL DEFAULT 'new'")
+        if "updated_at" not in lead_columns:
+            con.execute("ALTER TABLE business_leads ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''")
 
 
 def pack_price(per_10g: int, grams: int) -> int:
@@ -355,6 +366,31 @@ def admin_update_order(order_id: str, payload: UpdateOrderStatus, authorization:
     return admin_order(order_row(order_id))
 
 
+@app.get("/api/admin/business-leads")
+def admin_business_leads(authorization: str = Header(default="")):
+    require_admin(authorization)
+    with db() as con:
+        rows = con.execute("SELECT * FROM business_leads ORDER BY created_at DESC LIMIT 200").fetchall()
+    return {"leads": [dict(row) for row in rows]}
+
+
+@app.patch("/api/admin/business-leads/{lead_id}")
+def admin_update_business_lead(
+    lead_id: str, payload: UpdateLeadStatus, authorization: str = Header(default="")
+):
+    require_admin(authorization)
+    with db() as con:
+        exists = con.execute("SELECT 1 FROM business_leads WHERE id = ?", (lead_id,)).fetchone()
+        if not exists:
+            raise HTTPException(404, "Заявка не найдена")
+        con.execute(
+            "UPDATE business_leads SET status = ?, updated_at = ? WHERE id = ?",
+            (payload.status, now_iso(), lead_id),
+        )
+        row = con.execute("SELECT * FROM business_leads WHERE id = ?", (lead_id,)).fetchone()
+    return dict(row)
+
+
 @app.get("/api/delivery/quote")
 def delivery_quote(method: Literal["pickup", "cdek_pvz", "cdek_courier"]):
     return {
@@ -402,8 +438,10 @@ def create_business_lead(payload: CreateBusinessLead, background_tasks: Backgrou
     lead = {"id": uuid.uuid4().hex[:12].upper(), "created_at": now_iso(), **payload.model_dump()}
     with db() as con:
         con.execute(
-            "INSERT INTO business_leads VALUES (?, ?, ?, ?, ?, ?)",
-            (lead["id"], lead["created_at"], lead["company"], lead["name"], lead["contact"], lead["note"]),
+            """INSERT INTO business_leads
+               (id, created_at, company, name, contact, note, status, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, 'new', ?)""",
+            (lead["id"], lead["created_at"], lead["company"], lead["name"], lead["contact"], lead["note"], lead["created_at"]),
         )
     background_tasks.add_task(notify_business_lead, lead)
     return {"id": lead["id"], "accepted": True}

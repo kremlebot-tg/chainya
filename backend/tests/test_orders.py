@@ -109,3 +109,22 @@ def test_admin_lists_and_updates_orders(tmp_path, monkeypatch):
             f"/api/admin/orders/{created['id']}", headers=auth, json={"status": "confirmed"}
         )
         assert confirmed.json()["status"] == "confirmed"
+
+
+def test_admin_lists_and_updates_business_leads(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    monkeypatch.setattr(module, "notify_business_lead", lambda lead: None)
+    auth = {"Authorization": "Bearer test-admin-token"}
+    with client:
+        created = client.post("/api/business-leads", json={
+            "company": "Ресторан", "name": "Илья", "contact": "@ilya",
+            "note": "Нужна дегустация", "privacy_accepted": True,
+        }).json()
+        listing = client.get("/api/admin/business-leads", headers=auth)
+        assert listing.status_code == 200
+        assert listing.json()["leads"][0]["status"] == "new"
+        updated = client.patch(
+            f"/api/admin/business-leads/{created['id']}", headers=auth, json={"status": "contacted"}
+        )
+        assert updated.status_code == 200
+        assert updated.json()["status"] == "contacted"

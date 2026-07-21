@@ -1568,6 +1568,10 @@ select.input{
     cart_note_ph:'Комментарий к заказу', cart_submit:'Оформить заказ',
     cart_pay:'Тестовый режим: деньги не списываются, цены СДЭК демонстрационные.',
     privacy_accept:'Согласен на обработку данных согласно', privacy_link:'политике конфиденциальности', privacy_required:'Подтвердите согласие на обработку данных',
+    cart_phone_required:'Укажите телефон, чтобы мы могли подтвердить заказ.', cart_city_required:'Укажите город доставки.',
+    cart_pvz_required:'Укажите код или адрес пункта СДЭК.', cart_addr_required:'Укажите адрес доставки.',
+    cart_creating:'Создаём тестовый заказ…', cart_create_error:'Не удалось создать заказ. Попробуйте ещё раз.',
+    cart_created:id=>`Заказ ${id} создан. Переходим к тестовой оплате…`, b2b_error:'Не удалось отправить заявку. Попробуйте ещё раз.',
     dlv:{ pickup:'Самовывоз · Острякова, 3', cdek_pvz:'СДЭК · пункт выдачи', cdek_courier:'СДЭК · курьер' },
     order_head:'🛒 Заказ чая — Чайня', order_done:'Спасибо! Завершите заказ в нашем боте @chainyabot или позвоните +7 905 590-88-01 — подтвердим и посчитаем доставку.',
     ts_note:'За столом этот чай можно выпить бесплатно: два на выбор входят в стоимость стола.',
@@ -1715,6 +1719,10 @@ select.input{
     cart_note_ph:'Order comment', cart_submit:'Place order',
     cart_pay:'Test mode: no money is charged; CDEK prices are placeholders.',
     privacy_accept:'I consent to data processing under the', privacy_link:'privacy policy', privacy_required:'Please accept the data processing terms',
+    cart_phone_required:'Enter a phone number so we can confirm the order.', cart_city_required:'Enter the delivery city.',
+    cart_pvz_required:'Enter the CDEK pickup-point code or address.', cart_addr_required:'Enter the delivery address.',
+    cart_creating:'Creating your test order…', cart_create_error:'Could not create the order. Please try again.',
+    cart_created:id=>`Order ${id} created. Opening test payment…`, b2b_error:'Could not send your request. Please try again.',
     dlv:{ pickup:'Pickup · Ostryakova 3', cdek_pvz:'CDEK · pickup point', cdek_courier:'CDEK · courier' },
     order_head:'🛒 Tea order — Chaynya', order_done:'Thanks! Finish your order in our bot @chainyabot or call +7 905 590-88-01 — we’ll confirm and calculate shipping.',
     ts_note:'At the table this tea costs you nothing: two of your choice come with the table.',
@@ -1862,6 +1870,10 @@ select.input{
     cart_note_ph:'订单备注', cart_submit:'提交订单',
     cart_pay:'测试模式：不会扣款，CDEK运费为演示价格。',
     privacy_accept:'我同意按照以下条款处理个人数据：', privacy_link:'隐私政策', privacy_required:'请同意个人数据处理条款',
+    cart_phone_required:'请填写电话号码，以便我们确认订单。', cart_city_required:'请填写配送城市。',
+    cart_pvz_required:'请填写CDEK自提点代码或地址。', cart_addr_required:'请填写配送地址。',
+    cart_creating:'正在创建测试订单…', cart_create_error:'订单创建失败，请重试。',
+    cart_created:id=>`订单 ${id} 已创建，正在进入测试支付…`, b2b_error:'申请发送失败，请重试。',
     dlv:{ pickup:'自取 · 奥斯特里亚科娃街3号', cdek_pvz:'CDEK · 自提点', cdek_courier:'CDEK · 快递员' },
     order_head:'🛒 茶订单 — Chaynya', order_done:'谢谢！请在我们的机器人 @chainyabot 中完成订单，或致电 +7 905 590-88-01，我们会确认并计算运费。',
     ts_note:'在店里喝这款茶不另收费：茶席已含任选两款。',
@@ -2440,12 +2452,12 @@ select.input{
     const c = getCart();
     if (!c.length) return;
     const status = $('#cart-status'); status.textContent=''; status.classList.remove('cart-note--error');
-    if (!requireCartField('#c-phone','Укажите телефон, чтобы мы могли подтвердить заказ.')) return;
+    if (!requireCartField('#c-phone',T().cart_phone_required)) return;
     if (!$('#c-privacy').checked){ status.textContent = T().privacy_required; status.classList.add('cart-note--error'); $('#c-privacy').focus(); return; }
     const dlv = $('#c-dlv').value;
-    if (dlv !== 'pickup' && !requireCartField('#c-city','Укажите город доставки.')) return;
-    if (dlv === 'cdek_pvz' && !requireCartField('#c-pvz','Укажите код или адрес пункта СДЭК.')) return;
-    if (dlv === 'cdek_courier' && !requireCartField('#c-addr','Укажите адрес доставки.')) return;
+    if (dlv !== 'pickup' && !requireCartField('#c-city',T().cart_city_required)) return;
+    if (dlv === 'cdek_pvz' && !requireCartField('#c-pvz',T().cart_pvz_required)) return;
+    if (dlv === 'cdek_courier' && !requireCartField('#c-addr',T().cart_addr_required)) return;
     // компактный payload: id/pack/qty. Названия, цены и итог бот считает из своей
     // же базы — меньше байт для sendData (лимит 4096) и цена не зависит от клиента.
     const payload = {
@@ -2464,19 +2476,21 @@ select.input{
     };
     if (CHECKOUT_API){
       const submit = $('#cart-submit');
-      submit.disabled = true; status.textContent = 'Создаём тестовый заказ…';
+      submit.disabled = true; status.textContent = T().cart_creating;
       try {
         const response = await fetch('/api/orders', {
           method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify(payload),
         });
         const result = await response.json();
-        if (!response.ok) throw new Error(result.detail || 'Не удалось создать заказ');
+        if (!response.ok) throw new Error(T().cart_create_error);
         clearCart();
-        status.textContent = `Заказ ${result.order.id} создан. Переходим к тестовой оплате…`;
-        location.href = result.payment.url;
+        status.textContent = T().cart_created(result.order.id);
+        const paymentUrl = new URL(result.payment.url, location.href);
+        paymentUrl.searchParams.set('lang', LANG);
+        location.href = paymentUrl.href;
         return;
       } catch (e) {
-        status.textContent = e.message || 'Не удалось создать заказ';
+        status.textContent = T().cart_create_error;
         submit.disabled = false;
         return;
       }
@@ -2672,11 +2686,11 @@ select.input{
         }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.detail || 'Не удалось отправить заявку');
+      if (!response.ok) throw new Error(T().b2b_error);
     } catch (e) {
       submit.disabled = false;
       const note = document.querySelector('#b2b-form-wrap .summary__note');
-      note.textContent = e.message || 'Не удалось отправить заявку';
+      note.textContent = T().b2b_error;
       return;
     }
     lastB2B = { name: $('#b-name').value.trim() };
@@ -2732,6 +2746,7 @@ select.input{
     $$('[data-i18n-ph]').forEach(n => { const v = T()[n.dataset.i18nPh]; if (v != null) n.placeholder = v; });
     $$('[data-i18n-aria]').forEach(n => { const v = T()[n.dataset.i18nAria]; if (v != null) n.setAttribute('aria-label', v); });
     $$('[data-i18n-alt]').forEach(n => { const v = T()[n.dataset.i18nAlt]; if (v != null) n.alt = v; });
+    $$('a[href^="/privacy.html"]').forEach(a => { a.href = `/privacy.html?lang=${LANG}`; });
     buildHeroWall();
     buildRange();
     buildFilters();

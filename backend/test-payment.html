@@ -6,31 +6,38 @@
 @font-face{font-family:Prata;src:url('/fonts/prata-cyr.woff2')}@font-face{font-family:Golos;src:url('/fonts/golos-cyr.woff2')}:root{color-scheme:dark;--bg:#1d1915;--panel:#171411;--line:#55493e;--text:#f1eadf;--muted:#aaa094;--paper:#e8dfcf;--ink:#211b16}*{box-sizing:border-box}body{font:15px/1.5 Golos,Arial,sans-serif;background:var(--bg);color:var(--text);display:grid;place-items:center;min-height:100svh;margin:0;padding:24px}.card{width:min(600px,100%);padding:38px 40px 34px;border:1px solid var(--line);background:var(--panel)}.brand{display:flex;align-items:center;gap:12px;margin-bottom:34px;color:var(--muted);font-size:11px;letter-spacing:.16em;text-transform:uppercase}.brand img{width:28px;height:34px;object-fit:contain}h1{margin:0 0 7px;font:36px/1.17 Prata,serif;letter-spacing:-.02em}.muted{color:var(--muted)}.order-no{margin:0 0 25px}.items{border-top:1px solid var(--line)}.item,.sum{display:flex;justify-content:space-between;gap:18px;padding:13px 0;border-bottom:1px solid var(--line)}.item span:last-child,.sum b{white-space:nowrap}.totals{margin:15px 0 24px}.sum{border:0;padding:4px 0}.sum.total{font:19px Prata,serif;margin-top:7px}.pay,.back{display:block;width:100%;min-height:50px;padding:14px;border:1px solid var(--paper);border-radius:0;background:var(--paper);color:var(--ink);text-align:center;text-decoration:none;font:600 15px Golos,sans-serif;cursor:pointer}.pay:disabled{opacity:.55}.back{margin-top:10px;background:transparent;color:var(--text);border-color:var(--line)}#status{min-height:24px;margin:16px 0 0}.paid{padding:12px 14px;border-left:2px solid #819773;background:#20251d;color:#c5d4bb}.next{margin:18px 0;color:var(--muted);font-size:13px}@media(max-width:600px){body{padding:0;place-items:stretch}.card{width:100%;min-height:100svh;padding:24px 18px 28px;border:0}.brand{margin-bottom:30px}h1{font-size:32px}.item{font-size:13px}.pay,.back{min-height:54px;font-size:16px}}
 </style></head>
 <body><main class="card">
-  <div class="brand"><img src="/img/logo-mark.webp" alt=""><span>Чайня · Москва</span></div>
-  <h1 id="title">Ваш заказ</h1><p class="muted order-no" id="order-no">Загружаем…</p>
+  <div class="brand"><img src="/img/logo-mark.webp" alt=""><span data-k="brand">Чайня · Москва</span></div>
+  <h1 id="title" data-k="title">Ваш заказ</h1><p class="muted order-no" id="order-no" data-k="loading">Загружаем…</p>
   <div class="items" id="items"></div>
   <div class="totals" id="totals" hidden>
-    <div class="sum"><span>Товары</span><span id="subtotal"></span></div>
-    <div class="sum"><span>Доставка</span><span id="delivery"></span></div>
-    <div class="sum total"><b>Итого</b><b id="total"></b></div>
+    <div class="sum"><span data-k="goods">Товары</span><span id="subtotal"></span></div>
+    <div class="sum"><span data-k="delivery">Доставка</span><span id="delivery"></span></div>
+    <div class="sum total"><b data-k="total">Итого</b><b id="total"></b></div>
   </div>
-  <p class="muted">Тестовый режим: деньги не списываются.</p>
-  <button class="pay" id="pay" hidden>Имитировать успешную оплату</button>
+  <p class="muted" data-k="test">Тестовый режим: деньги не списываются.</p>
+  <button class="pay" id="pay" hidden data-k="pay">Имитировать успешную оплату</button>
   <p id="status" aria-live="polite"></p>
-  <p class="next" id="next" hidden>Мы получили заказ. Если потребуется уточнение доставки, свяжемся по указанному номеру.</p>
-  <a class="back" href="/#shop">Вернуться в магазин</a>
+  <p class="next" id="next" hidden data-k="next">Мы получили заказ. Если потребуется уточнение доставки, свяжемся по указанному номеру.</p>
+  <a class="back" href="/#shop" data-k="back">Вернуться в магазин</a>
 </main>
 <script>
-const id=location.pathname.split('/').pop(),token=new URLSearchParams(location.search).get('token')||'',pay=document.querySelector('#pay'),status=document.querySelector('#status');
-const rub=n=>new Intl.NumberFormat('ru-RU').format(n)+' ₽';
+const query=new URLSearchParams(location.search),requested=query.get('lang'),lang=['ru','en','zh'].includes(requested)?requested:'ru';
+const TEXT={
+  ru:{brand:'Чайня · Москва',title:'Ваш заказ',loading:'Загружаем…',goods:'Товары',delivery:'Доставка',total:'Итого',test:'Тестовый режим: деньги не списываются.',pay:'Имитировать успешную оплату',next:'Мы получили заказ. Если потребуется уточнение доставки, свяжемся по указанному номеру.',back:'Вернуться в магазин',order:id=>`Заказ № ${id}`,pc:'шт.',gram:'г',accepted:'Заказ принят',paid:'Оплата отмечена. Уведомление уже отправлено Чайне.',processing:'Обрабатываем…',notFound:'Заказ не найден',openError:'Не удалось открыть заказ',error:'Не удалось обработать оплату'},
+  en:{brand:'Chaynya · Moscow',title:'Your order',loading:'Loading…',goods:'Items',delivery:'Delivery',total:'Total',test:'Test mode: no money will be charged.',pay:'Simulate successful payment',next:'We have received your order. If we need to confirm delivery details, we will call the number provided.',back:'Return to the shop',order:id=>`Order no. ${id}`,pc:'pc.',gram:'g',accepted:'Order received',paid:'Payment marked as complete. Chaynya has already been notified.',processing:'Processing…',notFound:'Order not found',openError:'Could not open the order',error:'Could not process the payment'},
+  zh:{brand:'Chaynya茶馆 · 莫斯科',title:'您的订单',loading:'正在加载…',goods:'商品',delivery:'配送',total:'合计',test:'测试模式：不会扣款。',pay:'模拟支付成功',next:'我们已收到订单。如需确认配送信息，我们会拨打您填写的电话。',back:'返回商店',order:id=>`订单号 ${id}`,pc:'个',gram:'克',accepted:'订单已受理',paid:'已标记为支付成功，Chaynya茶馆已收到通知。',processing:'正在处理…',notFound:'未找到订单',openError:'无法打开订单',error:'支付处理失败'}
+};
+const t=TEXT[lang],id=location.pathname.split('/').pop(),token=query.get('token')||'',pay=document.querySelector('#pay'),status=document.querySelector('#status');
+document.documentElement.lang=lang;document.title=`${t.title} · Chaynya`;document.querySelectorAll('[data-k]').forEach(el=>el.textContent=t[el.dataset.k]);
+const rub=n=>new Intl.NumberFormat(lang==='zh'?'zh-CN':lang==='en'?'en-GB':'ru-RU').format(n)+' ₽';
 function render(d){
-  document.querySelector('#order-no').textContent=`Заказ № ${d.id}`;
+  document.querySelector('#order-no').textContent=t.order(d.id);
   const items=document.querySelector('#items');items.replaceChildren();
-  d.items.forEach(x=>{const row=document.createElement('div');row.className='item';const name=document.createElement('span');name.textContent=`${x.name} · ${x.pack==='pc'?'шт.':x.pack+' г'} × ${x.qty}`;const price=document.createElement('span');price.textContent=rub(x.total);row.append(name,price);items.append(row)});
+  d.items.forEach(x=>{const row=document.createElement('div');row.className='item';const name=document.createElement('span');name.textContent=`${x.name} · ${x.pack==='pc'?t.pc:x.pack+' '+t.gram} × ${x.qty}`;const price=document.createElement('span');price.textContent=rub(x.total);row.append(name,price);items.append(row)});
   document.querySelector('#subtotal').textContent=rub(d.subtotal);document.querySelector('#delivery').textContent=rub(d.delivery_price);document.querySelector('#total').textContent=rub(d.total);document.querySelector('#totals').hidden=false;
-  if(d.status==='paid'){document.querySelector('#title').textContent='Заказ принят';status.textContent='Оплата отмечена. Уведомление уже отправлено Чайне.';status.className='paid';document.querySelector('#next').hidden=false;pay.hidden=true}else{pay.hidden=false}
+  if(d.status==='paid'){document.querySelector('#title').textContent=t.accepted;status.textContent=t.paid;status.className='paid';document.querySelector('#next').hidden=false;pay.hidden=true}else{pay.hidden=false}
 }
-async function load(){try{const r=await fetch(`/api/orders/${id}?token=${encodeURIComponent(token)}`);const d=await r.json();if(!r.ok)throw new Error(d.detail||'Заказ не найден');render(d)}catch(e){status.textContent=e.message;document.querySelector('#order-no').textContent='Не удалось открыть заказ'}}
-pay.onclick=async()=>{pay.disabled=true;status.textContent='Обрабатываем…';try{const r=await fetch(`/api/orders/${id}/test-pay?token=${encodeURIComponent(token)}`,{method:'POST'});const d=await r.json();if(!r.ok)throw new Error(d.detail||'Ошибка');render(d)}catch(e){status.textContent=e.message;pay.disabled=false}};
+async function load(){try{const r=await fetch(`/api/orders/${id}?token=${encodeURIComponent(token)}`);const d=await r.json();if(!r.ok)throw new Error(t.notFound);render(d)}catch(e){status.textContent=t.notFound;document.querySelector('#order-no').textContent=t.openError}}
+pay.onclick=async()=>{pay.disabled=true;status.textContent=t.processing;try{const r=await fetch(`/api/orders/${id}/test-pay?token=${encodeURIComponent(token)}`,{method:'POST'});const d=await r.json();if(!r.ok)throw new Error(t.error);render(d)}catch(e){status.textContent=t.error;pay.disabled=false}};
 load();
 </script></body></html>

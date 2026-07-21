@@ -29,6 +29,8 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
+from .saby import SabyClient, SabyError
+
 
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT = ROOT.parent
@@ -56,6 +58,7 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="Chainya checkout", version="0.1.0", lifespan=lifespan)
+saby_client = SabyClient()
 _rate_buckets: dict[str, deque[float]] = defaultdict(deque)
 _rate_lock = threading.Lock()
 
@@ -389,6 +392,45 @@ def admin_update_business_lead(
         )
         row = con.execute("SELECT * FROM business_leads WHERE id = ?", (lead_id,)).fetchone()
     return dict(row)
+
+
+@app.get("/api/admin/saby/status")
+def admin_saby_status(authorization: str = Header(default="")):
+    require_admin(authorization)
+    return saby_client.configuration()
+
+
+@app.post("/api/admin/saby/test")
+def admin_saby_test(authorization: str = Header(default="")):
+    require_admin(authorization)
+    try:
+        result = saby_client.sales_points()
+    except SabyError as exc:
+        raise HTTPException(502, str(exc)) from exc
+    points = result.get("salesPoints", []) if isinstance(result, dict) else []
+    return {
+        "connected": True,
+        "points": [
+            {key: point.get(key) for key in ("id", "name", "address", "locality", "prices")}
+            for point in points[:50]
+        ],
+    }
+
+
+@app.get("/api/admin/saby/catalog-preview")
+def admin_saby_catalog_preview(authorization: str = Header(default="")):
+    require_admin(authorization)
+    try:
+        result = saby_client.catalog(page_size=25)
+    except SabyError as exc:
+        raise HTTPException(502, str(exc)) from exc
+    items = result.get("nomenclatures", result.get("items", [])) if isinstance(result, dict) else []
+    return {
+        "items": [
+            {key: item.get(key) for key in ("id", "externalId", "name", "cost", "balance", "published", "unit")}
+            for item in items[:25]
+        ]
+    }
 
 
 @app.get("/api/delivery/quote")

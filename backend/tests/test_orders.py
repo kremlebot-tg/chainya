@@ -128,3 +128,13 @@ def test_admin_lists_and_updates_business_leads(tmp_path, monkeypatch):
         )
         assert updated.status_code == 200
         assert updated.json()["status"] == "contacted"
+
+
+def test_admin_reports_saby_configuration(tmp_path, monkeypatch):
+    client, _ = app_client(tmp_path, monkeypatch)
+    auth = {"Authorization": "Bearer test-admin-token"}
+    with client:
+        assert client.get("/api/admin/saby/status").status_code == 401
+        response = client.get("/api/admin/saby/status", headers=auth)
+        assert response.status_code == 200
+        assert response.json()["configured"] is False

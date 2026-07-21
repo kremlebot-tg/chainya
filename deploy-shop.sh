@@ -18,17 +18,21 @@ COPYFILE_DISABLE=1 tar czf "$TMP/shop.tgz" \
 
 rsync -az "$TMP/shop.tgz" "$HOST:/tmp/chainya-shop.tgz"
 rsync -az ops/chainya-shop.service "$HOST:/tmp/chainya-shop.service"
+rsync -az ops/chainya-backup.service "$HOST:/tmp/chainya-backup.service"
+rsync -az ops/chainya-backup.timer "$HOST:/tmp/chainya-backup.timer"
 rsync -az ops/nginx-chainya.ru "$HOST:/tmp/nginx-chainya.ru"
 
 ssh "$HOST" '
   set -e
-  sudo mkdir -p /opt/chainya-shop /var/lib/chainya-shop
+  sudo mkdir -p /opt/chainya-shop /var/lib/chainya-shop /var/backups/chainya-shop
   sudo tar xzf /tmp/chainya-shop.tgz -C /opt/chainya-shop
   sudo python3 -m venv /opt/chainya-shop/.venv
   sudo /opt/chainya-shop/.venv/bin/pip install -q -r /opt/chainya-shop/backend/requirements.txt
   sudo chown -R root:root /opt/chainya-shop
   sudo chown -R www-data:www-data /var/lib/chainya-shop
   sudo install -m 0644 /tmp/chainya-shop.service /etc/systemd/system/chainya-shop.service
+  sudo install -m 0644 /tmp/chainya-backup.service /etc/systemd/system/chainya-backup.service
+  sudo install -m 0644 /tmp/chainya-backup.timer /etc/systemd/system/chainya-backup.timer
   sudo install -m 0644 /tmp/nginx-chainya.ru /etc/nginx/sites-available/chainya.ru
   sudo grep -E "^(BOT_TOKEN|OWNER_CHAT_ID)=" /opt/chainya-bot/.env | sudo tee /etc/chainya-shop.env >/dev/null
   if ! sudo test -s /etc/chainya-shop-admin.env; then
@@ -38,10 +42,12 @@ ssh "$HOST" '
   sudo chmod 600 /etc/chainya-shop-admin.env
   sudo systemctl daemon-reload
   sudo systemctl enable chainya-shop
+  sudo systemctl enable --now chainya-backup.timer
   sudo systemctl restart chainya-shop
   sudo nginx -t
   sudo systemctl reload nginx
-  rm -f /tmp/chainya-shop.tgz /tmp/chainya-shop.service /tmp/nginx-chainya.ru
+  sudo systemctl start chainya-backup.service
+  rm -f /tmp/chainya-shop.tgz /tmp/chainya-shop.service /tmp/chainya-backup.service /tmp/chainya-backup.timer /tmp/nginx-chainya.ru
 '
 
 ./deploy.sh

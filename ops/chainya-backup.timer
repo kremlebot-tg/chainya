@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily Chainya orders backup
+
+[Timer]
+OnCalendar=*-*-* 03:20:00 Europe/Moscow
+Persistent=true
+RandomizedDelaySec=10m
+
+[Install]
+WantedBy=timers.target

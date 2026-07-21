@@ -516,6 +516,8 @@ a{ color:inherit; text-decoration:none; }
 .cart-co{ margin-top:20px; }
 .cart-co__h{ font-family:'Prata',Georgia,serif; font-weight:400; font-size:1.15rem; margin:0 0 14px; }
 .cart-note{ margin:10px 0 0; font-size:11.5px; color:var(--text-3); line-height:1.5; text-align:center; }
+.cart-note--error{ color:#c66f62; }
+.input[aria-invalid="true"]{ border-color:#b9574b; box-shadow:0 0 0 1px #b9574b; }
 .consent{display:flex;align-items:flex-start;gap:10px;margin:14px 0;color:var(--text-3);font-size:12px;line-height:1.45}.consent input{width:18px;height:18px;margin:0;flex:none;accent-color:var(--accent)}.consent a{color:var(--text-2);border-bottom:1px solid var(--line)}
 
 /* ─────────────────────────  ФОРМЫ  ───────────────────────── */
@@ -705,6 +707,16 @@ select.input{
   /* тач-зоны корзины и языков до 44px (пальцу нужно 44, на десктопе было меньше) */
   .qty__b{ width:44px; height:44px; }
   .citem__rm{ width:44px; height:44px; }
+  .cart .sheet__head{ padding-block:15px; }
+  .cart .sheet__body{ padding-bottom:18px; }
+  .cart .sheet__foot{ padding-top:14px; padding-bottom:max(18px,env(safe-area-inset-bottom)); background:var(--bg); }
+  .cart .field{ margin-bottom:17px; }
+  .cart-co{ margin-top:16px; }
+  .citem{ display:grid; grid-template-columns:52px minmax(0,1fr) auto; gap:10px; }
+  .citem__img{ grid-row:1/3; }
+  .citem__info{ align-self:end; }
+  .citem .qty{ grid-column:2; align-self:start; }
+  .citem__rm{ grid-column:3; grid-row:1/3; align-self:center; }
   .nav__in{ height:56px; gap:8px; }
   .brand{ font-size:15px; letter-spacing:.14em; gap:8px; min-height:44px; min-width:0; }
   /* «МСК» — декоративная приписка: на телефоне она упиралась в переключатель
@@ -1305,7 +1317,7 @@ select.input{
         </div>
         <div class="field">
           <label class="label" for="c-phone" data-i18n="f_phone">Телефон</label>
-          <input class="input" type="tel" id="c-phone" placeholder="+7 (___) ___-__-__" autocomplete="tel">
+          <input class="input" type="tel" id="c-phone" placeholder="+7 (___) ___-__-__" autocomplete="tel" inputmode="tel" required>
         </div>
       </div>
       <div class="field">
@@ -2374,6 +2386,14 @@ select.input{
   }
   function syncCart(){ updateCartBadge(); buildDlv(); if (cartSheet.classList.contains('on')) renderCart(); }
 
+  function requireCartField(selector, message){
+    const field = $(selector), ok = field.value.trim();
+    field.setAttribute('aria-invalid', ok ? 'false' : 'true');
+    if (!ok){ const status=$('#cart-status'); status.textContent=message; status.classList.add('cart-note--error'); field.focus(); }
+    return !!ok;
+  }
+  $$('#cart-co .input').forEach(field => field.addEventListener('input', () => { field.removeAttribute('aria-invalid'); $('#cart-status').classList.remove('cart-note--error'); }));
+
   function openCart(){
     lastCartTrigger = document.activeElement;   // куда вернуть фокус при закрытии
     closeTea();
@@ -2419,12 +2439,13 @@ select.input{
   $('#cart-submit').addEventListener('click', async () => {
     const c = getCart();
     if (!c.length) return;
-    if (!$('#c-phone').value.trim()){ $('#c-phone').focus(); return; }        // телефон обязателен
-    if (!$('#c-privacy').checked){ $('#cart-status').textContent = T().privacy_required; $('#c-privacy').focus(); return; }
+    const status = $('#cart-status'); status.textContent=''; status.classList.remove('cart-note--error');
+    if (!requireCartField('#c-phone','Укажите телефон, чтобы мы могли подтвердить заказ.')) return;
+    if (!$('#c-privacy').checked){ status.textContent = T().privacy_required; status.classList.add('cart-note--error'); $('#c-privacy').focus(); return; }
     const dlv = $('#c-dlv').value;
-    if (dlv !== 'pickup' && !$('#c-city').value.trim()){ $('#c-city').focus(); return; }
-    if (dlv === 'cdek_pvz' && !$('#c-pvz').value.trim()){ $('#c-pvz').focus(); return; }
-    if (dlv === 'cdek_courier' && !$('#c-addr').value.trim()){ $('#c-addr').focus(); return; }
+    if (dlv !== 'pickup' && !requireCartField('#c-city','Укажите город доставки.')) return;
+    if (dlv === 'cdek_pvz' && !requireCartField('#c-pvz','Укажите код или адрес пункта СДЭК.')) return;
+    if (dlv === 'cdek_courier' && !requireCartField('#c-addr','Укажите адрес доставки.')) return;
     // компактный payload: id/pack/qty. Названия, цены и итог бот считает из своей
     // же базы — меньше байт для sendData (лимит 4096) и цена не зависит от клиента.
     const payload = {
@@ -2442,7 +2463,7 @@ select.input{
       $('#cart-co').hidden = true; $('#cart-submit').disabled = true; $('#cart-total').textContent = '—';
     };
     if (CHECKOUT_API){
-      const submit = $('#cart-submit'), status = $('#cart-status');
+      const submit = $('#cart-submit');
       submit.disabled = true; status.textContent = 'Создаём тестовый заказ…';
       try {
         const response = await fetch('/api/orders', {

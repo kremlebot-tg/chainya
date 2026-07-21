@@ -1,11 +1,13 @@
 <!doctype html>
 <html lang="ru">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Заказ · Чайня</title>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><title>Заказ · Чайня</title>
 <style>
-:root{color-scheme:dark}*{box-sizing:border-box}body{font:15px/1.5 system-ui;background:#141110;color:#eee;display:grid;place-items:center;min-height:100vh;margin:0;padding:24px}.card{width:min(520px,100%);padding:32px;border:1px solid #554b40;border-radius:18px;background:#211d1a}h1{margin:0 0 6px;font:34px/1.2 Georgia,serif}.muted{color:#aaa}.order-no{margin:0 0 22px}.items{border-top:1px solid #443d37}.item,.sum{display:flex;justify-content:space-between;gap:18px;padding:13px 0;border-bottom:1px solid #443d37}.item span:last-child,.sum b{white-space:nowrap}.totals{margin:15px 0 24px}.sum{border:0;padding:4px 0}.sum.total{font-size:19px;margin-top:6px}.pay,.back{display:block;box-sizing:border-box;width:100%;padding:14px;border:0;border-radius:10px;background:#c99a4b;color:#17110a;text-align:center;text-decoration:none;font:inherit;font-weight:700;cursor:pointer}.pay:disabled{opacity:.55}.back{margin-top:14px;background:transparent;color:#ddd;border:1px solid #554b40}#status{min-height:24px;margin:14px 0 0}.paid{color:#9fc38b}
+[hidden]{display:none!important}
+@font-face{font-family:Prata;src:url('/fonts/prata-cyr.woff2')}@font-face{font-family:Golos;src:url('/fonts/golos-cyr.woff2')}:root{color-scheme:dark;--bg:#1d1915;--panel:#171411;--line:#55493e;--text:#f1eadf;--muted:#aaa094;--paper:#e8dfcf;--ink:#211b16}*{box-sizing:border-box}body{font:15px/1.5 Golos,Arial,sans-serif;background:var(--bg);color:var(--text);display:grid;place-items:center;min-height:100svh;margin:0;padding:24px}.card{width:min(600px,100%);padding:38px 40px 34px;border:1px solid var(--line);background:var(--panel)}.brand{display:flex;align-items:center;gap:12px;margin-bottom:34px;color:var(--muted);font-size:11px;letter-spacing:.16em;text-transform:uppercase}.brand img{width:28px;height:34px;object-fit:contain}h1{margin:0 0 7px;font:36px/1.17 Prata,serif;letter-spacing:-.02em}.muted{color:var(--muted)}.order-no{margin:0 0 25px}.items{border-top:1px solid var(--line)}.item,.sum{display:flex;justify-content:space-between;gap:18px;padding:13px 0;border-bottom:1px solid var(--line)}.item span:last-child,.sum b{white-space:nowrap}.totals{margin:15px 0 24px}.sum{border:0;padding:4px 0}.sum.total{font:19px Prata,serif;margin-top:7px}.pay,.back{display:block;width:100%;min-height:50px;padding:14px;border:1px solid var(--paper);border-radius:0;background:var(--paper);color:var(--ink);text-align:center;text-decoration:none;font:600 15px Golos,sans-serif;cursor:pointer}.pay:disabled{opacity:.55}.back{margin-top:10px;background:transparent;color:var(--text);border-color:var(--line)}#status{min-height:24px;margin:16px 0 0}.paid{padding:12px 14px;border-left:2px solid #819773;background:#20251d;color:#c5d4bb}.next{margin:18px 0;color:var(--muted);font-size:13px}@media(max-width:600px){body{padding:0;place-items:stretch}.card{width:100%;min-height:100svh;padding:24px 18px 28px;border:0}.brand{margin-bottom:30px}h1{font-size:32px}.item{font-size:13px}.pay,.back{min-height:54px;font-size:16px}}
 </style></head>
 <body><main class="card">
-  <h1>Ваш заказ</h1><p class="muted order-no" id="order-no">Загружаем…</p>
+  <div class="brand"><img src="/img/logo-mark.webp" alt=""><span>Чайня · Москва</span></div>
+  <h1 id="title">Ваш заказ</h1><p class="muted order-no" id="order-no">Загружаем…</p>
   <div class="items" id="items"></div>
   <div class="totals" id="totals" hidden>
     <div class="sum"><span>Товары</span><span id="subtotal"></span></div>
@@ -15,6 +17,7 @@
   <p class="muted">Тестовый режим: деньги не списываются.</p>
   <button class="pay" id="pay" hidden>Имитировать успешную оплату</button>
   <p id="status" aria-live="polite"></p>
+  <p class="next" id="next" hidden>Мы получили заказ. Если потребуется уточнение доставки, свяжемся по указанному номеру.</p>
   <a class="back" href="/#shop">Вернуться в магазин</a>
 </main>
 <script>
@@ -25,7 +28,7 @@ function render(d){
   const items=document.querySelector('#items');items.replaceChildren();
   d.items.forEach(x=>{const row=document.createElement('div');row.className='item';const name=document.createElement('span');name.textContent=`${x.name} · ${x.pack==='pc'?'шт.':x.pack+' г'} × ${x.qty}`;const price=document.createElement('span');price.textContent=rub(x.total);row.append(name,price);items.append(row)});
   document.querySelector('#subtotal').textContent=rub(d.subtotal);document.querySelector('#delivery').textContent=rub(d.delivery_price);document.querySelector('#total').textContent=rub(d.total);document.querySelector('#totals').hidden=false;
-  if(d.status==='paid'){status.textContent='Заказ оплачен в тестовом режиме. Уведомление отправлено владельцам.';status.className='paid';pay.hidden=true}else{pay.hidden=false}
+  if(d.status==='paid'){document.querySelector('#title').textContent='Заказ принят';status.textContent='Оплата отмечена. Уведомление уже отправлено Чайне.';status.className='paid';document.querySelector('#next').hidden=false;pay.hidden=true}else{pay.hidden=false}
 }
 async function load(){try{const r=await fetch(`/api/orders/${id}?token=${encodeURIComponent(token)}`);const d=await r.json();if(!r.ok)throw new Error(d.detail||'Заказ не найден');render(d)}catch(e){status.textContent=e.message;document.querySelector('#order-no').textContent='Не удалось открыть заказ'}}
 pay.onclick=async()=>{pay.disabled=true;status.textContent='Обрабатываем…';try{const r=await fetch(`/api/orders/${id}/test-pay?token=${encodeURIComponent(token)}`,{method:'POST'});const d=await r.json();if(!r.ok)throw new Error(d.detail||'Ошибка');render(d)}catch(e){status.textContent=e.message;pay.disabled=false}};

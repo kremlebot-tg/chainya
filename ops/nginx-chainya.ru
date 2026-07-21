@@ -48,6 +48,8 @@ server {
     }
 
     location /test-payment/ {
+        add_header Cache-Control "no-store" always;
+        add_header Referrer-Policy "no-referrer" always;
         proxy_pass http://127.0.0.1:8077;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -55,6 +57,9 @@ server {
     }
 
     location /admin/ {
+        add_header Cache-Control "no-store" always;
+        add_header Referrer-Policy "no-referrer" always;
+        add_header X-Robots-Tag "noindex, nofollow" always;
         proxy_pass http://127.0.0.1:8077;
         proxy_http_version 1.1;
         proxy_set_header Host $host;

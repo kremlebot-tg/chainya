@@ -55,3 +55,21 @@ def test_saby_reports_missing_configuration_without_network():
     assert "SABY_SECRET_KEY" in client.configuration()["missing"]
     with pytest.raises(SabyError, match="Не заданы параметры"):
         client.sales_points()
+
+
+def test_saby_delivery_order_keeps_payload_and_uses_create_endpoint():
+    calls = []
+
+    def opener(request, timeout):
+        calls.append(request)
+        if request.full_url.endswith("/oauth/service/"):
+            return Response({"token": "access"})
+        assert request.method == "POST"
+        assert request.full_url.endswith("/retail/order/create")
+        assert json.loads(request.data) == {"pointId": 10, "amount": 1230, "items": [{"id": 7, "quantity": 1}]}
+        return Response({"id": 99, "status": "created"})
+
+    client = SabyClient(settings(), opener=opener)
+    result = client.create_delivery_order({"pointId": 10, "amount": 1230, "items": [{"id": 7, "quantity": 1}]})
+    assert result == {"id": 99, "status": "created"}
+    assert len(calls) == 2

@@ -30,6 +30,11 @@ ssh "$HOST" '
   sudo /opt/chainya-shop/.venv/bin/pip install -q -r /opt/chainya-shop/backend/requirements.txt
   sudo chown -R root:root /opt/chainya-shop
   sudo chown -R www-data:www-data /var/lib/chainya-shop
+  sudo chown -R root:root /var/backups/chainya-shop
+  sudo chmod 0700 /var/lib/chainya-shop /var/backups/chainya-shop
+  if sudo test -e /var/lib/chainya-shop/orders.sqlite3; then
+    sudo chmod 0600 /var/lib/chainya-shop/orders.sqlite3
+  fi
   sudo install -m 0644 /tmp/chainya-shop.service /etc/systemd/system/chainya-shop.service
   sudo install -m 0644 /tmp/chainya-backup.service /etc/systemd/system/chainya-backup.service
   sudo install -m 0644 /tmp/chainya-backup.timer /etc/systemd/system/chainya-backup.timer

@@ -1571,7 +1571,7 @@ select.input{
     cart_phone_required:'Укажите телефон, чтобы мы могли подтвердить заказ.', cart_city_required:'Укажите город доставки.',
     cart_pvz_required:'Укажите код или адрес пункта СДЭК.', cart_addr_required:'Укажите адрес доставки.',
     cart_creating:'Создаём тестовый заказ…', cart_create_error:'Не удалось создать заказ. Попробуйте ещё раз.',
-    cart_created:id=>`Заказ ${id} создан. Переходим к тестовой оплате…`, b2b_error:'Не удалось отправить заявку. Попробуйте ещё раз.',
+    cart_payment_unavailable:'Онлайн-оплата пока не подключена.', cart_created:id=>`Заказ ${id} создан. Переходим к тестовой оплате…`, b2b_error:'Не удалось отправить заявку. Попробуйте ещё раз.',
     dlv:{ pickup:'Самовывоз · Острякова, 3', cdek_pvz:'СДЭК · пункт выдачи', cdek_courier:'СДЭК · курьер' },
     order_head:'🛒 Заказ чая — Чайня', order_done:'Спасибо! Завершите заказ в нашем боте @chainyabot или позвоните +7 905 590-88-01 — подтвердим и посчитаем доставку.',
     ts_note:'За столом этот чай можно выпить бесплатно: два на выбор входят в стоимость стола.',
@@ -1722,7 +1722,7 @@ select.input{
     cart_phone_required:'Enter a phone number so we can confirm the order.', cart_city_required:'Enter the delivery city.',
     cart_pvz_required:'Enter the CDEK pickup-point code or address.', cart_addr_required:'Enter the delivery address.',
     cart_creating:'Creating your test order…', cart_create_error:'Could not create the order. Please try again.',
-    cart_created:id=>`Order ${id} created. Opening test payment…`, b2b_error:'Could not send your request. Please try again.',
+    cart_payment_unavailable:'Online payment is not connected yet.', cart_created:id=>`Order ${id} created. Opening test payment…`, b2b_error:'Could not send your request. Please try again.',
     dlv:{ pickup:'Pickup · Ostryakova 3', cdek_pvz:'CDEK · pickup point', cdek_courier:'CDEK · courier' },
     order_head:'🛒 Tea order — Chaynya', order_done:'Thanks! Finish your order in our bot @chainyabot or call +7 905 590-88-01 — we’ll confirm and calculate shipping.',
     ts_note:'At the table this tea costs you nothing: two of your choice come with the table.',
@@ -1873,7 +1873,7 @@ select.input{
     cart_phone_required:'请填写电话号码，以便我们确认订单。', cart_city_required:'请填写配送城市。',
     cart_pvz_required:'请填写CDEK自提点代码或地址。', cart_addr_required:'请填写配送地址。',
     cart_creating:'正在创建测试订单…', cart_create_error:'订单创建失败，请重试。',
-    cart_created:id=>`订单 ${id} 已创建，正在进入测试支付…`, b2b_error:'申请发送失败，请重试。',
+    cart_payment_unavailable:'在线支付尚未接入。', cart_created:id=>`订单 ${id} 已创建，正在进入测试支付…`, b2b_error:'申请发送失败，请重试。',
     dlv:{ pickup:'自取 · 奥斯特里亚科娃街3号', cdek_pvz:'CDEK · 自提点', cdek_courier:'CDEK · 快递员' },
     order_head:'🛒 茶订单 — Chaynya', order_done:'谢谢！请在我们的机器人 @chainyabot 中完成订单，或致电 +7 905 590-88-01，我们会确认并计算运费。',
     ts_note:'在店里喝这款茶不另收费：茶席已含任选两款。',
@@ -1958,6 +1958,37 @@ select.input{
 
   let LANG = 'ru';
   try{ const s = localStorage.getItem('chaynya-lang'); if (I18N[s]) LANG = s; }catch(e){}
+
+  /* ─────────────  ОБЕЗЛИЧЕННАЯ АНАЛИТИКА  ─────────────
+     Только продуктовые события: без cookies, IP, user-agent и сторонних
+     счётчиков. Случайный идентификатор живёт до закрытия вкладки. */
+  const dntPreference = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+  const ANALYTICS_OFF = dntPreference === '1' || dntPreference === 'yes';
+  let analyticsSession = '';
+  if (!ANALYTICS_OFF) {
+    try {
+      analyticsSession = sessionStorage.getItem('chainya-session') ||
+        (crypto.randomUUID ? crypto.randomUUID() : Array.from(crypto.getRandomValues(new Uint8Array(16)),x=>x.toString(16).padStart(2,'0')).join(''));
+      sessionStorage.setItem('chainya-session', analyticsSession);
+    } catch(e) {}
+  }
+  let analyticsReferrer = 'direct';
+  try {
+    const host = document.referrer && new URL(document.referrer).hostname;
+    if (host && host !== location.hostname) analyticsReferrer = host.replace(/[^A-Za-z0-9.:-]/g,'').slice(0,160) || 'direct';
+  } catch(e) {}
+  const analyticsDevice = matchMedia('(max-width: 700px)').matches ? 'mobile' : matchMedia('(max-width: 1050px)').matches ? 'tablet' : 'desktop';
+  function track(event, section=''){
+    if (ANALYTICS_OFF || !analyticsSession) return;
+    fetch('/api/analytics/events', {method:'POST',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      session_id:analyticsSession,event,section,language:LANG,device:analyticsDevice,referrer:analyticsReferrer,
+    })}).catch(()=>{});
+  }
+  function trackOnce(event, section=''){
+    const key=`chainya-event:${event}:${section}`;
+    try{ if(sessionStorage.getItem(key))return;sessionStorage.setItem(key,'1'); }catch(e){}
+    track(event,section);
+  }
   const T = () => I18N[LANG];
 
   const rub = n => n.toLocaleString('ru-RU') + ' ₽';
@@ -2008,6 +2039,8 @@ select.input{
     scrollTo({ top:0, behavior:'instant' });
     scheduleReveal();   // раскрыть блоки нового раздела, попавшие в кадр
     tgSyncBack();
+    trackOnce('section_view', view);
+    if (view === 'book') trackOnce('booking_start', 'book');
   }
   document.addEventListener('click', e => {
     const t = e.target.closest('[data-go]');
@@ -2412,6 +2445,7 @@ select.input{
     renderCart();
     cartSheet.classList.add('on'); $('#scrim').classList.add('on');
     lockScroll(); bgInert(true); cartSheet.focus({ preventScroll:true }); tgSyncBack();
+    track('cart_open','cart');
   }
   function closeCart(){
     if (!cartSheet.classList.contains('on')) return;
@@ -2451,6 +2485,7 @@ select.input{
   $('#cart-submit').addEventListener('click', async () => {
     const c = getCart();
     if (!c.length) return;
+    trackOnce('checkout_start','cart');
     const status = $('#cart-status'); status.textContent=''; status.classList.remove('cart-note--error');
     if (!requireCartField('#c-phone',T().cart_phone_required)) return;
     if (!$('#c-privacy').checked){ status.textContent = T().privacy_required; status.classList.add('cart-note--error'); $('#c-privacy').focus(); return; }
@@ -2468,6 +2503,7 @@ select.input{
       city: $('#c-city').value.trim(), address: $('#c-addr').value.trim(),
       pvz_code: $('#c-pvz').value.trim(), note: $('#c-note').value.trim(),
       privacy_accepted: true,
+      analytics_session: ANALYTICS_OFF ? null : analyticsSession || null,
     };
     const clearCart = () => {
       localStorage.removeItem(CART_KEY); updateCartBadge();
@@ -2482,7 +2518,8 @@ select.input{
           method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify(payload),
         });
         const result = await response.json();
-        if (!response.ok) throw new Error(T().cart_create_error);
+        if (!response.ok) throw new Error(response.status === 503 ? T().cart_payment_unavailable : T().cart_create_error);
+        if (!result.payment || !result.payment.url) throw new Error(T().cart_payment_unavailable);
         clearCart();
         status.textContent = T().cart_created(result.order.id);
         const paymentUrl = new URL(result.payment.url, location.href);
@@ -2490,7 +2527,7 @@ select.input{
         location.href = paymentUrl.href;
         return;
       } catch (e) {
-        status.textContent = T().cart_create_error;
+        status.textContent = e.message === T().cart_payment_unavailable ? e.message : T().cart_create_error;
         submit.disabled = false;
         return;
       }
@@ -2642,11 +2679,13 @@ select.input{
           date: B.date, date_h: fmtDate(B.date), time: B.time, guests: +B.guests,
           name: $('#f-name').value.trim(), phone: $('#f-phone').value.trim(), note: $('#f-note').value.trim(),
         }));
+        track('booking_sent','book');
         return; // телеграм закроет мини-апп сам
       } catch (e){ /* не тот контекст запуска — уходим на запасной путь ниже */ }
     }
     // обычный браузер: @chainyamsk — канал, писать нельзя; открываем бота, где
     // бронь оформляется нативно (в мини-аппе выше бронь уходит владельцу напрямую)
+    track('booking_handoff','book');
     window.open(BOT_URL, '_blank', 'noopener');
     lastBook = { name: $('#f-name').value.trim(), format: B.format, date: B.date, time: B.time, n: +B.guests };
     renderDone();
@@ -2694,6 +2733,7 @@ select.input{
       return;
     }
     lastB2B = { name: $('#b-name').value.trim() };
+    track('b2b_sent','b2b');
     $('#b2b-done-text').textContent = T().b2bDoneText(lastB2B.name);
     $('#b2b-form-wrap').hidden = true;
     $('#b2b-done').hidden = false;
@@ -2769,8 +2809,14 @@ select.input{
     applyLang();
   }));
 
+  const initialAnalyticsSection = (() => {
+    const raw = location.hash.replace('#','').split('-')[0] || 'home';
+    return ['home','shop','tea','cart','book','b2b','payment'].includes(raw) ? raw : 'home';
+  })();
   applyLang();
+  track('page_view', initialAnalyticsSection);
   goFromHash();
+  trackOnce('section_view', initialAnalyticsSection);
 
   // Инициализация мини-аппа: только когда сайт реально открыт внутри телеграма
   if (IN_TG){

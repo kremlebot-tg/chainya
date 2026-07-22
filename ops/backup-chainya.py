@@ -11,6 +11,7 @@ from pathlib import Path
 SOURCE = Path("/var/lib/chainya-shop/orders.sqlite3")
 DESTINATION = Path("/var/backups/chainya-shop")
 KEEP_DAYS = 30
+ANALYTICS_LIVE_DAYS = 360  # плюс максимум 30 дней жизни резервной копии
 
 
 def main() -> None:
@@ -18,6 +19,16 @@ def main() -> None:
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")
     target = DESTINATION / f"orders-{stamp}.sqlite3"
     with sqlite3.connect(SOURCE) as source, sqlite3.connect(target) as backup:
+        has_analytics = source.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'analytics_events'"
+        ).fetchone()
+        if has_analytics:
+            analytics_cutoff = datetime.now(timezone.utc) - timedelta(days=ANALYTICS_LIVE_DAYS)
+            source.execute(
+                "DELETE FROM analytics_events WHERE created_at < ?",
+                (analytics_cutoff.isoformat(),),
+            )
+            source.commit()
         source.backup(backup)
         if backup.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
             raise RuntimeError("Проверка резервной копии не пройдена")

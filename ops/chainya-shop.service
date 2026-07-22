@@ -7,6 +7,7 @@ Wants=network-online.target
 Type=simple
 User=www-data
 Group=www-data
+UMask=0077
 WorkingDirectory=/opt/chainya-shop
 Environment=CHAINYA_TEST_MODE=1
 Environment=CHAINYA_DATA_DIR=/var/lib/chainya-shop

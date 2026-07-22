@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import logging
 import os
 import re
@@ -20,11 +21,11 @@ import urllib.request
 import uuid
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager, contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
 
-from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request
+from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
@@ -45,6 +46,7 @@ OWNER_CHAT_IDS = [
 ]
 
 DELIVERY_PRICES = {"pickup": 0, "cdek_pvz": 490, "cdek_courier": 790}
+ANALYTICS_RETENTION_DAYS = 360
 DELIVERY_LABELS = {
     "pickup": "Самовывоз · Острякова, 3",
     "cdek_pvz": "СДЭК · пункт выдачи",
@@ -61,6 +63,9 @@ app = FastAPI(title="Chainya checkout", version="0.1.0", lifespan=lifespan)
 saby_client = SabyClient()
 _rate_buckets: dict[str, deque[float]] = defaultdict(deque)
 _rate_lock = threading.Lock()
+_rate_salt = secrets.token_bytes(16)
+_analytics_cleanup_lock = threading.Lock()
+_analytics_cleanup_after = 0.0
 
 
 class OrderItem(BaseModel):
@@ -87,6 +92,7 @@ class CreateOrder(BaseModel):
     pvz_code: str = Field(default="", max_length=80)
     note: str = Field(default="", max_length=1000)
     privacy_accepted: Literal[True]
+    analytics_session: str | None = Field(default=None, min_length=16, max_length=80, pattern=r"^[A-Za-z0-9_-]+$")
 
     @field_validator("phone")
     @classmethod
@@ -120,6 +126,18 @@ class UpdateLeadStatus(BaseModel):
     status: Literal["new", "contacted", "closed"]
 
 
+class AnalyticsEvent(BaseModel):
+    session_id: str = Field(min_length=16, max_length=80, pattern=r"^[A-Za-z0-9_-]+$")
+    event: Literal[
+        "page_view", "section_view", "tea_view", "cart_open", "checkout_start",
+        "booking_start", "booking_sent", "booking_handoff", "b2b_sent",
+    ]
+    section: Literal["", "home", "shop", "tea", "cart", "book", "b2b", "payment"] = ""
+    language: Literal["ru", "en", "zh"] = "ru"
+    device: Literal["mobile", "tablet", "desktop"] = "desktop"
+    referrer: str = Field(default="direct", max_length=160, pattern=r"^[A-Za-z0-9.:-]+$")
+
+
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -127,7 +145,8 @@ def now_iso() -> str:
 def rate_limit(request: Request, bucket: str, limit: int, window: int) -> None:
     """Небольшой per-IP лимит для одного процесса checkout."""
     address = request.client.host if request.client else "unknown"
-    key, now = f"{bucket}:{address}", time.monotonic()
+    address_hash = hashlib.blake2b(address.encode(), key=_rate_salt, digest_size=12).hexdigest()
+    key, now = f"{bucket}:{address_hash}", time.monotonic()
     with _rate_lock:
         hits = _rate_buckets[key]
         while hits and hits[0] <= now - window:
@@ -178,6 +197,10 @@ def init_db() -> None:
         columns = {row["name"] for row in con.execute("PRAGMA table_info(orders)")}
         if "payment_token" not in columns:
             con.execute("ALTER TABLE orders ADD COLUMN payment_token TEXT")
+        if "paid_at" not in columns:
+            con.execute("ALTER TABLE orders ADD COLUMN paid_at TEXT")
+        con.execute("CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at)")
+        con.execute("CREATE INDEX IF NOT EXISTS idx_orders_status_paid ON orders(status, paid_at)")
         con.execute("""
             CREATE TABLE IF NOT EXISTS business_leads (
                 id TEXT PRIMARY KEY,
@@ -195,6 +218,37 @@ def init_db() -> None:
             con.execute("ALTER TABLE business_leads ADD COLUMN status TEXT NOT NULL DEFAULT 'new'")
         if "updated_at" not in lead_columns:
             con.execute("ALTER TABLE business_leads ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''")
+        con.execute("CREATE INDEX IF NOT EXISTS idx_business_leads_created ON business_leads(created_at)")
+        con.execute("CREATE INDEX IF NOT EXISTS idx_business_leads_status ON business_leads(status)")
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS analytics_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                session_hash TEXT NOT NULL,
+                event TEXT NOT NULL,
+                section TEXT NOT NULL DEFAULT '',
+                language TEXT NOT NULL DEFAULT 'ru',
+                device TEXT NOT NULL DEFAULT 'desktop',
+                referrer TEXT NOT NULL DEFAULT 'direct'
+            )
+        """)
+        con.execute("CREATE INDEX IF NOT EXISTS idx_analytics_created ON analytics_events(created_at)")
+        con.execute("CREATE INDEX IF NOT EXISTS idx_analytics_event_created ON analytics_events(event, created_at)")
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_analytics_session_created "
+            "ON analytics_events(session_hash, created_at)"
+        )
+        # Сырые обезличенные события нужны только для сравнений и сезонности.
+        # Года достаточно; старая телеметрия не должна бесконечно раздувать базу.
+        con.execute(
+            "DELETE FROM analytics_events WHERE created_at < ?",
+            ((datetime.now(timezone.utc) - timedelta(days=ANALYTICS_RETENTION_DAYS)).isoformat(),),
+        )
+    try:
+        DATA_DIR.chmod(0o700)
+        DB_PATH.chmod(0o600)
+    except OSError:
+        logging.warning("Не удалось ужесточить права на каталог данных", exc_info=True)
 
 
 def pack_price(per_10g: int, grams: int) -> int:
@@ -242,6 +296,7 @@ def public_order(row: sqlite3.Row) -> dict:
         "subtotal": row["subtotal"], "delivery_price": row["delivery_price"],
         "total": row["total"], "payment_method": row["payment_method"],
         "delivery": row["delivery"], "items": json.loads(row["items_json"]),
+        "paid_at": row["paid_at"] if "paid_at" in row.keys() else None,
     }
 
 
@@ -339,23 +394,306 @@ def notify_business_lead(lead: dict) -> None:
     send_to_owners(text, "B2B-заявку")
 
 
+PAID_ORDER_STATUSES = ("paid", "confirmed", "packing", "shipped", "completed")
+
+
+def hash_session(session_id: str) -> str:
+    return hashlib.sha256(session_id.encode()).hexdigest()[:32]
+
+
+def cleanup_analytics_if_due(con: sqlite3.Connection) -> None:
+    global _analytics_cleanup_after
+    now = time.monotonic()
+    if now < _analytics_cleanup_after:
+        return
+    with _analytics_cleanup_lock:
+        if now < _analytics_cleanup_after:
+            return
+        con.execute(
+            "DELETE FROM analytics_events WHERE created_at < ?",
+            ((datetime.now(timezone.utc) - timedelta(days=ANALYTICS_RETENTION_DAYS)).isoformat(),),
+        )
+        _analytics_cleanup_after = now + 86400
+
+
+def analytics_window(days: int, offset: int = 0) -> tuple[datetime, datetime]:
+    """UTC boundaries for Moscow calendar days and an equal comparison window."""
+    now = datetime.now(timezone.utc)
+    moscow_now = now + timedelta(hours=3)
+    current_start = (
+        moscow_now.replace(hour=0, minute=0, second=0, microsecond=0)
+        - timedelta(days=days - 1, hours=3)
+    )
+    duration = now - current_start
+    if not offset:
+        return current_start, now
+    end = current_start - duration * (offset - 1)
+    return end - duration, end
+
+
+def analytics_summary(con: sqlite3.Connection, start: datetime, end: datetime) -> dict:
+    row = con.execute(
+        """
+        WITH window_events AS (
+          SELECT * FROM analytics_events WHERE created_at >= ? AND created_at < ?
+        ), cohort AS (
+          SELECT DISTINCT session_hash FROM window_events WHERE event = 'page_view'
+        )
+        SELECT
+          SUM(event = 'page_view') AS visits,
+          COUNT(DISTINCT CASE WHEN event = 'page_view' THEN session_hash END) AS visitors,
+          COUNT(DISTINCT CASE WHEN event = 'section_view' AND section = 'shop' AND session_hash IN (SELECT session_hash FROM cohort) THEN session_hash END) AS shop_visitors,
+          COUNT(DISTINCT CASE WHEN event = 'cart_open' AND session_hash IN (SELECT session_hash FROM cohort) THEN session_hash END) AS cart_visitors,
+          COUNT(DISTINCT CASE WHEN event = 'checkout_start' AND session_hash IN (SELECT session_hash FROM cohort) THEN session_hash END) AS checkout_visitors,
+          COUNT(DISTINCT CASE WHEN event = 'booking_start' AND session_hash IN (SELECT session_hash FROM cohort) THEN session_hash END) AS booking_visitors,
+          COUNT(DISTINCT CASE WHEN event = 'b2b_sent' AND session_hash IN (SELECT session_hash FROM cohort) THEN session_hash END) AS b2b_visitors,
+          COUNT(DISTINCT CASE WHEN event = 'order_created' AND session_hash IN (SELECT session_hash FROM cohort) THEN session_hash END) AS order_visitors
+        FROM window_events
+        """,
+        (start.isoformat(), end.isoformat()),
+    ).fetchone()
+    result = {key: int(row[key] or 0) for key in row.keys()}
+    result["shop_conversion"] = round(100 * result["shop_visitors"] / result["visitors"], 1) if result["visitors"] else 0
+    return result
+
+
+def commerce_summary(con: sqlite3.Connection, start: datetime, end: datetime) -> dict:
+    placeholders = ",".join("?" for _ in PAID_ORDER_STATUSES)
+    created = int(con.execute(
+        "SELECT COUNT(*) FROM orders WHERE created_at >= ? AND created_at < ?",
+        (start.isoformat(), end.isoformat()),
+    ).fetchone()[0])
+    paid = con.execute(
+        f"""
+        SELECT
+          COUNT(*) AS paid_orders,
+          COALESCE(SUM(total), 0) AS revenue
+        FROM orders
+        WHERE status IN ({placeholders})
+          AND COALESCE(paid_at, created_at) >= ? AND COALESCE(paid_at, created_at) < ?
+        """,
+        (*PAID_ORDER_STATUSES, start.isoformat(), end.isoformat()),
+    ).fetchone()
+    queue = con.execute(
+        """
+        SELECT
+          SUM(status = 'pending_payment') AS awaiting_payment,
+          SUM(status IN ('paid','confirmed')) AS needs_attention,
+          SUM(status IN ('packing','shipped')) AS in_fulfilment
+        FROM orders
+        """
+    ).fetchone()
+    result = {
+        "orders_created": created,
+        "paid_orders": int(paid["paid_orders"] or 0),
+        "revenue": int(paid["revenue"] or 0),
+        **{key: int(queue[key] or 0) for key in queue.keys()},
+    }
+    result["average_order"] = round(result["revenue"] / result["paid_orders"]) if result["paid_orders"] else 0
+    result["leads"] = int(con.execute(
+        "SELECT COUNT(*) FROM business_leads WHERE created_at >= ? AND created_at < ?",
+        (start.isoformat(), end.isoformat()),
+    ).fetchone()[0])
+    result["new_leads"] = int(con.execute(
+        "SELECT COUNT(*) FROM business_leads WHERE status = 'new'"
+    ).fetchone()[0])
+    return result
+
+
+def percent_change(current: int, previous: int) -> float | None:
+    if previous == 0:
+        return None if current else 0
+    return round((current - previous) * 100 / previous, 1)
+
+
+def dashboard_data(days: int) -> dict:
+    start, end = analytics_window(days)
+    previous_start, previous_end = analytics_window(days, 1)
+    with db() as con:
+        cleanup_analytics_if_due(con)
+        traffic = analytics_summary(con, start, end)
+        previous_traffic = analytics_summary(con, previous_start, previous_end)
+        commerce = commerce_summary(con, start, end)
+        previous_commerce = commerce_summary(con, previous_start, previous_end)
+        traffic["order_conversion"] = round(
+            100 * traffic["order_visitors"] / traffic["visitors"], 1
+        ) if traffic["visitors"] else 0
+
+        traffic_rows = con.execute(
+            """
+            WITH window_events AS (
+              SELECT * FROM analytics_events WHERE created_at >= ? AND created_at < ?
+            ), cohort AS (
+              SELECT DISTINCT session_hash FROM window_events WHERE event = 'page_view'
+            )
+            SELECT date(created_at, '+3 hours') AS day,
+              SUM(event = 'page_view') AS visits,
+              COUNT(DISTINCT CASE WHEN event = 'page_view' THEN session_hash END) AS visitors,
+              COUNT(DISTINCT CASE WHEN event = 'section_view' AND section = 'shop' AND session_hash IN (SELECT session_hash FROM cohort) THEN session_hash END) AS shop
+            FROM window_events GROUP BY day
+            """,
+            (start.isoformat(), end.isoformat()),
+        ).fetchall()
+        order_rows = con.execute(
+            """
+            SELECT date(created_at, '+3 hours') AS day,
+              COUNT(*) AS orders
+            FROM orders WHERE created_at >= ? AND created_at < ? GROUP BY day
+            """,
+            (start.isoformat(), end.isoformat()),
+        ).fetchall()
+        revenue_rows = con.execute(
+            """
+            SELECT date(COALESCE(paid_at, created_at), '+3 hours') AS day, COALESCE(SUM(total), 0) AS revenue
+            FROM orders
+            WHERE status IN ('paid','confirmed','packing','shipped','completed')
+              AND COALESCE(paid_at, created_at) >= ? AND COALESCE(paid_at, created_at) < ?
+            GROUP BY day
+            """,
+            (start.isoformat(), end.isoformat()),
+        ).fetchall()
+        traffic_by_day = {row["day"]: dict(row) for row in traffic_rows}
+        orders_by_day = {row["day"]: dict(row) for row in order_rows}
+        revenue_by_day = {row["day"]: int(row["revenue"] or 0) for row in revenue_rows}
+        daily = []
+        moscow_today = (datetime.now(timezone.utc) + timedelta(hours=3)).date()
+        for index in range(days):
+            day = (moscow_today - timedelta(days=days - 1 - index)).isoformat()
+            trow, orow = traffic_by_day.get(day, {}), orders_by_day.get(day, {})
+            daily.append({
+                "date": day,
+                "visits": int(trow.get("visits") or 0),
+                "visitors": int(trow.get("visitors") or 0),
+                "shop": int(trow.get("shop") or 0),
+                "orders": int(orow.get("orders") or 0),
+                "revenue": revenue_by_day.get(day, 0),
+            })
+
+        breakdown = {}
+        for field in ("device", "language", "referrer"):
+            rows = con.execute(
+                f"""SELECT {field} AS name, COUNT(DISTINCT session_hash) AS value
+                    FROM analytics_events WHERE event = 'page_view' AND created_at >= ? AND created_at < ?
+                    GROUP BY {field} ORDER BY value DESC LIMIT 8""",
+                (start.isoformat(), end.isoformat()),
+            ).fetchall()
+            breakdown[field] = [{"name": row["name"], "value": int(row["value"])} for row in rows]
+        section_rows = con.execute(
+            """WITH window_events AS (
+                  SELECT * FROM analytics_events WHERE created_at >= ? AND created_at < ?
+                ), cohort AS (
+                  SELECT DISTINCT session_hash FROM window_events WHERE event = 'page_view'
+                )
+                SELECT section AS name, COUNT(DISTINCT session_hash) AS value
+                FROM window_events
+                WHERE event = 'section_view' AND session_hash IN (SELECT session_hash FROM cohort)
+                GROUP BY section ORDER BY value DESC""",
+            (start.isoformat(), end.isoformat()),
+        ).fetchall()
+        breakdown["section"] = [{"name": row["name"], "value": int(row["value"])} for row in section_rows]
+
+        tea_totals: dict[str, dict] = {}
+        order_item_rows = con.execute(
+            "SELECT items_json FROM orders WHERE created_at >= ? AND created_at < ? AND status != 'cancelled'",
+            (start.isoformat(), end.isoformat()),
+        ).fetchall()
+        for row in order_item_rows:
+            for item in json.loads(row["items_json"]):
+                tea = tea_totals.setdefault(item["id"], {"id": item["id"], "name": item["name"], "qty": 0, "revenue": 0})
+                tea["qty"] += int(item["qty"])
+                tea["revenue"] += int(item["total"])
+
+        first_event = con.execute("SELECT MIN(created_at) FROM analytics_events").fetchone()[0]
+
+    changes = {
+        "visits": percent_change(traffic["visits"], previous_traffic["visits"]),
+        "visitors": percent_change(traffic["visitors"], previous_traffic["visitors"]),
+        "paid_orders": percent_change(commerce["paid_orders"], previous_commerce["paid_orders"]),
+        "revenue": percent_change(commerce["revenue"], previous_commerce["revenue"]),
+    }
+    return {
+        "period": {"days": days, "start": start.isoformat(), "end": end.isoformat()},
+        "traffic": traffic,
+        "commerce": commerce,
+        "changes": changes,
+        "daily": daily,
+        "breakdown": breakdown,
+        "top_teas": sorted(tea_totals.values(), key=lambda item: (item["revenue"], item["qty"]), reverse=True)[:5],
+        "system": {
+            "checkout": "test" if TEST_MODE else "unconfigured",
+            "saby_configured": bool(saby_client.configuration().get("configured")),
+            "telegram_configured": bool(BOT_TOKEN and OWNER_CHAT_IDS),
+            "notification_recipients": len(OWNER_CHAT_IDS),
+            "catalog_items": len(load_catalog()),
+            "analytics_since": first_event,
+            "database_size": DB_PATH.stat().st_size if DB_PATH.exists() else 0,
+        },
+    }
+
+
 @app.get("/api/health")
 def health():
     return {"ok": True, "test_mode": TEST_MODE, "catalog_items": len(load_catalog())}
 
 
+@app.post("/api/analytics/events", status_code=204)
+def collect_analytics(payload: AnalyticsEvent, request: Request):
+    """Store a small anonymous product event; IP and user-agent are never persisted."""
+    rate_limit(request, "analytics", 180, 600)
+    session_hash = hash_session(payload.session_id)
+    with db() as con:
+        cleanup_analytics_if_due(con)
+        con.execute(
+            """INSERT INTO analytics_events
+               (created_at, session_hash, event, section, language, device, referrer)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (now_iso(), session_hash, payload.event, payload.section, payload.language, payload.device, payload.referrer),
+        )
+    return Response(status_code=204)
+
+
+@app.get("/api/admin/dashboard")
+def admin_dashboard(
+    days: int = Query(default=30, ge=7, le=90), authorization: str = Header(default="")
+):
+    require_admin(authorization)
+    return dashboard_data(days)
+
+
 @app.get("/api/admin/orders")
-def admin_orders(authorization: str = Header(default=""), status: str = ""):
+def admin_orders(
+    authorization: str = Header(default=""),
+    status: str = "",
+    q: str = Query(default="", max_length=160),
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+):
     require_admin(authorization)
     allowed = {"pending_payment", "paid", "confirmed", "packing", "shipped", "completed", "cancelled"}
     if status and status not in allowed:
         raise HTTPException(422, "Неизвестный статус")
+    conditions, params = [], []
+    if status:
+        conditions.append("status = ?")
+        params.append(status)
+    query = q.strip()
+    if query:
+        conditions.append("casefold(id || ' ' || customer_json || ' ' || items_json) LIKE ?")
+        params.append(f"%{query.casefold()}%")
+    where = " WHERE " + " AND ".join(conditions) if conditions else ""
     with db() as con:
-        if status:
-            rows = con.execute("SELECT * FROM orders WHERE status = ? ORDER BY created_at DESC LIMIT 200", (status,)).fetchall()
-        else:
-            rows = con.execute("SELECT * FROM orders ORDER BY created_at DESC LIMIT 200").fetchall()
-    return {"orders": [admin_order(row) for row in rows]}
+        con.create_function("casefold", 1, lambda value: (value or "").casefold())
+        total = int(con.execute(f"SELECT COUNT(*) FROM orders{where}", params).fetchone()[0])
+        rows = con.execute(
+            f"SELECT * FROM orders{where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            (*params, limit, offset),
+        ).fetchall()
+    return {
+        "orders": [admin_order(row) for row in rows],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 @app.patch("/api/admin/orders/{order_id}")
@@ -364,17 +702,51 @@ def admin_update_order(order_id: str, payload: UpdateOrderStatus, authorization:
     row = order_row(order_id)
     if row["status"] == "pending_payment" and payload.status not in {"paid", "cancelled"}:
         raise HTTPException(409, "Сначала заказ должен быть оплачен или отменён")
+    updated = now_iso()
     with db() as con:
-        con.execute("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?", (payload.status, now_iso(), order_id))
+        if payload.status == "paid":
+            con.execute(
+                "UPDATE orders SET status = ?, updated_at = ?, paid_at = COALESCE(paid_at, ?) WHERE id = ?",
+                (payload.status, updated, updated, order_id),
+            )
+        else:
+            con.execute("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?", (payload.status, updated, order_id))
     return admin_order(order_row(order_id))
 
 
 @app.get("/api/admin/business-leads")
-def admin_business_leads(authorization: str = Header(default="")):
+def admin_business_leads(
+    authorization: str = Header(default=""),
+    status: str = "",
+    q: str = Query(default="", max_length=160),
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+):
     require_admin(authorization)
+    if status and status not in {"new", "contacted", "closed"}:
+        raise HTTPException(422, "Неизвестный статус")
+    conditions, params = [], []
+    if status:
+        conditions.append("status = ?")
+        params.append(status)
+    query = q.strip()
+    if query:
+        conditions.append("casefold(company || ' ' || name || ' ' || contact || ' ' || note) LIKE ?")
+        params.append(f"%{query.casefold()}%")
+    where = " WHERE " + " AND ".join(conditions) if conditions else ""
     with db() as con:
-        rows = con.execute("SELECT * FROM business_leads ORDER BY created_at DESC LIMIT 200").fetchall()
-    return {"leads": [dict(row) for row in rows]}
+        con.create_function("casefold", 1, lambda value: (value or "").casefold())
+        total = int(con.execute(f"SELECT COUNT(*) FROM business_leads{where}", params).fetchone()[0])
+        rows = con.execute(
+            f"SELECT * FROM business_leads{where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            (*params, limit, offset),
+        ).fetchall()
+    return {
+        "leads": [dict(row) for row in rows],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 @app.patch("/api/admin/business-leads/{lead_id}")
@@ -446,12 +818,15 @@ def delivery_quote(method: Literal["pickup", "cdek_pvz", "cdek_courier"]):
 @app.post("/api/orders", status_code=201)
 def create_order(payload: CreateOrder, request: Request):
     rate_limit(request, "create-order", 12, 600)
+    if not TEST_MODE:
+        raise HTTPException(503, "Онлайн-оплата пока не подключена")
     validate_delivery(payload)
     lines, subtotal = price_order(payload)
     delivery_price = DELIVERY_PRICES[payload.delivery]
     order_id = uuid.uuid4().hex[:12].upper()
     created = now_iso()
-    customer = payload.model_dump(exclude={"items", "payment_method", "delivery"})
+    customer = payload.model_dump(exclude={"items", "payment_method", "delivery", "analytics_session"})
+    analytics_session_hash = hash_session(payload.analytics_session) if payload.analytics_session else None
     payment_token = uuid.uuid4().hex
     with db() as con:
         con.execute(
@@ -464,6 +839,19 @@ def create_order(payload: CreateOrder, request: Request):
              json.dumps(customer, ensure_ascii=False), json.dumps(lines, ensure_ascii=False), None,
              payment_token),
         )
+        if analytics_session_hash:
+            context = con.execute(
+                """SELECT language, device, referrer FROM analytics_events
+                    WHERE session_hash = ? ORDER BY id DESC LIMIT 1""",
+                (analytics_session_hash,),
+            ).fetchone()
+            if context:
+                con.execute(
+                    """INSERT INTO analytics_events
+                       (created_at, session_hash, event, section, language, device, referrer)
+                       VALUES (?, ?, 'order_created', 'payment', ?, ?, ?)""",
+                    (created, analytics_session_hash, context["language"], context["device"], context["referrer"]),
+                )
     base = str(request.base_url).rstrip("/")
     return {
         "order": public_order(order_row(order_id)),
@@ -509,8 +897,8 @@ def test_pay(order_id: str, token: str, background_tasks: BackgroundTasks, reque
         require_order_token(row, token)
         if row["status"] == "pending_payment":
             con.execute(
-                "UPDATE orders SET status = 'paid', updated_at = ?, provider_payment_id = ? WHERE id = ?",
-                (now_iso(), f"mock_{uuid.uuid4().hex}", order_id),
+                "UPDATE orders SET status = 'paid', updated_at = ?, paid_at = ?, provider_payment_id = ? WHERE id = ?",
+                (now_iso(), now_iso(), f"mock_{uuid.uuid4().hex}", order_id),
             )
             should_notify = True
     if should_notify:
@@ -529,6 +917,13 @@ def test_payment_page(order_id: str, token: str):
 
 @app.get("/admin/orders")
 def admin_page():
+    return FileResponse(ROOT / "backend" / "admin.html")
+
+
+@app.get("/manage/")
+@app.get("/manage")
+def management_page():
+    """Short, memorable alias for the owner dashboard; access still requires #token."""
     return FileResponse(ROOT / "backend" / "admin.html")
 
 

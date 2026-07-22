@@ -47,6 +47,19 @@ server {
         client_max_body_size 32k;
     }
 
+    location /api/admin/ {
+        add_header Cache-Control "no-store" always;
+        add_header Pragma "no-cache" always;
+        add_header Referrer-Policy "no-referrer" always;
+        proxy_pass http://127.0.0.1:8077;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        client_max_body_size 32k;
+    }
+
     location /test-payment/ {
         add_header Cache-Control "no-store" always;
         add_header Referrer-Policy "no-referrer" always;
@@ -57,6 +70,30 @@ server {
     }
 
     location /admin/ {
+        add_header Cache-Control "no-store" always;
+        add_header Referrer-Policy "no-referrer" always;
+        add_header X-Robots-Tag "noindex, nofollow" always;
+        proxy_pass http://127.0.0.1:8077;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location = /manage {
+        add_header Cache-Control "no-store" always;
+        add_header Referrer-Policy "no-referrer" always;
+        add_header X-Robots-Tag "noindex, nofollow" always;
+        proxy_pass http://127.0.0.1:8077;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location = /manage/ {
         add_header Cache-Control "no-store" always;
         add_header Referrer-Policy "no-referrer" always;
         add_header X-Robots-Tag "noindex, nofollow" always;

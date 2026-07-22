@@ -22,6 +22,10 @@ CHAINYA_TEST_MODE=1 .venv/bin/uvicorn backend.app:app --reload --port 8080
 - `POST /api/orders` — серверная проверка, расчёт и сохранение заказа.
 - `GET /api/orders/{id}` — состояние заказа.
 - `POST /api/orders/{id}/test-pay` — имитация webhook успешной оплаты.
+- `POST /api/analytics/events` — обезличенное событие сайта без IP, cookies и user-agent.
+- `GET /api/admin/dashboard?days=30` — агрегаты, графики, воронка и состояние систем.
+- `GET /api/admin/orders?q=&status=&limit=50&offset=0` — поиск и постраничная очередь заказов.
+- `GET /api/admin/business-leads?q=&status=&limit=50&offset=0` — поиск и постраничные B2B-заявки.
 - `GET /api/admin/saby/status` — готовность конфигурации Saby без раскрытия секретов.
 - `POST /api/admin/saby/test` — проверка авторизации и получение точек продаж.
 - `GET /api/admin/saby/catalog-preview` — первые 25 позиций выбранного прайс-листа.
@@ -29,6 +33,11 @@ CHAINYA_TEST_MODE=1 .venv/bin/uvicorn backend.app:app --reload --port 8080
 Цены СДЭК сейчас демонстрационные. Перед продакшеном mock-расчёт и test-pay
 заменяются адаптерами СДЭК, эквайринга и Saby. Секреты передаются только через
 переменные окружения.
+
+Панель владельца открывается по `/manage#ADMIN_TOKEN` (старый адрес
+`/admin/orders#ADMIN_TOKEN` также работает). Токен находится во фрагменте URL и
+не отправляется веб-серверу; после первого открытия сохраняется только в
+`sessionStorage` вкладки. Сырые события статистики хранятся не более 400 дней.
 
 Если заданы `BOT_TOKEN` и `OWNER_CHAT_ID`, после первого перехода заказа в
 `paid` backend отправляет владельцам уведомление через Telegram. Повторный вызов

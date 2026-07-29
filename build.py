@@ -34,11 +34,20 @@ assert "/*@FONTS@*/" in src, "маркер /*@FONTS@*/ пропал из src.htm
 TITLE = "Чайня · чайная на Острякова"
 DESC = ("Чайная у метро Аэропорт. Чайная церемония с мастером, два чая "
         "на выбор уже в стоимости. Китайский чай прямого привоза и доставка по России.")
+SELLER_NAME = "ИНДИВИДУАЛЬНЫЙ ПРЕДПРИНИМАТЕЛЬ ДАВТЯН АРМАН КАРАПЕТОВИЧ"
+SELLER_INN = "772606053199"
+SELLER_OGRNIP = "326774600295390"
+SELLER_EMAIL = "chainya@bk.ru"
+SELLER_REGISTERED_ADDRESS = (
+    "129226, Россия, г. Москва, ул. Сергея Эйзенштейна, "
+    "д. 6, корп. 2, стр. 2, кв. 233"
+)
 
 # og:image обязан быть абсолютным: по относительному пути телеграм и соцсети
 # картинку не подтянут. Меняется на свой домен, когда он появится.
 SITE = "https://chainya.ru/"
 SECURITY_CONTACT = "https://t.me/chainyabot"
+SECURITY_EMAIL = "mailto:chainya@bk.ru"
 
 # Телеграм кэширует саму картинку по её URL и по тому же адресу за новой не ходит:
 # @WebpageBot перечитывает разметку страницы, но подменённый файл оставляет старый.
@@ -64,29 +73,56 @@ HEAD_EXTRA = f"""<meta name="description" content="{DESC}">
 <link rel="apple-touch-icon" href="favicon.png">
 {json.dumps({
     "@context": "https://schema.org",
-    "@type": ["CafeOrCoffeeShop", "Store"],
-    "name": "Чайня",
-    "description": DESC,
-    "url": SITE,
-    "image": SITE + OG_NAME,
-    "telephone": "+7 905 590-88-01",
-    "priceRange": "₽₽",
-    "currenciesAccepted": "RUB",
-    "servesCuisine": "Чай",
-    "address": {
-        "@type": "PostalAddress",
-        "streetAddress": "улица Острякова, 3, помещение 114",
-        "addressLocality": "Москва",
-        "addressCountry": "RU",
-    },
-    "openingHoursSpecification": {
-        "@type": "OpeningHoursSpecification",
-        "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-        "opens": "12:00",
-        "closes": "22:00",
-    },
-    "hasMap": "https://yandex.com/maps/org/chaynya/49488428011/",
-    "sameAs": ["https://t.me/chainyamsk", "https://yandex.com/maps/org/chaynya/49488428011/"],
+    "@graph": [
+        {
+            "@type": "Organization",
+            "@id": SITE + "#seller",
+            "name": SELLER_NAME,
+            "alternateName": "Чайня",
+            "taxID": SELLER_INN,
+            "identifier": {
+                "@type": "PropertyValue",
+                "propertyID": "ОГРНИП",
+                "value": SELLER_OGRNIP,
+            },
+            "email": SELLER_EMAIL,
+            "telephone": "+7 905 590-88-01",
+            "address": {
+                "@type": "PostalAddress",
+                "streetAddress": SELLER_REGISTERED_ADDRESS,
+                "addressCountry": "RU",
+            },
+        },
+        {
+            "@type": ["CafeOrCoffeeShop", "Store"],
+            "@id": SITE + "#store",
+            "name": "Чайня",
+            "legalName": SELLER_NAME,
+            "branchOf": {"@id": SITE + "#seller"},
+            "description": DESC,
+            "url": SITE,
+            "image": SITE + OG_NAME,
+            "email": SELLER_EMAIL,
+            "telephone": "+7 905 590-88-01",
+            "priceRange": "₽₽",
+            "currenciesAccepted": "RUB",
+            "servesCuisine": "Чай",
+            "address": {
+                "@type": "PostalAddress",
+                "streetAddress": "улица Острякова, 3, помещение 114",
+                "addressLocality": "Москва",
+                "addressCountry": "RU",
+            },
+            "openingHoursSpecification": {
+                "@type": "OpeningHoursSpecification",
+                "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+                "opens": "12:00",
+                "closes": "22:00",
+            },
+            "hasMap": "https://yandex.com/maps/org/chaynya/49488428011/",
+            "sameAs": ["https://t.me/chainyamsk", "https://yandex.com/maps/org/chaynya/49488428011/"],
+        },
+    ],
 }, ensure_ascii=False).join(('<script type="application/ld+json">', '</script>'))}"""
 
 
@@ -171,9 +207,11 @@ if web:
     shutil.copy(root / "src-assets" / "favicon.png", dist / "favicon.png")
     shutil.copy(OG_SRC, dist / OG_NAME)
     shutil.copy(root / "privacy.html", dist / "privacy.html")
+    shutil.copy(root / "legal.html", dist / "legal.html")
     well_known = dist / ".well-known"
     well_known.mkdir()
     (well_known / "security.txt").write_text(
+        f"Contact: {SECURITY_EMAIL}\n"
         f"Contact: {SECURITY_CONTACT}\n"
         f"Canonical: {SITE}.well-known/security.txt\n"
         "Expires: 2027-07-29T00:00:00Z\n"
@@ -213,6 +251,7 @@ if web:
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
         f"  <url><loc>{SITE}</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>\n"
+        f"  <url><loc>{SITE}legal.html</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>\n"
         "</urlset>\n",
         encoding="utf-8",
     )

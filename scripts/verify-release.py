@@ -33,6 +33,24 @@ SECRET_PATTERNS = (
         rb"SABY_APP_SECRET|SABY_SECRET_KEY)\s*[:=]\s*[\"']?[A-Za-z0-9]"
     ),
 )
+SELLER_DETAILS = (
+    "ИНДИВИДУАЛЬНЫЙ ПРЕДПРИНИМАТЕЛЬ ДАВТЯН АРМАН КАРАПЕТОВИЧ",
+    "772606053199",
+    "326774600295390",
+    "129226, Россия, г. Москва, ул. Сергея Эйзенштейна, д. 6, корп. 2, стр. 2, кв. 233",
+    "chainya@bk.ru",
+)
+LEGAL_PLACEHOLDERS = (
+    re.compile(r"\bTODO(?:\s|:|-)", re.I),
+    re.compile(r"example@example", re.I),
+    re.compile(r"укажите реквизиты", re.I),
+    re.compile(r"заполнить реквизиты", re.I),
+)
+PRIVATE_BANK_PATTERNS = (
+    re.compile(r"\bБИК\s*[:№]?\s*\d", re.I),
+    re.compile(r"корреспондентск\w*\s+сч[её]т\w*\s*[:№]?\s*\d", re.I),
+    re.compile(r"расч[её]тн\w*\s+сч[её]т\w*\s*[:№]?\s*\d", re.I),
+)
 
 
 def check_dist(root: pathlib.Path) -> list[str]:
@@ -41,6 +59,7 @@ def check_dist(root: pathlib.Path) -> list[str]:
         "index.html",
         "404.html",
         "privacy.html",
+        "legal.html",
         "robots.txt",
         "sitemap.xml",
         ".well-known/security.txt",
@@ -48,6 +67,19 @@ def check_dist(root: pathlib.Path) -> list[str]:
     missing = sorted(name for name in required if not (root / name).is_file())
     if missing:
         errors.append("нет обязательных файлов: " + ", ".join(missing))
+    for name in ("index.html", "privacy.html", "legal.html"):
+        path = root / name
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        for detail in SELLER_DETAILS:
+            if detail not in text:
+                errors.append(f"{name}: отсутствуют подтверждённые реквизиты {detail!r}")
+        for placeholder in LEGAL_PLACEHOLDERS:
+            if placeholder.search(text):
+                errors.append(f"{name}: найдена юридическая заглушка {placeholder.pattern!r}")
+        if any(pattern.search(text) for pattern in PRIVATE_BANK_PATTERNS):
+            errors.append(f"{name}: обнаружены лишние банковские реквизиты")
     for path in root.rglob("*"):
         if not path.is_file():
             continue

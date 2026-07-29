@@ -1330,6 +1330,7 @@ select.input{
           <li><a href="https://t.me/chainyabot" target="_blank" rel="noopener" data-i18n="foot_bot">Бот: @chainyabot</a></li>
           <li><a href="https://t.me/chainyamsk" target="_blank" rel="noopener" data-i18n="foot_tg">Канал: @chainyamsk</a></li>
           <li><a href="tel:+79055908801" data-i18n="foot_phone">+7 (905) 590-88-01</a></li>
+          <li><a href="mailto:chainya@bk.ru">chainya@bk.ru</a></li>
           <li><a href="https://yandex.com/maps/org/chaynya/49488428011/" target="_blank" rel="noopener" data-i18n="foot_ya">Мы на Яндекс.Картах</a></li>
         </ul>
       </div>
@@ -1344,6 +1345,7 @@ select.input{
     <div class="foot__bot">
       <span data-i18n="foot_c">© 2026 Чайня</span>
       <a href="/privacy.html" data-i18n="privacy_link">Политика конфиденциальности</a>
+      <a href="/legal.html" data-i18n="legal_link">Реквизиты и условия</a>
       <span class="foot__by"><a href="https://rednd.ru" target="_blank" rel="noopener">rednd.ru</a></span>
     </div>
   </div>
@@ -1439,6 +1441,7 @@ select.input{
           <option value="bank_card" data-i18n="pay_card">Карта любого российского банка · Т-Банк</option>
         </select>
         <p class="field-hint" id="c-payment-hint" data-i18n="payment_hint">Подойдёт карта любого российского банка. Оплата проходит на защищённой форме Т‑Банка.</p>
+        <p class="field-hint"><a href="/legal.html" target="_blank" rel="noopener" data-i18n="payment_terms_link">Условия оплаты и возврата</a></p>
       </div>
       <div class="delivery-quote" id="c-delivery-quote" aria-live="polite"></div>
       <div class="field">
@@ -1664,7 +1667,7 @@ select.input{
     cart_pvz:'Пункт выдачи СДЭК', cart_pvz_ph:'Улица, метро или код пункта',
     cart_addr:'Адрес', cart_addr_ph:'Улица, дом, квартира', cart_payment:'Оплата',
     pay_card:'Карта любого российского банка · Т-Банк', pay_sbp:'СБП',
-    payment_hint:'Подойдёт карта любого российского банка. Оплата проходит на защищённой форме Т‑Банка.',
+    payment_hint:'Подойдёт карта любого российского банка. Оплата проходит на защищённой форме Т‑Банка.', payment_terms_link:'Условия оплаты и возврата',
     cart_note_ph:'Комментарий к заказу', cart_submit:'Оформить заказ', cart_submit_total:a=>`Перейти к оплате · ${a}`,
     cart_decrease:n=>`Уменьшить количество «${n}»`, cart_increase:n=>`Увеличить количество «${n}»`,
     cart_pay:'Стоимость и срок доставки рассчитывает СДЭК перед оплатой.',
@@ -1674,7 +1677,7 @@ select.input{
     cart_quote_loading:'СДЭК рассчитывает стоимость…',
     cart_quote_ready:(a,min,max)=>`СДЭК · ${a} · ${min===max?min:`${min}–${max}`} дн.`,
     cart_quote_error:'Не удалось рассчитать доставку. Проверьте город или попробуйте ещё раз.',
-    privacy_accept:'Согласен на обработку данных согласно', privacy_link:'политике конфиденциальности', privacy_required:'Подтвердите согласие на обработку данных',
+    privacy_accept:'Согласен на обработку данных согласно', privacy_link:'политике конфиденциальности', legal_link:'Реквизиты и условия', privacy_required:'Подтвердите согласие на обработку данных',
     cart_phone_required:'Укажите телефон, чтобы мы могли подтвердить заказ.', cart_city_required:'Укажите город доставки.',
     cart_pvz_required:'Выберите пункт из подсказок СДЭК.', cart_addr_required:'Укажите адрес доставки.',
     cart_creating:'Создаём заказ…', cart_create_error:'Не удалось создать заказ. Попробуйте ещё раз.',
@@ -1825,7 +1828,7 @@ select.input{
     cart_pvz:'CDEK pickup point', cart_pvz_ph:'Street, metro or point code',
     cart_addr:'Address', cart_addr_ph:'Street, building, flat', cart_payment:'Payment',
     pay_card:'Any Russian bank card · T-Bank', pay_sbp:'SBP',
-    payment_hint:'Cards issued by any Russian bank are accepted. Payment is completed on T‑Bank’s secure form.',
+    payment_hint:'Cards issued by any Russian bank are accepted. Payment is completed on T‑Bank’s secure form.', payment_terms_link:'Payment and return terms',
     cart_note_ph:'Order comment', cart_submit:'Place order', cart_submit_total:a=>`Continue to payment · ${a}`,
     cart_decrease:n=>`Decrease quantity of ${n}`, cart_increase:n=>`Increase quantity of ${n}`,
     cart_pay:'CDEK calculates the delivery price and time before payment.',
@@ -1835,7 +1838,7 @@ select.input{
     cart_quote_loading:'CDEK is calculating delivery…',
     cart_quote_ready:(a,min,max)=>`CDEK · ${a} · ${min===max?min:`${min}–${max}`} days`,
     cart_quote_error:'Could not calculate delivery. Check the city or try again.',
-    privacy_accept:'I consent to data processing under the', privacy_link:'privacy policy', privacy_required:'Please accept the data processing terms',
+    privacy_accept:'I consent to data processing under the', privacy_link:'privacy policy', legal_link:'Seller details and terms', privacy_required:'Please accept the data processing terms',
     cart_phone_required:'Enter a phone number so we can confirm the order.', cart_city_required:'Enter the delivery city.',
     cart_pvz_required:'Choose a CDEK point from the suggestions.', cart_addr_required:'Enter the delivery address.',
     cart_creating:'Creating your order…', cart_create_error:'Could not create the order. Please try again.',
@@ -1986,7 +1989,7 @@ select.input{
     cart_pvz:'CDEK自提点', cart_pvz_ph:'街道、地铁站或网点代码',
     cart_addr:'地址', cart_addr_ph:'街道、门牌号、公寓', cart_payment:'支付',
     pay_card:'任意俄罗斯银行的银行卡 · T-Bank', pay_sbp:'快速支付系统（SBP）',
-    payment_hint:'支持任意俄罗斯银行发行的银行卡。付款将在T‑Bank的安全页面完成。',
+    payment_hint:'支持任意俄罗斯银行发行的银行卡。付款将在T‑Bank的安全页面完成。', payment_terms_link:'支付与退款条款',
     cart_note_ph:'订单备注', cart_submit:'提交订单', cart_submit_total:a=>`前往支付 · ${a}`,
     cart_decrease:n=>`减少${n}的数量`, cart_increase:n=>`增加${n}的数量`,
     cart_pay:'付款前由CDEK计算运费和时效。',
@@ -1996,7 +1999,7 @@ select.input{
     cart_quote_loading:'CDEK正在计算运费…',
     cart_quote_ready:(a,min,max)=>`CDEK · ${a} · ${min===max?min:`${min}–${max}`}天`,
     cart_quote_error:'无法计算运费，请检查城市或重试。',
-    privacy_accept:'我同意按照以下条款处理个人数据：', privacy_link:'隐私政策', privacy_required:'请同意个人数据处理条款',
+    privacy_accept:'我同意按照以下条款处理个人数据：', privacy_link:'隐私政策', legal_link:'商家信息与条款', privacy_required:'请同意个人数据处理条款',
     cart_phone_required:'请填写电话号码，以便我们确认订单。', cart_city_required:'请填写配送城市。',
     cart_pvz_required:'请从提示中选择CDEK自提点。', cart_addr_required:'请填写配送地址。',
     cart_creating:'正在创建订单…', cart_create_error:'订单创建失败，请重试。',
@@ -3181,6 +3184,7 @@ select.input{
     $$('[data-i18n-aria]').forEach(n => { const v = T()[n.dataset.i18nAria]; if (v != null) n.setAttribute('aria-label', v); });
     $$('[data-i18n-alt]').forEach(n => { const v = T()[n.dataset.i18nAlt]; if (v != null) n.alt = v; });
     $$('a[href^="/privacy.html"]').forEach(a => { a.href = `/privacy.html?lang=${LANG}`; });
+    $$('a[href^="/legal.html"]').forEach(a => { a.href = `/legal.html?lang=${LANG}`; });
     selectHeroImage();
     buildRange();
     buildFilters();

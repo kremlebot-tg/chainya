@@ -45,9 +45,13 @@ server {
     add_header Content-Security-Policy "base-uri 'self'; object-src 'none'; form-action 'self'" always;
 
     location /api/admin/ {
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header X-Content-Type-Options "nosniff" always;
         add_header Cache-Control "no-store" always;
         add_header Pragma "no-cache" always;
         add_header Referrer-Policy "no-referrer" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+        add_header Content-Security-Policy "base-uri 'self'; object-src 'none'; form-action 'self'" always;
         proxy_pass http://127.0.0.1:8077;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -70,8 +74,12 @@ server {
     location ^~ /test-payment/ { return 404; }
 
     location /payment/ {
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header X-Content-Type-Options "nosniff" always;
         add_header Cache-Control "no-store" always;
         add_header Referrer-Policy "no-referrer" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+        add_header Content-Security-Policy "base-uri 'self'; object-src 'none'; form-action 'self'" always;
         add_header X-Robots-Tag "noindex, nofollow" always;
         proxy_pass http://127.0.0.1:8077;
         proxy_http_version 1.1;
@@ -82,8 +90,12 @@ server {
     }
 
     location /admin/ {
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header X-Content-Type-Options "nosniff" always;
         add_header Cache-Control "no-store" always;
         add_header Referrer-Policy "no-referrer" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+        add_header Content-Security-Policy "base-uri 'self'; object-src 'none'; form-action 'self'" always;
         add_header X-Robots-Tag "noindex, nofollow" always;
         proxy_pass http://127.0.0.1:8077;
         proxy_http_version 1.1;
@@ -94,8 +106,12 @@ server {
     }
 
     location = /manage {
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header X-Content-Type-Options "nosniff" always;
         add_header Cache-Control "no-store" always;
         add_header Referrer-Policy "no-referrer" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+        add_header Content-Security-Policy "base-uri 'self'; object-src 'none'; form-action 'self'" always;
         add_header X-Robots-Tag "noindex, nofollow" always;
         proxy_pass http://127.0.0.1:8077;
         proxy_http_version 1.1;
@@ -106,8 +122,12 @@ server {
     }
 
     location = /manage/ {
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header X-Content-Type-Options "nosniff" always;
         add_header Cache-Control "no-store" always;
         add_header Referrer-Policy "no-referrer" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+        add_header Content-Security-Policy "base-uri 'self'; object-src 'none'; form-action 'self'" always;
         add_header X-Robots-Tag "noindex, nofollow" always;
         proxy_pass http://127.0.0.1:8077;
         proxy_http_version 1.1;
@@ -133,20 +153,35 @@ server {
     # HTML содержит весь JavaScript приложения, поэтому его нельзя оставлять в
     # браузере после релиза. Фото и шрифты ниже по-прежнему кэшируются отдельно.
     location = / {
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header X-Content-Type-Options "nosniff" always;
         add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+        add_header Content-Security-Policy "base-uri 'self'; object-src 'none'; form-action 'self'" always;
         expires -1;
         try_files /index.html =404;
     }
 
     location = /index.html {
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header X-Content-Type-Options "nosniff" always;
         add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+        add_header Content-Security-Policy "base-uri 'self'; object-src 'none'; form-action 'self'" always;
         expires -1;
     }
 
     error_page 404 /404.html;
     location = /404.html {
         internal;
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header X-Content-Type-Options "nosniff" always;
         add_header Cache-Control "no-store" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+        add_header Content-Security-Policy "base-uri 'self'; object-src 'none'; form-action 'self'" always;
     }
 
     # Клиентские экраны используют hash-маршруты (#shop, #book), поэтому
@@ -155,12 +190,22 @@ server {
 
     location ~* \.(woff2?|ttf)$ {
         expires 30d;
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header X-Content-Type-Options "nosniff" always;
         add_header Cache-Control "public";
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+        add_header Content-Security-Policy "base-uri 'self'; object-src 'none'; form-action 'self'" always;
     }
 
     location ~* \.(jpg|jpeg|png|webp|svg|ico)$ {
         expires 7d;
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header X-Content-Type-Options "nosniff" always;
         add_header Cache-Control "public";
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+        add_header Content-Security-Policy "base-uri 'self'; object-src 'none'; form-action 'self'" always;
     }
 
     gzip on;

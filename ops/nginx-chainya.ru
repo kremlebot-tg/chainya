@@ -1,12 +1,13 @@
-# chainya.ru — сайт и тестовый checkout «Чайни».
-# Не добавлять X-Frame-Options / CSP frame-ancestors: сайт работает как Telegram Mini App.
+# chainya.ru — сайт и checkout «Чайни».
+# X-Frame-Options и CSP frame-ancestors намеренно не задаются: сайт работает
+# как Telegram Mini App. Остальные заголовки не мешают встраиванию.
 
 server {
     listen 80;
     listen [::]:80;
     server_name chainya.ru www.chainya.ru;
 
-    location /.well-known/acme-challenge/ { root /var/www/html; }
+    location ^~ /.well-known/acme-challenge/ { root /var/www/html; }
     location / { return 301 https://chainya.ru$request_uri; }
 }
 
@@ -37,15 +38,11 @@ server {
     access_log /var/log/nginx/chainya.access.log;
     error_log /var/log/nginx/chainya.error.log;
 
-    location /api/ {
-        proxy_pass http://127.0.0.1:8077;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        client_max_body_size 32k;
-    }
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+    add_header Content-Security-Policy "base-uri 'self'; object-src 'none'; form-action 'self'" always;
 
     location /api/admin/ {
         add_header Cache-Control "no-store" always;
@@ -60,12 +57,27 @@ server {
         client_max_body_size 32k;
     }
 
-    location /test-payment/ {
-        add_header Cache-Control "no-store" always;
-        add_header Referrer-Policy "no-referrer" always;
+    location /api/ {
         proxy_pass http://127.0.0.1:8077;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        client_max_body_size 32k;
+    }
+
+    location ^~ /test-payment/ { return 404; }
+
+    location /payment/ {
+        add_header Cache-Control "no-store" always;
+        add_header Referrer-Policy "no-referrer" always;
+        add_header X-Robots-Tag "noindex, nofollow" always;
+        proxy_pass http://127.0.0.1:8077;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
@@ -105,6 +117,19 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
+    location = /.well-known/security.txt {
+        default_type text/plain;
+        try_files /.well-known/security.txt =404;
+    }
+
+    # Не позволяем SPA-маршрутизации маскировать чувствительные файлы.
+    location ~* "(^|/)(?:\.env(?:\..*)?|\.git(?:/|$)|\.DS_Store$|\._[^/]*$|__pycache__(?:/|$)|README(?:\.[^/]*)?$)" {
+        return 404;
+    }
+    location ~* \.(?:py|pyc|zip|tar|gz|sql|sqlite|sqlite3|db|bak|backup|old)$ {
+        return 404;
+    }
+
     # HTML содержит весь JavaScript приложения, поэтому его нельзя оставлять в
     # браузере после релиза. Фото и шрифты ниже по-прежнему кэшируются отдельно.
     location = / {
@@ -118,7 +143,15 @@ server {
         expires -1;
     }
 
-    location / { try_files $uri $uri/ /index.html; }
+    error_page 404 /404.html;
+    location = /404.html {
+        internal;
+        add_header Cache-Control "no-store" always;
+    }
+
+    # Клиентские экраны используют hash-маршруты (#shop, #book), поэтому
+    # несуществующие URL-пути не должны получать главную страницу.
+    location / { try_files $uri $uri/ =404; }
 
     location ~* \.(woff2?|ttf)$ {
         expires 30d;

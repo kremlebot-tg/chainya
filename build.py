@@ -38,6 +38,7 @@ DESC = ("Чайная у метро Аэропорт. Чайная церемо�
 # og:image обязан быть абсолютным: по относительному пути телеграм и соцсети
 # картинку не подтянут. Меняется на свой домен, когда он появится.
 SITE = "https://chainya.ru/"
+SECURITY_CONTACT = "https://t.me/chainyabot"
 
 # Телеграм кэширует саму картинку по её URL и по тому же адресу за новой не ходит:
 # @WebpageBot перечитывает разметку страницы, но подменённый файл оставляет старый.
@@ -84,8 +85,8 @@ HEAD_EXTRA = f"""<meta name="description" content="{DESC}">
         "opens": "12:00",
         "closes": "22:00",
     },
-    "hasMap": "https://yandex.ru/maps/org/chaynya/",
-    "sameAs": ["https://t.me/chainyamsk", "https://yandex.ru/maps/org/chaynya/"],
+    "hasMap": "https://yandex.com/maps/org/chaynya/49488428011/",
+    "sameAs": ["https://t.me/chainyamsk", "https://yandex.com/maps/org/chaynya/49488428011/"],
 }, ensure_ascii=False).join(('<script type="application/ld+json">', '</script>'))}"""
 
 
@@ -130,16 +131,29 @@ if unused := have - used:
     print("не используются:", ", ".join(sorted(unused)))
 
 
-def document(body: str, extra_head: str = "") -> str:
+def document(body: str, extra_head: str = "", *, telegram_sdk: bool = True) -> str:
+    # В исходнике CSS хранится первым блоком, чтобы проект оставался одним
+    # редактируемым файлом. В готовом HTML переносим его в <head>: браузер
+    # получает стили до body, а документ остаётся валидным.
+    style_match = re.match(r"\s*(<style>.*?</style>)\s*", body, flags=re.S)
+    style_block = ""
+    if style_match:
+        style_block = style_match.group(1)
+        body = body[style_match.end():]
+    sdk = (
+        '<script src="https://telegram.org/js/telegram-web-app.js"></script>\n'
+        if telegram_sdk else ""
+    )
     return (
         '<!doctype html>\n<html lang="ru">\n<head>\n'
         '<meta charset="utf-8">\n'
-        '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
+        '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
         f"<title>{TITLE}</title>\n"
-        # Telegram Mini App SDK: даёт window.Telegram.WebApp внутри телеграма.
-        # В обычном браузере platform='unknown' и вся мини-апп-логика молчит.
-        '<script src="https://telegram.org/js/telegram-web-app.js"></script>\n'
+        # Telegram Mini App SDK нужен только основному приложению. Служебная
+        # 404-страница не должна выполнять внешний JavaScript.
+        f"{sdk}"
         f"{extra_head}\n"
+        f"{style_block}\n"
         "<style>*{margin:0}</style>\n"
         "</head>\n<body>\n" + body + "\n</body>\n</html>\n"
     )
@@ -157,9 +171,67 @@ if web:
     shutil.copy(root / "src-assets" / "favicon.png", dist / "favicon.png")
     shutil.copy(OG_SRC, dist / OG_NAME)
     shutil.copy(root / "privacy.html", dist / "privacy.html")
-    # CNAME подключает домен на GitHub Pages: файл в артефакте = кастомный домен
-    (dist / "CNAME").write_text("chainya.ru\n", encoding="utf-8")
+    well_known = dist / ".well-known"
+    well_known.mkdir()
+    (well_known / "security.txt").write_text(
+        f"Contact: {SECURITY_CONTACT}\n"
+        f"Canonical: {SITE}.well-known/security.txt\n"
+        "Expires: 2027-07-29T00:00:00Z\n"
+        "Preferred-Languages: ru, en\n",
+        encoding="utf-8",
+    )
+    (dist / "404.html").write_text(
+        document(
+            """
+<main style="min-height:100svh;display:grid;place-items:center;padding:24px;background:#141110;color:#e8e4dc;text-align:center">
+  <section>
+    <img src="/img/logo-mark.webp" alt="" width="54" height="64">
+    <p style="margin:24px 0 8px;color:#b9afa4;letter-spacing:.16em;text-transform:uppercase">Ошибка 404</p>
+    <h1 style="margin:0;font:clamp(34px,8vw,64px)/1.1 Prata,serif">Такой страницы нет</h1>
+    <p style="margin:18px auto 28px;max-width:38rem;color:#b9afa4;font:16px/1.6 Golos,sans-serif">Вернитесь в чайную или откройте каталог — всё остальное на месте.</p>
+    <a href="/" style="display:inline-block;padding:13px 22px;border:1px solid #d6c9b9;color:#e8e4dc;text-decoration:none;font:600 14px Golos,sans-serif">Вернуться на главную</a>
+  </section>
+</main>
+""",
+            '<meta name="robots" content="noindex,nofollow">',
+            telegram_sdk=False,
+        ),
+        encoding="utf-8",
+    )
+    (dist / "robots.txt").write_text(
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Disallow: /admin/\n"
+        "Disallow: /api/\n"
+        "Disallow: /manage\n"
+        "Disallow: /payment/\n"
+        "Disallow: /test-payment/\n"
+        f"Sitemap: {SITE}sitemap.xml\n",
+        encoding="utf-8",
+    )
+    (dist / "sitemap.xml").write_text(
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        f"  <url><loc>{SITE}</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>\n"
+        "</urlset>\n",
+        encoding="utf-8",
+    )
     (dist / "index.html").write_text(document(content, HEAD_EXTRA), encoding="utf-8")
+
+    forbidden = [
+        path for path in dist.rglob("*")
+        if path.name == ".DS_Store"
+        or path.name.startswith("._")
+        or path.suffix.lower() in {
+            ".py", ".pyc", ".zip", ".tar", ".gz", ".sql", ".sqlite",
+            ".sqlite3", ".db", ".bak", ".backup", ".old",
+        }
+    ]
+    if forbidden:
+        raise SystemExit(
+            "ЗАПРЕЩЁННЫЕ ФАЙЛЫ В DIST: "
+            + ", ".join(str(path.relative_to(dist)) for path in forbidden)
+        )
 
     html_kb = round((dist / "index.html").stat().st_size / 1024)
     assets = sum(f.stat().st_size for f in dist.rglob("*") if f.is_file()) - (dist / "index.html").stat().st_size

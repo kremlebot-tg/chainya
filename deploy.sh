@@ -18,11 +18,15 @@ python3 build.py --web >/dev/null
 [ -f dist/index.html ] || { echo "✗ dist/index.html не собрался"; exit 1; }
 
 echo "→ синхронизация ($(du -sh dist | cut -f1))"
-COPYFILE_DISABLE=1 rsync -az --exclude=CNAME dist/ "$HOST:$DIR/"
+python3 scripts/verify-release.py --dist dist
+COPYFILE_DISABLE=1 rsync -az \
+  --exclude='._*' --exclude='.DS_Store' \
+  dist/ "$HOST:$DIR/"
 
 echo "→ раскладка + проверка"
 ssh "$HOST" '
   set -e
+  find '"$DIR"' -type f \( -name "._*" -o -name ".DS_Store" \) -delete
   chown -R www-data:www-data '"$DIR"'
   nginx -t >/dev/null 2>&1 || { echo "✗ конфиг nginx сломан — reload не делаю"; exit 1; }
   # проверяем по https: http теперь 301→https, старая проверка на http падала
@@ -33,4 +37,5 @@ ssh "$HOST" '
 
 echo "→ проверка снаружи"
 curl -s -o /dev/null -w "  https://chainya.ru → %{http_code} за %{time_total}s\n" --max-time 15 https://chainya.ru/ || true
+python3 scripts/verify-release.py --dist dist --base-url https://chainya.ru
 echo "✓ готово"

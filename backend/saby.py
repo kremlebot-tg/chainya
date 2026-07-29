@@ -13,7 +13,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from typing import Any, Callable
 
@@ -28,9 +28,9 @@ class SabyError(RuntimeError):
 
 @dataclass(frozen=True)
 class SabySettings:
-    app_client_id: str = ""
-    app_secret: str = ""
-    secret_key: str = ""
+    app_client_id: str = field(default="", repr=False)
+    app_secret: str = field(default="", repr=False)
+    secret_key: str = field(default="", repr=False)
     point_id: int | None = None
     price_list_id: int | None = None
 
@@ -99,8 +99,10 @@ class SabyClient:
             raise SabyError("Saby вернул некорректный ответ") from exc
         if isinstance(result, dict) and result.get("error"):
             error = result["error"]
-            message = error.get("message") if isinstance(error, dict) else str(error)
-            raise SabyError(f"Ошибка Saby: {message or 'запрос отклонён'}")
+            raw_code = error.get("code") if isinstance(error, dict) else None
+            code = str(raw_code).strip() if raw_code is not None else ""
+            suffix = f" (код {code})" if code and code.replace("-", "").replace("_", "").isalnum() and len(code) <= 32 else ""
+            raise SabyError(f"Saby отклонил запрос{suffix}")
         return result
 
     def access_token(self, force: bool = False) -> str:
@@ -155,6 +157,34 @@ class SabyClient:
             "pointId": point, "priceListId": price, "noStopList": "true",
             "withBalance": "true", "page": page, "pageSize": min(max(page_size, 1), 25),
         })
+
+    def catalog_all(
+        self, point_id: int | None = None, price_list_id: int | None = None,
+        *, with_balance: bool = False, max_pages: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Возвращает выбранный прайс целиком, не теряя вторую и следующие страницы."""
+        point = point_id or self.settings.point_id
+        price = price_list_id or self.settings.price_list_id
+        if not point or not price:
+            raise SabyError("Не выбраны точка продаж и прайс-лист Saby")
+
+        items: dict[Any, dict[str, Any]] = {}
+        for page in range(max_pages):
+            result = self.api("/retail/v2/nomenclature/list", {
+                "pointId": point, "priceListId": price, "noStopList": "false",
+                "withBalance": str(with_balance).lower(), "page": page, "pageSize": 25,
+            })
+            rows = result.get("nomenclatures", []) if isinstance(result, dict) else []
+            if not isinstance(rows, list):
+                raise SabyError("Saby вернул каталог в неожиданном формате")
+            for item in rows:
+                if isinstance(item, dict):
+                    key = item.get("id", item.get("externalId"))
+                    items[key if key is not None else (page, len(items))] = item
+            has_more = bool((result.get("outcome") or {}).get("hasMore")) if isinstance(result, dict) else False
+            if not has_more:
+                return list(items.values())
+        raise SabyError("Каталог Saby содержит слишком много страниц")
 
     def companies(self) -> Any:
         return self.api("/retail/company/list")

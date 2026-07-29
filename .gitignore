@@ -8,8 +8,23 @@ artifact.html
 # Служебное
 .claude/
 .DS_Store
+._*
+**/._*
 __pycache__/
 *.pyc
 .venv/
 backend/data/
 mobile-test.html
+.env
+.env.*
+*.env
+*.bak
+*.backup
+*.old
+*.sql
+*.sqlite
+*.sqlite3
+*.db
+*.zip
+*.tar
+*.gz

@@ -9,6 +9,7 @@
   --bg-3:      #F2F1EC;
   --line:      #CBCABF;
   --line-soft: #DCDBD1;
+  --line-control:#8A867B;
   --text:      #191715;
   --text-2:    #454239;
   --text-3:    #615E54;
@@ -31,9 +32,13 @@
   --lq-other:  #8A7B5C;
 
   --pad:  clamp(20px, 5vw, 72px);
+  --sheet-pad: clamp(18px, 4vw, 32px);
   --maxw: 1240px;
   --r:    4px;
-  --ease: cubic-bezier(.22,.61,.36,1);
+  --ease: cubic-bezier(.22,1,.36,1);
+  --motion-fast:160ms;
+  --motion-base:280ms;
+  --motion-slow:520ms;
 }
 
 /* Тёмная тема — сам зал: лампа, глина, тёплый уголь; красный только в акценте */
@@ -44,6 +49,7 @@
     --bg-3:      #232020;
     --line:      #332E2B;
     --line-soft: #262221;
+    --line-control:#736C67;
     --text:      #F1EDE6;
     --text-2:    #B6AFA6;
     --text-3:    #948C83;
@@ -59,12 +65,14 @@
 }
 :root[data-theme="light"]{
   --bg:#E7E6DF; --bg-2:#DEDDD4; --bg-3:#F2F1EC; --line:#CBCABF; --line-soft:#DCDBD1;
+  --line-control:#8A867B;
   --text:#191715; --text-2:#454239; --text-3:#615E54;
   --accent:#B23430; --accent-2:#C24A40; --accent-hover:#96241F; --on-accent:#F2F1EC;
   --blend:multiply; --grain:.035; --w-body:410; color-scheme:light;
 }
 :root[data-theme="dark"]{
   --bg:#141110; --bg-2:#1B1817; --bg-3:#232020; --line:#332E2B; --line-soft:#262221;
+  --line-control:#736C67;
   --text:#F1EDE6; --text-2:#B6AFA6; --text-3:#948C83;
   --accent:#DB6A62; --accent-2:#E68F87; --accent-hover:#E68F87; --on-accent:#101614;
   --blend:screen; --grain:.05; --w-body:440; color-scheme:dark;
@@ -77,7 +85,7 @@ body{
   font-family:'Golos Text', system-ui, sans-serif;
   font-size:17px; font-weight:var(--w-body);
   line-height:1.62; letter-spacing:-.005em;
-  -webkit-font-smoothing:antialiased;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
 }
 img{ max-width:100%; display:block; }
 button{ font:inherit; color:inherit; background:none; border:0; cursor:pointer; }
@@ -85,17 +93,22 @@ input, select, textarea{ font:inherit; color:inherit; }
 a{ color:inherit; text-decoration:none; }
 :focus-visible{ outline:2px solid var(--accent); outline-offset:3px; border-radius:2px; }
 /* Скип-линк: спрятан за верхним краем, выезжает при фокусе (первый Tab) */
-.skip{ position:fixed; left:12px; top:-64px; z-index:100; padding:10px 16px; background:var(--accent); color:#1a1206; border-radius:8px; font-weight:600; transition:top .2s var(--ease); }
+.skip{ position:fixed; left:12px; top:-64px; z-index:100; padding:10px 16px; background:var(--accent); color:var(--on-accent); border-radius:var(--r); font-weight:600; transition:top var(--motion-fast) var(--ease); }
 .skip:focus{ top:12px; }
 
 /* Китайский: у Prata и Golos нет CJK, иероглифы отдаём системным шрифтам.
    Заголовкам — сунти (аналог дидона), тексту — системный гротеск. */
-:lang(zh) body{ letter-spacing:0; }
-:lang(zh) .display, :lang(zh) .tea__name, :lang(zh) .hall h3, :lang(zh) .summary h3,
-:lang(zh) .sheet__head h2, :lang(zh) .done-card h2, :lang(zh) .svc__p{
-  font-family:'Songti SC','Noto Serif SC','SimSun',serif; letter-spacing:.02em;
+:lang(zh) body{
+  font-family:'PingFang SC','Microsoft YaHei','Noto Sans CJK SC','Golos Text',sans-serif;
+  letter-spacing:0; line-height:1.72;
 }
-:lang(zh) .label{ letter-spacing:.2em; }
+:lang(zh) .display, :lang(zh) .tea__name, :lang(zh) .hall h3, :lang(zh) .summary h3,
+:lang(zh) .sheet__head h2, :lang(zh) .done-card h2, :lang(zh) .svc__p,
+:lang(zh) .brand, :lang(zh) .foot__brand, :lang(zh) .tier__q, :lang(zh) .price{
+  font-family:'Songti SC','STSong','Noto Serif CJK SC','Noto Serif SC','SimSun',serif;
+  letter-spacing:0; word-break:keep-all;
+}
+:lang(zh) .label{ letter-spacing:.08em; text-transform:none; }
 
 .wrap{ max-width:var(--maxw); margin-inline:auto; padding-inline:var(--pad); }
 
@@ -104,7 +117,7 @@ a{ color:inherit; text-decoration:none; }
   line-height:1.02; letter-spacing:-.02em; text-wrap:balance;
 }
 .label{
-  font-size:11.5px; font-weight:600; letter-spacing:.13em; text-transform:uppercase;
+  font-size:12px; font-weight:600; letter-spacing:.11em; text-transform:uppercase;
   color:var(--text-3); line-height:1.4;
 }
 .lead{ font-size:clamp(1.02rem,1.35vw,1.2rem); line-height:1.6; color:var(--text-2); }
@@ -126,7 +139,8 @@ a{ color:inherit; text-decoration:none; }
 }
 .nav__in{
   max-width:var(--maxw); margin-inline:auto; padding:0 var(--pad);
-  height:66px; display:flex; align-items:center; gap:clamp(16px,3vw,44px);
+  height:calc(66px + env(safe-area-inset-top)); padding-top:env(safe-area-inset-top);
+  display:flex; align-items:center; gap:clamp(16px,3vw,44px);
 }
 .brand{
   display:flex; align-items:center; gap:11px; margin-right:auto;
@@ -202,54 +216,32 @@ a{ color:inherit; text-decoration:none; }
 @keyframes tap{ 0%{ transform:scale(1); } 45%{ transform:scale(.965); } 100%{ transform:scale(1); } }
 .btn.tapped{ animation:tap .32s var(--ease); }
 
-/* Диаграмма вкуса «прорастает» из центра при открытии паспорта */
-@keyframes radar-grow{ from{ opacity:0; transform:scale(.12); } to{ opacity:1; transform:none; } }
-@keyframes radar-fade{ from{ opacity:0; } to{ opacity:1; } }
-#ts-radar .area{ transform-box:view-box; transform-origin:160px 116px; animation:radar-grow .6s var(--ease) both; }
-#ts-radar .grid, #ts-radar .spoke{ animation:radar-fade .5s var(--ease) both; }
-#ts-radar .dot{ animation:radar-fade .4s var(--ease) both .34s; }
-#ts-radar .lbl{ animation:radar-fade .55s var(--ease) both .18s; }
-
 /* ─────────────────────────  ГЕРОЙ  ─────────────────────────
-   Фото мастера здесь не ставим: он работает ниже, в карточке услуги.
-   Вместо него сама коллекция — стена листа из тех же снимков, что в магазине.
-   Дрейф нарочно медленный (полторы минуты на круг): это покой, а не бегущая строка. */
+   Один документальный кадр вместо бесконечной стены товаров. Он меняется раз
+   в день между реальными сценами чайной: живо, но без фонового шума. */
 .hero{
   position:relative; overflow:hidden;
-  min-height:min(86vh, 760px); display:flex; align-items:center;
+  min-height:min(86vh, 780px); display:flex; align-items:center;
 }
-.hero__wall{
-  --wall-gap:clamp(8px,.9vw,14px);
-  position:absolute; top:-10%; bottom:-10%; right:0; width:46%;
-  display:flex; gap:var(--wall-gap); pointer-events:none; z-index:0;
-  opacity:.72; filter:saturate(.92);   /* стена — фон, а не соперник заголовку */
+.hero__media{
+  position:absolute; z-index:0; top:clamp(30px,5vw,64px); right:var(--pad);
+  bottom:clamp(30px,5vw,64px); width:min(43vw,540px); overflow:hidden;
+  border-radius:var(--r); background:var(--bg-2);
 }
-/* align-self:start обязателен: иначе колонка растянется по высоте стены,
-   а translateY(-50%) считался бы от неё, а не от длины ленты, и петля дёрнулась бы.
-   padding-bottom добавляет 14-й зазор: у 14 картинок промежутков только 13,
-   и без него половина высоты не совпадает с шагом петли на ползазора. */
-.hero__col{
-  flex:1; align-self:flex-start; display:flex; flex-direction:column;
-  gap:var(--wall-gap); padding-bottom:var(--wall-gap); will-change:transform;
+.hero__media img{
+  width:100%; height:100%; object-fit:cover; object-position:50% 46%;
+  filter:saturate(.88) contrast(.98); transition:opacity var(--motion-slow) var(--ease);
 }
-.hero__col img{ width:100%; aspect-ratio:1; object-fit:cover; border-radius:var(--r); }
-.hero__col--0{ animation:drift-up 96s linear infinite; }
-.hero__col--1{ animation:drift-down 124s linear infinite; }
-@keyframes drift-up  { from{ transform:translateY(0); }     to{ transform:translateY(-50%); } }
-@keyframes drift-down{ from{ transform:translateY(-50%); }  to{ transform:translateY(0); } }
-/* Ширма поверх стены: слева гасит её под текст, сверху и снизу растворяет в фоне */
 .hero::after{
   content:''; position:absolute; inset:0; z-index:1; pointer-events:none;
-  background:
-    linear-gradient(to right, var(--bg) 46%, color-mix(in srgb, var(--bg) 50%, transparent) 68%, transparent 82%),
-    linear-gradient(to bottom, var(--bg), transparent 16%, transparent 80%, var(--bg));
+  background:linear-gradient(to right, var(--bg) 42%, color-mix(in srgb, var(--bg) 78%, transparent) 58%, transparent 76%);
 }
 .hero__in{
   position:relative; z-index:2; width:100%;
   max-width:var(--maxw); margin-inline:auto;
   padding:clamp(56px,8vw,104px) var(--pad);
 }
-/* Текст держим в левой половине: правая отдана стене целиком */
+/* Текст держим в левой половине: правая отдана живому кадру. */
 .hero__copy{ max-width:min(54%, 660px); }
 .hero h1{ font-size:clamp(2.7rem,5.6vw,4.6rem); margin:18px 0 0; }
 .hero h1 em{ font-style:normal; color:var(--accent-2); }
@@ -284,12 +276,12 @@ a{ color:inherit; text-decoration:none; }
 /* ── Услуги: две карточки, чем платит гость ── */
 .svcs{ display:grid; grid-template-columns:1fr 1fr; gap:clamp(14px,1.6vw,20px); }
 .svc{
-  border:1px solid var(--line-soft); border-radius:var(--r); overflow:hidden;
-  background:var(--bg-3); display:flex; flex-direction:column;
+  border-top:1px solid var(--line); padding-top:14px;
+  background:transparent; display:flex; flex-direction:column;
 }
-.svc__art{ aspect-ratio:16/10; overflow:hidden; background:var(--bg-2); }
+.svc__art{ aspect-ratio:16/10; overflow:hidden; background:var(--bg-2); border-radius:var(--r); }
 .svc__art img{ width:100%; height:100%; object-fit:cover; }
-.svc__body{ padding:clamp(20px,2.4vw,30px); display:flex; flex-direction:column; flex:1; }
+.svc__body{ padding:20px 0 0; display:flex; flex-direction:column; flex:1; }
 .svc h3{ font-size:1.15rem; font-weight:600; margin:0; letter-spacing:-.01em; }
 .svc p{ margin:10px 0 0; font-size:14.5px; color:var(--text-2); line-height:1.6; }
 .svc__foot{
@@ -312,13 +304,12 @@ a{ color:inherit; text-decoration:none; }
 }
 .credo__p{ margin:22px 0 0; font-size:15.5px; line-height:1.66; color:var(--text-2); max-width:56ch; }
 
-/* ── Шаги: нумерация настоящая, проливы идут по порядку ── */
-.steps{ display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--line-soft); border:1px solid var(--line-soft); }
-.step{ background:var(--bg); padding:26px 22px 30px; transition:background .3s var(--ease); }
-.step:hover{ background:var(--bg-3); }
+/* ── Шаги: редакционная линия вместо четырёх одинаковых «виджетов» ── */
+.steps{ display:grid; grid-template-columns:repeat(4,1fr); gap:clamp(18px,2.4vw,34px); }
+.step{ border-top:1px solid var(--line); padding:18px 0 0; }
 .steps--3{ grid-template-columns:repeat(3,1fr); }
-.step__n{ font-family:'Prata',Georgia,serif; font-size:2.4rem; color:var(--accent); line-height:1; opacity:.75; }
-.step h3{ font-size:1.08rem; font-weight:600; margin:16px 0 8px; letter-spacing:-.01em; }
+.step__n{ font-size:12px; font-weight:600; letter-spacing:.08em; color:var(--accent); line-height:1; }
+.step h3{ font-size:1.08rem; font-weight:600; margin:22px 0 8px; letter-spacing:-.01em; }
 .step p{ margin:0; font-size:15px; color:var(--text-2); line-height:1.6; }
 
 /* ── Карточка чая ── */
@@ -326,12 +317,14 @@ a{ color:inherit; text-decoration:none; }
 .tea{
   position:relative; background:var(--bg-3); border:1px solid var(--line-soft);
   border-radius:var(--r); overflow:hidden; display:flex; flex-direction:column;
-  cursor:pointer; text-align:left;
-  transition:border-color .25s var(--ease), transform .25s var(--ease);
+  text-align:left; transition:border-color var(--motion-base) var(--ease);
 }
-.tea:hover{ border-color:var(--line); transform:translateY(-2px); }
-.tea__art{ aspect-ratio:4/3; overflow:hidden; background:var(--bg-2); position:relative; }
-.tea__art img{ width:100%; height:100%; object-fit:cover; transition:transform .5s var(--ease); }
+.tea:hover{ border-color:var(--line); }
+.tea:has(.tea__hit:focus-visible){ outline:2px solid var(--accent); outline-offset:3px; }
+.tea__hit{ position:absolute; inset:0; z-index:1; width:100%; border-radius:var(--r); }
+.tea__hit:focus-visible{ outline:0; }
+.tea__art{ aspect-ratio:1; overflow:hidden; background:var(--bg-2); position:relative; }
+.tea__art img{ width:100%; height:100%; object-fit:cover; transition:transform var(--motion-slow) var(--ease); }
 .tea:hover .tea__art img{ transform:scale(1.03); }
 /* Точка = тип чая. Та же легенда, что в фильтрах. */
 .tea__dot{
@@ -346,7 +339,7 @@ a{ color:inherit; text-decoration:none; }
   transition:color .2s var(--ease), background .2s var(--ease), transform .12s var(--ease);
 }
 .tea__fav{
-  position:absolute; top:8px; right:8px; width:34px; height:34px; z-index:2;
+  position:absolute; top:8px; right:8px; width:34px; height:34px; z-index:3;
   background:color-mix(in srgb, var(--bg) 60%, transparent);
   -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px);
 }
@@ -363,19 +356,22 @@ a{ color:inherit; text-decoration:none; }
 .chip__n{ margin-left:4px; opacity:.65; }
 #fav-empty{ margin:26px 0 0; color:var(--text-3); font-size:14.5px; }
 .tea__body{ padding:16px 18px 18px; display:flex; flex-direction:column; flex:1; }
-.tea__name{ font-family:'Prata',Georgia,serif; font-size:1.18rem; line-height:1.2; letter-spacing:-.01em; }
-.tea__orig{ margin-top:5px; font-size:12.5px; color:var(--text-3); }
+.tea__name{ font-family:'Prata',Georgia,serif; font-size:1.18rem; line-height:1.22; letter-spacing:-.01em; overflow-wrap:anywhere; }
+.tea__orig{ margin-top:5px; font-size:12.5px; color:var(--text-3); overflow-wrap:anywhere; }
 .tea__foot{
   margin-top:auto; padding-top:14px; display:flex; align-items:baseline;
   justify-content:space-between; gap:10px;
 }
 .price{ font-family:'Prata',Georgia,serif; font-size:1.22rem; font-variant-numeric:tabular-nums; }
 .price small{ font-family:'Golos Text',sans-serif; font-size:12px; color:var(--text-3); margin-left:4px; }
-.tea__more{
-  font-size:12.5px; color:var(--text-3); display:inline-flex; align-items:center; gap:5px;
-  transition:color .2s var(--ease), gap .2s var(--ease);
+.tea__quick{
+  position:relative; z-index:3; flex:none; width:34px; height:34px; display:grid;
+  place-items:center; border:1px solid var(--line); border-radius:var(--r);
+  font-size:20px; line-height:1; color:var(--text); background:var(--bg-3);
+  transition:background var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease);
 }
-.tea:hover .tea__more{ color:var(--accent); gap:9px; }
+.tea__quick:hover:not(:disabled){ background:var(--text); color:var(--bg); border-color:var(--text); }
+.tea__quick:disabled{ color:var(--text-3); cursor:not-allowed; opacity:.55; }
 .shop__foot{
   margin:clamp(32px,4vw,48px) 0 0; padding-top:22px; border-top:1px solid var(--line-soft);
   font-size:13.5px; color:var(--text-3); line-height:1.6; max-width:70ch;
@@ -393,7 +389,10 @@ a{ color:inherit; text-decoration:none; }
 .pack span{ display:block; font-size:11.5px; opacity:.75; font-variant-numeric:tabular-nums; margin-top:1px; }
 
 /* ── Фильтры карты ── */
-.chips{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:28px; }
+.shop-toolbar{ margin-bottom:28px; }
+.chips{ display:flex; flex-wrap:wrap; gap:8px; }
+.shop-count{ margin:12px 0 0; color:var(--text-3); font-size:12.5px; }
+.shop-count b{ color:var(--text-2); font-weight:600; margin-left:7px; }
 .chip{
   display:inline-flex; align-items:center; gap:8px; padding:8px 15px;
   border:1px solid var(--line); border-radius:100px; font-size:13.5px; color:var(--text-2);
@@ -432,7 +431,7 @@ a{ color:inherit; text-decoration:none; }
 }
 .scrim.on{ opacity:1; visibility:visible; }
 .sheet{
-  position:fixed; top:0; right:0; bottom:0; z-index:51; width:min(500px,100%);
+  position:fixed; top:0; right:0; bottom:0; z-index:51; width:min(520px,100%); height:100dvh;
   background:var(--bg); border-left:1px solid var(--line);
   transform:translateX(100%); display:flex; flex-direction:column;
   /* visibility:hidden убирает закрытую панель из tab-order и дерева доступности
@@ -441,11 +440,12 @@ a{ color:inherit; text-decoration:none; }
 }
 .sheet.on{ transform:none; visibility:visible; transition:transform .38s var(--ease); }
 .sheet__head{
-  padding:22px var(--pad); display:flex; align-items:center; justify-content:space-between;
+  padding:max(22px,env(safe-area-inset-top)) var(--sheet-pad) 22px;
+  display:flex; align-items:center; justify-content:space-between;
   gap:14px; border-bottom:1px solid var(--line-soft);
 }
 .sheet__head h2{ font-family:'Prata',Georgia,serif; font-weight:400; font-size:1.4rem; margin:0; line-height:1.2; }
-.sheet__body{ flex:1; overflow-y:auto; padding:0 var(--pad) 20px; }
+.sheet__body{ flex:1; overflow-y:auto; overscroll-behavior:contain; padding:0 var(--sheet-pad) 20px; }
 .sheet__art{ margin:16px 0 18px; border-radius:var(--r); overflow:hidden; aspect-ratio:4/3; background:var(--bg-2); }
 .sheet__art img{ width:100%; height:100%; object-fit:cover; }
 .ts-orig{ margin:0; font-size:13.5px; color:var(--text-3); }
@@ -468,32 +468,31 @@ a{ color:inherit; text-decoration:none; }
 }
 .tea__art--oos img{ filter:grayscale(.55) opacity(.72); }
 
-/* Вкусовой профиль (паутинка) */
-/* Паутинка занимает почти всю ширину панели: паспорт узкий (410px), а боковые
-   паддинги по 72px съедали место — отыгрываем их отрицательным margin */
-.ts-taste{ margin-top:24px; margin-inline:calc(var(--pad) * -0.7); }
+/* Вкусовой профиль: четыре ведущие ноты вместо мелкой девятиосевой паутинки */
+.ts-taste{ margin-top:24px; }
 .ts-taste__h{
-  font-family:'Montserrat',sans-serif; font-size:11px; font-weight:600;
+  font-family:'Golos Text',sans-serif; font-size:12px; font-weight:600;
   letter-spacing:.12em; text-transform:uppercase; color:var(--text-3);
-  margin:0 0 2px; padding-inline:calc(var(--pad) * 0.7);
+  margin:0 0 4px;
 }
-.ts-radar{ width:100%; max-width:none; height:auto; display:block; margin:0 auto; overflow:visible; }
-.ts-radar .grid{ fill:none; stroke:var(--line); stroke-width:.6; opacity:.55; }
-.ts-radar .spoke{ stroke:var(--line-soft); stroke-width:.6; }
-.ts-radar .area{ fill:color-mix(in srgb, var(--accent) 22%, transparent); stroke:var(--accent); stroke-width:1.4; stroke-linejoin:round; }
-.ts-radar .dot{ fill:var(--accent); }
-.ts-radar .lbl{ fill:var(--text-3); font-family:'Golos Text',sans-serif; font-size:8.7px; }
-.sheet__foot{ padding:18px var(--pad) 26px; border-top:1px solid var(--line); }
+.ts-profile{ margin-top:14px; display:grid; gap:11px; }
+.ts-profile__row{ display:grid; grid-template-columns:minmax(88px,1fr) minmax(100px,1.4fr) 30px; gap:12px; align-items:center; }
+.ts-profile__name{ font-size:13px; color:var(--text-2); }
+.ts-profile__track{ height:3px; background:var(--line-soft); overflow:hidden; }
+.ts-profile__fill{ display:block; height:100%; background:var(--accent); transform-origin:left; }
+.ts-profile__value{ color:var(--text-3); font-size:11.5px; text-align:right; }
+.sheet__foot{ padding:18px var(--sheet-pad) max(26px,env(safe-area-inset-bottom)); border-top:1px solid var(--line); }
 .sheet__sum{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px; }
 .sheet__sum b{ font-family:'Prata',Georgia,serif; font-weight:400; font-size:1.5rem; font-variant-numeric:tabular-nums; }
 .sheet__note{ margin:12px 0 0; font-size:11.5px; color:var(--text-3); line-height:1.5; text-align:center; }
 
 /* ─────────  КОРЗИНА  ───────── */
+.cart{ width:min(620px,100%); }
 .cart-btn{ position:relative; }
 .cart-badge{
   position:absolute; top:-4px; right:-4px; min-width:17px; height:17px; padding:0 4px;
-  border-radius:9px; background:var(--accent); color:#1a1206; font-size:10.5px; font-weight:700;
-  line-height:17px; text-align:center; font-variant-numeric:tabular-nums; box-shadow:0 0 0 2px var(--bg-1);
+  border-radius:9px; background:var(--accent); color:var(--on-accent); font-size:10.5px; font-weight:700;
+  line-height:17px; text-align:center; font-variant-numeric:tabular-nums; box-shadow:0 0 0 2px var(--bg);
 }
 .cart-empty{ text-align:center; color:var(--text-3); padding:34px 8px; line-height:1.6; }
 .citem{ display:flex; align-items:center; gap:12px; padding:14px 0; border-bottom:1px solid var(--line); }
@@ -503,7 +502,7 @@ a{ color:inherit; text-decoration:none; }
 .citem__pack{ font-size:12.5px; color:var(--text-3); margin-top:3px; font-variant-numeric:tabular-nums; }
 .qty{ display:flex; align-items:center; gap:2px; flex:none; }
 .qty__b{
-  width:30px; height:30px; border:1px solid var(--line); background:transparent; color:var(--text-1);
+  width:30px; height:30px; border:1px solid var(--line-control); background:transparent; color:var(--text);
   border-radius:8px; font-size:17px; line-height:1; cursor:pointer; transition:.15s var(--ease);
 }
 .qty__b:hover{ border-color:var(--accent); color:var(--accent); }
@@ -518,18 +517,51 @@ a{ color:inherit; text-decoration:none; }
 .cart-note{ margin:10px 0 0; font-size:11.5px; color:var(--text-3); line-height:1.5; text-align:center; }
 .cart-note--error{ color:#c66f62; }
 .input[aria-invalid="true"]{ border-color:#b9574b; box-shadow:0 0 0 1px #b9574b; }
-.consent{display:flex;align-items:flex-start;gap:10px;margin:14px 0;color:var(--text-3);font-size:12px;line-height:1.45}.consent input{width:18px;height:18px;margin:0;flex:none;accent-color:var(--accent)}.consent a{color:var(--text-2);border-bottom:1px solid var(--line)}
+.consent{display:flex;align-items:flex-start;gap:10px;margin:14px 0;color:var(--text-3);font-size:13px;line-height:1.45}.consent input{width:20px;height:20px;margin:0;flex:none;accent-color:var(--accent)}.consent a{color:var(--text-2);border-bottom:1px solid var(--line)}
+.delivery-combobox{ position:relative; }
+.delivery-results{
+  position:absolute; z-index:8; left:0; right:0; top:calc(100% + 5px);
+  max-height:260px; overflow:auto; overscroll-behavior:contain;
+  border:1px solid var(--line-control); border-radius:4px;
+  background:var(--bg-2); box-shadow:0 16px 38px rgba(0,0,0,.22);
+}
+.delivery-option{
+  display:block; width:100%; padding:12px 14px; border:0;
+  border-bottom:1px solid var(--line); background:transparent; color:var(--text);
+  text-align:left; cursor:pointer; line-height:1.35;
+}
+.delivery-option:last-child{ border-bottom:0; }
+.delivery-option:hover,.delivery-option:focus-visible{ background:var(--bg-3); outline:none; }
+.delivery-option strong{ display:block; font-size:14px; font-weight:550; }
+.delivery-option small{ display:block; margin-top:3px; color:var(--text-3); font-size:12px; }
+.delivery-selected{
+  margin-top:8px; padding:10px 12px; border-left:2px solid var(--accent);
+  background:var(--bg-3); color:var(--text-2); font-size:12.5px; line-height:1.45;
+}
+.delivery-quote{
+  min-height:20px; margin:-8px 0 18px; color:var(--text-3);
+  font-size:12.5px; line-height:1.45;
+}
+.delivery-quote[data-state="ready"]{ color:var(--text-2); }
+.delivery-quote[data-state="error"]{ color:#c66f62; }
 
 /* ─────────────────────────  ФОРМЫ  ───────────────────────── */
 /* minmax(0,…), а не 1fr: у элементов грида min-width:auto, и лента дней
    шириной в 1000+ px растянула бы колонку, уведя всю страницу вбок */
 .book{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,.78fr); gap:clamp(28px,4vw,64px); align-items:start; }
+#view-b2b .book{ grid-template-columns:minmax(0,1.3fr) minmax(340px,.62fr); }
 .book > *{ min-width:0; }
 .field{ margin-bottom:22px; }
-.field > .label{ display:block; margin-bottom:9px; }
+.field > .label{
+  display:block; margin-bottom:9px; font-size:14px; font-weight:500;
+  letter-spacing:0; text-transform:none; color:var(--text-2);
+}
+.field-hint{
+  margin:8px 2px 0; color:var(--text-3); font-size:12.5px; line-height:1.45;
+}
 .input, select.input{
   width:100%; padding:12px 14px; background:var(--bg-3);
-  border:1px solid var(--line); border-radius:3px; font-size:15px;
+  border:1px solid var(--line-control); border-radius:3px; font-size:15px;
   transition:border-color .2s var(--ease);
   -webkit-appearance:none; appearance:none;
 }
@@ -618,15 +650,12 @@ select.input{
 /* ── Опт ── */
 .bsteps{ display:grid; grid-template-columns:repeat(3,1fr); gap:clamp(12px,1.4vw,18px); }
 .bstep{
-  background:var(--bg-3); border:1px solid var(--line-soft); border-radius:var(--r);
-  overflow:hidden; display:flex; flex-direction:column;
-  transition:border-color .25s var(--ease), transform .25s var(--ease);
+  background:transparent; border:0; border-top:1px solid var(--line); padding-top:12px;
+  display:flex; flex-direction:column;
 }
-.bstep:hover{ border-color:var(--line); transform:translateY(-2px); }
-.bstep__art{ aspect-ratio:4/3; overflow:hidden; background:var(--bg-2); }
+.bstep__art{ aspect-ratio:4/3; overflow:hidden; background:var(--bg-2); border-radius:var(--r); }
 .bstep__art img{ width:100%; height:100%; object-fit:cover; transition:transform .5s var(--ease); }
-.bstep:hover .bstep__art img{ transform:scale(1.03); }
-.bstep__body{ padding:20px 20px 24px; }
+.bstep__body{ padding:18px 0 0; }
 .bstep__body .step__n{ font-size:1.7rem; }
 .bstep h3{ font-size:1.05rem; font-weight:600; margin:10px 0 8px; letter-spacing:-.01em; }
 .bstep p{ margin:0; font-size:14.5px; color:var(--text-2); line-height:1.6; }
@@ -649,7 +678,7 @@ select.input{
 /* ─────────────────────────  ПОДВАЛ  ───────────────────────── */
 .foot{ border-top:1px solid var(--line-soft); background:var(--bg-2); padding:clamp(48px,6vw,76px) 0 34px; }
 .foot__grid{ display:grid; grid-template-columns:1.4fr 1fr 1fr 1fr; gap:clamp(24px,3vw,44px); }
-.foot h4{ font-size:12px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--text-3); margin:0 0 14px; }
+.foot h3{ font-size:12px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--text-3); margin:0 0 14px; }
 .foot ul{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:9px; }
 .foot li, .foot p{ font-size:14px; color:var(--text-2); margin:0; }
 .foot a{ transition:color .2s var(--ease); }
@@ -675,15 +704,6 @@ select.input{
 
 /* ─────────────────────────  АДАПТИВ  ───────────────────────── */
 @media (max-width:1000px){
-  .hero{ min-height:0; }
-  .hero__copy{ max-width:none; }
-  /* На узком экране стена уходит в фон целиком и гасится сильнее: текст важнее */
-  .hero__wall{ width:100%; opacity:.3; }
-  .hero::after{
-    background:
-      linear-gradient(to bottom, color-mix(in srgb, var(--bg) 72%, transparent), var(--bg) 62%),
-      linear-gradient(to bottom, var(--bg), transparent 14%);
-  }
   .sec__head{ grid-template-columns:1fr; align-items:start; }
   .steps{ grid-template-columns:1fr 1fr; }
   .svcs{ grid-template-columns:1fr; }
@@ -692,7 +712,7 @@ select.input{
   .credo{ grid-template-columns:1fr; gap:26px; }
   .credo__art{ aspect-ratio:4/3; }
   .credo__art img{ object-position:50% 30%; }
-  .book{ grid-template-columns:minmax(0,1fr); }
+  .book, #view-b2b .book{ grid-template-columns:minmax(0,1fr); }
   .summary{ position:static; }
   .foot__grid{ grid-template-columns:1fr 1fr; }
   .facts__in{ grid-template-columns:1fr 1fr; }
@@ -717,13 +737,12 @@ select.input{
   .citem__info{ align-self:end; }
   .citem .qty{ grid-column:2; align-self:start; }
   .citem__rm{ grid-column:3; grid-row:1/3; align-self:center; }
-  .nav__in{ height:56px; gap:8px; }
+  .nav__in{ height:calc(56px + env(safe-area-inset-top)); gap:8px; }
   .brand{ font-size:15px; letter-spacing:.14em; gap:8px; min-height:44px; min-width:0; }
   /* «МСК» — декоративная приписка: на телефоне она упиралась в переключатель
      языка (шапка и так плотная: знак + название + языки + корзина + тема) */
   .brand sup{ display:none; }
   .brand__mark{ height:28px; }
-  .nav__links{ display:none; }
   /* Тач-зоны: пальцу нужно 44px, мышке хватало 26. Ниже — только мобильные размеры */
   .lang{ padding:2px; }
   .lang button{ min-height:44px; padding:0 11px; font-size:12px; }
@@ -733,18 +752,6 @@ select.input{
     .brand span{ display:none; }        /* совсем узко: оставляем один знак */
   }
   .icon-btn{ width:44px; height:44px; }
-  .nav--mob{
-    display:flex; gap:6px; overflow-x:auto; padding:0 var(--pad) 10px;
-    border-bottom:1px solid var(--line-soft); scrollbar-width:none;
-    -webkit-overflow-scrolling:touch; scroll-snap-type:x proximity;
-  }
-  .nav--mob::-webkit-scrollbar{ display:none; }
-  .nav--mob .nav__link{
-    display:flex; align-items:center; min-height:44px; padding:0 16px;
-    border:1px solid var(--line); border-radius:100px; font-size:14px;
-    scroll-snap-align:start;
-  }
-  .nav--mob .nav__link[aria-current="page"]{ background:var(--text); border-color:var(--text); color:var(--bg); }
   .link-arrow{ min-height:44px; }
   .chip{ min-height:44px; padding:0 16px; }
   .slot, .day, .pack{ min-height:46px; }
@@ -762,15 +769,17 @@ select.input{
   .btn{ min-height:50px; }
   .foot ul{ gap:2px; }
   .foot li a{ display:inline-flex; align-items:center; min-height:44px; }
-  .steps{ grid-template-columns:1fr; }
-  .facts__in{ grid-template-columns:1fr; }
-  .fact{ border-left:0; padding-left:0; border-top:1px solid var(--line-soft); }
-  .fact:first-child{ border-top:0; }
+  .steps{ grid-template-columns:1fr 1fr; }
+  .facts__in{ grid-template-columns:1fr 1fr; }
+  .fact{ border-top:1px solid var(--line-soft); }
+  .fact:nth-child(odd){ border-left:0; padding-left:0; }
+  .fact:nth-child(-n+2){ border-top:0; }
   .foot__grid{ grid-template-columns:1fr; }
   .row2{ grid-template-columns:1fr; }
   .hero__cta .btn{ flex:1; }
   .tier{ grid-template-columns:1fr; gap:6px; }
   .gallery{ grid-template-columns:1fr 1fr; }
+  .gallery img:first-child{ grid-column:1/-1; aspect-ratio:16/9; }
   .brange__strip{ grid-template-columns:repeat(4,1fr); }
   .bsteps{ grid-template-columns:1fr; }
   .bstep__art{ aspect-ratio:16/9; }
@@ -779,7 +788,75 @@ select.input{
   .slots{ grid-template-columns:repeat(3,1fr); gap:8px; }
 }
 .nav--mob{ display:none; }
-@media (max-width:620px){ .nav--mob{ display:flex; } }
+@media (max-width:900px){
+  .nav__links{ display:none; }
+  .nav--mob{
+    display:flex; gap:24px; overflow-x:auto; padding:0 var(--pad);
+    border-bottom:1px solid var(--line-soft); scrollbar-width:none;
+    -webkit-overflow-scrolling:touch; scroll-snap-type:x proximity;
+  }
+  .nav--mob::-webkit-scrollbar{ display:none; }
+  .nav--mob .nav__link{
+    position:relative; display:flex; align-items:center; flex:none; min-height:44px;
+    padding:0; font-size:14px; scroll-snap-align:center;
+  }
+  .nav--mob .nav__link::after{
+    content:''; position:absolute; left:0; right:0; bottom:-1px; height:2px;
+    background:var(--accent); transform:scaleX(0); transform-origin:left;
+    transition:transform var(--motion-fast) var(--ease);
+  }
+  .nav--mob .nav__link[aria-current="page"]{ color:var(--text); }
+  .nav--mob .nav__link[aria-current="page"]::after{ transform:scaleX(1); }
+}
+@media (max-width:700px){
+  .hero{ min-height:0; display:flex; flex-direction:column; align-items:stretch; }
+  .hero::after{ display:none; }
+  .hero__in{ order:1; padding-top:clamp(50px,14vw,76px); padding-bottom:34px; }
+  .hero__copy{ max-width:none; }
+  .hero__media{
+    position:relative; order:2; inset:auto; width:auto; aspect-ratio:4/3;
+    margin:0 var(--pad) clamp(28px,8vw,52px);
+  }
+  .hero__media img{ object-position:50% 42%; }
+  .hero h1{ font-size:clamp(2.25rem,11vw,3.25rem); }
+  .hero__lead{ margin-top:21px; }
+  .hero__cta{ margin-top:24px; }
+}
+@media (max-width:620px){
+  .shop-toolbar{ margin-bottom:20px; }
+  .chips{
+    flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; scroll-snap-type:x proximity;
+    margin-inline:calc(var(--pad) * -1); padding-inline:var(--pad); padding-bottom:4px;
+  }
+  .chips::-webkit-scrollbar{ display:none; }
+  .chip{ flex:none; scroll-snap-align:start; }
+  .shop-count{ margin-top:10px; }
+  #menu-teas.tea-grid{ grid-template-columns:1fr; gap:10px; }
+  #menu-teas .tea{
+    display:grid; grid-template-columns:minmax(112px,36%) minmax(0,1fr);
+    min-height:142px;
+  }
+  #menu-teas .tea__art{ aspect-ratio:auto; min-height:142px; height:100%; }
+  #menu-teas .tea__body{ padding:13px 13px 12px; min-width:0; }
+  #menu-teas .tea__name{
+    font-family:'Golos Text',sans-serif; font-size:14.5px; font-weight:600;
+    line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+  }
+  #menu-teas .tea__orig{
+    font-size:11.5px; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2;
+    -webkit-box-orient:vertical; overflow:hidden;
+  }
+  #menu-teas .tea__foot{ padding-top:9px; align-items:center; }
+  #menu-teas .price{ font-family:'Golos Text',sans-serif; font-size:15px; font-weight:600; }
+  #menu-teas .price small{ display:block; margin:2px 0 0; font-size:10.5px; font-weight:400; }
+  #menu-teas .tea__quick{ width:38px; height:38px; }
+}
+@media (max-width:359px){
+  .steps, .facts__in{ grid-template-columns:1fr; }
+  .fact{ border-left:0; padding-left:0; }
+  .fact:nth-child(2){ border-top:1px solid var(--line-soft); }
+  .hero__cta .btn{ flex-basis:100%; }
+}
 
 /* На тач-экране :hover срабатывает после тапа и залипает, пока не ткнёшь
    в другое место: поднятая карточка так и остаётся поднятой. Сдвиги и
@@ -803,9 +880,6 @@ select.input{
     animation-duration:.01ms !important; animation-delay:0s !important;
     transition-duration:.01ms !important; transition-delay:0s !important;
   }
-  /* Стена в герое — бесконечная петля: мгновенная «анимация» бросила бы её
-     в конечное состояние translateY(-50%) и обрезала бы половину картинок. */
-  .hero__col{ animation:none !important; transform:none !important; }
   /* Появление при скролле не должно прятать контент от тех, кто отключил анимации */
   .reveal{ opacity:1 !important; transform:none !important; }
 }
@@ -827,7 +901,7 @@ select.input{
 
 <header class="nav">
   <div class="nav__in">
-    <a class="brand" href="#" data-go="home">
+    <a class="brand" href="#home" data-go="home">
       <img class="brand__mark" src="{{img:logo-mark}}" alt="" data-i18n-alt="alt_logo" width="186" height="377">
       <span><span data-i18n="brand">Чайня</span><sup data-i18n="brand_sup">МСК</sup></span>
     </a>
@@ -852,7 +926,7 @@ select.input{
       </button>
     </div>
   </div>
-  <nav class="nav--mob" aria-label="Разделы сайта (мобильное меню)">
+  <nav class="nav--mob" data-i18n-aria="a_nav" aria-label="Разделы сайта">
     <a class="nav__link" href="#home" data-go="home" data-i18n="nav_home" aria-current="page">Чайная</a>
     <a class="nav__link" href="#shop" data-go="shop" data-i18n="nav_shop">Купить чай</a>
     <a class="nav__link" href="#b2b" data-go="b2b" data-i18n="nav_b2b">Для бизнеса</a>
@@ -864,7 +938,9 @@ select.input{
 <!-- ══════════════════  ЧАЙНАЯ  ══════════════════ -->
 <section class="view is-active" id="view-home">
   <div class="hero">
-    <div class="hero__wall" id="hero-wall" aria-hidden="true"></div>
+    <figure class="hero__media">
+      <img id="hero-img" src="{{img:hero-master}}" alt="" data-i18n-alt="alt_master" fetchpriority="high">
+    </figure>
     <div class="hero__in">
       <div class="hero__copy">
         <p class="label" data-i18n="hero_label">Москва · Острякова, 3 · чайная</p>
@@ -897,7 +973,6 @@ select.input{
         </div>
       </div>
     </div>
-  </div>
 
   <!-- Две услуги: это и есть модель заведения -->
   <div class="sec wrap">
@@ -1034,7 +1109,10 @@ select.input{
       </div>
       <p class="lead" data-i18n="shop_lead"></p>
     </div>
-    <div class="chips" id="filters"></div>
+    <div class="shop-toolbar">
+      <div class="chips" id="filters" role="group" data-i18n-aria="filters_label" aria-label="Фильтры каталога"></div>
+      <p class="shop-count"><span data-i18n="shop_count">В подборке</span><b class="num" id="shop-count">0</b></p>
+    </div>
     <div class="tea-grid" id="menu-teas"></div>
     <p id="fav-empty" data-i18n="fav_empty" hidden>Здесь появится то, что вы отметите сердечком.</p>
     <p class="shop__foot" data-i18n="shop_foot"></p>
@@ -1188,13 +1266,16 @@ select.input{
             </div>
             <div class="field">
               <label class="label" for="f-phone" data-i18n="f_phone">Телефон</label>
-              <input class="input" type="tel" id="f-phone" placeholder="+7 (___) ___-__-__" autocomplete="tel">
+              <input class="input" type="tel" id="f-phone" data-i18n-ph="phone_ph"
+                     placeholder="+7 (___) ___-__-__" autocomplete="tel" inputmode="tel" maxlength="25">
             </div>
           </div>
           <div class="field">
             <label class="label" for="f-note" data-i18n="f_note">Пожелания</label>
             <textarea class="input" id="f-note" data-i18n-ph="f_note_ph"></textarea>
           </div>
+          <label class="consent"><input type="checkbox" id="f-privacy"><span><span data-i18n="privacy_accept">Согласен на обработку данных согласно</span> <a href="/privacy.html" target="_blank" rel="noopener" data-i18n="privacy_link">политике конфиденциальности</a></span></label>
+          <p class="cart-note cart-note--error" id="f-status" role="status" aria-live="polite"></p>
         </div>
 
         <aside class="summary">
@@ -1236,7 +1317,7 @@ select.input{
         <p style="margin-top:12px; max-width:32ch" data-i18n="foot_desc"></p>
       </div>
       <div>
-        <h4 data-i18n="foot_addr_h">Адрес</h4>
+        <h3 data-i18n="foot_addr_h">Адрес</h3>
         <ul>
           <li data-i18n="foot_addr1">Москва, ул. Острякова, 3</li>
           <li data-i18n="foot_addr2">первый этаж, помещение 114</li>
@@ -1244,16 +1325,16 @@ select.input{
         </ul>
       </div>
       <div>
-        <h4 data-i18n="foot_contact_h">Связь</h4>
+        <h3 data-i18n="foot_contact_h">Связь</h3>
         <ul>
           <li><a href="https://t.me/chainyabot" target="_blank" rel="noopener" data-i18n="foot_bot">Бот: @chainyabot</a></li>
           <li><a href="https://t.me/chainyamsk" target="_blank" rel="noopener" data-i18n="foot_tg">Канал: @chainyamsk</a></li>
           <li><a href="tel:+79055908801" data-i18n="foot_phone">+7 (905) 590-88-01</a></li>
-          <li><a href="https://yandex.ru/maps/org/chaynya/" target="_blank" rel="noopener" data-i18n="foot_ya">Мы на Яндекс.Картах</a></li>
+          <li><a href="https://yandex.com/maps/org/chaynya/49488428011/" target="_blank" rel="noopener" data-i18n="foot_ya">Мы на Яндекс.Картах</a></li>
         </ul>
       </div>
       <div>
-        <h4 data-i18n="foot_hours_h">Часы</h4>
+        <h3 data-i18n="foot_hours_h">Часы</h3>
         <ul>
           <li class="num" data-i18n="foot_hours1">Ежедневно · 12:00–22:00</li>
           <li style="color:var(--text-3)" data-i18n="foot_hours2">Последняя посадка в 20:00</li>
@@ -1269,7 +1350,7 @@ select.input{
 </footer>
 
 <div class="scrim" id="scrim"></div>
-<aside class="sheet" id="tea-sheet" tabindex="-1" role="dialog" aria-modal="true" data-i18n-aria="a_tea" aria-label="О чае">
+<div class="sheet" id="tea-sheet" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="ts-name">
   <div class="sheet__head">
     <h2 id="ts-name" style="flex:1; min-width:0">—</h2>
     <button class="sheet__fav" id="ts-fav" aria-pressed="false" data-i18n-aria="fav_label" aria-label="В избранное">
@@ -1281,12 +1362,12 @@ select.input{
   </div>
   <div class="sheet__body">
     <!-- без src: пустой атрибут заставляет браузер грузить саму страницу -->
-    <div class="sheet__art"><img id="ts-img" alt=""></div>
+    <div class="sheet__art"><img id="ts-img" src="{{img:hero-master}}" alt="" loading="lazy" width="1500" height="2255"></div>
     <div class="ts-meta"><span class="ts-stock" id="ts-stock"></span><p class="ts-orig" id="ts-orig"></p></div>
     <p class="ts-desc" id="ts-desc"></p>
     <div class="ts-taste" id="ts-taste" hidden>
-      <h4 class="ts-taste__h" data-i18n="taste_h">Вкусовой профиль</h4>
-      <svg class="ts-radar" id="ts-radar" viewBox="0 0 320 240" role="img" data-i18n-aria="taste_h" aria-label="Вкусовой профиль"></svg>
+      <h3 class="ts-taste__h" data-i18n="taste_h">Вкусовой профиль</h3>
+      <div class="ts-profile" id="ts-profile"></div>
     </div>
   </div>
   <!-- Фасовка живёт в футере, а не в теле: тело скроллится, и на коротком
@@ -1297,11 +1378,11 @@ select.input{
     <button class="btn btn--solid btn--wide" id="ts-add" data-i18n="ts_add">В корзину</button>
     <p class="sheet__note" data-i18n="ts_note"></p>
   </div>
-</aside>
+</div>
 
-<aside class="sheet cart" id="cart-sheet" tabindex="-1" role="dialog" aria-modal="true" data-i18n-aria="a_cart" aria-label="Корзина">
+<div class="sheet cart" id="cart-sheet" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="cart-title">
   <div class="sheet__head">
-    <h2 style="flex:1; min-width:0" data-i18n="cart_h">Корзина</h2>
+    <h2 id="cart-title" style="flex:1; min-width:0" data-i18n="cart_h">Корзина</h2>
     <button class="icon-btn" id="cart-close" data-i18n-aria="a_close" aria-label="Закрыть" style="flex:none">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
     </button>
@@ -1317,7 +1398,10 @@ select.input{
         </div>
         <div class="field">
           <label class="label" for="c-phone" data-i18n="f_phone">Телефон</label>
-          <input class="input" type="tel" id="c-phone" placeholder="+7 (___) ___-__-__" autocomplete="tel" inputmode="tel" required>
+          <input class="input" type="tel" id="c-phone" data-i18n-ph="phone_ph"
+                 placeholder="+7 (___) ___-__-__" autocomplete="tel" inputmode="tel"
+                 maxlength="25" aria-describedby="c-phone-hint" required>
+          <p class="field-hint" id="c-phone-hint" data-i18n="phone_hint">Начнём с +7. Номер другой страны можно ввести с её кодом.</p>
         </div>
       </div>
       <div class="field">
@@ -1326,23 +1410,37 @@ select.input{
       </div>
       <div class="field" id="c-city-field" hidden>
         <label class="label" for="c-city" data-i18n="cart_city">Город</label>
-        <input class="input" type="text" id="c-city" data-i18n-ph="cart_city_ph" autocomplete="address-level2">
+        <div class="delivery-combobox">
+          <input class="input" type="text" id="c-city" data-i18n-ph="cart_city_ph"
+                 autocomplete="off" role="combobox" aria-autocomplete="list"
+                 aria-expanded="false" aria-controls="c-city-results">
+          <input type="hidden" id="c-city-code">
+          <div class="delivery-results" id="c-city-results" role="listbox" hidden></div>
+        </div>
       </div>
       <div class="field" id="c-pvz-field" hidden>
-        <label class="label" for="c-pvz" data-i18n="cart_pvz">Пункт выдачи СДЭК</label>
-        <input class="input" type="text" id="c-pvz" data-i18n-ph="cart_pvz_ph">
+        <label class="label" for="c-pvz-search" data-i18n="cart_pvz">Пункт выдачи СДЭК</label>
+        <div class="delivery-combobox">
+          <input class="input" type="text" id="c-pvz-search" data-i18n-ph="cart_pvz_ph"
+                 autocomplete="off" role="combobox" aria-autocomplete="list"
+                 aria-expanded="false" aria-controls="c-pvz-results">
+          <input type="hidden" id="c-pvz">
+          <div class="delivery-results" id="c-pvz-results" role="listbox" hidden></div>
+        </div>
+        <div class="delivery-selected" id="c-pvz-selected" hidden></div>
       </div>
       <div class="field" id="c-addr-field">
         <label class="label" for="c-addr" data-i18n="cart_addr">Адрес</label>
-        <input class="input" type="text" id="c-addr" data-i18n-ph="cart_addr_ph" autocomplete="street-address">
+        <input class="input" type="text" id="c-addr" data-i18n-ph="cart_addr_ph" autocomplete="address-line1">
       </div>
       <div class="field">
         <label class="label" for="c-payment" data-i18n="cart_payment">Оплата</label>
-        <select class="input" id="c-payment">
-          <option value="bank_card" data-i18n="pay_card">Банковская карта</option>
-          <option value="sbp" data-i18n="pay_sbp">СБП</option>
+        <select class="input" id="c-payment" aria-describedby="c-payment-hint">
+          <option value="bank_card" data-i18n="pay_card">Карта любого российского банка · Т-Банк</option>
         </select>
+        <p class="field-hint" id="c-payment-hint" data-i18n="payment_hint">Подойдёт карта любого российского банка. Оплата проходит на защищённой форме Т‑Банка.</p>
       </div>
+      <div class="delivery-quote" id="c-delivery-quote" aria-live="polite"></div>
       <div class="field">
         <label class="label" for="c-note" data-i18n="f_note">Пожелания</label>
         <textarea class="input" id="c-note" data-i18n-ph="cart_note_ph"></textarea>
@@ -1356,7 +1454,7 @@ select.input{
     <p class="cart-note" data-i18n="cart_pay"></p>
     <p class="cart-note" id="cart-status" aria-live="polite"></p>
   </div>
-</aside>
+</div>
 
 <script>
 (() => {
@@ -1382,7 +1480,7 @@ select.input{
 
   /* Языконезависимое: тип, цена, фото. Цена — за 10 г (на кассе она за грамм). */
   const TEA_META = [
-    { id:'chongshicha', t:'herbs',  p:350, unit:'g',  img:'{{img:tea-chongshicha}}' },
+    { id:'chongshicha', t:'herbs',  p:350, unit:'g', stock:false, img:'{{img:tea-chongshicha}}' },
     { id:'baihao',      t:'white',  p:175, unit:'g',  img:'{{img:tea-baihao}}' },
     { id:'baimudan',    t:'white',  p:165, unit:'g',  img:'{{img:tea-baimudan}}' },
     { id:'longjing',    t:'green',  p:160, unit:'g',  img:'{{img:tea-longjing}}' },
@@ -1457,10 +1555,17 @@ select.input{
     herbal:{floral:3,fruity:2,driedfruit:1,honey:1,nutty:0,roasted:0,spicy:1,woody:0,herbal:5},
   };
   const inStock = m => m.stock !== false;
+  // Доступные позиции всегда идут первыми, но исходный порядок внутри обеих
+  // групп сохраняется. Поэтому привычная раскладка каталога не «прыгает», когда
+  // у одного из чаёв меняется остаток.
+  const stockFirst = items => [
+    ...items.filter(inStock),
+    ...items.filter(m => !inStock(m)),
+  ];
 
-  /* ─────────────  ВКУСОВОЙ ПРОФИЛЬ (паутинка)  ─────────────
-     9 осей, оценки из TASTE. Рисуем SVG: сетка, спицы, залитый
-     многоугольник и подписи. Подписи зависят от языка. */
+  /* ─────────────  ВКУСОВОЙ ПРОФИЛЬ  ─────────────
+     Показываем четыре ведущие ноты: их легче сравнить на телефоне, чем девять
+     подписей вокруг декоративной паутинки. Исходные оценки остаются в TASTE. */
   const AXES = [
     { k:'floral',     ru:'Цветочный', en:'Floral',      zh:'花香' },
     { k:'fruity',     ru:'Фруктовый', en:'Fruity',      zh:'果香' },
@@ -1476,23 +1581,16 @@ select.input{
     const t = TASTE[id], box = $('#ts-taste');
     if (!t){ box.hidden = true; return; }
     box.hidden = false;
-    const cx = 160, cy = 116, R = 84, n = AXES.length;
-    const ang = i => (-90 + i * 360 / n) * Math.PI / 180;
-    const pt = (i, r) => [cx + r * Math.cos(ang(i)), cy + r * Math.sin(ang(i))];
-    const poly = r => AXES.map((_, i) => pt(i, r).map(v => v.toFixed(1)).join(',')).join(' ');
-    let s = '';
-    [1 / 3, 2 / 3, 1].forEach(f => { s += `<polygon class="grid" points="${poly(R * f)}"/>`; });
-    AXES.forEach((_, i) => { const [x, y] = pt(i, R); s += `<line class="spoke" x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`; });
-    const dpts = AXES.map((a, i) => pt(i, R * (t[a.k] || 0) / 5).map(v => v.toFixed(1)).join(',')).join(' ');
-    s += `<polygon class="area" points="${dpts}"/>`;
-    AXES.forEach((a, i) => { if (t[a.k]){ const [x, y] = pt(i, R * t[a.k] / 5); s += `<circle class="dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.4"/>`; } });
-    AXES.forEach((a, i) => {
-      const [x, y] = pt(i, R + 15), c = Math.cos(ang(i)), sn = Math.sin(ang(i));
-      const anc = c > 0.3 ? 'start' : c < -0.3 ? 'end' : 'middle';
-      const dy = sn < -0.5 ? -2 : sn > 0.5 ? 8 : 3;
-      s += `<text class="lbl" x="${x.toFixed(1)}" y="${(y + dy).toFixed(1)}" text-anchor="${anc}">${a[LANG] || a.ru}</text>`;
-    });
-    $('#ts-radar').innerHTML = s;
+    const top = AXES.map((axis, order) => ({ axis, order, value:t[axis.k] || 0 }))
+      .filter(item => item.value > 0)
+      .sort((a,b) => b.value - a.value || a.order - b.order)
+      .slice(0,4);
+    $('#ts-profile').innerHTML = top.map(({ axis, value }) => `
+      <div class="ts-profile__row">
+        <span class="ts-profile__name">${axis[LANG] || axis.ru}</span>
+        <span class="ts-profile__track" aria-hidden="true"><span class="ts-profile__fill" style="width:${value * 20}%"></span></span>
+        <span class="ts-profile__value num">${value}/5</span>
+      </div>`).join('');
   }
 
   /* Что показываем на главной: редкость, флагман и понятный вход */
@@ -1504,7 +1602,7 @@ select.input{
   ru: {
     locale:'ru-RU',
     title:'Чайня · чайная на Острякова',
-    a_lang:'Язык', a_theme:'Сменить тему', a_close:'Закрыть', a_tea:'О чае', a_nav:'Разделы сайта', skip:'Перейти к содержимому',
+    a_lang:'Язык', a_theme:'Сменить тему', a_close:'Закрыть', a_tea:'О чае', a_nav:'Разделы сайта', filters_label:'Фильтры каталога', skip:'Перейти к содержимому',
     alt_master:'Чайный мастер разливает настой из чахая по чашкам',
     alt_logo:'Знак Чайни: буквы Ч, Н, Я, сложенные под иероглиф',
     alt_pour:'Мастер наливает настой в чахай',
@@ -1551,7 +1649,7 @@ select.input{
     hall_cta:'Выбрать время',
     shop_label:'Купить чай', shop_h:'Тот же лист,<br>что и в зале',
     shop_lead:'Здесь чай продаётся домой: фасуем в пакеты 25, 50 и 100 г и отправляем доставкой. Если вы пришли к нам за стол, платить за чай не нужно: два на выбор уже входят в стоимость.',
-    shop_foot:'Цены на пакеты считаются от цены за 10 г. Прессованное продаём целиком: мандарин и квадратик поштучно, блины по запросу.',
+    shop_foot:'Цены на пакеты считаются от цены за 10 г. Прессованное продаём целиком: мандарин и квадратик поштучно, блины по запросу.', shop_count:'В подборке',
     types:['Все','Белый','Зелёный','Габа','Улуны Фуцзяни','Улуны Гуандуна','Улуны Уишаня','Красный','Шэн Пуэр','Шу Пуэр','Хэй Ча','Травы и добавки'],
     more:'о чае', per_pc:'за штуку', per_pack25:'за 25 г', gram:'г',
     fav_label:'В избранное', filter_fav:'Избранное', fav_empty:'Здесь появится то, что вы отметите сердечком.',
@@ -1559,19 +1657,28 @@ select.input{
     unit_pc:'Одна штука', unit_pack:'Пакет {g} г',
     ts_buy:'Купить с доставкой', order_prefill:'Здравствуйте! Хочу заказать с доставкой: ',
     a_cart:'Корзина', ts_add:'В корзину', ts_added:'Добавлено ✓',
+    tea_open:n=>`Открыть чай «${n}»`, quick_add:n=>`Быстро добавить «${n}» в корзину`,
     cart_h:'Корзина', cart_empty:'Пусто. Загляните в «Купить чай» и добавьте сорт.',
     cart_remove:'Убрать', cart_total:'Итого', cart_co_h:'Оформление',
-    cart_dlv:'Получение', cart_city:'Город', cart_city_ph:'Например, Москва',
-    cart_pvz:'Пункт выдачи СДЭК', cart_pvz_ph:'Код или адрес пункта',
+    cart_dlv:'Получение', cart_city:'Город', cart_city_ph:'Начните вводить город',
+    cart_pvz:'Пункт выдачи СДЭК', cart_pvz_ph:'Улица, метро или код пункта',
     cart_addr:'Адрес', cart_addr_ph:'Улица, дом, квартира', cart_payment:'Оплата',
-    pay_card:'Банковская карта', pay_sbp:'СБП',
-    cart_note_ph:'Комментарий к заказу', cart_submit:'Оформить заказ',
-    cart_pay:'Тестовый режим: деньги не списываются, цены СДЭК демонстрационные.',
+    pay_card:'Карта любого российского банка · Т-Банк', pay_sbp:'СБП',
+    payment_hint:'Подойдёт карта любого российского банка. Оплата проходит на защищённой форме Т‑Банка.',
+    cart_note_ph:'Комментарий к заказу', cart_submit:'Оформить заказ', cart_submit_total:a=>`Перейти к оплате · ${a}`,
+    cart_decrease:n=>`Уменьшить количество «${n}»`, cart_increase:n=>`Увеличить количество «${n}»`,
+    cart_pay:'Стоимость и срок доставки рассчитывает СДЭК перед оплатой.',
+    cart_city_searching:'Ищем город…', cart_city_empty:'Город не найден',
+    cart_pvz_searching:'Загружаем пункты…', cart_pvz_empty:'Пункты не найдены',
+    cart_quote_city:'Сначала выберите город из подсказок.',
+    cart_quote_loading:'СДЭК рассчитывает стоимость…',
+    cart_quote_ready:(a,min,max)=>`СДЭК · ${a} · ${min===max?min:`${min}–${max}`} дн.`,
+    cart_quote_error:'Не удалось рассчитать доставку. Проверьте город или попробуйте ещё раз.',
     privacy_accept:'Согласен на обработку данных согласно', privacy_link:'политике конфиденциальности', privacy_required:'Подтвердите согласие на обработку данных',
     cart_phone_required:'Укажите телефон, чтобы мы могли подтвердить заказ.', cart_city_required:'Укажите город доставки.',
-    cart_pvz_required:'Укажите код или адрес пункта СДЭК.', cart_addr_required:'Укажите адрес доставки.',
-    cart_creating:'Создаём тестовый заказ…', cart_create_error:'Не удалось создать заказ. Попробуйте ещё раз.',
-    cart_payment_unavailable:'Онлайн-оплата пока не подключена.', cart_created:id=>`Заказ ${id} создан. Переходим к тестовой оплате…`, b2b_error:'Не удалось отправить заявку. Попробуйте ещё раз.',
+    cart_pvz_required:'Выберите пункт из подсказок СДЭК.', cart_addr_required:'Укажите адрес доставки.',
+    cart_creating:'Создаём заказ…', cart_create_error:'Не удалось создать заказ. Попробуйте ещё раз.',
+    cart_payment_unavailable:'Онлайн-оплата пока не подключена.', cart_created:id=>`Заказ ${id} создан. Переходим к защищённой форме Т-Банка…`, b2b_error:'Не удалось отправить заявку. Попробуйте ещё раз.',
     dlv:{ pickup:'Самовывоз · Острякова, 3', cdek_pvz:'СДЭК · пункт выдачи', cdek_courier:'СДЭК · курьер' },
     order_head:'🛒 Заказ чая — Чайня', order_done:'Спасибо! Завершите заказ в нашем боте @chainyabot или позвоните +7 905 590-88-01 — подтвердим и посчитаем доставку.',
     ts_note:'За столом этот чай можно выпить бесплатно: два на выбор входят в стоимость стола.',
@@ -1599,6 +1706,7 @@ select.input{
     fmt_incl:'В обе цены входят два чая на выбор. Третий — по желанию, на месте.',
     f_date:'Дата', today:'сегодня', tomorrow:'завтра', f_time:'Время посадки', f_guests:'Гостей',
     f_name:'Имя', f_name_ph:'Как к вам обращаться', f_phone:'Телефон',
+    phone_ph:'+7 (___) ___-__-__', phone_hint:'Начнём с +7. Номер другой страны можно ввести с её кодом.',
     f_note:'Пожелания', f_note_ph:'Первый раз на чайной церемонии, хотим что-нибудь бодрящее. Или: у нас день рождения, нужна свеча.',
     sum_h:'Ваша бронь', sum_sub:'Чайня · Острякова, 3',
     sum_format:'Формат', sum_date:'Дата', sum_time:'Время', sum_guests:'Гостей', sum_session:'Стол', sum_session_v:'2 часа · 2 чая',
@@ -1655,7 +1763,7 @@ select.input{
   en: {
     locale:'en-GB',
     title:'Chaynya · a tea house on Ostryakova',
-    a_lang:'Language', a_theme:'Theme', a_close:'Close', a_tea:'About the tea', a_nav:'Site sections', skip:'Skip to content',
+    a_lang:'Language', a_theme:'Theme', a_close:'Close', a_tea:'About the tea', a_nav:'Site sections', filters_label:'Catalogue filters', skip:'Skip to content',
     alt_master:'A tea master pouring the liquor from a pitcher into cups',
     alt_logo:'The Chaynya mark: the letters Ч, Н, Я stacked like a Chinese character',
     alt_pour:'The master pouring the liquor into a cha hai',
@@ -1701,31 +1809,40 @@ select.input{
     hall_m1:'9 seats', hall_m2:'no deposit', hall_m3:'tea to take home, off the shelf',
     hall_cta:'Pick a time',
     shop_label:'Buy tea', shop_h:'The same leaf<br>we serve inside',
-    shop_lead:'This is tea to take home: we pack it into 25, 50 and 100 g bags and ship it. If you are coming to sit at a table, you pay nothing for tea here: two of your choice are already in the price.',
-    shop_foot:'Bag prices are worked out from the per-10 g price. Pressed tea goes whole: the mandarin and the mini brick are sold by the piece, cakes on request.',
+    shop_lead:'Tea to take home, packed in 25, 50 and 100 g bags and shipped across Russia. Two teas are included with every table booking.',
+    shop_foot:'Package prices are calculated from the price per 10 g. Pressed tea is sold whole: the mandarin and mini brick by the piece, cakes on request.', shop_count:'In this selection',
     types:['All','White','Green','GABA','Fujian oolong','Guangdong oolong','Wuyi oolong','Black','Sheng pu-erh','Shou pu-erh','Hei cha','Herbs & extras'],
     more:'more', per_pc:'each', per_pack25:'for 25 g', gram:'g',
-    fav_label:'Add to favourites', filter_fav:'Favourites', fav_empty:'Teas you heart will show up here.',
+    fav_label:'Add to favourites', filter_fav:'Favourites', fav_empty:'Teas you save will appear here.',
     taste_h:'Flavour profile', in_stock:'in stock', oos:'out of stock',
     unit_pc:'One piece', unit_pack:'A {g} g bag',
     ts_buy:'Buy with delivery', order_prefill:'Hello! I’d like to order with delivery: ',
     a_cart:'Cart', ts_add:'Add to cart', ts_added:'Added ✓',
+    tea_open:n=>`Open ${n}`, quick_add:n=>`Quick-add ${n} to cart`,
     cart_h:'Cart', cart_empty:'Empty. Open “Buy tea” and pick a few.',
     cart_remove:'Remove', cart_total:'Total', cart_co_h:'Checkout',
-    cart_dlv:'Delivery', cart_city:'City', cart_city_ph:'For example, Moscow',
-    cart_pvz:'CDEK pickup point', cart_pvz_ph:'Point code or address',
+    cart_dlv:'Delivery', cart_city:'City', cart_city_ph:'Start typing a city',
+    cart_pvz:'CDEK pickup point', cart_pvz_ph:'Street, metro or point code',
     cart_addr:'Address', cart_addr_ph:'Street, building, flat', cart_payment:'Payment',
-    pay_card:'Bank card', pay_sbp:'SBP',
-    cart_note_ph:'Order comment', cart_submit:'Place order',
-    cart_pay:'Test mode: no money is charged; CDEK prices are placeholders.',
+    pay_card:'Any Russian bank card · T-Bank', pay_sbp:'SBP',
+    payment_hint:'Cards issued by any Russian bank are accepted. Payment is completed on T‑Bank’s secure form.',
+    cart_note_ph:'Order comment', cart_submit:'Place order', cart_submit_total:a=>`Continue to payment · ${a}`,
+    cart_decrease:n=>`Decrease quantity of ${n}`, cart_increase:n=>`Increase quantity of ${n}`,
+    cart_pay:'CDEK calculates the delivery price and time before payment.',
+    cart_city_searching:'Searching for the city…', cart_city_empty:'City not found',
+    cart_pvz_searching:'Loading pickup points…', cart_pvz_empty:'No pickup points found',
+    cart_quote_city:'Choose a city from the suggestions first.',
+    cart_quote_loading:'CDEK is calculating delivery…',
+    cart_quote_ready:(a,min,max)=>`CDEK · ${a} · ${min===max?min:`${min}–${max}`} days`,
+    cart_quote_error:'Could not calculate delivery. Check the city or try again.',
     privacy_accept:'I consent to data processing under the', privacy_link:'privacy policy', privacy_required:'Please accept the data processing terms',
     cart_phone_required:'Enter a phone number so we can confirm the order.', cart_city_required:'Enter the delivery city.',
-    cart_pvz_required:'Enter the CDEK pickup-point code or address.', cart_addr_required:'Enter the delivery address.',
-    cart_creating:'Creating your test order…', cart_create_error:'Could not create the order. Please try again.',
-    cart_payment_unavailable:'Online payment is not connected yet.', cart_created:id=>`Order ${id} created. Opening test payment…`, b2b_error:'Could not send your request. Please try again.',
+    cart_pvz_required:'Choose a CDEK point from the suggestions.', cart_addr_required:'Enter the delivery address.',
+    cart_creating:'Creating your order…', cart_create_error:'Could not create the order. Please try again.',
+    cart_payment_unavailable:'Online payment is not connected yet.', cart_created:id=>`Order ${id} created. Opening the secure T-Bank payment form…`, b2b_error:'Could not send your request. Please try again.',
     dlv:{ pickup:'Pickup · Ostryakova 3', cdek_pvz:'CDEK · pickup point', cdek_courier:'CDEK · courier' },
     order_head:'🛒 Tea order — Chaynya', order_done:'Thanks! Finish your order in our bot @chainyabot or call +7 905 590-88-01 — we’ll confirm and calculate shipping.',
-    ts_note:'At the table this tea costs you nothing: two of your choice come with the table.',
+    ts_note:'Two teas of your choice are included with every table booking.',
     b2b_label:'For business', b2b_h:'Our leaf<br>on your menu',
     b2b_lead:'We bring tea from China ourselves and wholesale it to cafés, restaurants and offices. The same leaf we serve in the room — and any other one to order.',
     brange_label:'What we ship', brange_note:'Anything on our menu: white, green, GABA, oolongs, blacks, pu-erh, pressed cakes. Wholesale also covers what is not in the room right now — we bring it to order. The same leaf, out of the same delivery: no flavourings, no second-rate batches.',
@@ -1750,6 +1867,7 @@ select.input{
     fmt_incl:'Both prices already include two teas of your choice. A third one is optional, at the table.',
     f_date:'Date', today:'today', tomorrow:'tomorrow', f_time:'Seating time', f_guests:'Guests',
     f_name:'Name', f_name_ph:'What should we call you', f_phone:'Phone',
+    phone_ph:'+7 (___) ___-__-__', phone_hint:'We start with +7. For another country, enter its country code.',
     f_note:'Special requests', f_note_ph:'First tea ceremony, something invigorating please. Or: it’s a birthday, we need a candle.',
     sum_h:'Your booking', sum_sub:'Chaynya · Ostryakova 3',
     sum_format:'Format', sum_date:'Date', sum_time:'Time', sum_guests:'Guests', sum_session:'Table', sum_session_v:'2 hours · 2 teas',
@@ -1806,7 +1924,7 @@ select.input{
   zh: {
     locale:'zh-CN',
     title:'Chaynya · 莫斯科茶馆',
-    a_lang:'语言', a_theme:'主题', a_close:'关闭', a_tea:'茶叶详情', a_nav:'网站栏目', skip:'跳到内容',
+    a_lang:'语言', a_theme:'主题', a_close:'关闭', a_tea:'茶叶详情', a_nav:'网站栏目', filters_label:'茶叶分类筛选', skip:'跳到内容',
     alt_master:'茶艺师正把茶汤从茶海分入茶杯',
     alt_logo:'Chaynya的标记：Ч、Н、Я三个字母叠成汉字的样子',
     alt_pour:'茶艺师把茶汤注入茶海',
@@ -1853,7 +1971,7 @@ select.input{
     hall_cta:'选时间',
     shop_label:'买茶', shop_h:'与店里<br>同一份茶叶',
     shop_lead:'这里的茶是带回家的：按25、50、100克分装，快递寄出。若您是来店里坐茶席，茶不必另付：两款任选已含在价内。',
-    shop_foot:'分装价格按每10克的价格折算。紧压茶整件出售：小青柑和小金砖论个，茶饼可另询。',
+    shop_foot:'分装价格按每10克的价格折算。紧压茶整件出售：小青柑和小金砖论个，茶饼可另询。', shop_count:'当前选择',
     types:['全部','白茶','绿茶','佳叶龙茶','闽南乌龙','广东乌龙','武夷岩茶','红茶','生普洱','熟普洱','黑茶','花草与配料'],
     more:'详情', per_pc:'每个', per_pack25:'25克装', gram:'克',
     fav_label:'加入收藏', filter_fav:'收藏', fav_empty:'您用爱心标记的茶会显示在这里。',
@@ -1861,20 +1979,29 @@ select.input{
     unit_pc:'一个', unit_pack:'{g}克装',
     ts_buy:'下单配送', order_prefill:'您好！我想下单配送：',
     a_cart:'购物车', ts_add:'加入购物车', ts_added:'已加入 ✓',
+    tea_open:n=>`查看${n}`, quick_add:n=>`将${n}加入购物车`,
     cart_h:'购物车', cart_empty:'空的。到「买茶」里添加茶品吧。',
     cart_remove:'移除', cart_total:'合计', cart_co_h:'结算',
-    cart_dlv:'配送', cart_city:'城市', cart_city_ph:'例如：莫斯科',
-    cart_pvz:'CDEK自提点', cart_pvz_ph:'网点代码或地址',
+    cart_dlv:'配送', cart_city:'城市', cart_city_ph:'开始输入城市名称',
+    cart_pvz:'CDEK自提点', cart_pvz_ph:'街道、地铁站或网点代码',
     cart_addr:'地址', cart_addr_ph:'街道、门牌号、公寓', cart_payment:'支付',
-    pay_card:'银行卡', pay_sbp:'快速支付系统（SBP）',
-    cart_note_ph:'订单备注', cart_submit:'提交订单',
-    cart_pay:'测试模式：不会扣款，CDEK运费为演示价格。',
+    pay_card:'任意俄罗斯银行的银行卡 · T-Bank', pay_sbp:'快速支付系统（SBP）',
+    payment_hint:'支持任意俄罗斯银行发行的银行卡。付款将在T‑Bank的安全页面完成。',
+    cart_note_ph:'订单备注', cart_submit:'提交订单', cart_submit_total:a=>`前往支付 · ${a}`,
+    cart_decrease:n=>`减少${n}的数量`, cart_increase:n=>`增加${n}的数量`,
+    cart_pay:'付款前由CDEK计算运费和时效。',
+    cart_city_searching:'正在查找城市…', cart_city_empty:'未找到城市',
+    cart_pvz_searching:'正在加载自提点…', cart_pvz_empty:'未找到自提点',
+    cart_quote_city:'请先从提示中选择城市。',
+    cart_quote_loading:'CDEK正在计算运费…',
+    cart_quote_ready:(a,min,max)=>`CDEK · ${a} · ${min===max?min:`${min}–${max}`}天`,
+    cart_quote_error:'无法计算运费，请检查城市或重试。',
     privacy_accept:'我同意按照以下条款处理个人数据：', privacy_link:'隐私政策', privacy_required:'请同意个人数据处理条款',
     cart_phone_required:'请填写电话号码，以便我们确认订单。', cart_city_required:'请填写配送城市。',
-    cart_pvz_required:'请填写CDEK自提点代码或地址。', cart_addr_required:'请填写配送地址。',
-    cart_creating:'正在创建测试订单…', cart_create_error:'订单创建失败，请重试。',
-    cart_payment_unavailable:'在线支付尚未接入。', cart_created:id=>`订单 ${id} 已创建，正在进入测试支付…`, b2b_error:'申请发送失败，请重试。',
-    dlv:{ pickup:'自取 · 奥斯特里亚科娃街3号', cdek_pvz:'CDEK · 自提点', cdek_courier:'CDEK · 快递员' },
+    cart_pvz_required:'请从提示中选择CDEK自提点。', cart_addr_required:'请填写配送地址。',
+    cart_creating:'正在创建订单…', cart_create_error:'订单创建失败，请重试。',
+    cart_payment_unavailable:'在线支付尚未接入。', cart_created:id=>`订单 ${id} 已创建，正在进入T-Bank安全支付页面…`, b2b_error:'申请发送失败，请重试。',
+    dlv:{ pickup:'自取 · 奥斯特里亚科娃街3号', cdek_pvz:'CDEK · 自提点', cdek_courier:'CDEK · 送货上门' },
     order_head:'🛒 茶订单 — Chaynya', order_done:'谢谢！请在我们的机器人 @chainyabot 中完成订单，或致电 +7 905 590-88-01，我们会确认并计算运费。',
     ts_note:'在店里喝这款茶不另收费：茶席已含任选两款。',
     b2b_label:'企业合作', b2b_h:'把我们的茶<br>放上您的菜单',
@@ -1901,6 +2028,7 @@ select.input{
     fmt_incl:'两种价格均已含两款自选茶。第三款可在现场按需加点。',
     f_date:'日期', today:'今天', tomorrow:'明天', f_time:'入座时间', f_guests:'人数',
     f_name:'称呼', f_name_ph:'怎么称呼您', f_phone:'电话',
+    phone_ph:'+7 (___) ___-__-__', phone_hint:'默认以+7开头；其他国家号码请输入相应国家代码。',
     f_note:'备注', f_note_ph:'第一次喝工夫茶，想要提神的。或者：过生日，需要一支蜡烛。',
     sum_h:'您的预订', sum_sub:'Chaynya · 奥斯特里亚科娃街3号',
     sum_format:'形式', sum_date:'日期', sum_time:'时间', sum_guests:'人数', sum_session:'茶席', sum_session_v:'2小时 · 2款茶',
@@ -1991,13 +2119,55 @@ select.input{
   }
   const T = () => I18N[LANG];
 
-  const rub = n => n.toLocaleString('ru-RU') + ' ₽';
+  const rub = n => n.toLocaleString(T().locale || 'ru-RU') + ' ₽';
   // Цена пакета считается от цены за 10 г и округляется до пятёрки:
   // «437,5 ₽» на ценнике не пишут.
   const packPrice = (per10, grams) => Math.round(per10 * grams / 10 / 5) * 5;
   const el  = (h) => { const d = document.createElement('div'); d.innerHTML = h.trim(); return d.firstElementChild; };
+  const escAttr = value => String(value).replace(/[&"<>]/g, ch => ({'&':'&amp;','"':'&quot;','<':'&lt;','>':'&gt;'}[ch]));
   const $   = (s, r=document) => r.querySelector(s);
   const $$  = (s, r=document) => [...r.querySelectorAll(s)];
+
+  /* Телефон по умолчанию российский: подставляем +7 и форматируем без
+     отдельного выбора страны. Явный международный код (например, +357)
+     оставляем как есть — форма не запирает гостей в российском формате. */
+  function formatPhoneInput(field){
+    const raw = field.value;
+    const digits = raw.replace(/\D/g,'');
+    const explicitForeign = raw.trim().startsWith('+') && digits && !digits.startsWith('7');
+    if (explicitForeign){
+      field.value = `+${digits.slice(0,15)}`;
+      return;
+    }
+    if (!digits){ field.value=''; return; }
+    let ru = digits;
+    if (ru.startsWith('8')) ru = `7${ru.slice(1)}`;
+    else if (!ru.startsWith('7')) ru = `7${ru}`;
+    const local = ru.slice(1,11);
+    let value = '+7';
+    if (local.length) value += ` (${local.slice(0,3)}`;
+    if (local.length >= 3) value += ')';
+    if (local.length > 3) value += ` ${local.slice(3,6)}`;
+    if (local.length > 6) value += `-${local.slice(6,8)}`;
+    if (local.length > 8) value += `-${local.slice(8,10)}`;
+    field.value = value;
+  }
+  ['#f-phone','#c-phone'].forEach(selector => {
+    const field = $(selector);
+    field.addEventListener('focus', () => {
+      if (!field.value.trim()){
+        field.value='+7 ';
+        field.setSelectionRange(field.value.length,field.value.length);
+      }
+    });
+    field.addEventListener('input', () => {
+      formatPhoneInput(field);
+      field.setSelectionRange(field.value.length,field.value.length);
+    });
+    field.addEventListener('blur', () => {
+      if (field.value.replace(/\D/g,'') === '7') field.value='';
+    });
+  });
 
   /* ─────────────  TELEGRAM MINI APP  ─────────────
      Тот же сайт, открытый ботом внутри телеграма. Если мы там — синхронизируем
@@ -2019,24 +2189,35 @@ select.input{
 
   /* ─────────────  ТЕМА  ───────────── */
   const root = document.documentElement;
+  try{
+    const savedTheme = localStorage.getItem('chaynya-theme');
+    if (savedTheme === 'light' || savedTheme === 'dark') root.dataset.theme = savedTheme;
+  }catch(e){}
   const isDark = () => (root.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')) === 'dark';
-  $('#theme').addEventListener('click', () => { root.dataset.theme = isDark() ? 'light' : 'dark'; });
+  $('#theme').addEventListener('click', () => {
+    root.dataset.theme = isDark() ? 'light' : 'dark';
+    try{ localStorage.setItem('chaynya-theme', root.dataset.theme); }catch(e){}
+  });
 
   /* ─────────────  НАВИГАЦИЯ  ───────────── */
-  function go(view){
+  function go(view, updateHistory=true){
+    const changingView = ($('.view.is-active') || {}).id !== 'view-' + view;
     $$('.view').forEach(v => v.classList.toggle('is-active', v.id === 'view-' + view));
     $$('.nav__link').forEach(a => {
       if (a.dataset.go === view) a.setAttribute('aria-current','page');
       else a.removeAttribute('aria-current');
     });
+    const activeMobileNav = $('.nav--mob .nav__link[aria-current="page"]');
+    if (activeMobileNav) requestAnimationFrame(() => activeMobileNav.scrollIntoView({ block:'nearest', inline:'center' }));
     // Разделы «Бронь» и «Для бизнеса» двухшаговые (форма → подтверждение).
     // Подтверждение показывается на месте, без навигации, поэтому при любом
     // переходе возвращаем форму — иначе повторный заход застревает на «Почти
     // готово» вместо чистой формы.
     $('#book-form').hidden = false; $('#book-done').hidden = true;
     $('#b2b-form-wrap').hidden = false; $('#b2b-done').hidden = true;
-    closeTea();
-    scrollTo({ top:0, behavior:'instant' });
+    closeTea(false);
+    if (updateHistory && location.hash !== '#' + view) history.pushState({ view }, '', '#' + view);
+    if (changingView) scrollTo({ top:0, behavior:'instant' });
     scheduleReveal();   // раскрыть блоки нового раздела, попавшие в кадр
     tgSyncBack();
     trackOnce('section_view', view);
@@ -2055,10 +2236,11 @@ select.input{
   const HASH_VIEWS = ['home', 'shop', 'b2b', 'book'];
   function goFromHash(){
     const h = location.hash.replace('#', '');
-    if (HASH_VIEWS.includes(h)){ go(h); return; }
+    if (!h){ go('home', false); return; }
+    if (HASH_VIEWS.includes(h)){ go(h, false); return; }
     if (h.startsWith('tea-')){
       const m = TEA_META.find(x => x.id === h.slice(4));
-      if (m){ go('shop'); openTea(m); }
+      if (m){ go('shop', false); openTea(m, false); }
     }
   }
   addEventListener('hashchange', goFromHash);
@@ -2073,12 +2255,12 @@ select.input{
   function teaCard(m){
     const txt = T().teas[m.id];
     const node = el(`
-      <article class="tea" data-type="${m.t}" data-id="${m.id}" tabindex="0" role="button" aria-label="${txt.n}">
+      <article class="tea" data-type="${m.t}" data-id="${m.id}">
         <div class="tea__art${inStock(m) ? '' : ' tea__art--oos'}">
-          <img src="${m.img}" alt="${txt.n}" loading="lazy" width="360" height="360">
+          <img src="${m.img}" alt="${escAttr(txt.n)}" loading="lazy" width="360" height="360">
           <span class="tea__dot" style="background:${LQ[m.t]}"></span>
           ${inStock(m) ? '' : `<span class="tea__oos">${T().oos}</span>`}
-          <button class="tea__fav" data-id="${m.id}" aria-pressed="${isFav(m.id)}" aria-label="${T().fav_label}" title="${T().fav_label}">
+          <button class="tea__fav" data-id="${m.id}" aria-pressed="${isFav(m.id)}" aria-label="${escAttr(T().fav_label)}" title="${escAttr(T().fav_label)}">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
           </button>
         </div>
@@ -2087,20 +2269,23 @@ select.input{
           <p class="tea__orig">${txt.o}</p>
           <div class="tea__foot">
             <span class="price num">${priceOf(m)}</span>
-            <span class="tea__more">${T().more}
-              <svg width="11" height="8" viewBox="0 0 14 10" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M1 5h11M8.5 1.5L12 5l-3.5 3.5"/></svg>
-            </span>
+            <button class="tea__quick" aria-label="${escAttr(T().quick_add(txt.n))}" title="${escAttr(T().quick_add(txt.n))}"${inStock(m) ? '' : ' disabled'}>+</button>
           </div>
         </div>
+        <button class="tea__hit" aria-label="${escAttr(T().tea_open(txt.n))}"></button>
       </article>`);
-    node.addEventListener('click', () => { lastCard = node; openTea(m); });
-    node.addEventListener('keydown', e => {
-      if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); lastCard = node; openTea(m); }
-    });
-    // Сердце не должно открывать паспорт — гасим всплытие
+    const hit = $('.tea__hit', node);
+    hit.addEventListener('click', () => { lastCard = hit; openTea(m); });
     const fav = $('.tea__fav', node);
-    fav.addEventListener('click', e => { e.stopPropagation(); toggleFav(m.id); });
-    fav.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
+    fav.addEventListener('click', () => toggleFav(m.id));
+    const quick = $('.tea__quick', node);
+    quick.addEventListener('click', () => {
+      if (!inStock(m)) return;
+      cartAdd(m.id, m.unit === 'pc' ? 'pc' : PACKS[0]);
+      quick.textContent = '✓';
+      setTimeout(() => { if (quick.isConnected) quick.textContent = '+'; }, 900);
+      track('cart_add','shop');
+    });
     return node;
   }
 
@@ -2121,26 +2306,22 @@ select.input{
     pick.forEach(m => strip.append(el(`<img src="${m.img}" alt="" loading="lazy">`)));
   }
 
-  /* Стена чая в герое. Собираем из тех же TEA_META, что и магазин:
-     data-URI переиспользуется как строка, файл от этого не толстеет. */
-  function buildHeroWall(){
-    const wall = $('#hero-wall');
-    if (wall.childElementCount) return;   // картинки не зависят от языка, хватит одного раза
-    const COLS = 2, PER = 7;
-    for (let c = 0; c < COLS; c++){
-      const col = el(`<div class="hero__col hero__col--${c}"></div>`);
-      const pics = TEA_META.filter((_, i) => i % COLS === c).slice(0, PER);
-      // список дублируется: на этом держится бесшовная петля translateY(-50%)
-      [...pics, ...pics].forEach(m => col.append(el(`<img src="${m.img}" alt="" loading="lazy">`)));
-      wall.append(col);
-    }
+  const HERO_PICS = [
+    { src:'{{img:hero-master}}', alt:'alt_master', pos:'50% 46%' },
+    { src:'{{img:master-pour}}', alt:'alt_pour', pos:'52% 42%' },
+    { src:'{{img:ceremony-self}}', alt:'alt_self', pos:'50% 50%' },
+  ];
+  function selectHeroImage(){
+    const pic = HERO_PICS[Math.floor(Date.now() / 86400000) % HERO_PICS.length];
+    const img = $('#hero-img');
+    img.src = pic.src; img.alt = T()[pic.alt] || ''; img.style.objectPosition = pic.pos;
   }
 
   let lastCard = null, lastCartTrigger = null;   // куда вернуть фокус после закрытия панели
   // Фон инертен, пока открыта выдвижная панель: и ловушка фокуса (Tab не уходит
   // под скрим), и скрытие фона от скринридера. Панели — <aside> после </main>/
   // <footer>, поэтому сами остаются активными.
-  function bgInert(on){ document.querySelectorAll('header, main, footer').forEach(n => { n.inert = on; }); }
+  function bgInert(on){ document.querySelectorAll('.skip, header, main, footer').forEach(n => { n.inert = on; }); }
   /* ─────────────  ИЗБРАННОЕ  ─────────────
      Чистый фронт: список id в localStorage, сердце на карточке и в паспорте,
      отдельный чип-фильтр. Сервер не нужен. */
@@ -2167,8 +2348,9 @@ select.input{
   function buildTeaGrids(){
     const home = $('#home-teas'), menu = $('#menu-teas');
     home.innerHTML = ''; menu.innerHTML = '';
-    home.append(...FEATURED.map(id => teaCard(TEA_META.find(m => m.id === id))));
-    menu.append(...TEA_META.map(teaCard));
+    const featured = FEATURED.map(id => TEA_META.find(m => m.id === id)).filter(Boolean);
+    home.append(...stockFirst(featured).map(teaCard));
+    menu.append(...stockFirst(TEA_META).map(teaCard));
     applyFilter();
   }
   function applyFilter(){
@@ -2181,6 +2363,7 @@ select.input{
       c.style.display = ok ? '' : 'none';
       if (ok) shown++;
     });
+    $('#shop-count').textContent = shown;
     // подсказка, когда в избранном пусто
     $('#fav-empty').hidden = !(curFilter === 'fav' && shown === 0);
     // Фильтр поднимает наверх карточки, которые лежали за кадром и потому ещё не
@@ -2243,7 +2426,7 @@ select.input{
   // добавить. curPack: граммовка (25/50/100) или 'pc' для штучных (мандарин).
   let curTea = null, curPack = null;
 
-  function openTea(m){
+  function openTea(m, updateHistory=true){
     const txt = T().teas[m.id];
     curTea = m;
     $('#ts-name').textContent = txt.n;
@@ -2258,6 +2441,9 @@ select.input{
     const st = $('#ts-stock'), ok = inStock(m);
     st.textContent = ok ? T().in_stock : T().oos;
     st.classList.toggle('ts-stock--oos', !ok);
+    const add = $('#ts-add');
+    add.disabled = !ok;
+    add.textContent = ok ? T().ts_add : T().oos;
 
     renderRadar(m.id);
 
@@ -2292,15 +2478,21 @@ select.input{
     lockScroll();
     bgInert(true);
     sheet.focus({ preventScroll:true });
+    if (updateHistory && location.hash !== '#tea-' + m.id)
+      history.pushState({ tea:m.id }, '', '#tea-' + m.id);
     tgSyncBack();
   }
-  function closeTea(){
+  function closeTea(updateHistory=true){
     if (!sheet.classList.contains('on')) return;
     sheet.classList.remove('on');
     $('#scrim').classList.remove('on');
     unlockScroll();
     bgInert(false);
     if (lastCard){ lastCard.focus({ preventScroll:true }); lastCard = null; }
+    if (updateHistory && location.hash.startsWith('#tea-')){
+      if (history.state && history.state.tea) history.back();
+      else history.replaceState({ view:'shop' }, '', '#shop');
+    }
     tgSyncBack();
   }
   $('#ts-close').addEventListener('click', closeTea);
@@ -2348,13 +2540,28 @@ select.input{
     let a; try{ a = JSON.parse(localStorage.getItem(CART_KEY) || '[]'); }catch(e){ return []; }
     // самолечение: выкидываем позиции с неизвестным id (меню могли отредактировать
     // после того, как гость собрал корзину) — иначе оформление падало бы на них
-    return Array.isArray(a) ? a.filter(it => it && it.qty > 0 && teaById(it.id)) : [];
+    return Array.isArray(a) ? a.filter(it => it && it.qty > 0 && teaById(it.id) && inStock(teaById(it.id))) : [];
   }
   function setCart(c){ try{ localStorage.setItem(CART_KEY, JSON.stringify(c)); }catch(e){} updateCartBadge(); }
   function cartCount(){ return getCart().reduce((s, it) => s + it.qty, 0); }
   function cartTotal(){ return getCart().reduce((s, it) => s + linePrice(it) * it.qty, 0); }
-  const DLV_PRICE = { pickup:0, cdek_pvz:490, cdek_courier:790 };
+  const DLV_PRICE = { pickup:0 };
+  let deliveryQuote = null;
+  let cityTimer = 0, pvzTimer = 0, citySequence = 0, pvzSequence = 0, quoteSequence = 0;
   function checkoutTotal(){ return cartTotal() + (DLV_PRICE[$('#c-dlv').value] || 0); }
+  function deliveryReady(){
+    const method = $('#c-dlv').value;
+    if (method === 'pickup') return true;
+    if (!deliveryQuote || deliveryQuote.method !== method) return false;
+    if (String(deliveryQuote.city_code) !== $('#c-city-code').value) return false;
+    return method !== 'cdek_pvz' || !!$('#c-pvz').value;
+  }
+  function updateCheckoutTotal(){
+    const amount = rub(checkoutTotal());
+    $('#cart-total').textContent = amount;
+    $('#cart-submit').textContent = T().cart_submit_total(amount);
+    $('#cart-submit').disabled = !getCart().length || !deliveryReady();
+  }
   let _cartN = -1;
   function updateCartBadge(){
     const n = cartCount(), b = $('#cart-count');
@@ -2367,9 +2574,12 @@ select.input{
   }
 
   function cartAdd(id, pack){
+    const m = teaById(id);
+    if (!m || !inStock(m)) return false;
     const c = getCart(), it = c.find(x => x.id === id && x.pack === pack);
     if (it) it.qty++; else c.push({ id, pack, qty:1 });
     setCart(c);
+    return true;
   }
   function cartStep(id, pack, d){
     const c = getCart(), it = c.find(x => x.id === id && x.pack === pack);
@@ -2385,7 +2595,7 @@ select.input{
     wrap.innerHTML = '';
     if (!c.length){
       wrap.append(el(`<div class="cart-empty">${T().cart_empty}</div>`));
-      $('#cart-co').hidden = true; $('#cart-submit').disabled = true; $('#cart-total').textContent = '—';
+      $('#cart-co').hidden = true; $('#cart-submit').disabled = true; $('#cart-submit').textContent = T().cart_submit; $('#cart-total').textContent = '—';
       return;
     }
     c.forEach(it => {
@@ -2397,9 +2607,9 @@ select.input{
           <div class="citem__pack">${packLabel(it)} · ${rub(linePrice(it))}</div>
         </div>
         <div class="qty">
-          <button class="qty__b" data-d="-1" aria-label="−">−</button>
+          <button class="qty__b" data-d="-1" aria-label="${T().cart_decrease(T().teas[it.id].n)}">−</button>
           <span class="qty__n">${it.qty}</span>
-          <button class="qty__b" data-d="1" aria-label="+">+</button>
+          <button class="qty__b" data-d="1" aria-label="${T().cart_increase(T().teas[it.id].n)}">+</button>
         </div>
         <button class="citem__rm" aria-label="${T().cart_remove}">×</button>
       </div>`);
@@ -2407,8 +2617,9 @@ select.input{
       row.querySelector('.citem__rm').addEventListener('click', () => cartRemove(it.id, it.pack));
       wrap.append(row);
     });
-    $('#cart-co').hidden = false; $('#cart-submit').disabled = false;
-    $('#cart-total').textContent = rub(checkoutTotal());
+    $('#cart-co').hidden = false;
+    updateCheckoutTotal();
+    if ($('#c-dlv').value !== 'pickup' && $('#c-city-code').value) requestDeliveryQuote();
   }
 
   const DLV = ['pickup', 'cdek_pvz', 'cdek_courier'];
@@ -2422,12 +2633,151 @@ select.input{
     sel.value = cur;
     toggleAddr();
   }
+  function setDeliveryStatus(text='', state=''){
+    const box = $('#c-delivery-quote');
+    box.textContent = text;
+    if (state) box.dataset.state = state; else delete box.dataset.state;
+  }
+  function closeDeliveryResults(input, results){
+    results.hidden = true;
+    input.setAttribute('aria-expanded','false');
+  }
+  function openDeliveryResults(input, results){
+    results.hidden = false;
+    input.setAttribute('aria-expanded','true');
+  }
+  function deliveryOption(title, meta, action){
+    const button = document.createElement('button');
+    button.type = 'button'; button.className = 'delivery-option'; button.setAttribute('role','option');
+    const strong = document.createElement('strong'); strong.textContent = title;
+    const small = document.createElement('small'); small.textContent = meta;
+    button.append(strong,small); button.addEventListener('click',action);
+    return button;
+  }
+  function deliveryMessage(results, text){
+    results.replaceChildren(deliveryOption(text,'',()=>{}));
+  }
+  function resetPoint(){
+    $('#c-pvz').value = '';
+    $('#c-pvz-search').value = '';
+    $('#c-pvz-selected').hidden = true;
+    closeDeliveryResults($('#c-pvz-search'),$('#c-pvz-results'));
+  }
+  function resetQuote(message=''){
+    deliveryQuote = null;
+    delete DLV_PRICE.cdek_pvz; delete DLV_PRICE.cdek_courier;
+    setDeliveryStatus(message);
+    updateCheckoutTotal();
+  }
+  async function searchCities(){
+    const input = $('#c-city'), results = $('#c-city-results'), query = input.value.trim();
+    const sequence = ++citySequence;
+    if (query.length < 2){ closeDeliveryResults(input,results); return; }
+    deliveryMessage(results,T().cart_city_searching); openDeliveryResults(input,results);
+    try{
+      const response = await fetch('/api/delivery/cities?q='+encodeURIComponent(query));
+      const data = await response.json();
+      if (sequence !== citySequence) return;
+      if (!response.ok) throw new Error();
+      results.replaceChildren();
+      (data.cities || []).forEach(city => {
+        const region = city.region && city.region !== city.city ? city.region : city.country;
+        results.append(deliveryOption(city.city,region,()=>chooseCity(city)));
+      });
+      if (!results.childElementCount) deliveryMessage(results,T().cart_city_empty);
+      openDeliveryResults(input,results);
+    }catch(e){
+      if (sequence === citySequence) deliveryMessage(results,T().cart_quote_error);
+    }
+  }
+  function chooseCity(city){
+    const input = $('#c-city');
+    input.value = city.city + (city.region && city.region !== city.city ? `, ${city.region}` : '');
+    $('#c-city-code').value = String(city.code);
+    input.removeAttribute('aria-invalid');
+    closeDeliveryResults(input,$('#c-city-results'));
+    resetPoint();
+    requestDeliveryQuote();
+    if ($('#c-dlv').value === 'cdek_pvz') searchPoints();
+  }
+  async function searchPoints(){
+    const cityCode = $('#c-city-code').value;
+    const input = $('#c-pvz-search'), results = $('#c-pvz-results');
+    const sequence = ++pvzSequence;
+    if (!cityCode){ closeDeliveryResults(input,results); return; }
+    deliveryMessage(results,T().cart_pvz_searching); openDeliveryResults(input,results);
+    try{
+      const params = new URLSearchParams({city_code:cityCode,q:input.value.trim()});
+      const response = await fetch('/api/delivery/points?'+params);
+      const data = await response.json();
+      if (sequence !== pvzSequence) return;
+      if (!response.ok) throw new Error();
+      results.replaceChildren();
+      (data.points || []).forEach(point => {
+        const meta = [point.address,point.metro ? `м. ${point.metro}`:'',point.work_time].filter(Boolean).join(' · ');
+        results.append(deliveryOption(point.code,meta,()=>choosePoint(point)));
+      });
+      if (!results.childElementCount) deliveryMessage(results,T().cart_pvz_empty);
+      openDeliveryResults(input,results);
+    }catch(e){
+      if (sequence === pvzSequence) deliveryMessage(results,T().cart_quote_error);
+    }
+  }
+  function choosePoint(point){
+    const input = $('#c-pvz-search'), selected = $('#c-pvz-selected');
+    input.value = `${point.code} · ${point.address}`;
+    $('#c-pvz').value = point.code;
+    input.removeAttribute('aria-invalid');
+    selected.textContent = [point.address,point.work_time].filter(Boolean).join(' · ');
+    selected.hidden = false;
+    closeDeliveryResults(input,$('#c-pvz-results'));
+    updateCheckoutTotal();
+  }
+  async function requestDeliveryQuote(){
+    const method = $('#c-dlv').value, cityCode = $('#c-city-code').value;
+    if (method === 'pickup'){
+      deliveryQuote = {method:'pickup',city_code:0,price:0};
+      setDeliveryStatus(''); updateCheckoutTotal(); return;
+    }
+    if (!cityCode){ resetQuote(T().cart_quote_city); return; }
+    const items = getCart().map(it=>({id:it.id,pack:it.pack,qty:it.qty}));
+    if (!items.length) return;
+    const signature = JSON.stringify({method,cityCode,items});
+    if (deliveryQuote && deliveryQuote.signature === signature){ updateCheckoutTotal(); return; }
+    const sequence = ++quoteSequence;
+    resetQuote(T().cart_quote_loading);
+    try{
+      const response = await fetch('/api/delivery/quote',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({items,method,city_code:+cityCode}),
+      });
+      const data = await response.json();
+      if (sequence !== quoteSequence) return;
+      if (!response.ok) throw new Error();
+      deliveryQuote = {...data,signature};
+      DLV_PRICE[method] = data.price;
+      setDeliveryStatus(T().cart_quote_ready(rub(data.price),data.period_min,data.period_max),'ready');
+      updateCheckoutTotal();
+    }catch(e){
+      if (sequence !== quoteSequence) return;
+      resetQuote(T().cart_quote_error); $('#c-delivery-quote').dataset.state='error';
+    }
+  }
   function toggleAddr(){
     const dlv = $('#c-dlv').value;
     $('#c-city-field').hidden = dlv === 'pickup';
     $('#c-pvz-field').hidden = dlv !== 'cdek_pvz';
     $('#c-addr-field').hidden = dlv !== 'cdek_courier';
-    if (getCart().length) $('#cart-total').textContent = rub(checkoutTotal());
+    deliveryQuote = null;
+    if (dlv === 'pickup'){
+      setDeliveryStatus('');
+      DLV_PRICE.pickup = 0;
+      updateCheckoutTotal();
+    } else {
+      resetQuote($('#c-city-code').value ? T().cart_quote_loading : T().cart_quote_city);
+      if ($('#c-city-code').value) requestDeliveryQuote();
+      if (dlv === 'cdek_pvz' && $('#c-city-code').value) searchPoints();
+    }
   }
   function syncCart(){ updateCartBadge(); buildDlv(); if (cartSheet.classList.contains('on')) renderCart(); }
 
@@ -2438,6 +2788,20 @@ select.input{
     return !!ok;
   }
   $$('#cart-co .input').forEach(field => field.addEventListener('input', () => { field.removeAttribute('aria-invalid'); $('#cart-status').classList.remove('cart-note--error'); }));
+  $('#c-city').addEventListener('input',()=>{
+    $('#c-city-code').value=''; resetPoint(); resetQuote(T().cart_quote_city);
+    clearTimeout(cityTimer); cityTimer=setTimeout(searchCities,280);
+  });
+  $('#c-city').addEventListener('focus',()=>{ if ($('#c-city').value.trim().length>=2 && !$('#c-city-code').value) searchCities(); });
+  $('#c-pvz-search').addEventListener('input',()=>{
+    $('#c-pvz').value=''; $('#c-pvz-selected').hidden=true; updateCheckoutTotal();
+    clearTimeout(pvzTimer); pvzTimer=setTimeout(searchPoints,220);
+  });
+  $('#c-pvz-search').addEventListener('focus',()=>{ if ($('#c-city-code').value) searchPoints(); });
+  document.addEventListener('click',e=>{
+    if (!e.target.closest('#c-city-field')) closeDeliveryResults($('#c-city'),$('#c-city-results'));
+    if (!e.target.closest('#c-pvz-field')) closeDeliveryResults($('#c-pvz-search'),$('#c-pvz-results'));
+  });
 
   function openCart(){
     lastCartTrigger = document.activeElement;   // куда вернуть фокус при закрытии
@@ -2475,8 +2839,8 @@ select.input{
   addEventListener('keydown', e => { if (e.key === 'Escape') closeCart(); });
   $('#c-dlv').addEventListener('change', toggleAddr);
   $('#ts-add').addEventListener('click', () => {
-    if (!curTea || curPack == null) return;
-    cartAdd(curTea.id, curPack);
+    if (!curTea || curPack == null || !inStock(curTea)) return;
+    if (!cartAdd(curTea.id, curPack)) return;
     const b = $('#ts-add');
     b.textContent = T().ts_added;
     b.classList.remove('tapped'); void b.offsetWidth; b.classList.add('tapped');
@@ -2491,8 +2855,19 @@ select.input{
     if (!$('#c-privacy').checked){ status.textContent = T().privacy_required; status.classList.add('cart-note--error'); $('#c-privacy').focus(); return; }
     const dlv = $('#c-dlv').value;
     if (dlv !== 'pickup' && !requireCartField('#c-city',T().cart_city_required)) return;
-    if (dlv === 'cdek_pvz' && !requireCartField('#c-pvz',T().cart_pvz_required)) return;
+    if (dlv !== 'pickup' && !$('#c-city-code').value){
+      status.textContent=T().cart_quote_city; status.classList.add('cart-note--error');
+      $('#c-city').setAttribute('aria-invalid','true'); $('#c-city').focus(); return;
+    }
+    if (dlv === 'cdek_pvz' && !$('#c-pvz').value){
+      status.textContent=T().cart_pvz_required; status.classList.add('cart-note--error');
+      $('#c-pvz-search').setAttribute('aria-invalid','true'); $('#c-pvz-search').focus(); return;
+    }
     if (dlv === 'cdek_courier' && !requireCartField('#c-addr',T().cart_addr_required)) return;
+    if (dlv !== 'pickup' && !deliveryReady()){
+      status.textContent=T().cart_quote_error; status.classList.add('cart-note--error');
+      requestDeliveryQuote(); return;
+    }
     // компактный payload: id/pack/qty. Названия, цены и итог бот считает из своей
     // же базы — меньше байт для sendData (лимит 4096) и цена не зависит от клиента.
     const payload = {
@@ -2500,9 +2875,11 @@ select.input{
       items: c.map(it => ({ id:it.id, pack:it.pack, qty:it.qty })),
       delivery: dlv, payment_method: $('#c-payment').value,
       name: $('#c-name').value.trim(), phone: $('#c-phone').value.trim(),
-      city: $('#c-city').value.trim(), address: $('#c-addr').value.trim(),
+      city: $('#c-city').value.trim(), city_code:$('#c-city-code').value ? +$('#c-city-code').value : null,
+      address: $('#c-addr').value.trim(),
       pvz_code: $('#c-pvz').value.trim(), note: $('#c-note').value.trim(),
       privacy_accepted: true,
+      language: LANG,
       analytics_session: ANALYTICS_OFF ? null : analyticsSession || null,
     };
     const clearCart = () => {
@@ -2512,23 +2889,37 @@ select.input{
     };
     if (CHECKOUT_API){
       const submit = $('#cart-submit');
+      const attemptSignature = JSON.stringify(payload);
+      if (submit.dataset.idempotencyPayload !== attemptSignature){
+        submit.dataset.idempotencyPayload = attemptSignature;
+        submit.dataset.idempotencyKey = crypto.randomUUID
+          ? crypto.randomUUID()
+          : `web-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+      }
       submit.disabled = true; status.textContent = T().cart_creating;
       try {
         const response = await fetch('/api/orders', {
-          method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify(payload),
+          method:'POST',
+          headers:{ 'Content-Type':'application/json', 'Idempotency-Key':submit.dataset.idempotencyKey },
+          body:JSON.stringify(payload),
         });
         const result = await response.json();
-        if (!response.ok) throw new Error(response.status === 503 ? T().cart_payment_unavailable : T().cart_create_error);
+        if (!response.ok){
+          const detail = typeof result.detail === 'string' ? result.detail : '';
+          throw new Error(response.status === 503 ? T().cart_payment_unavailable : detail || T().cart_create_error);
+        }
         if (!result.payment || !result.payment.url) throw new Error(T().cart_payment_unavailable);
-        clearCart();
+        delete submit.dataset.idempotencyPayload; delete submit.dataset.idempotencyKey;
+        try{ localStorage.setItem('chaynya-pending-order', result.order.id); }catch(e){}
         status.textContent = T().cart_created(result.order.id);
-        const paymentUrl = new URL(result.payment.url, location.href);
-        paymentUrl.searchParams.set('lang', LANG);
-        location.href = paymentUrl.href;
+        // PaymentURL is an opaque, bank-issued redirect. Language is already
+        // sent to Init; changing the returned URL could invalidate it.
+        location.href = result.payment.url;
         return;
       } catch (e) {
-        status.textContent = e.message === T().cart_payment_unavailable ? e.message : T().cart_create_error;
-        submit.disabled = false;
+        status.textContent = e.message || T().cart_create_error;
+        status.classList.add('cart-note--error');
+        submit.disabled = !deliveryReady();
         return;
       }
     }
@@ -2667,6 +3058,13 @@ select.input{
 
   $('#submit').addEventListener('click', () => {
     if (!B.date || !B.time) return;
+    const privacyStatus = $('#f-status');
+    privacyStatus.textContent = '';
+    if (!$('#f-privacy').checked){
+      privacyStatus.textContent = T().privacy_required;
+      $('#f-privacy').focus();
+      return;
+    }
     // В телеграм-мини-аппе шлём бронь прямо боту (он перешлёт её заведению и
     // подтвердит), а не открываем чат. sendData работает, когда мини-апп открыт
     // кнопкой «Забронировать» из бота; если нет (полный веб-апп/обычный браузер)
@@ -2746,7 +3144,7 @@ select.input{
      Без IntersectionObserver: он молчит в фоновой вкладке — а так контент точно
      не «залипнет» невидимым. Скрытые вью (display:none) дают нулевой rect и не
      раскрываются раньше времени. */
-  const REVEAL_SEL = '.sec__head, .step, .tea, .bstep, .svc, .tier, .hall';
+  const REVEAL_SEL = '.sec__head, .credo, .hall';
   let _revScheduled = false;
   function revealCheck(){
     _revScheduled = false;
@@ -2754,14 +3152,10 @@ select.input{
     // проявиться до того, как читатель до него доскроллит, и не мигает у него
     // перед носом. Ниже 1.0 было поздно.
     const h = innerHeight, look = h * 1.25;
-    let n = 0;
     document.querySelectorAll('.reveal:not(.in)').forEach(el => {
       const r = el.getBoundingClientRect();
       if (r.bottom > 4 && r.top < look){
-        // Каскад: соседи выходят друг за другом, а не пачкой разом — так спокойнее
-        // для глаза. Порядок — по DOM, то есть слева направо и сверху вниз.
-        // Ступеньку ограничиваем пятью, иначе у большой пачки будет длинный хвост.
-        el.style.transitionDelay = (Math.min(n++, 5) * 55) + 'ms';
+        el.style.transitionDelay = '0ms';
         el.classList.add('in');
       }
     });
@@ -2787,7 +3181,7 @@ select.input{
     $$('[data-i18n-aria]').forEach(n => { const v = T()[n.dataset.i18nAria]; if (v != null) n.setAttribute('aria-label', v); });
     $$('[data-i18n-alt]').forEach(n => { const v = T()[n.dataset.i18nAlt]; if (v != null) n.alt = v; });
     $$('a[href^="/privacy.html"]').forEach(a => { a.href = `/privacy.html?lang=${LANG}`; });
-    buildHeroWall();
+    selectHeroImage();
     buildRange();
     buildFilters();
     buildTeaGrids();

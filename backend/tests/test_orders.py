@@ -1,16 +1,30 @@
 import importlib
+import json
+import sqlite3
+from datetime import datetime, timedelta
 from urllib.parse import parse_qs, urlparse
 
 from fastapi.testclient import TestClient
 
+from backend.cdek import CdekSettings
+from backend.saby import SabySettings
 
-def app_client(tmp_path, monkeypatch):
+
+def app_client(tmp_path, monkeypatch, *, test_mode="1"):
+    for key in (
+        "TBANK_TERMINAL_KEY", "TBANK_PASSWORD", "TBANK_NOTIFICATION_URL",
+        "TBANK_SUCCESS_URL", "TBANK_FAIL_URL", "TBANK_CHECKOUT_MODE",
+        "CDEK_CLIENT_ID", "CDEK_CLIENT_SECRET", "CDEK_INTEGRATION_MODE",
+        "SABY_APP_CLIENT_ID", "SABY_APP_SECRET", "SABY_SECRET_KEY",
+        "SABY_POINT_ID", "SABY_PRICE_LIST_ID", "SABY_ORDER_SYNC_MODE",
+    ):
+        monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("CHAINYA_DATA_DIR", str(tmp_path))
-    monkeypatch.setenv("CHAINYA_TEST_MODE", "1")
+    monkeypatch.setenv("CHAINYA_TEST_MODE", test_mode)
     monkeypatch.setenv("ADMIN_TOKEN", "test-admin-token")
     import backend.app as module
     module = importlib.reload(module)
-    return TestClient(module.app), module
+    return TestClient(module.app, base_url="https://chainya.ru"), module
 
 
 def payload(**changes):
@@ -27,6 +41,15 @@ def payload(**changes):
     return data
 
 
+def test_test_mode_parser_fails_closed(monkeypatch, tmp_path):
+    _, module = app_client(tmp_path, monkeypatch)
+    assert module.test_mode_from_value(None) is True
+    assert module.test_mode_from_value("1") is True
+    assert module.test_mode_from_value(" true ") is True
+    assert module.test_mode_from_value("typo") is True
+    assert module.test_mode_from_value("0") is False
+
+
 def test_server_prices_order_and_mock_payment(tmp_path, monkeypatch):
     client, module = app_client(tmp_path, monkeypatch)
     sent = []
@@ -39,6 +62,7 @@ def test_server_prices_order_and_mock_payment(tmp_path, monkeypatch):
         assert order["subtotal"] == 2 * 440  # 175 ₽ / 10 г → 440 ₽ / 25 г
         assert order["total"] == 880
         assert order["status"] == "pending_payment"
+        assert order["payment_state"] == "awaiting"
         payment_token = parse_qs(urlparse(body["payment"]["url"]).query)["token"][0]
         assert client.get(f"/api/orders/{order['id']}").status_code == 422
         assert client.get(f"/api/orders/{order['id']}", params={"token": "wrong"}).status_code == 403
@@ -47,9 +71,38 @@ def test_server_prices_order_and_mock_payment(tmp_path, monkeypatch):
         paid = client.post(f"/api/orders/{order['id']}/test-pay", params={"token": payment_token})
         assert paid.status_code == 200
         assert paid.json()["status"] == "paid"
+        assert paid.json()["payment_state"] == "paid"
         assert sent == [order["id"]]
         assert client.post(f"/api/orders/{order['id']}/test-pay", params={"token": payment_token}).status_code == 200
         assert sent == [order["id"]]
+
+
+def test_order_creation_is_idempotent_for_network_retries(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    headers = {"Idempotency-Key": "checkout-018f6f07-7648-7d6b-a0b1-safe"}
+    with client:
+        first = client.post("/api/orders", json=payload(), headers=headers)
+        second = client.post("/api/orders", json=payload(), headers=headers)
+        conflict = client.post("/api/orders", json=payload(name="Другой"), headers=headers)
+        invalid = client.post(
+            "/api/orders", json=payload(), headers={"Idempotency-Key": "contains a space"}
+        )
+        with module.db() as con:
+            rows = con.execute(
+                "SELECT idempotency_key_hash, request_hash FROM orders"
+            ).fetchall()
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert first.json()["order"]["id"] == second.json()["order"]["id"]
+    assert first.json()["payment"]["url"] == second.json()["payment"]["url"]
+    assert first.json()["payment"]["reused"] is False
+    assert second.json()["payment"]["reused"] is True
+    assert conflict.status_code == 409
+    assert invalid.status_code == 422
+    assert len(rows) == 1
+    assert rows[0]["idempotency_key_hash"] != headers["Idempotency-Key"]
+    assert len(rows[0]["idempotency_key_hash"]) == 64
+    assert len(rows[0]["request_hash"]) == 64
 
 
 def test_rejects_client_pack_for_piece_item(tmp_path, monkeypatch):
@@ -74,6 +127,89 @@ def test_requires_pvz_details(tmp_path, monkeypatch):
     with client:
         response = client.post("/api/orders", json=payload(delivery="cdek_pvz", city="Москва"))
         assert response.status_code == 422
+
+
+def test_city_search_falls_back_to_local_prefix_index(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    module.CDEK_CITIES_PATH.write_text(json.dumps([
+        {
+            "city": "Санкт-Петербург",
+            "region": "Санкт-Петербург",
+            "country": "Россия",
+            "population": 5_600_000,
+        },
+        {
+            "city": "Москва",
+            "region": "Москва",
+            "country": "Россия",
+            "population": 13_000_000,
+        },
+    ], ensure_ascii=False))
+    def fake_cities(**params):
+        if params.get("city") == "Санкт-Петербург":
+            return [{
+                "code": 137,
+                "city": "Санкт-Петербург",
+                "region": "Санкт-Петербург",
+                "country": "Россия",
+            }]
+        return []
+    monkeypatch.setattr(module.cdek_client, "cities", fake_cities)
+    with client:
+        response = client.get("/api/delivery/cities", params={"q": "санкт"})
+    assert response.status_code == 200
+    assert response.json()["cities"] == [{
+        "code": 137,
+        "city": "Санкт-Петербург",
+        "region": "Санкт-Петербург",
+        "country": "Россия",
+    }]
+
+
+def test_cdek_quote_and_order_use_server_price_and_selected_point(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        module.cdek_client,
+        "settings",
+        CdekSettings(client_id="client", client_secret="secret"),
+    )
+    monkeypatch.setattr(module.cdek_client, "calculate_tariff", lambda request: {
+        "delivery_sum": 321.2,
+        "period_min": 2,
+        "period_max": 3,
+        "tariff_name": "Посылка склад-склад",
+    })
+    monkeypatch.setattr(module.cdek_client, "delivery_points", lambda **params: [{
+        "code": "SPB1",
+        "name": "SPB1, Санкт-Петербург",
+        "status": "ACTIVE",
+        "is_handout": True,
+        "work_time": "10:00–20:00",
+        "location": {
+            "city_code": 137,
+            "address": "Невский проспект, 1",
+        },
+    }])
+    request = {
+        "items": [{"id": "baihao", "pack": 25, "qty": 2}],
+        "method": "cdek_pvz",
+        "city_code": 137,
+    }
+    with client:
+        quote = client.post("/api/delivery/quote", json=request)
+        order = client.post("/api/orders", json=payload(
+            delivery="cdek_pvz",
+            city="Санкт-Петербург",
+            city_code=137,
+            pvz_code="SPB1",
+        ))
+    assert quote.status_code == 200
+    assert quote.json()["price"] == 322
+    assert quote.json()["tariff_code"] == 136
+    assert order.status_code == 201
+    assert order.json()["order"]["delivery_price"] == 322
+    assert order.json()["order"]["total"] == 1202
+    assert order.json()["order"]["delivery_quote"]["period_max"] == 3
 
 
 def test_requires_privacy_consent(tmp_path, monkeypatch):
@@ -109,6 +245,11 @@ def test_admin_lists_and_updates_orders(tmp_path, monkeypatch):
         listing = client.get("/api/admin/orders", headers=auth)
         assert listing.status_code == 200
         assert listing.json()["orders"][0]["customer"]["phone"] == "+7 999 123-45-67"
+        integrations = listing.json()["orders"][0]["integrations"]
+        assert integrations["payment"]["provider"] == "test"
+        assert integrations["payment"]["state"] == "awaiting"
+        assert integrations["saby"]["state"] == "not_queued"
+        assert integrations["cdek"]["state"] == "not_requested"
         assert listing.json()["total"] == 1
         blocked = client.patch(
             f"/api/admin/orders/{created['id']}", headers=auth, json={"status": "confirmed"}
@@ -120,6 +261,56 @@ def test_admin_lists_and_updates_orders(tmp_path, monkeypatch):
             f"/api/admin/orders/{created['id']}", headers=auth, json={"status": "confirmed"}
         )
         assert confirmed.json()["status"] == "confirmed"
+
+
+def test_legacy_orders_receive_safe_integration_states(tmp_path, monkeypatch):
+    database = sqlite3.connect(tmp_path / "orders.sqlite3")
+    database.execute(
+        """CREATE TABLE orders (
+             id TEXT PRIMARY KEY, status TEXT NOT NULL, created_at TEXT NOT NULL,
+             updated_at TEXT NOT NULL, subtotal INTEGER NOT NULL,
+             delivery_price INTEGER NOT NULL, total INTEGER NOT NULL,
+             payment_method TEXT NOT NULL, delivery TEXT NOT NULL,
+             customer_json TEXT NOT NULL, items_json TEXT NOT NULL,
+             provider_payment_id TEXT, payment_token TEXT, paid_at TEXT
+           )"""
+    )
+    common = (
+        "2026-07-20T10:00:00+00:00", "2026-07-20T10:05:00+00:00",
+        100, 0, 100, "sbp", "pickup", json.dumps({"phone": "+79990000000"}), "[]",
+    )
+    database.execute(
+        "INSERT INTO orders VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("MOCKPAID", "paid", *common, "mock_123", "token-1", common[1]),
+    )
+    database.execute(
+        "INSERT INTO orders VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("MANUALPAID", "confirmed", *common, None, "token-2", common[1]),
+    )
+    database.execute(
+        "INSERT INTO orders VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("PENDING", "pending_payment", *common, None, "token-3", None),
+    )
+    database.execute(
+        "INSERT INTO orders VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("CANCELLEDPAID", "cancelled", *common, "mock_456", "token-4", common[1]),
+    )
+    database.commit()
+    database.close()
+
+    client, module = app_client(tmp_path, monkeypatch)
+    with client:
+        with module.db() as con:
+            rows = {
+                row["id"]: row
+                for row in con.execute(
+                    "SELECT id, payment_provider, payment_state FROM orders"
+                ).fetchall()
+            }
+    assert (rows["MOCKPAID"]["payment_provider"], rows["MOCKPAID"]["payment_state"]) == ("test", "paid")
+    assert (rows["MANUALPAID"]["payment_provider"], rows["MANUALPAID"]["payment_state"]) == ("manual", "paid")
+    assert (rows["PENDING"]["payment_provider"], rows["PENDING"]["payment_state"]) == ("test", "awaiting")
+    assert (rows["CANCELLEDPAID"]["payment_provider"], rows["CANCELLEDPAID"]["payment_state"]) == ("test", "paid")
 
 
 def test_admin_lists_and_updates_business_leads(tmp_path, monkeypatch):
@@ -180,6 +371,203 @@ def test_admin_reports_saby_configuration(tmp_path, monkeypatch):
         assert response.json()["configured"] is False
 
 
+def test_admin_reports_secret_free_integration_readiness(tmp_path, monkeypatch):
+    client, _ = app_client(tmp_path, monkeypatch)
+    auth = {"Authorization": "Bearer test-admin-token"}
+    with client:
+        assert client.get("/api/admin/integrations/status").status_code == 401
+        response = client.get("/api/admin/integrations/status", headers=auth)
+    assert response.status_code == 200
+    result = response.json()
+    assert result["guard"] == {
+        "test_mode": True,
+        "external_writes_locked": True,
+        "demo_writes_enabled": False,
+        "workflow_exposed": True,
+        "exposed_providers": ["cdek", "saby", "tbank"],
+    }
+    assert result["tbank"]["adapter_ready"] is True
+    assert result["tbank"]["mode"] == "off"
+    assert result["tbank"]["writes_enabled"] is False
+    assert result["saby"]["mapping_valid"] is True
+    assert result["saby"]["mapping_items"] == 30
+    assert result["saby"]["writes_enabled"] is False
+    assert result["cdek"]["adapter_ready"] is True
+    assert result["cdek"]["writes_enabled"] is False
+    serialized = json.dumps(result)
+    assert "app_secret" not in serialized
+    assert "client_secret" not in serialized
+    assert "password" not in serialized
+
+
+def test_integration_preview_is_network_free_and_builds_pickup_saby_payload(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    auth = {"Authorization": "Bearer test-admin-token"}
+    monkeypatch.setattr(module.saby_client, "settings", SabySettings(
+        app_client_id="configured", app_secret="configured", secret_key="configured",
+        point_id=274, price_list_id=7,
+    ))
+    monkeypatch.setattr(module.tbank_client, "create_payment", lambda *_a, **_k: (_ for _ in ()).throw(
+        AssertionError("preview must not call T-Bank")
+    ))
+    monkeypatch.setattr(module.saby_client, "create_delivery_order", lambda *_a, **_k: (_ for _ in ()).throw(
+        AssertionError("preview must not call Saby")
+    ))
+    monkeypatch.setattr(module.cdek_client, "create_order", lambda *_a, **_k: (_ for _ in ()).throw(
+        AssertionError("preview must not call CDEK")
+    ))
+    ready_at = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        assert client.patch(
+            f"/api/admin/orders/{order['id']}", headers=auth, json={"status": "paid"}
+        ).status_code == 200
+        response = client.get(
+            f"/api/admin/orders/{order['id']}/integration-preview",
+            params={"ready_at": ready_at}, headers=auth,
+        )
+    assert response.status_code == 200
+    result = response.json()
+    assert result["external_writes_locked"] is True
+    assert result["payment"]["amount_kopeks"] == 88_000
+    assert result["payment"]["network_called"] is False
+    assert result["saby"]["ready"] is True
+    assert result["saby"]["payload"]["pointId"] == 274
+    assert result["saby"]["payload"]["priceListId"] == 7
+    assert result["saby"]["payload"]["nomenclatures"][0]["id"] == 39
+    assert len(result["saby"]["payload_sha256"]) == 64
+    assert result["cdek"]["required"] is False
+
+
+def test_saby_preview_rejects_unpaid_order_and_past_ready_time(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    auth = {"Authorization": "Bearer test-admin-token"}
+    monkeypatch.setattr(module.saby_client, "settings", SabySettings(
+        app_client_id="configured", app_secret="configured", secret_key="configured",
+        point_id=274, price_list_id=7,
+    ))
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        unpaid = client.get(
+            f"/api/admin/orders/{order['id']}/integration-preview",
+            params={"ready_at": "2020-01-01 12:00:00"}, headers=auth,
+        ).json()
+    assert unpaid["saby"]["ready"] is False
+    assert "Заказ ещё не оплачен" in unpaid["saby"]["blockers"]
+    assert "Плановое время готовности должно быть в будущем" in unpaid["saby"]["blockers"]
+    assert "payload" not in unpaid["saby"]
+
+
+def test_admin_saby_test_reports_catalog_and_delivery_blocker(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    auth = {"Authorization": "Bearer test-admin-token"}
+    refs = list(module.SABY_NOMENCLATURE_BY_SITE_ID.values())
+    monkeypatch.setattr(module.saby_client, "configuration", lambda: {
+        "configured": True, "point_id": 274, "price_list_id": 7, "missing": [],
+    })
+    monkeypatch.setattr(module.saby_client, "sales_points", lambda product="retail": {
+        "salesPoints": [{"id": 274, "name": "Чайня"}] if product == "retail" else {},
+    })
+    monkeypatch.setattr(module.saby_client, "price_lists", lambda: {
+        "priceLists": [{"id": 7, "name": "Сайт chainya.ru"}],
+    })
+    monkeypatch.setattr(module.saby_client, "catalog_all", lambda with_balance=False: [
+        {"id": index, "name": f"Чай {index}", "cost": 10 + index,
+         "balance": 100, "externalId": ref.external_id}
+        for index, ref in enumerate(refs)
+    ] + [{
+        "id": 59, "name": "Чон Ши Ча", "cost": 350, "balance": 0,
+        "externalId": "9003e2a3-bbd8-4353-85f7-b2e901781ec8",
+    }])
+    with client:
+        response = client.post("/api/admin/saby/test", headers=auth)
+    assert response.status_code == 200
+    result = response.json()
+    assert result["connected"] is True
+    assert result["point_found"] is True
+    assert result["price_list_found"] is True
+    assert result["catalog_items"] == 31
+    assert result["priced_items"] == 31
+    assert result["in_stock_items"] == 30
+    assert result["catalog_mapping_valid"] is True
+    assert result["zero_balance_items"] == []
+    assert result["warnings"] == ["В Saby есть скрытые на сайте позиции: 1"]
+    assert result["delivery_configured"] is False
+    assert result["ready_for_orders"] is False
+    assert result["blockers"] == ["Точка «Чайня» ещё не включена для продукта delivery"]
+
+
+def test_saby_readiness_rejects_unknown_balance_and_external_id_mismatch(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    auth = {"Authorization": "Bearer test-admin-token"}
+    refs = list(module.SABY_NOMENCLATURE_BY_SITE_ID.values())
+    monkeypatch.setattr(module.saby_client, "configuration", lambda: {
+        "configured": True, "point_id": 274, "price_list_id": 7, "missing": [],
+    })
+    monkeypatch.setattr(module.saby_client, "sales_points", lambda product="retail": {
+        "salesPoints": [{"id": 274, "name": "Чайня"}],
+    })
+    monkeypatch.setattr(module.saby_client, "price_lists", lambda: {
+        "priceLists": [{"id": 7, "name": "Сайт chainya.ru"}],
+    })
+    catalog = [
+        {"id": index, "name": f"Чай {index}", "cost": 10,
+         "balance": 100, "externalId": ref.external_id}
+        for index, ref in enumerate(refs)
+    ]
+    catalog[0]["externalId"] = "00000000-0000-0000-0000-000000000000"
+    catalog[1]["balance"] = "100"
+    monkeypatch.setattr(module.saby_client, "catalog_all", lambda with_balance=False: catalog)
+    with client:
+        result = client.post("/api/admin/saby/test", headers=auth).json()
+    assert result["ready_for_orders"] is False
+    assert result["catalog_mapping_valid"] is False
+    assert result["in_stock_items"] == 28
+    assert result["unknown_balance_items"] == [{"id": 1, "name": "Бай Му Дань"}]
+    assert "Каталог сайта не совпадает" in " ".join(result["blockers"])
+    assert "не вернул числовой остаток" in " ".join(result["blockers"])
+
+
+def test_paid_order_is_sent_to_saby_once_in_auto_mode(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    monkeypatch.setenv("SABY_ORDER_SYNC_MODE", "auto")
+    monkeypatch.setattr(module.saby_client, "settings", SabySettings(
+        app_client_id="configured", app_secret="configured", secret_key="configured",
+        point_id=274, price_list_id=7,
+    ))
+    sent = []
+    monkeypatch.setattr(
+        module.saby_client,
+        "create_delivery_order",
+        lambda data: sent.append(data) or {"externalId": "saby-order-123"},
+    )
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        monkeypatch.setattr(module, "TEST_MODE", False)
+        monkeypatch.setattr(
+            module,
+            "integration_writer",
+            module.IntegrationWriter(
+                test_mode=False, exposed_providers=frozenset({"tbank", "saby", "cdek"})
+            ),
+        )
+        with module.db() as con:
+            con.execute(
+                """UPDATE orders SET status = 'paid', payment_state = 'paid',
+                       paid_at = ?, updated_at = ? WHERE id = ?""",
+                (module.now_iso(), module.now_iso(), order["id"]),
+            )
+        module.sync_paid_order_to_saby(order["id"])
+        module.sync_paid_order_to_saby(order["id"])
+        current = module.admin_order(module.order_row(order["id"]))
+
+    assert len(sent) == 1
+    assert sent[0]["delivery"] == {"isPickup": True, "paymentType": "online"}
+    assert current["integrations"]["saby"]["state"] == "synced"
+    assert current["integrations"]["saby"]["external_id"] == "saby-order-123"
+    assert current["integrations"]["saby"]["attempts"] == 1
+
+
 def test_anonymous_analytics_feed_dashboard(tmp_path, monkeypatch):
     client, module = app_client(tmp_path, monkeypatch)
     auth = {"Authorization": "Bearer test-admin-token"}
@@ -222,6 +610,7 @@ def test_anonymous_analytics_feed_dashboard(tmp_path, monkeypatch):
         assert dashboard["commerce"]["revenue"] == 880
         assert dashboard["breakdown"]["device"] == [{"name": "mobile", "value": 1}]
         assert dashboard["system"]["catalog_items"] > 0
+        assert dashboard["system"]["catalog_active_items"] == 30
         assert len(dashboard["daily"]) == 30
 
         with module.db() as con:
@@ -240,6 +629,32 @@ def test_anonymous_analytics_feed_dashboard(tmp_path, monkeypatch):
         assert "analytics_session_hash" not in order_columns
         assert "ip" not in analytics_columns
         assert "user_agent" not in analytics_columns
+
+
+def test_production_dashboard_uses_actual_tbank_write_readiness(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    auth = {"Authorization": "Bearer test-admin-token"}
+    integration = module.integrations_status()
+    integration["guard"]["external_writes_locked"] = False
+    integration["tbank"].update(
+        {
+            "configured": True,
+            "mode": "auto",
+            "writes_enabled": True,
+            "callback_ready": True,
+            "receipt_configured": True,
+        }
+    )
+    monkeypatch.setattr(module, "TEST_MODE", False)
+    monkeypatch.setattr(module, "integrations_status", lambda: integration)
+
+    with client:
+        dashboard = client.get("/api/admin/dashboard", headers=auth).json()
+
+    assert dashboard["system"]["checkout"] == "live"
+    assert dashboard["system"]["tbank_writes_enabled"] is True
+    assert dashboard["system"]["tbank_callback_ready"] is True
+    assert dashboard["system"]["tbank_receipt_configured"] is True
 
 
 def test_analytics_validates_public_payload_and_dashboard_range(tmp_path, monkeypatch):
@@ -283,5 +698,33 @@ def test_management_pages_are_served_without_exposing_token(tmp_path, monkeypatc
         for path in ("/manage", "/manage/", "/admin/orders"):
             response = client.get(path)
             assert response.status_code == 200
-            assert "Чайня" in response.text
+            assert "Вход владельца" in response.text
+            assert "Пульс бизнеса" not in response.text
             assert "ADMIN_TOKEN" not in response.text
+
+        bad = client.post("/api/admin/session", json={"token": "not-the-owner-token"})
+        assert bad.status_code == 401
+        login = client.post("/api/admin/session", json={"token": "test-admin-token"})
+        assert login.status_code == 204
+        assert "HttpOnly" in login.headers["set-cookie"]
+        assert "Secure" in login.headers["set-cookie"]
+        assert "SameSite=strict" in login.headers["set-cookie"]
+
+        panel = client.get("/manage")
+        assert panel.status_code == 200
+        assert "Пульс бизнеса" in panel.text
+        assert "chainya-admin-token" not in panel.text
+        assert client.get("/api/admin/dashboard").status_code == 200
+
+        assert client.delete("/api/admin/session").status_code == 204
+        assert "Вход владельца" in client.get("/manage").text
+        assert client.get("/api/admin/dashboard").status_code == 401
+
+
+def test_production_does_not_register_test_payment_routes(tmp_path, monkeypatch):
+    client, _ = app_client(tmp_path, monkeypatch, test_mode="0")
+    with client:
+        assert client.get("/test-payment/nonexistent", params={"token": "x"}).status_code == 404
+        assert client.post(
+            "/api/orders/nonexistent/test-pay", params={"token": "x"}
+        ).status_code == 404

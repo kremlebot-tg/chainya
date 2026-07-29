@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>Оплата заказа · Чайня</title>
+  <style>
+    @font-face{font-family:Prata;src:url('/fonts/prata-cyr.woff2')}@font-face{font-family:Golos;src:url('/fonts/golos-cyr.woff2')}
+    :root{color-scheme:dark;--bg:#151210;--panel:#1d1915;--line:#4b4138;--text:#f1eadf;--muted:#aaa094;--accent:#d7a44c;--ok:#9db58d;--bad:#d88778}
+    *{box-sizing:border-box}body{min-height:100svh;margin:0;padding:28px;display:grid;place-items:center;background:radial-gradient(circle at 50% 18%,#241e19 0,transparent 42%),var(--bg);color:var(--text);font:15px/1.55 Golos,Arial,sans-serif}
+    main{width:min(560px,100%);border:1px solid var(--line);background:rgba(29,25,21,.96);padding:40px}
+    .brand{display:flex;align-items:center;gap:12px;margin-bottom:38px;color:var(--muted);font-size:11px;letter-spacing:.16em;text-transform:uppercase}.brand img{width:28px;height:34px;object-fit:contain}
+    .mark{width:48px;height:48px;display:grid;place-items:center;border:1px solid var(--line);border-radius:50%;margin-bottom:22px;color:var(--accent);font-size:22px}.mark.ok{color:var(--ok);border-color:var(--ok)}.mark.bad{color:var(--bad);border-color:var(--bad)}
+    h1{font:34px/1.2 Prata,serif;letter-spacing:-.02em;margin:0 0 12px}.copy{color:var(--muted);margin:0 0 26px}.order{padding:14px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:18px}.order b{font-weight:600}.order span:last-child{white-space:nowrap}
+    .back{display:block;margin-top:28px;padding:14px 18px;border:1px solid var(--text);background:var(--text);color:#211b16;text-align:center;text-decoration:none;font-weight:600}.hint{margin:14px 0 0;color:var(--muted);font-size:12px;text-align:center}
+    @media(max-width:600px){body{padding:0;place-items:stretch}main{width:100%;min-height:100svh;border:0;padding:25px 19px 30px}.brand{margin-bottom:42px}h1{font-size:31px}.back{min-height:54px;padding:15px 18px;margin-top:auto}.result{display:flex;min-height:calc(100svh - 105px);flex-direction:column}.hint{padding-bottom:8px}}
+  </style>
+</head>
+<body><main>
+  <div class="brand"><img src="/img/logo-mark.webp" alt=""><span data-k="brand">Чайня · Москва</span></div>
+  <section class="result">
+    <div class="mark" id="mark" aria-hidden="true">···</div>
+    <h1 id="title">Проверяем оплату</h1>
+    <p class="copy" id="copy">Обычно подтверждение занимает несколько секунд.</p>
+    <div class="order"><b id="order-label">Заказ</b><span id="order-id">—</span></div>
+    <a class="back" href="/#shop" id="back">Вернуться в магазин</a>
+    <p class="hint" id="hint">Не закрывайте страницу, пока проверка не завершится.</p>
+  </section>
+</main>
+<script>
+const q=new URLSearchParams(location.search),lang=['ru','en','zh'].includes(q.get('lang'))?q.get('lang'):'ru';
+const TEXT={
+ ru:{brand:'Чайня · Москва',checking:'Проверяем оплату',checkingCopy:'Обычно подтверждение занимает несколько секунд.',paid:'Оплата прошла',paidCopy:'Заказ принят. Чайня уже получила уведомление и свяжется с вами, если нужно уточнить доставку.',failed:'Оплата не прошла',failedCopy:'Деньги не списаны. Вернитесь в магазин и попробуйте оформить заказ ещё раз.',refunded:'Платёж возвращён',refundedCopy:'Полный возврат принят банком.',order:'Заказ',back:'Вернуться в магазин',wait:'Не закрывайте страницу, пока проверка не завершится.',later:'Подтверждение ещё не пришло. Можно вернуться в магазин — статус заказа сохранён.',error:'Не удалось проверить заказ. Вернитесь в магазин и попробуйте позже.'},
+ en:{brand:'Chaynya · Moscow',checking:'Checking payment',checkingCopy:'Confirmation usually takes a few seconds.',paid:'Payment complete',paidCopy:'Your order has been received. Chaynya has been notified and will contact you if delivery needs clarification.',failed:'Payment failed',failedCopy:'No money was charged. Return to the shop and try placing the order again.',refunded:'Payment refunded',refundedCopy:'The bank has accepted the full refund.',order:'Order',back:'Return to the shop',wait:'Keep this page open until the check is complete.',later:'Confirmation has not arrived yet. You may return to the shop — the order status is saved.',error:'Could not check the order. Return to the shop and try again later.'},
+ zh:{brand:'Chaynya茶馆 · 莫斯科',checking:'正在确认支付',checkingCopy:'确认通常只需几秒钟。',paid:'支付成功',paidCopy:'订单已受理。茶馆已经收到通知，如需确认配送信息会与您联系。',failed:'支付失败',failedCopy:'没有扣款。请返回商店重新下单。',refunded:'款项已退回',refundedCopy:'银行已受理全额退款。',order:'订单',back:'返回商店',wait:'确认完成前请不要关闭页面。',later:'尚未收到确认。您可以返回商店，订单状态已保存。',error:'无法查询订单，请稍后返回商店重试。'}
+};
+const t=TEXT[lang],id=q.get('order_id')||'',token=q.get('token')||'',mark=document.querySelector('#mark'),title=document.querySelector('#title'),copy=document.querySelector('#copy'),hint=document.querySelector('#hint');
+document.documentElement.lang=lang;document.title=`${t.checking} · Chaynya`;document.querySelector('[data-k="brand"]').textContent=t.brand;document.querySelector('#order-label').textContent=t.order;document.querySelector('#order-id').textContent=id||'—';document.querySelector('#back').textContent=t.back;hint.textContent=t.wait;
+function show(kind){mark.className='mark '+(kind==='paid'||kind==='refunded'?'ok':kind==='failed'?'bad':'');mark.textContent=kind==='paid'?'✓':kind==='failed'?'×':kind==='refunded'?'↩':'···';title.textContent=t[kind]||t.checking;copy.textContent=t[kind+'Copy']||t.checkingCopy;document.title=`${title.textContent} · Chaynya`;if(kind!=='checking')hint.textContent='';if(kind==='paid'){try{localStorage.removeItem('chaynya-cart');localStorage.removeItem('chaynya-pending-order')}catch(e){}}}
+let attempts=0;
+async function poll(){
+ try{const r=await fetch(`/api/orders/${encodeURIComponent(id)}?token=${encodeURIComponent(token)}`,{cache:'no-store'});if(!r.ok)throw 0;const d=await r.json();if(d.payment_state==='paid')return show('paid');if(d.payment_state==='refunded'||d.payment_state==='partially_refunded')return show('refunded');if(['failed','cancelled'].includes(d.payment_state)||location.pathname.endsWith('/fail'))return show('failed');if(++attempts<15)return setTimeout(poll,2000);hint.textContent=t.later}
+ catch(e){show('failed');copy.textContent=t.error}
+}
+if(!id||!token){
+ if(location.pathname.endsWith('/fail'))show('failed');
+ else{show('checking');hint.textContent=t.later}
+}else{show('checking');poll()}
+</script></body></html>

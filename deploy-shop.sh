@@ -11,6 +11,12 @@ trap 'rm -rf "$TMP"' EXIT
 test -f "$BOT_ROOT/teas.json" || { echo "нет каталога $BOT_ROOT/teas.json"; exit 1; }
 
 cd "$ROOT"
+test -z "$(git status --porcelain)" || {
+  echo "рабочая папка не чистая — сначала зафиксируйте release commit"
+  exit 1
+}
+RELEASE_COMMIT="$(git rev-parse HEAD)"
+printf '%s\n' "$RELEASE_COMMIT" > "$TMP/RELEASE_COMMIT"
 python3 build.py --web
 COPYFILE_DISABLE=1 tar czf "$TMP/shop.tgz" \
   --exclude='backend/data' --exclude='backend/__pycache__' --exclude='backend/tests/__pycache__' \
@@ -18,6 +24,7 @@ COPYFILE_DISABLE=1 tar czf "$TMP/shop.tgz" \
   backend ops -C "$BOT_ROOT" teas.json
 
 rsync -az "$TMP/shop.tgz" "$HOST:/tmp/chainya-shop.tgz"
+rsync -az "$TMP/RELEASE_COMMIT" "$HOST:/tmp/chainya-release-commit"
 rsync -az ops/chainya-shop.service "$HOST:/tmp/chainya-shop.service"
 rsync -az ops/chainya-backup.service "$HOST:/tmp/chainya-backup.service"
 rsync -az ops/chainya-backup.timer "$HOST:/tmp/chainya-backup.timer"
@@ -27,6 +34,7 @@ ssh "$HOST" '
   set -e
   sudo mkdir -p /opt/chainya-shop /var/lib/chainya-shop /var/backups/chainya-shop
   sudo tar xzf /tmp/chainya-shop.tgz -C /opt/chainya-shop
+  sudo install -m 0444 /tmp/chainya-release-commit /opt/chainya-shop/RELEASE_COMMIT
   sudo python3 -m venv /opt/chainya-shop/.venv
   sudo /opt/chainya-shop/.venv/bin/pip install -q -r /opt/chainya-shop/backend/requirements.txt
   sudo chown -R root:root /opt/chainya-shop
@@ -63,7 +71,7 @@ ssh "$HOST" '
   fi
   sudo systemctl reload nginx
   sudo systemctl start chainya-backup.service
-  rm -f /tmp/chainya-shop.tgz /tmp/chainya-shop.service /tmp/chainya-backup.service /tmp/chainya-backup.timer /tmp/nginx-chainya.ru /tmp/nginx-chainya.ru.previous
+  rm -f /tmp/chainya-shop.tgz /tmp/chainya-release-commit /tmp/chainya-shop.service /tmp/chainya-backup.service /tmp/chainya-backup.timer /tmp/nginx-chainya.ru /tmp/nginx-chainya.ru.previous
 '
 
 ./deploy.sh

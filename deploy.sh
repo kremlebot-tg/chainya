@@ -12,6 +12,11 @@ set -euo pipefail
 HOST="liable-copper"
 DIR="/var/www/chainya"
 cd "$(dirname "$0")"
+test -z "$(git status --porcelain)" || {
+  echo "✗ рабочая папка не чистая — сначала зафиксируйте release commit"
+  exit 1
+}
+RELEASE_COMMIT="$(git rev-parse HEAD)"
 
 echo "→ сборка (build.py --web)"
 python3 build.py --web >/dev/null
@@ -34,6 +39,7 @@ ssh "$HOST" '
   echo "  локальная проверка: HTTPS $code, файлов: $(find '"$DIR"' -type f | wc -l)"
   [ "$code" = "200" ] || exit 1
 '
+ssh "$HOST" "printf '%s\\n' '$RELEASE_COMMIT' > /var/lib/chainya-shop/web-release-commit"
 
 echo "→ проверка снаружи"
 curl -s -o /dev/null -w "  https://chainya.ru → %{http_code} за %{time_total}s\n" --max-time 15 https://chainya.ru/ || true

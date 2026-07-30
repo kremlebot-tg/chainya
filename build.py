@@ -31,9 +31,9 @@ assert "/*@FONTS@*/" in src, "маркер /*@FONTS@*/ пропал из src.htm
 
 # Тот же заголовок, что в словаре I18N.ru: JS перепишет его при старте,
 # но краулерам и первой отрисовке достаётся статический.
-TITLE = "Чайня · чайная на Острякова"
-DESC = ("Чайная у метро Аэропорт. Чайная церемония с мастером, два чая "
-        "на выбор уже в стоимости. Китайский чай прямого привоза и доставка по России.")
+TITLE = "Чайня · китайский чай с доставкой"
+DESC = ("Китайский чай с доставкой по Москве и России: белый, зелёный, "
+        "улуны, красный чай, пуэр и авторские сборы. Чайная на Острякова, 3.")
 SELLER_NAME = "ИНДИВИДУАЛЬНЫЙ ПРЕДПРИНИМАТЕЛЬ ДАВТЯН АРМАН КАРАПЕТОВИЧ"
 SELLER_INN = "772606053199"
 SELLER_OGRNIP = "326774600295390"
@@ -57,8 +57,7 @@ OG_SRC = root / "src-assets" / "og.jpg"
 OG_NAME = f"og.{hashlib.sha256(OG_SRC.read_bytes()).hexdigest()[:8]}.jpg"
 
 HEAD_EXTRA = f"""<meta name="description" content="{DESC}">
-<meta name="theme-color" content="#141110" media="(prefers-color-scheme: dark)">
-<meta name="theme-color" content="#E7E6DF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#141110">
 <meta property="og:type" content="website">
 <meta property="og:title" content="{TITLE}">
 <meta property="og:description" content="{DESC}">

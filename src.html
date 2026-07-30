@@ -3,25 +3,24 @@
 
 /* ─────────────────────────  ТОКЕНЫ  ───────────────────────── */
 :root{
-  /* Светлая тема — спокойная бумага чайной карты; красный только в акценте */
-  --bg:        #E7E6DF;
-  --bg-2:      #DEDDD4;
-  --bg-3:      #F2F1EC;
-  --line:      #CBCABF;
-  --line-soft: #DCDBD1;
-  --line-control:#8A867B;
-  --text:      #191715;
-  --text-2:    #454239;
-  --text-3:    #615E54;
-  --accent:    #B23430;
-  --accent-2:  #C24A40;
-  --accent-hover: #96241F;
-  --on-accent: #F2F1EC;
-  color-scheme: light;
-  --blend:     multiply;
-  --grain:     .035;
-  /* На тёмном фоне текст визуально худеет (иррадиация) — там вес чуть выше */
-  --w-body:    410;
+  /* Единственная тема — сам зал: лампа, глина, тёплый уголь. */
+  --bg:        #141110;
+  --bg-2:      #1B1817;
+  --bg-3:      #232020;
+  --line:      #332E2B;
+  --line-soft: #262221;
+  --line-control:#736C67;
+  --text:      #F1EDE6;
+  --text-2:    #B6AFA6;
+  --text-3:    #948C83;
+  --accent:    #DB6A62;
+  --accent-2:  #E68F87;
+  --accent-hover: #E68F87;
+  --on-accent: #101614;
+  color-scheme: dark;
+  --blend:     screen;
+  --grain:     .05;
+  --w-body:    440;
 
   /* Цвет настоя — это данные, а не декор. Одинаков в обеих темах. */
   --lq-white:  #E3DCA6;
@@ -39,43 +38,6 @@
   --motion-fast:160ms;
   --motion-base:280ms;
   --motion-slow:520ms;
-}
-
-/* Тёмная тема — сам зал: лампа, глина, тёплый уголь; красный только в акценте */
-@media (prefers-color-scheme: dark){
-  :root{
-    --bg:        #141110;
-    --bg-2:      #1B1817;
-    --bg-3:      #232020;
-    --line:      #332E2B;
-    --line-soft: #262221;
-    --line-control:#736C67;
-    --text:      #F1EDE6;
-    --text-2:    #B6AFA6;
-    --text-3:    #948C83;
-    --accent:    #DB6A62;
-    --accent-2:  #E68F87;
-    --accent-hover: #E68F87;
-    --on-accent: #101614;
-    color-scheme: dark;
-    --blend:     screen;
-    --grain:     .05;
-    --w-body:    440;
-  }
-}
-:root[data-theme="light"]{
-  --bg:#E7E6DF; --bg-2:#DEDDD4; --bg-3:#F2F1EC; --line:#CBCABF; --line-soft:#DCDBD1;
-  --line-control:#8A867B;
-  --text:#191715; --text-2:#454239; --text-3:#615E54;
-  --accent:#B23430; --accent-2:#C24A40; --accent-hover:#96241F; --on-accent:#F2F1EC;
-  --blend:multiply; --grain:.035; --w-body:410; color-scheme:light;
-}
-:root[data-theme="dark"]{
-  --bg:#141110; --bg-2:#1B1817; --bg-3:#232020; --line:#332E2B; --line-soft:#262221;
-  --line-control:#736C67;
-  --text:#F1EDE6; --text-2:#B6AFA6; --text-3:#948C83;
-  --accent:#DB6A62; --accent-2:#E68F87; --accent-hover:#E68F87; --on-accent:#101614;
-  --blend:screen; --grain:.05; --w-body:440; color-scheme:dark;
 }
 
 /* ─────────────────────────  БАЗА  ───────────────────────── */
@@ -147,12 +109,8 @@ a{ color:inherit; text-decoration:none; }
   font-family:'Prata', Georgia, serif; font-size:19px; letter-spacing:.22em;
   text-transform:uppercase; white-space:nowrap;
 }
-/* Знак «ЧНЯ»: белая плашка. На светлой теме её надо обвести, иначе сольётся */
+/* Знак «ЧНЯ»: белая плашка на тёмном фоне. */
 .brand__mark{ height:32px; width:auto; display:block; border-radius:2px; }
-:root[data-theme="light"] .brand__mark,
-:root:not([data-theme]) .brand__mark{ box-shadow:0 0 0 1px var(--line); }
-@media (prefers-color-scheme: dark){ :root:not([data-theme]) .brand__mark{ box-shadow:none; } }
-:root[data-theme="dark"] .brand__mark{ box-shadow:none; }
 .brand sup{ font-family:'Golos Text',sans-serif; font-size:9.5px; font-weight:600; letter-spacing:.1em; color:var(--text-2); top:-.85em; }
 .nav__links{ display:flex; gap:clamp(12px,2vw,30px); }
 .nav__link{
@@ -273,8 +231,8 @@ a{ color:inherit; text-decoration:none; }
 .sec__head h2{ font-size:clamp(1.9rem,3.6vw,3rem); margin:14px 0 0; }
 .sec__head p{ margin:0; }
 
-/* ── Услуги: две карточки, чем платит гость ── */
-.svcs{ display:grid; grid-template-columns:1fr 1fr; gap:clamp(14px,1.6vw,20px); }
+/* ── Чайные услуги: в зале и на выезде ── */
+.svcs{ display:grid; grid-template-columns:repeat(3,1fr); gap:clamp(14px,1.6vw,20px); }
 .svc{
   border-top:1px solid var(--line); padding-top:14px;
   background:transparent; display:flex; flex-direction:column;
@@ -290,6 +248,18 @@ a{ color:inherit; text-decoration:none; }
 }
 .svc__p{ font-family:'Prata',Georgia,serif; font-size:1.6rem; font-variant-numeric:tabular-nums; }
 .svc__t{ font-size:13px; color:var(--text-3); }
+
+/* Два самостоятельных направления для бизнеса — поставки и мероприятия. */
+.b2b-offers{
+  display:grid; grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:clamp(18px,2.4vw,30px); margin-bottom:clamp(48px,7vw,88px);
+}
+.b2b-offer{ border-top:1px solid var(--line); padding-top:14px; }
+.b2b-offer__art{ aspect-ratio:16/9; overflow:hidden; border-radius:var(--r); background:var(--bg-2); }
+.b2b-offer__art img{ width:100%; height:100%; object-fit:cover; }
+.b2b-offer h3{ margin:18px 0 8px; font-size:1.25rem; font-weight:600; }
+.b2b-offer p{ margin:0; max-width:58ch; color:var(--text-2); font-size:15px; line-height:1.65; }
+#view-b2b .book > div > .label{ display:block; margin-bottom:18px; }
 
 /* ── Философия ── */
 .credo{
@@ -685,10 +655,6 @@ select.input{
 .foot a:hover{ color:var(--accent); }
 .foot__logo{ margin-bottom:18px; }
 .foot__logo img{ height:86px; width:auto; display:block; border-radius:2px; }
-:root[data-theme="light"] .foot__logo img,
-:root:not([data-theme]) .foot__logo img{ box-shadow:0 0 0 1px var(--line); }
-@media (prefers-color-scheme: dark){ :root:not([data-theme]) .foot__logo img{ box-shadow:none; } }
-:root[data-theme="dark"] .foot__logo img{ box-shadow:none; }
 .foot__brand{ font-family:'Prata',Georgia,serif; font-size:22px; letter-spacing:.2em; text-transform:uppercase; }
 .foot__bot{
   margin-top:clamp(36px,5vw,56px); padding-top:22px; border-top:1px solid var(--line-soft);
@@ -782,6 +748,7 @@ select.input{
   .gallery img:first-child{ grid-column:1/-1; aspect-ratio:16/9; }
   .brange__strip{ grid-template-columns:repeat(4,1fr); }
   .bsteps{ grid-template-columns:1fr; }
+  .svcs, .b2b-offers{ grid-template-columns:1fr; }
   .bstep__art{ aspect-ratio:16/9; }
   .packs{ gap:8px; }
   /* Сетка слотов: 74px даёт четыре в ряд и жмёт цифры, три ряднее */
@@ -891,9 +858,9 @@ select.input{
 
 <noscript>
   <div style="max-width:640px;margin:48px auto;padding:0 22px;line-height:1.6;color:#e8e4dc;font-family:system-ui,sans-serif">
-    <h1>Чайня — чайная у метро Аэропорт</h1>
+    <h1>Чайня — китайский чай с доставкой</h1>
     <p>Москва, ул. Острякова, 3, помещение 114 (метро Аэропорт). Ежедневно 12:00–22:00.</p>
-    <p>Чайная церемония с мастером и китайский чай навынос с доставкой по России.</p>
+    <p>Китайский чай в фасовке 25, 50 и 100 г с доставкой по России. В чайной можно попробовать чай за столом с мастером или самостоятельно.</p>
     <p>Телефон <a href="tel:+79055908801">+7 905 590-88-01</a> · канал <a href="https://t.me/chainyamsk">@chainyamsk</a> · бот <a href="https://t.me/chainyabot">@chainyabot</a>.</p>
     <p>Для каталога чая, брони и корзины включите, пожалуйста, JavaScript.</p>
   </div>
@@ -906,7 +873,7 @@ select.input{
       <span><span data-i18n="brand">Чайня</span><sup data-i18n="brand_sup">МСК</sup></span>
     </a>
     <nav class="nav__links" data-i18n-aria="a_nav" aria-label="Разделы сайта">
-      <a class="nav__link" href="#home" data-go="home" data-i18n="nav_home" aria-current="page">Чайная</a>
+      <a class="nav__link" href="#home" data-go="home" data-i18n="nav_home" aria-current="page">Главная</a>
       <a class="nav__link" href="#shop" data-go="shop" data-i18n="nav_shop">Купить чай</a>
       <a class="nav__link" href="#b2b" data-go="b2b" data-i18n="nav_b2b">Для бизнеса</a>
       <a class="nav__link" href="#book" data-go="book" data-i18n="nav_book">Бронь</a>
@@ -921,13 +888,10 @@ select.input{
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4H6zM3 6h18M16 10a4 4 0 0 1-8 0"/></svg>
         <span class="cart-badge" id="cart-count" hidden>0</span>
       </button>
-      <button class="icon-btn" id="theme" data-i18n-aria="a_theme" aria-label="Сменить тему">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
-      </button>
     </div>
   </div>
   <nav class="nav--mob" data-i18n-aria="a_nav" aria-label="Разделы сайта">
-    <a class="nav__link" href="#home" data-go="home" data-i18n="nav_home" aria-current="page">Чайная</a>
+    <a class="nav__link" href="#home" data-go="home" data-i18n="nav_home" aria-current="page">Главная</a>
     <a class="nav__link" href="#shop" data-go="shop" data-i18n="nav_shop">Купить чай</a>
     <a class="nav__link" href="#b2b" data-go="b2b" data-i18n="nav_b2b">Для бизнеса</a>
     <a class="nav__link" href="#book" data-go="book" data-i18n="nav_book">Бронь</a>
@@ -939,16 +903,16 @@ select.input{
 <section class="view is-active" id="view-home">
   <div class="hero">
     <figure class="hero__media">
-      <img id="hero-img" src="{{img:hero-master}}" alt="" data-i18n-alt="alt_master" fetchpriority="high">
+      <img id="hero-img" src="{{img:tea-dancong}}" alt="" data-i18n-alt="alt_product" fetchpriority="high">
     </figure>
     <div class="hero__in">
       <div class="hero__copy">
-        <p class="label" data-i18n="hero_label">Москва · Острякова, 3 · чайная</p>
-        <h1 class="display" data-i18n="hero_h">Два часа,<br>два чая<br>и <em>мастер напротив</em></h1>
+        <p class="label" data-i18n="hero_label">Китайский чай · доставка по России</p>
+        <h1 class="display" data-i18n="hero_h">Чай,<br>к которому<br><em>возвращаются</em></h1>
         <p class="lead hero__lead" data-i18n="hero_lead"></p>
         <div class="hero__cta">
-          <button class="btn btn--solid" data-go="book" data-i18n="cta_book">Забронировать стол</button>
-          <button class="btn btn--ghost" data-go="shop" data-i18n="cta_menu">Купить чай</button>
+          <button class="btn btn--solid" data-go="shop" data-i18n="cta_menu">Выбрать чай</button>
+          <button class="btn btn--ghost" data-go="book" data-i18n="cta_book">Попробовать в Чайне</button>
         </div>
       </div>
     </div>
@@ -956,25 +920,41 @@ select.input{
   <div class="facts">
       <div class="facts__in">
         <div class="fact">
-          <p class="label" data-i18n="fact1_k">Где</p>
-          <p class="fact__v"><span data-i18n="fact1_v">Острякова, 3</span><br><small data-i18n="fact1_s">помещение 114, метро Аэропорт</small></p>
+          <p class="label" data-i18n="fact1_k">Ассортимент</p>
+          <p class="fact__v"><span data-i18n="fact1_v">33 позиции</span><br><small data-i18n="fact1_s">от белого чая до выдержанного хэй ча</small></p>
         </div>
         <div class="fact">
-          <p class="label" data-i18n="fact2_k">Церемония с мастером</p>
-          <p class="fact__v num"><span data-i18n="fact2_v">1500 ₽</span><br><small data-i18n="fact2_s">два часа, мастер за вашим столом</small></p>
+          <p class="label" data-i18n="fact2_k">Фасовка</p>
+          <p class="fact__v num"><span data-i18n="fact2_v">25 · 50 · 100 г</span><br><small data-i18n="fact2_s">можно начать с небольшого пакета</small></p>
         </div>
         <div class="fact">
-          <p class="label" data-i18n="fact3_k">Завариваете сами</p>
-          <p class="fact__v num"><span data-i18n="fact3_v">1200 ₽</span><br><small data-i18n="fact3_s">два часа, посуду и воду даём</small></p>
+          <p class="label" data-i18n="fact3_k">Доставка</p>
+          <p class="fact__v num"><span data-i18n="fact3_v">СДЭК</span><br><small data-i18n="fact3_s">по Москве и всей России</small></p>
         </div>
         <div class="fact">
-          <p class="label" data-i18n="fact4_k">Чай за столом</p>
-          <p class="fact__v num"><span data-i18n="fact4_v">2 на выбор</span><br><small data-i18n="fact4_s">уже входят в стоимость стола</small></p>
+          <p class="label" data-i18n="fact4_k">Попробовать</p>
+          <p class="fact__v num"><span data-i18n="fact4_v">Острякова, 3</span><br><small data-i18n="fact4_s">в чайной у метро Аэропорт</small></p>
         </div>
       </div>
     </div>
 
-  <!-- Две услуги: это и есть модель заведения -->
+  <div class="sec wrap">
+    <div class="sec__head">
+      <div>
+        <p class="label" data-i18n="fromcard_label">Выбрать чай</p>
+        <h2 class="display" data-i18n="fromcard_h">Начните<br>с этих</h2>
+      </div>
+      <p class="lead" data-i18n="fromcard_lead"></p>
+    </div>
+    <div class="tea-grid" id="home-teas"></div>
+    <div style="margin-top:30px">
+      <button class="link-arrow" data-go="shop"><span data-i18n="fromcard_link">Весь каталог</span>
+        <svg width="14" height="10" viewBox="0 0 14 10" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M1 5h11M8.5 1.5L12 5l-3.5 3.5"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Церемонии — дополнительный способ познакомиться с нашим чаем -->
   <div class="sec wrap">
     <div class="sec__head">
       <div>
@@ -1003,6 +983,17 @@ select.input{
           <div class="svc__foot">
             <span class="svc__p num" data-i18n="svc2_price">1200 ₽</span>
             <span class="svc__t" data-i18n="svc_time">2 часа</span>
+          </div>
+        </div>
+      </article>
+      <article class="svc">
+        <div class="svc__art"><img src="{{img:master-pour}}" alt="" data-i18n-alt="alt_pour" loading="lazy"></div>
+        <div class="svc__body">
+          <h3 data-i18n="svc3_h">Выездная церемония</h3>
+          <p data-i18n="svc3_p"></p>
+          <div class="svc__foot">
+            <span class="svc__p" data-i18n="svc3_price">По запросу</span>
+            <span class="svc__t" data-i18n="svc3_time">мероприятия и частные выезды</span>
           </div>
         </div>
       </article>
@@ -1052,22 +1043,6 @@ select.input{
         <h3 data-i18n="step4_h">Донышко</h3>
         <p data-i18n="step4_p"></p>
       </div>
-    </div>
-  </div>
-
-  <div class="sec sec--line wrap">
-    <div class="sec__head">
-      <div>
-        <p class="label" data-i18n="fromcard_label">Что налить</p>
-        <h2 class="display" data-i18n="fromcard_h">Что стоит<br>попробовать</h2>
-      </div>
-      <p class="lead" data-i18n="fromcard_lead"></p>
-    </div>
-    <div class="tea-grid" id="home-teas"></div>
-    <div style="margin-top:30px">
-      <button class="link-arrow" data-go="shop"><span data-i18n="fromcard_link">Все 24 чая</span>
-        <svg width="14" height="10" viewBox="0 0 14 10" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M1 5h11M8.5 1.5L12 5l-3.5 3.5"/></svg>
-      </button>
     </div>
   </div>
 
@@ -1126,13 +1101,27 @@ select.input{
       <div class="sec__head">
         <div>
           <p class="label" data-i18n="b2b_label">Для бизнеса</p>
-          <h2 class="display" data-i18n="b2b_h">Наш лист<br>в вашей карте</h2>
+          <h2 class="display" data-i18n="b2b_h">Чай для команды,<br>гостей и событий</h2>
         </div>
         <p class="lead" data-i18n="b2b_lead"></p>
       </div>
 
+      <div class="b2b-offers">
+        <article class="b2b-offer">
+          <div class="b2b-offer__art"><img src="{{img:hall-shelf}}" alt="" data-i18n-alt="alt_shelf" loading="lazy"></div>
+          <h3 data-i18n="b2b_offer1_h">Чай для заведений и офисов</h3>
+          <p data-i18n="b2b_offer1_p"></p>
+        </article>
+        <article class="b2b-offer">
+          <div class="b2b-offer__art"><img src="{{img:master-pour}}" alt="" data-i18n-alt="alt_pour" loading="lazy"></div>
+          <h3 data-i18n="b2b_offer2_h">Выездные чайные церемонии</h3>
+          <p data-i18n="b2b_offer2_p"></p>
+        </article>
+      </div>
+
       <div class="book">
         <div>
+          <p class="label" data-i18n="supply_label">Как устроены поставки</p>
           <!-- Шаги с фотографиями: чистый текст тут читался как объявление -->
           <div class="bsteps">
             <article class="bstep">
@@ -1184,7 +1173,7 @@ select.input{
           <h3 data-i18n="b2b_form_h">Оставить заявку</h3>
           <p class="summary__sub" data-i18n="b2b_form_sub">Ответим в течение рабочего дня</p>
           <div class="field">
-            <label class="label" for="b-company" data-i18n="b_company">Заведение</label>
+            <label class="label" for="b-company" data-i18n="b_company">Компания или мероприятие</label>
             <input class="input" type="text" id="b-company" data-i18n-ph="b_company_ph">
           </div>
           <div class="field">
@@ -1196,7 +1185,7 @@ select.input{
             <input class="input" type="text" id="b-phone" data-i18n-ph="b_phone_ph">
           </div>
           <div class="field">
-            <label class="label" for="b-note" data-i18n="b_note">Что наливаете сейчас</label>
+            <label class="label" for="b-note" data-i18n="b_note">Что вам нужно</label>
             <textarea class="input" id="b-note" data-i18n-ph="b_note_ph"></textarea>
           </div>
           <label class="consent"><input type="checkbox" id="b-privacy"><span><span data-i18n="privacy_accept">Согласен на обработку данных согласно</span> <a href="/privacy.html" target="_blank" data-i18n="privacy_link">политике конфиденциальности</a></span></label>
@@ -1604,9 +1593,10 @@ select.input{
 
   ru: {
     locale:'ru-RU',
-    title:'Чайня · чайная на Острякова',
-    a_lang:'Язык', a_theme:'Сменить тему', a_close:'Закрыть', a_tea:'О чае', a_nav:'Разделы сайта', filters_label:'Фильтры каталога', skip:'Перейти к содержимому',
+    title:'Чайня · китайский чай с доставкой',
+    a_lang:'Язык', a_close:'Закрыть', a_tea:'О чае', a_nav:'Разделы сайта', filters_label:'Фильтры каталога', skip:'Перейти к содержимому',
     alt_master:'Чайный мастер разливает настой из чахая по чашкам',
+    alt_product:'Сухой китайский чай в чайной посуде',
     alt_logo:'Знак Чайни: буквы Ч, Н, Я, сложенные под иероглиф',
     alt_pour:'Мастер наливает настой в чахай',
     credo_label:'Зачем мы это делаем', credo_q:'Чай — это не только строгая церемония, но и повод поэкспериментировать',
@@ -1618,31 +1608,33 @@ select.input{
     alt_bar:'Стойка с сифоном и полки с чаем',
     alt_shelf:'Полки с чаем в красных коробках и блины пуэра',
     brand:'Чайня', brand_sup:'МСК',
-    nav_home:'Чайная', nav_shop:'Купить чай', nav_b2b:'Для бизнеса', nav_book:'Бронь',
-    hero_label:'Москва · Острякова, 3 · чайная',
-    hero_h:'Два часа,<br>два чая<br>и <em>мастер напротив</em>',
-    hero_lead:'Мастер садится за ваш стол и заваривает сам: подбирает лист под настроение, ведёт его через восемь-двенадцать проливов и по ходу объясняет, что происходит в чашке. Два чая на выбор уже в цене. Опыт не нужен, готовиться не надо.',
-    cta_book:'Забронировать стол', cta_menu:'Купить чай',
-    fact1_k:'Где', fact1_v:'Острякова, 3', fact1_s:'помещение 114, метро Аэропорт',
-    fact2_k:'Церемония с мастером', fact2_v:'1500 ₽', fact2_s:'два часа, мастер за вашим столом',
-    fact3_k:'Завариваете сами', fact3_v:'1200 ₽', fact3_s:'два часа, посуду и воду даём',
-    fact4_k:'Чай за столом', fact4_v:'2 на выбор', fact4_s:'уже входят в стоимость стола',
-    svc_label:'Как это устроено', svc_h:'Два часа за столом<br>и два чая на выбор',
-    svc_lead:'В обе цены уже входят два чая из нашей коллекции: выбираете любые, мастер заваривает. Захотите третий, доплатите на месте. Больше ничего считать не нужно.',
+    nav_home:'Главная', nav_shop:'Купить чай', nav_b2b:'Для бизнеса', nav_book:'Бронь',
+    hero_label:'Китайский чай · доставка по России',
+    hero_h:'Чай,<br>к которому<br><em>возвращаются</em>',
+    hero_lead:'Отбираем китайский чай, который сами пьём и завариваем в Чайне. Можно взять небольшой пакет на пробу, собрать заказ домой или сначала познакомиться с листом за нашим столом. Посуда тоже появится в каталоге — чуть позже.',
+    cta_book:'Попробовать в Чайне', cta_menu:'Выбрать чай',
+    fact1_k:'Ассортимент', fact1_v:TEA_META.length+' позиции', fact1_s:'от белого чая до выдержанного хэй ча',
+    fact2_k:'Фасовка', fact2_v:'25 · 50 · 100 г', fact2_s:'можно начать с небольшого пакета',
+    fact3_k:'Доставка', fact3_v:'СДЭК', fact3_s:'по Москве и всей России',
+    fact4_k:'Попробовать', fact4_v:'Острякова, 3', fact4_s:'в чайной у метро Аэропорт',
+    svc_label:'Чайные услуги', svc_h:'Попробовать лист<br>не только дома',
+    svc_lead:'Если хочется не просто заказать чай, а прожить его вместе с мастером, приходите в Чайню или пригласите нас на своё событие.',
     svc1_h:'Церемония с мастером', svc1_price:'1500 ₽',
     svc1_p:'Мастер весь стол работает на вас: греет посуду, следит за временем, наливает и объясняет. Берите, если пришли впервые или хотите разобраться всерьёз.',
     svc2_h:'Самостоятельная церемония', svc2_price:'1200 ₽',
     svc2_p:'Даём стол, посуду, воду нужной температуры и подсказку на старте. Дальше завариваете сами и никто не мешает. Для тех, кто уже в теме.',
     svc_time:'2 часа · 2 чая',
+    svc3_h:'Выездная церемония', svc3_p:'Привезём чай, посуду и мастера на корпоратив, презентацию, свадьбу или частную встречу. Формат и число гостей соберём под событие.',
+    svc3_price:'По запросу', svc3_time:'мероприятия и частные выезды',
     how_label:'За столом', how_h:'Четыре шага<br>до первого глотка',
     how_lead:'Если никогда не пили чай проливами, готовиться не нужно. Мастер ведёт стол сам и объясняет по ходу.',
     step1_h:'Разговор', step1_p:'Мастер спросит, зачем вы пришли: взбодриться или, наоборот, выдохнуть. Принесёт несколько сухих листов понюхать.',
     step2_h:'Выбор', step2_p:'Выбираете два чая из коллекции. Обычно берут разные: сначала что-то светлое, ближе к концу тёмное и плотное.',
     step3_h:'Проливы', step3_p:'Дальше по кругу: короткий залив, слив в чахай, разлив по чашам. С каждым проливом выдержка растёт, и вкус меняется.',
     step4_h:'Донышко', step4_p:'Когда лист отдал всё, его разворачивают на блюдце. По листу видно, где он рос и как его делали.',
-    fromcard_label:'Что налить', fromcard_h:'Что стоит<br>попробовать',
-    fromcard_lead:'Точка в углу карточки показывает тип чая. Вся коллекция читается по ней: от белого до пуэра. Любой из этих чаёв можно и выпить за столом, и забрать домой.',
-    fromcard_link:'Все '+TEA_META.length+' чая',
+    fromcard_label:'Выбрать чай', fromcard_h:'Начните<br>с этих',
+    fromcard_lead:'Три разных входа в коллекцию: необычный чай, характерный улун и понятная сладкая габа. Откройте карточку, выберите фасовку — остальное посчитаем в корзине.',
+    fromcard_link:'Весь каталог · '+TEA_META.length,
     hall_label:'Зал', hall_h:'Где сесть',
     hall_lead:'Стол бронируется на сессию целиком. Мы не подсаживаем гостей и не торопим, даже если вы засиделись.',
     hall_h3:'Один зал, девять мест',
@@ -1685,8 +1677,11 @@ select.input{
     dlv:{ pickup:'Самовывоз · Острякова, 3', cdek_pvz:'СДЭК · пункт выдачи', cdek_courier:'СДЭК · курьер' },
     order_head:'🛒 Заказ чая — Чайня', order_done:'Спасибо! Завершите заказ в нашем боте @chainyabot или позвоните +7 905 590-88-01 — подтвердим и посчитаем доставку.',
     ts_note:'За столом этот чай можно выпить бесплатно: два на выбор входят в стоимость стола.',
-    b2b_label:'Для бизнеса', b2b_h:'Наш лист<br>в вашей карте',
-    b2b_lead:'Возим чай из Китая сами и отдаём его оптом кофейням, ресторанам и офисам. Тот же лист, что наливаем в зале, — и любой другой под заказ.',
+    b2b_label:'Для бизнеса и событий', b2b_h:'Чай для команды,<br>гостей и событий',
+    b2b_lead:'Поставим листовой чай в заведение или офис, соберём чайную карту и проведём выездную церемонию на вашей площадке.',
+    b2b_offer1_h:'Чай для заведений и офисов', b2b_offer1_p:'Подбираем сорта под кухню, формат и бюджет, считаем себестоимость и возим партии по графику.',
+    b2b_offer2_h:'Выездные чайные церемонии', b2b_offer2_p:'Мастер приезжает с чаем и посудой на корпоратив, презентацию, свадьбу или частную встречу. Сценарий, продолжительность и число гостей согласуем заранее.',
+    supply_label:'Как устроены поставки',
     brange_label:'Что возим', brange_note:'Любую позицию из нашей карты: белый, зелёный, габа, улуны, красные, пуэр, прессовки. Оптом возьмём и то, чего сейчас нет в зале, — привезём под заказ. Тот же лист, из той же поставки: ароматизаторов и пересорта не будет.',
     tier1_q:'Кому', tier1_d:'Кофейням, ресторанам, чайным и офисам. Возьмём и небольшую партию: сначала лучше проверить, как ваш гость реагирует на живой лист.',
     tier3_q:'Цена', tier3_d:'Обговариваем индивидуально: зависит от сорта и объёма. Скажите, что интересно, — посчитаем.',
@@ -1694,15 +1689,15 @@ select.input{
     bstep2_h:'Подбор', bstep2_p:'Собираем карту под кухню и цены. Считаем себестоимость чашки и чайника, чтобы вы понимали маржу.',
     bstep3_h:'Поставки', bstep3_p:'Возим партии по графику. Если сорт закончился раньше срока, довозим отдельно.',
     b2b_form_h:'Оставить заявку', b2b_form_sub:'Ответим в течение рабочего дня',
-    b_company:'Заведение', b_company_ph:'Кофейня «Утро», Москва',
+    b_company:'Компания или мероприятие', b_company_ph:'Кофейня «Утро» или летняя свадьба',
     b_name:'Как вас зовут', b_phone:'Телефон или телеграм', b_phone_ph:'+7 или @ник',
-    b_note:'Что наливаете сейчас', b_note_ph:'Пакетированный чёрный, хотим перейти на листовой. Расход около 2 кг в месяц.',
+    b_note:'Что вам нужно', b_note_ph:'Поставка чая в офис или выездная церемония на 40 гостей.',
     b2b_send:'Отправить',
     b2b_form_note:'Заявка придёт владельцам в Telegram. Ответим в течение рабочего дня.',
     b2b_done_h:'Заявка у нас', b2b_done_back:'Посмотреть чаи',
     b2bDoneText:(name) => `${name ? name + ', с' : 'С'}пишемся в течение рабочего дня.`,
     book_label:'Бронь', book_h:'Занять стол',
-    book_lead:'Бронь бесплатная и ни к чему не обязывает. Выбираете время — мы открываем телеграм с готовой заявкой, вам остаётся отправить.',
+    book_lead:'Здесь бронируют церемонию в Чайне на Острякова, 3. Бронь бесплатная: выберите время, а мы откроем Telegram с готовой заявкой.',
     f_format:'Формат',
     fmt_master:'Церемония с мастером', fmt_master_d:'мастер заваривает и ведёт стол',
     fmt_self:'Самостоятельно', fmt_self_d:'посуду и воду даём, завариваете сами',
@@ -1765,9 +1760,10 @@ select.input{
 
   en: {
     locale:'en-GB',
-    title:'Chaynya · a tea house on Ostryakova',
-    a_lang:'Language', a_theme:'Theme', a_close:'Close', a_tea:'About the tea', a_nav:'Site sections', filters_label:'Catalogue filters', skip:'Skip to content',
+    title:'Chaynya · Chinese tea delivered',
+    a_lang:'Language', a_close:'Close', a_tea:'About the tea', a_nav:'Site sections', filters_label:'Catalogue filters', skip:'Skip to content',
     alt_master:'A tea master pouring the liquor from a pitcher into cups',
+    alt_product:'Loose Chinese tea presented in tea ware',
     alt_logo:'The Chaynya mark: the letters Ч, Н, Я stacked like a Chinese character',
     alt_pour:'The master pouring the liquor into a cha hai',
     credo_label:'Why we do this', credo_q:'Tea is not only a strict ceremony. It is also a reason to experiment',
@@ -1779,31 +1775,33 @@ select.input{
     alt_bar:'The counter with a siphon and shelves of tea',
     alt_shelf:'Shelves of tea in red boxes and pressed pu-erh cakes',
     brand:'Chaynya', brand_sup:'MSK',
-    nav_home:'Tea house', nav_shop:'Buy tea', nav_b2b:'For business', nav_book:'Booking',
-    hero_label:'Moscow · Ostryakova 3 · tea house',
-    hero_h:'Two hours,<br>two teas<br>and <em>a master across the table</em>',
-    hero_lead:'The master sits down at your table and does the brewing: picks a leaf to match your mood, takes it through eight to twelve pours, and explains what is happening in the cup as it happens. Two teas of your choice are already in the price. No experience needed, nothing to prepare.',
-    cta_book:'Book a table', cta_menu:'Buy tea',
-    fact1_k:'Where', fact1_v:'Ostryakova 3', fact1_s:'unit 114, Aeroport metro',
-    fact2_k:'With a master', fact2_v:'1500 ₽', fact2_s:'two hours, the master stays at your table',
-    fact3_k:'Brew it yourself', fact3_v:'1200 ₽', fact3_s:'two hours, teaware and water included',
-    fact4_k:'Tea at the table', fact4_v:'2 of your choice', fact4_s:'already included in the price',
-    svc_label:'How it works', svc_h:'Two hours at a table<br>and two teas of your choice',
-    svc_lead:'Both prices already include two teas from our collection: pick any, the master brews them. Want a third? Pay for it on the spot. Nothing else to work out.',
+    nav_home:'Home', nav_shop:'Buy tea', nav_b2b:'For business', nav_book:'Booking',
+    hero_label:'Chinese tea · delivery across Russia',
+    hero_h:'Tea<br>you will want<br><em>to return to</em>',
+    hero_lead:'We select the Chinese teas we drink and brew at Chaynya ourselves. Start with a small bag, build an order for home, or get to know the leaf at our table first. Teaware will join the catalogue soon.',
+    cta_book:'Try it at Chaynya', cta_menu:'Choose tea',
+    fact1_k:'Selection', fact1_v:TEA_META.length+' teas', fact1_s:'from white tea to aged hei cha',
+    fact2_k:'Pack sizes', fact2_v:'25 · 50 · 100 g', fact2_s:'start with a small bag',
+    fact3_k:'Delivery', fact3_v:'CDEK', fact3_s:'Moscow and across Russia',
+    fact4_k:'Taste in person', fact4_v:'Ostryakova 3', fact4_s:'near Aeroport metro',
+    svc_label:'Tea services', svc_h:'More ways<br>to meet the leaf',
+    svc_lead:'If you want more than a delivery, join the master at our tea house or invite us to brew at your event.',
     svc1_h:'Ceremony with a master', svc1_price:'1500 ₽',
     svc1_p:'The master works your table the whole time: warms the ware, watches the clock, pours and explains. Take this if it is your first time or you want to get into it properly.',
     svc2_h:'Brew it yourself', svc2_price:'1200 ₽',
     svc2_p:'We give you the table, the ware, water at the right temperature and a nudge to start. After that you brew and nobody hovers. For people already at home with tea.',
     svc_time:'2 hours · 2 teas',
+    svc3_h:'Off-site tea ceremony', svc3_p:'We bring tea, teaware and a master to a company event, presentation, wedding or private gathering. The format and guest count are tailored to the occasion.',
+    svc3_price:'On request', svc3_time:'events and private bookings',
     how_label:'At the table', how_h:'Four steps<br>to the first sip',
     how_lead:'New to brewing in pours? Nothing to prepare. The master runs the table and explains as you go.',
     step1_h:'Talk', step1_p:'The master asks what brought you in: waking up or winding down. Then brings a few dry leaves to smell.',
     step2_h:'Choice', step2_p:'You pick two teas from the collection. Most people take contrasting ones: something light to open with, something dark and dense towards the end.',
     step3_h:'Pours', step3_p:'Then round after round: a short steep, decant into the pitcher, pour into cups. Each round steeps longer, and the taste keeps shifting.',
     step4_h:'The spent leaf', step4_p:'Once the leaf has given everything, it gets unfolded on a saucer. It shows where the tea grew and how it was made.',
-    fromcard_label:'What to pour', fromcard_h:'Worth<br>a try',
-    fromcard_lead:'The dot in the corner of each card marks the type of tea. The whole collection reads by it, from white to pu-erh. Any of these you can drink at the table or take home.',
-    fromcard_link:'All '+TEA_META.length+' teas',
+    fromcard_label:'Choose tea', fromcard_h:'Start<br>with these',
+    fromcard_lead:'Three different ways into the collection: an unusual tea, a distinctive oolong and an approachable honeyed GABA. Open a card, choose a pack, and the cart handles the rest.',
+    fromcard_link:'Full catalogue · '+TEA_META.length,
     hall_label:'The room', hall_h:'Where you sit',
     hall_lead:'A table is booked for the whole session. We never seat strangers together and never hurry you out.',
     hall_h3:'One room, nine seats',
@@ -1846,8 +1844,11 @@ select.input{
     dlv:{ pickup:'Pickup · Ostryakova 3', cdek_pvz:'CDEK · pickup point', cdek_courier:'CDEK · courier' },
     order_head:'🛒 Tea order — Chaynya', order_done:'Thanks! Finish your order in our bot @chainyabot or call +7 905 590-88-01 — we’ll confirm and calculate shipping.',
     ts_note:'Two teas of your choice are included with every table booking.',
-    b2b_label:'For business', b2b_h:'Our leaf<br>on your menu',
-    b2b_lead:'We bring tea from China ourselves and wholesale it to cafés, restaurants and offices. The same leaf we serve in the room — and any other one to order.',
+    b2b_label:'For business and events', b2b_h:'Tea for teams,<br>guests and events',
+    b2b_lead:'We supply loose-leaf tea to venues and offices, build tea menus, and hold off-site ceremonies at your location.',
+    b2b_offer1_h:'Tea for venues and offices', b2b_offer1_p:'We match teas to your menu, format and budget, calculate cost per serving, and deliver on a schedule.',
+    b2b_offer2_h:'Off-site tea ceremonies', b2b_offer2_p:'A master brings the tea and teaware to a company event, presentation, wedding or private gathering. We agree the programme, duration and guest count in advance.',
+    supply_label:'How supply works',
     brange_label:'What we ship', brange_note:'Anything on our menu: white, green, GABA, oolongs, blacks, pu-erh, pressed cakes. Wholesale also covers what is not in the room right now — we bring it to order. The same leaf, out of the same delivery: no flavourings, no second-rate batches.',
     tier1_q:'Who for', tier1_d:'Cafés, restaurants, tea rooms and offices. A small first batch is fine: better to see how your guests take to a real leaf before committing.',
     tier3_q:'Price', tier3_d:'Agreed individually: depends on the tea and the volume. Tell us what interests you and we will price it.',
@@ -1855,15 +1856,15 @@ select.input{
     bstep2_h:'Selection', bstep2_p:'We build a menu around your kitchen and prices, and cost out a cup and a pot so you know your margin.',
     bstep3_h:'Supply', bstep3_p:'Deliveries on a schedule. If a tea runs out early, we bring more separately.',
     b2b_form_h:'Make an enquiry', b2b_form_sub:'We reply within one working day',
-    b_company:'Venue', b_company_ph:'Utro coffee shop, Moscow',
+    b_company:'Company or event', b_company_ph:'Utro coffee shop or a summer wedding',
     b_name:'Your name', b_phone:'Phone or Telegram', b_phone_ph:'+7 or @handle',
-    b_note:'What tea do you serve now', b_note_ph:'Bagged black tea; we want to switch to loose leaf. About 2 kg a month.',
+    b_note:'What do you need', b_note_ph:'Tea for the office or an off-site ceremony for 40 guests.',
     b2b_send:'Send',
     b2b_form_note:'The owners will receive your enquiry in Telegram. We reply within one working day.',
     b2b_done_h:'Enquiry received', b2b_done_back:'See the teas',
     b2bDoneText:(name) => `${name ? name + ', we' : 'We'}’ll get back to you within one working day.`,
     book_label:'Booking', book_h:'Take a table',
-    book_lead:'Booking is free, no strings attached. Pick a time and we open Telegram with the request ready — you just hit send.',
+    book_lead:'This page books a ceremony at Chaynya, 3 Ostryakova Street. Booking is free: pick a time and we open Telegram with the request ready.',
     f_format:'Format',
     fmt_master:'Ceremony with a master', fmt_master_d:'the master brews and runs the table',
     fmt_self:'On your own', fmt_self_d:'we give you the ware and water, you brew',
@@ -1926,9 +1927,10 @@ select.input{
 
   zh: {
     locale:'zh-CN',
-    title:'Chaynya · 莫斯科茶馆',
-    a_lang:'语言', a_theme:'主题', a_close:'关闭', a_tea:'茶叶详情', a_nav:'网站栏目', filters_label:'茶叶分类筛选', skip:'跳到内容',
+    title:'Chaynya · 中国茶配送',
+    a_lang:'语言', a_close:'关闭', a_tea:'茶叶详情', a_nav:'网站栏目', filters_label:'茶叶分类筛选', skip:'跳到内容',
     alt_master:'茶艺师正把茶汤从茶海分入茶杯',
+    alt_product:'茶器中展示的中国散茶',
     alt_logo:'Chaynya的标记：Ч、Н、Я三个字母叠成汉字的样子',
     alt_pour:'茶艺师把茶汤注入茶海',
     credo_label:'我们为什么做这件事', credo_q:'茶不只是严谨的仪式，也是一个可以动手实验的契机',
@@ -1940,31 +1942,33 @@ select.input{
     alt_bar:'吧台上的虹吸壶与茶叶货架',
     alt_shelf:'红色茶盒货架与普洱茶饼',
     brand:'Chaynya', brand_sup:'莫斯科',
-    nav_home:'茶馆', nav_shop:'买茶', nav_b2b:'企业合作', nav_book:'订座',
-    hero_label:'莫斯科 · 奥斯特里亚科娃街3号 · 茶馆',
-    hero_h:'两小时，<br>两款茶，<br><em>茶艺师就在对面</em>',
-    hero_lead:'茶艺师坐到您的桌前，亲手冲泡：按您的状态挑茶，一路冲到八至十二泡，边泡边讲杯中正在发生什么。两款茶任选，已含在价内。不需要经验，也不用提前准备。',
-    cta_book:'订座', cta_menu:'买茶',
-    fact1_k:'地址', fact1_v:'奥斯特里亚科娃街3号', fact1_s:'114号铺，机场地铁站',
-    fact2_k:'茶艺师陪泡', fact2_v:'1500 ₽', fact2_s:'两小时，茶艺师全程在您桌旁',
-    fact3_k:'自己冲泡', fact3_v:'1200 ₽', fact3_s:'两小时，茶具与热水由我们提供',
-    fact4_k:'席上的茶', fact4_v:'任选2款', fact4_s:'已包含在茶席价格里',
-    svc_label:'怎么算钱', svc_h:'两小时茶席<br>外加任选两款茶',
-    svc_lead:'两种价格都已包含我们收藏中的两款茶：随您挑，茶艺师来泡。想喝第三款，现场加点即可。别的不用再算。',
+    nav_home:'首页', nav_shop:'买茶', nav_b2b:'企业合作', nav_book:'订座',
+    hero_label:'中国茶 · 俄罗斯境内配送',
+    hero_h:'一杯让人<br>愿意一次次<br><em>回来品的茶</em>',
+    hero_lead:'我们只挑自己会喝、也会在Chaynya亲手冲泡的中国茶。可以买一小包试喝，也可以为家里组合一份订单；还可以先到店里坐下来认识这片茶叶。茶具也将稍后加入目录。',
+    cta_book:'到店试茶', cta_menu:'选茶',
+    fact1_k:'茶品', fact1_v:TEA_META.length+'款', fact1_s:'从白茶到陈年黑茶',
+    fact2_k:'规格', fact2_v:'25 · 50 · 100克', fact2_s:'可以先从小包装开始',
+    fact3_k:'配送', fact3_v:'CDEK', fact3_s:'莫斯科及俄罗斯全境',
+    fact4_k:'到店品尝', fact4_v:'奥斯特里亚科娃街3号', fact4_s:'机场地铁站附近',
+    svc_label:'茶服务', svc_h:'不只是在家<br>喝一杯茶',
+    svc_lead:'如果您想亲身感受茶叶，而不只是收取配送，可以来茶馆与茶艺师同席，也可以邀请我们到您的活动现场。',
     svc1_h:'茶艺师陪泡', svc1_price:'1500 ₽',
     svc1_p:'茶艺师全程为您服务：温杯、控时、分汤、讲解。第一次来，或者想认真了解，选这个。',
     svc2_h:'自己冲泡', svc2_price:'1200 ₽',
     svc2_p:'我们提供茶席、茶具、合适水温的热水，开场稍作指点。之后您自己泡，没人打扰。适合已经懂茶的客人。',
     svc_time:'2小时 · 2款茶',
+    svc3_h:'外出茶会', svc3_p:'我们带着茶、茶具和茶艺师前往企业活动、发布会、婚礼或私人聚会。形式与人数会按活动定制。',
+    svc3_price:'按需报价', svc3_time:'活动与私人预约',
     how_label:'茶席之上', how_h:'从落座到第一口<br>只需四步',
     how_lead:'没喝过工夫茶也不用准备什么，茶艺师会边泡边讲。',
     step1_h:'聊几句', step1_p:'茶艺师先问您想要什么：提神，还是放松。然后拿几种干茶给您闻。',
     step2_h:'选茶', step2_p:'从我们的茶里挑两款。多数客人会选反差大的：先来清淡的，收尾用浓厚的。',
     step3_h:'冲泡', step3_p:'接着一轮一轮来：快注快出，倒入茶海，再分到各杯。每一泡时间渐长，味道不断变化。',
     step4_h:'看叶底', step4_p:'茶叶泡尽后，摊在碟子上细看。叶底能看出茶树长在哪里、工艺如何。',
-    fromcard_label:'泡点什么', fromcard_h:'值得<br>一试',
-    fromcard_lead:'卡片角上的圆点标示茶类。整个收藏都照它来读：从白茶到普洱。这些茶既可以在席上喝，也可以带回家。',
-    fromcard_link:'全部'+TEA_META.length+'款茶',
+    fromcard_label:'选茶', fromcard_h:'可以先从<br>这三款开始',
+    fromcard_lead:'三种不同的入门方式：一款少见的茶、一款个性鲜明的乌龙，以及一款容易入口的蜜香GABA。打开卡片，选择包装，购物车会完成其余计算。',
+    fromcard_link:'完整目录 · '+TEA_META.length+'款',
     hall_label:'茶室', hall_h:'坐在哪里',
     hall_lead:'订座即包下整场茶席。我们不拼桌，也绝不催客。',
     hall_h3:'一间茶室，九个座位',
@@ -2007,8 +2011,11 @@ select.input{
     dlv:{ pickup:'自取 · 奥斯特里亚科娃街3号', cdek_pvz:'CDEK · 自提点', cdek_courier:'CDEK · 送货上门' },
     order_head:'🛒 茶订单 — Chaynya', order_done:'谢谢！请在我们的机器人 @chainyabot 中完成订单，或致电 +7 905 590-88-01，我们会确认并计算运费。',
     ts_note:'在店里喝这款茶不另收费：茶席已含任选两款。',
-    b2b_label:'企业合作', b2b_h:'把我们的茶<br>放上您的菜单',
-    b2b_lead:'我们自己从中国进货，批发给咖啡馆、餐厅和办公室。与店里所泡的是同一份茶叶——其他品类也可订货。',
+    b2b_label:'企业与活动', b2b_h:'为团队、宾客<br>与活动准备茶',
+    b2b_lead:'我们为餐饮场所和办公室供应散茶、设计茶单，也可以到您的场地举办茶会。',
+    b2b_offer1_h:'餐饮与办公室用茶', b2b_offer1_p:'按您的菜单、经营形式和预算配茶，核算单杯成本，并按计划供货。',
+    b2b_offer2_h:'外出茶会', b2b_offer2_p:'茶艺师带茶与茶具前往企业活动、发布会、婚礼或私人聚会。流程、时长和宾客人数提前商定。',
+    supply_label:'供货流程',
     brange_label:'供什么', brange_note:'我们茶单上的任何一款：白茶、绿茶、佳叶龙茶、乌龙、红茶、普洱、紧压茶。批发不限库存：店里暂时没有的也能为您订货。同一份茶叶，同一批到货，不加香精，没有次货。',
     tier1_q:'面向谁', tier1_d:'咖啡馆、餐厅、茶馆和办公室。小批量也可以：先看看您的客人对原叶茶的反应，再决定不迟。',
     tier3_q:'价格', tier3_d:'个别商定：取决于品类和数量。告诉我们您感兴趣的部分，我们来核算。',
@@ -2016,15 +2023,15 @@ select.input{
     bstep2_h:'选品', bstep2_p:'按您的菜品和价位搭配茶单，核算每杯每壶的成本，让您清楚利润。',
     bstep3_h:'供货', bstep3_p:'按约定周期送货。哪款提前喝完，我们单独补上。',
     b2b_form_h:'提交申请', b2b_form_sub:'一个工作日内回复',
-    b_company:'门店名称', b_company_ph:'莫斯科「清晨」咖啡馆',
+    b_company:'公司或活动', b_company_ph:'「清晨」咖啡馆或夏季婚礼',
     b_name:'怎么称呼您', b_phone:'电话或Telegram', b_phone_ph:'+7 或 @用户名',
-    b_note:'现在用什么茶', b_note_ph:'袋泡红茶，想换成散茶。每月约2公斤。',
+    b_note:'您需要什么', b_note_ph:'办公室供茶，或为40位宾客举办外出茶会。',
     b2b_send:'发送',
     b2b_form_note:'申请将通过 Telegram 发送给店主。我们将在一个工作日内回复。',
     b2b_done_h:'申请已收到', b2b_done_back:'看茶',
     b2bDoneText:(name) => `${name ? name + '，' : ''}我们将在一个工作日内回复。`,
     book_label:'订座', book_h:'订一张茶桌',
-    book_lead:'订座免费，也没有任何附加条件。选好时间后，我们会打开Telegram并填好预订内容，您发送即可。',
+    book_lead:'这里预订的是奥斯特里亚科娃街3号Chaynya店内茶会。预订免费：选好时间后，我们会打开Telegram并填好申请。',
     f_format:'形式',
     fmt_master:'茶艺师主泡', fmt_master_d:'茶艺师亲自冲泡、掌席',
     fmt_self:'自助冲泡', fmt_self_d:'我们提供茶具和用水，您自己泡',
@@ -2173,8 +2180,8 @@ select.input{
   });
 
   /* ─────────────  TELEGRAM MINI APP  ─────────────
-     Тот же сайт, открытый ботом внутри телеграма. Если мы там — синхронизируем
-     тему, разворачиваем на весь экран, ведём нативную кнопку «назад» и шлём
+     Тот же сайт, открытый ботом внутри телеграма. Если мы там — фиксируем
+     фирменный фон, разворачиваем на весь экран, ведём нативную кнопку «назад» и шлём
      бронь прямо в бота (sendData), а не открываем чат. В обычном браузере
      window.Telegram.WebApp тоже есть, но platform='unknown' — тогда всё это
      выключено и сайт работает как обычно. */
@@ -2189,18 +2196,6 @@ select.input{
       || $('#tea-sheet').classList.contains('on') || $('#cart-sheet').classList.contains('on');
     sub ? TG.BackButton.show() : TG.BackButton.hide();
   }
-
-  /* ─────────────  ТЕМА  ───────────── */
-  const root = document.documentElement;
-  try{
-    const savedTheme = localStorage.getItem('chaynya-theme');
-    if (savedTheme === 'light' || savedTheme === 'dark') root.dataset.theme = savedTheme;
-  }catch(e){}
-  const isDark = () => (root.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')) === 'dark';
-  $('#theme').addEventListener('click', () => {
-    root.dataset.theme = isDark() ? 'light' : 'dark';
-    try{ localStorage.setItem('chaynya-theme', root.dataset.theme); }catch(e){}
-  });
 
   /* ─────────────  НАВИГАЦИЯ  ───────────── */
   function go(view, updateHistory=true){
@@ -2310,9 +2305,9 @@ select.input{
   }
 
   const HERO_PICS = [
-    { src:'{{img:hero-master}}', alt:'alt_master', pos:'50% 46%' },
-    { src:'{{img:master-pour}}', alt:'alt_pour', pos:'52% 42%' },
-    { src:'{{img:ceremony-self}}', alt:'alt_self', pos:'50% 50%' },
+    { src:'{{img:tea-dancong}}', alt:'alt_product', pos:'50% 50%' },
+    { src:'{{img:tea-gaba-honey}}', alt:'alt_product', pos:'50% 50%' },
+    { src:'{{img:tea-baihao}}', alt:'alt_product', pos:'50% 50%' },
   ];
   function selectHeroImage(){
     const pic = HERO_PICS[Math.floor(Date.now() / 86400000) % HERO_PICS.length];
@@ -3220,13 +3215,7 @@ select.input{
   if (IN_TG){
     TG.ready();
     TG.expand();
-    const brandBg = () => (TG.colorScheme === 'light' ? '#E7E6DF' : '#141110');
-    const tgTheme = () => {
-      document.documentElement.setAttribute('data-theme', TG.colorScheme === 'light' ? 'light' : 'dark');
-      try { TG.setHeaderColor(brandBg()); TG.setBackgroundColor(brandBg()); } catch(e){}
-    };
-    tgTheme();
-    TG.onEvent('themeChanged', tgTheme);
+    try { TG.setHeaderColor('#141110'); TG.setBackgroundColor('#141110'); } catch(e){}
     TG.BackButton.onClick(() => {
       if ($('#cart-sheet').classList.contains('on')) closeCart();
       else if ($('#tea-sheet').classList.contains('on')) closeTea();

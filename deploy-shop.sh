@@ -168,16 +168,20 @@ restore_active() {
       fi
       sudo mv "$previous" "$active" || return 1
     fi
-    sudo test -d "$active" && ! sudo test -L "$active"
-    return
+    if sudo test -d "$active" && ! sudo test -L "$active"; then
+      return 0
+    fi
+    return 1
   fi
 
   if [ -n "$previous" ]; then
     sudo test -d "$previous" || return 1
     sudo ln -sfnT "$previous" "${active}.rollback" || return 1
     sudo mv -Tf "${active}.rollback" "$active" || return 1
-    [ "$(sudo readlink -f "$active")" = "$previous" ]
-    return
+    if [ "$(sudo readlink -f "$active")" = "$previous" ]; then
+      return 0
+    fi
+    return 1
   fi
 
   if sudo test -L "$active"; then

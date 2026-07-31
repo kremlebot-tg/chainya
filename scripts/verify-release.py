@@ -153,6 +153,16 @@ def status(url: str) -> tuple[int, str]:
     return code, content_type
 
 
+def combined_header(headers: object, name: str) -> str:
+    """Return every HTTP field value; repeated headers are semantically one list."""
+    get_all = getattr(headers, "get_all", None)
+    values = get_all(name) if callable(get_all) else None
+    if values:
+        return ", ".join(str(value) for value in values)
+    get = getattr(headers, "get", None)
+    return str(get(name, "")) if callable(get) else ""
+
+
 def check_live(base_url: str) -> list[str]:
     errors: list[str] = []
     base = base_url.rstrip("/")
@@ -164,10 +174,10 @@ def check_live(base_url: str) -> list[str]:
             "cache-control": "no-store",
         }
         for name, marker in expected_headers.items():
-            value = root_headers.get(name, "")
+            value = combined_header(root_headers, name)
             if marker.lower() not in value.lower():
                 errors.append(f"/: заголовок {name} не содержит {marker!r}")
-        csp = root_headers.get("content-security-policy", "")
+        csp = combined_header(root_headers, "content-security-policy")
         for directive in ("default-src 'self'", "object-src 'none'", "form-action 'self'"):
             if directive not in csp:
                 errors.append(f"/: CSP не содержит {directive!r}")

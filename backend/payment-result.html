@@ -21,28 +21,38 @@
 <body><main>
   <div class="brand"><img src="/img/logo-mark.webp" alt=""><span data-k="brand">Чайня · Москва</span></div>
   <section class="result">
-    <div class="mark" id="mark" aria-hidden="true">···</div>
-    <h1 id="title">Проверяем оплату</h1>
-    <p class="copy" id="copy">Обычно подтверждение занимает несколько секунд.</p>
+    <div role="status" aria-live="polite" aria-atomic="true">
+      <div class="mark" id="mark" aria-hidden="true">···</div>
+      <h1 id="title">Проверяем оплату</h1>
+      <p class="copy" id="copy">Обычно подтверждение занимает несколько секунд.</p>
+    </div>
     <div class="order"><b id="order-label">Заказ</b><span id="order-id">—</span></div>
     <a class="back" href="/#shop" id="back">Вернуться в магазин</a>
-    <p class="hint" id="hint">Не закрывайте страницу, пока проверка не завершится.</p>
+    <p class="hint" id="hint" role="status" aria-live="polite">Не закрывайте страницу, пока проверка не завершится.</p>
   </section>
 </main>
 <script>
 const q=new URLSearchParams(location.search),lang=['ru','en','zh'].includes(q.get('lang'))?q.get('lang'):'ru';
 const TEXT={
- ru:{brand:'Чайня · Москва',checking:'Проверяем оплату',checkingCopy:'Обычно подтверждение занимает несколько секунд.',paid:'Оплата прошла',paidCopy:'Заказ принят. Чайня уже получила уведомление и свяжется с вами, если нужно уточнить доставку.',failed:'Оплата не прошла',failedCopy:'Деньги не списаны. Вернитесь в магазин и попробуйте оформить заказ ещё раз.',refunded:'Платёж возвращён',refundedCopy:'Полный возврат принят банком.',order:'Заказ',back:'Вернуться в магазин',wait:'Не закрывайте страницу, пока проверка не завершится.',later:'Подтверждение ещё не пришло. Можно вернуться в магазин — статус заказа сохранён.',error:'Не удалось проверить заказ. Вернитесь в магазин и попробуйте позже.'},
- en:{brand:'Chaynya · Moscow',checking:'Checking payment',checkingCopy:'Confirmation usually takes a few seconds.',paid:'Payment complete',paidCopy:'Your order has been received. Chaynya has been notified and will contact you if delivery needs clarification.',failed:'Payment failed',failedCopy:'No money was charged. Return to the shop and try placing the order again.',refunded:'Payment refunded',refundedCopy:'The bank has accepted the full refund.',order:'Order',back:'Return to the shop',wait:'Keep this page open until the check is complete.',later:'Confirmation has not arrived yet. You may return to the shop — the order status is saved.',error:'Could not check the order. Return to the shop and try again later.'},
- zh:{brand:'Chaynya茶馆 · 莫斯科',checking:'正在确认支付',checkingCopy:'确认通常只需几秒钟。',paid:'支付成功',paidCopy:'订单已受理。茶馆已经收到通知，如需确认配送信息会与您联系。',failed:'支付失败',failedCopy:'没有扣款。请返回商店重新下单。',refunded:'款项已退回',refundedCopy:'银行已受理全额退款。',order:'订单',back:'返回商店',wait:'确认完成前请不要关闭页面。',later:'尚未收到确认。您可以返回商店，订单状态已保存。',error:'无法查询订单，请稍后返回商店重试。'}
+ ru:{brand:'Чайня · Москва',checking:'Проверяем оплату',checkingCopy:'Обычно подтверждение занимает несколько секунд.',paid:'Оплата прошла',paidCopy:'Заказ принят. Чайня уже получила уведомление и свяжется с вами, если нужно уточнить доставку.',failed:'Оплата не прошла',failedCopy:'Деньги не списаны. Вернитесь в магазин и попробуйте оформить заказ ещё раз.',refunded:'Платёж возвращён',refundedCopy:'Полный возврат принят банком.',unknown:'Не удалось проверить оплату',unknownCopy:'Статус платежа пока неизвестен. Вернитесь в магазин и проверьте заказ позже.',order:'Заказ',back:'Вернуться в магазин',wait:'Не закрывайте страницу, пока проверка не завершится.',later:'Подтверждение ещё не пришло. Можно вернуться в магазин — статус заказа сохранён.'},
+ en:{brand:'Chaynya · Moscow',checking:'Checking payment',checkingCopy:'Confirmation usually takes a few seconds.',paid:'Payment complete',paidCopy:'Your order has been received. Chaynya has been notified and will contact you if delivery needs clarification.',failed:'Payment failed',failedCopy:'No money was charged. Return to the shop and try placing the order again.',refunded:'Payment refunded',refundedCopy:'The bank has accepted the full refund.',unknown:'Could not check payment',unknownCopy:'The payment status is not known yet. Return to the shop and check the order later.',order:'Order',back:'Return to the shop',wait:'Keep this page open until the check is complete.',later:'Confirmation has not arrived yet. You may return to the shop — the order status is saved.'},
+ zh:{brand:'Chaynya茶馆 · 莫斯科',checking:'正在确认支付',checkingCopy:'确认通常只需几秒钟。',paid:'支付成功',paidCopy:'订单已受理。茶馆已经收到通知，如需确认配送信息会与您联系。',failed:'支付失败',failedCopy:'没有扣款。请返回商店重新下单。',refunded:'款项已退回',refundedCopy:'银行已受理全额退款。',unknown:'无法确认支付状态',unknownCopy:'目前尚不清楚支付状态。请返回商店，稍后再查看订单。',order:'订单',back:'返回商店',wait:'确认完成前请不要关闭页面。',later:'尚未收到确认。您可以返回商店，订单状态已保存。'}
 };
 const t=TEXT[lang],id=q.get('order_id')||'',token=q.get('token')||'',mark=document.querySelector('#mark'),title=document.querySelector('#title'),copy=document.querySelector('#copy'),hint=document.querySelector('#hint');
 document.documentElement.lang=lang;document.title=`${t.checking} · Chaynya`;document.querySelector('[data-k="brand"]').textContent=t.brand;document.querySelector('#order-label').textContent=t.order;document.querySelector('#order-id').textContent=id||'—';document.querySelector('#back').textContent=t.back;hint.textContent=t.wait;
+document.querySelector('#back').href=`/?lang=${encodeURIComponent(lang)}#shop`;
 function show(kind){mark.className='mark '+(kind==='paid'||kind==='refunded'?'ok':kind==='failed'?'bad':'');mark.textContent=kind==='paid'?'✓':kind==='failed'?'×':kind==='refunded'?'↩':'···';title.textContent=t[kind]||t.checking;copy.textContent=t[kind+'Copy']||t.checkingCopy;document.title=`${title.textContent} · Chaynya`;if(kind!=='checking')hint.textContent='';if(kind==='paid'){try{localStorage.removeItem('chaynya-cart');localStorage.removeItem('chaynya-pending-order')}catch(e){}}}
 let attempts=0;
+const MAX_ATTEMPTS=15;
+function retry(networkError){
+ attempts+=1;
+ if(attempts<MAX_ATTEMPTS)return setTimeout(poll,2000);
+ if(networkError)return show('unknown');
+ hint.textContent=t.later;
+}
 async function poll(){
- try{const r=await fetch(`/api/orders/${encodeURIComponent(id)}?token=${encodeURIComponent(token)}`,{cache:'no-store'});if(!r.ok)throw 0;const d=await r.json();if(d.payment_state==='paid')return show('paid');if(d.payment_state==='refunded'||d.payment_state==='partially_refunded')return show('refunded');if(['failed','cancelled'].includes(d.payment_state)||location.pathname.endsWith('/fail'))return show('failed');if(++attempts<15)return setTimeout(poll,2000);hint.textContent=t.later}
- catch(e){show('failed');copy.textContent=t.error}
+ try{const r=await fetch(`/api/orders/${encodeURIComponent(id)}?token=${encodeURIComponent(token)}`,{cache:'no-store'});if(!r.ok)throw 0;const d=await r.json();if(d.payment_state==='paid')return show('paid');if(d.payment_state==='refunded'||d.payment_state==='partially_refunded')return show('refunded');if(['failed','cancelled'].includes(d.payment_state))return show('failed');retry(false)}
+ catch(e){retry(true)}
 }
 if(!id||!token){
  if(location.pathname.endsWith('/fail'))show('failed');

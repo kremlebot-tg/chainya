@@ -5,8 +5,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=www-data
-Group=www-data
+User=chainya-shop
+Group=chainya-shop
 UMask=0077
 WorkingDirectory=/opt/chainya-shop
 Environment=CHAINYA_DATA_DIR=/var/lib/chainya-shop
@@ -15,7 +15,9 @@ EnvironmentFile=-/etc/chainya-shop.env
 EnvironmentFile=-/etc/chainya-shop-admin.env
 EnvironmentFile=-/etc/chainya-shop-saby.env
 EnvironmentFile=-/etc/chainya-shop-integrations.env
-ExecStart=/opt/chainya-shop/.venv/bin/uvicorn backend.app:app --host 127.0.0.1 --port 8077 --proxy-headers --forwarded-allow-ips=127.0.0.1
+# Публичные запросы уже пишет Nginx. Uvicorn access log отключён, чтобы query
+# token страниц заказа и оплаты не дублировался в journald.
+ExecStart=/opt/chainya-shop/.venv/bin/uvicorn backend.app:app --host 127.0.0.1 --port 8077 --proxy-headers --forwarded-allow-ips=127.0.0.1 --no-access-log
 Restart=always
 RestartSec=3
 NoNewPrivileges=true

@@ -18,13 +18,31 @@ FORBIDDEN_SUFFIXES = {
 }
 SENSITIVE_PATHS = (
     "/.env",
+    "/.env.production",
     "/.git/config",
+    "/.DS_Store",
     "/README.md",
+    "/src.html",
+    "/build.py",
+    "/deploy.sh",
+    "/deploy-shop.sh",
+    "/ops/nginx-chainya.ru",
     "/backend/app.py",
+    "/backend/teas.json",
+    "/backend/__pycache__/app.cpython-312.pyc",
     "/backup.zip",
+    "/backup.sql",
+    "/site.tar.gz",
     "/orders.sqlite3",
+    "/RELEASE_COMMIT",
     "/test-payment/nonexistent",
     "/definitely-not-a-real-chainya-page-7f31",
+)
+PUBLIC_PATHS = (
+    ("/", "text/html"),
+    ("/privacy.html", "text/html"),
+    ("/legal.html", "text/html"),
+    ("/api/catalog", "application/json"),
 )
 SECRET_PATTERNS = (
     re.compile(rb"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
@@ -37,8 +55,17 @@ SELLER_DETAILS = (
     "ИНДИВИДУАЛЬНЫЙ ПРЕДПРИНИМАТЕЛЬ ДАВТЯН АРМАН КАРАПЕТОВИЧ",
     "772606053199",
     "326774600295390",
-    "129226, Россия, г. Москва, ул. Сергея Эйзенштейна, д. 6, корп. 2, стр. 2, кв. 233",
     "chainya@bk.ru",
+)
+REGISTERED_ADDRESS = (
+    "129226, Россия, г. Москва, ул. Сергея Эйзенштейна, "
+    "д. 6, корп. 2, стр. 2, кв. 233"
+)
+REGISTERED_ADDRESS_PARTS = (
+    "129226",
+    "Москва",
+    "ул. Сергея Эйзенштейна, д. 6, корп. 2, стр. 2, кв. 233",
+    '"addressCountry": "RU"',
 )
 LEGAL_PLACEHOLDERS = (
     re.compile(r"\bTODO(?:\s|:|-)", re.I),
@@ -75,6 +102,16 @@ def check_dist(root: pathlib.Path) -> list[str]:
         for detail in SELLER_DETAILS:
             if detail not in text:
                 errors.append(f"{name}: отсутствуют подтверждённые реквизиты {detail!r}")
+        if name == "index.html":
+            for detail in REGISTERED_ADDRESS_PARTS:
+                if detail not in text:
+                    errors.append(
+                        f"{name}: неполный структурированный адрес продавца {detail!r}"
+                    )
+        elif REGISTERED_ADDRESS not in text:
+            errors.append(
+                f"{name}: отсутствует подтверждённый адрес {REGISTERED_ADDRESS!r}"
+            )
         for placeholder in LEGAL_PLACEHOLDERS:
             if placeholder.search(text):
                 errors.append(f"{name}: найдена юридическая заглушка {placeholder.pattern!r}")
@@ -98,7 +135,7 @@ def check_dist(root: pathlib.Path) -> list[str]:
     return errors
 
 
-def status(url: str) -> tuple[int, str]:
+def response_metadata(url: str) -> tuple[int, str, object]:
     request = urllib.request.Request(
         url,
         headers={"User-Agent": "ChainyaReleaseVerifier/1.0"},
@@ -106,14 +143,41 @@ def status(url: str) -> tuple[int, str]:
     )
     try:
         with urllib.request.urlopen(request, timeout=15) as response:
-            return response.status, response.headers.get_content_type()
+            return response.status, response.headers.get_content_type(), response.headers
     except urllib.error.HTTPError as exc:
-        return exc.code, exc.headers.get_content_type()
+        return exc.code, exc.headers.get_content_type(), exc.headers
+
+
+def status(url: str) -> tuple[int, str]:
+    code, content_type, _headers = response_metadata(url)
+    return code, content_type
 
 
 def check_live(base_url: str) -> list[str]:
     errors: list[str] = []
     base = base_url.rstrip("/")
+    root_code, root_type, root_headers = response_metadata(base + "/")
+    if root_code == 200 and root_type == "text/html":
+        expected_headers = {
+            "strict-transport-security": "max-age=",
+            "x-content-type-options": "nosniff",
+            "cache-control": "no-store",
+        }
+        for name, marker in expected_headers.items():
+            value = root_headers.get(name, "")
+            if marker.lower() not in value.lower():
+                errors.append(f"/: заголовок {name} не содержит {marker!r}")
+        csp = root_headers.get("content-security-policy", "")
+        for directive in ("default-src 'self'", "object-src 'none'", "form-action 'self'"):
+            if directive not in csp:
+                errors.append(f"/: CSP не содержит {directive!r}")
+    for path, expected_type in PUBLIC_PATHS:
+        code, content_type = status(base + path)
+        if code != 200 or content_type != expected_type:
+            errors.append(
+                f"{path}: ожидался 200 {expected_type}, "
+                f"получен {code} {content_type}"
+            )
     for path in SENSITIVE_PATHS:
         code, _content_type = status(base + path)
         if code not in {403, 404}:

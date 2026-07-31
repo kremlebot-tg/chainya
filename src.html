@@ -242,6 +242,7 @@ a{ color:inherit; text-decoration:none; }
 .svc__body{ padding:20px 0 0; display:flex; flex-direction:column; flex:1; }
 .svc h3{ font-size:1.15rem; font-weight:600; margin:0; letter-spacing:-.01em; }
 .svc p{ margin:10px 0 0; font-size:14.5px; color:var(--text-2); line-height:1.6; }
+.svc .link-arrow{ align-self:flex-start; margin-top:18px; }
 .svc__foot{
   margin-top:auto; padding-top:18px; display:flex; align-items:baseline;
   justify-content:space-between; gap:12px;
@@ -259,6 +260,7 @@ a{ color:inherit; text-decoration:none; }
 .b2b-offer__art img{ width:100%; height:100%; object-fit:cover; }
 .b2b-offer h3{ margin:18px 0 8px; font-size:1.25rem; font-weight:600; }
 .b2b-offer p{ margin:0; max-width:58ch; color:var(--text-2); font-size:15px; line-height:1.65; }
+.b2b-offer .link-arrow{ margin-top:16px; }
 #view-b2b .book > div > .label{ display:block; margin-bottom:18px; }
 
 /* ── Философия ── */
@@ -504,6 +506,7 @@ a{ color:inherit; text-decoration:none; }
 .delivery-option:hover,.delivery-option:focus-visible{ background:var(--bg-3); outline:none; }
 .delivery-option strong{ display:block; font-size:14px; font-weight:550; }
 .delivery-option small{ display:block; margin-top:3px; color:var(--text-3); font-size:12px; }
+.delivery-message{ padding:13px 14px; color:var(--text-3); font-size:13px; line-height:1.45; }
 .delivery-selected{
   margin-top:8px; padding:10px 12px; border-left:2px solid var(--accent);
   background:var(--bg-3); color:var(--text-2); font-size:12.5px; line-height:1.45;
@@ -529,6 +532,17 @@ a{ color:inherit; text-decoration:none; }
 .field-hint{
   margin:8px 2px 0; color:var(--text-3); font-size:12.5px; line-height:1.45;
 }
+.payment-method{
+  display:flex; align-items:center; gap:12px; min-height:50px; padding:11px 14px;
+  border:1px solid var(--line-control); border-radius:3px; background:var(--bg-3);
+}
+.payment-method__mark{
+  width:28px; height:28px; flex:none; display:grid; place-items:center;
+  border:1px solid var(--line-control); color:var(--accent); font-size:15px;
+}
+.payment-method__copy{ min-width:0; }
+.payment-method__copy strong{ display:block; font-size:14.5px; font-weight:550; }
+.payment-method__copy span{ display:block; margin-top:2px; color:var(--text-3); font-size:12px; }
 .input, select.input{
   width:100%; padding:12px 14px; background:var(--bg-3);
   border:1px solid var(--line-control); border-radius:3px; font-size:15px;
@@ -672,7 +686,7 @@ select.input{
 @media (max-width:1000px){
   .sec__head{ grid-template-columns:1fr; align-items:start; }
   .steps{ grid-template-columns:1fr 1fr; }
-  .svcs{ grid-template-columns:1fr; }
+  .svcs{ grid-template-columns:repeat(2,minmax(0,1fr)); }
   .hall{ grid-template-columns:1fr; }
   .hall__art{ min-height:210px; }
   .credo{ grid-template-columns:1fr; gap:26px; }
@@ -903,7 +917,10 @@ select.input{
 <section class="view is-active" id="view-home">
   <div class="hero">
     <figure class="hero__media">
-      <img id="hero-img" src="{{img:tea-dancong}}" alt="" data-i18n-alt="alt_product" fetchpriority="high">
+      <img id="hero-img" alt="" data-i18n-alt="alt_product" fetchpriority="high" decoding="async" width="800" height="800">
+      <script>
+        (()=>{const a=['{{img:tea-dancong}}','{{img:tea-gaba-honey}}','{{img:tea-baihao}}'];document.currentScript.previousElementSibling.src=a[Math.floor(Date.now()/86400000)%a.length]})()
+      </script>
     </figure>
     <div class="hero__in">
       <div class="hero__copy">
@@ -965,7 +982,7 @@ select.input{
     </div>
     <div class="svcs">
       <article class="svc">
-        <div class="svc__art"><img src="{{img:hero-master}}" alt="" data-i18n-alt="alt_master" loading="lazy"></div>
+        <div class="svc__art"><img src="{{img:hero-master}}" alt="" data-i18n-alt="alt_master" loading="lazy" width="1500" height="2255"></div>
         <div class="svc__body">
           <h3 data-i18n="svc1_h">Церемония с мастером</h3>
           <p data-i18n="svc1_p"></p>
@@ -976,7 +993,7 @@ select.input{
         </div>
       </article>
       <article class="svc">
-        <div class="svc__art"><img src="{{img:ceremony-self}}" alt="" data-i18n-alt="alt_self" loading="lazy"></div>
+        <div class="svc__art"><img src="{{img:ceremony-self}}" alt="" data-i18n-alt="alt_self" loading="lazy" width="1300" height="1954"></div>
         <div class="svc__body">
           <h3 data-i18n="svc2_h">Самостоятельная церемония</h3>
           <p data-i18n="svc2_p"></p>
@@ -987,7 +1004,7 @@ select.input{
         </div>
       </article>
       <article class="svc">
-        <div class="svc__art"><img src="{{img:master-pour}}" alt="" data-i18n-alt="alt_pour" loading="lazy"></div>
+        <div class="svc__art"><img src="{{img:master-pour}}" alt="" data-i18n-alt="alt_pour" loading="lazy" width="1100" height="1656"></div>
         <div class="svc__body">
           <h3 data-i18n="svc3_h">Выездная церемония</h3>
           <p data-i18n="svc3_p"></p>
@@ -995,6 +1012,7 @@ select.input{
             <span class="svc__p" data-i18n="svc3_price">По запросу</span>
             <span class="svc__t" data-i18n="svc3_time">мероприятия и частные выезды</span>
           </div>
+          <button class="link-arrow b2b-intent" type="button" data-go="b2b" data-intent="event"><span data-i18n="svc3_cta">Обсудить выезд</span> <span aria-hidden="true">→</span></button>
         </div>
       </article>
     </div>
@@ -1003,7 +1021,7 @@ select.input{
   <!-- Философия: слова владельца из канала, не мой пересказ -->
   <div class="sec sec--line wrap">
     <div class="credo">
-      <div class="credo__art"><img src="{{img:master-pour}}" alt="" data-i18n-alt="alt_pour" loading="lazy"></div>
+      <div class="credo__art"><img src="{{img:master-pour}}" alt="" data-i18n-alt="alt_pour" loading="lazy" width="1100" height="1656"></div>
       <div class="credo__body">
         <p class="label" data-i18n="credo_label">Зачем мы это делаем</p>
         <blockquote class="credo__q display" data-i18n="credo_q"></blockquote>
@@ -1055,7 +1073,7 @@ select.input{
       <p class="lead" data-i18n="hall_lead"></p>
     </div>
     <div class="hall">
-      <div class="hall__art"><img src="{{img:hall-room}}" alt="" data-i18n-alt="alt_room" loading="lazy"></div>
+      <div class="hall__art"><img src="{{img:hall-room}}" alt="" data-i18n-alt="alt_room" loading="lazy" width="1600" height="1065"></div>
       <div class="hall__body">
         <h3 data-i18n="hall_h3">Один зал, девять мест</h3>
         <p data-i18n="hall_p1"></p>
@@ -1064,9 +1082,9 @@ select.input{
       </div>
     </div>
     <div class="gallery">
-      <img src="{{img:hall-table}}" alt="" data-i18n-alt="alt_table" loading="lazy">
-      <img src="{{img:hall-bar}}" alt="" data-i18n-alt="alt_bar" loading="lazy">
-      <img src="{{img:hall-shelf}}" alt="" data-i18n-alt="alt_shelf" loading="lazy">
+      <img src="{{img:hall-table}}" alt="" data-i18n-alt="alt_table" loading="lazy" width="1300" height="865">
+      <img src="{{img:hall-bar}}" alt="" data-i18n-alt="alt_bar" loading="lazy" width="1300" height="865">
+      <img src="{{img:hall-shelf}}" alt="" data-i18n-alt="alt_shelf" loading="lazy" width="1300" height="865">
     </div>
     <div style="margin-top:36px">
       <button class="btn btn--solid" data-go="book" data-i18n="hall_cta">Выбрать время</button>
@@ -1080,7 +1098,7 @@ select.input{
     <div class="sec__head">
       <div>
         <p class="label" data-i18n="shop_label">Купить чай</p>
-        <h2 class="display" data-i18n="shop_h">Тот же лист,<br>что и в зале</h2>
+        <h1 class="display" data-i18n="shop_h">Тот же лист,<br>что и в зале</h1>
       </div>
       <p class="lead" data-i18n="shop_lead"></p>
     </div>
@@ -1101,21 +1119,23 @@ select.input{
       <div class="sec__head">
         <div>
           <p class="label" data-i18n="b2b_label">Для бизнеса</p>
-          <h2 class="display" data-i18n="b2b_h">Чай для команды,<br>гостей и событий</h2>
+          <h1 class="display" data-i18n="b2b_h">Чай для команды,<br>гостей и событий</h1>
         </div>
         <p class="lead" data-i18n="b2b_lead"></p>
       </div>
 
       <div class="b2b-offers">
         <article class="b2b-offer">
-          <div class="b2b-offer__art"><img src="{{img:hall-shelf}}" alt="" data-i18n-alt="alt_shelf" loading="lazy"></div>
+          <div class="b2b-offer__art"><img src="{{img:hall-shelf}}" alt="" data-i18n-alt="alt_shelf" loading="lazy" width="1300" height="865"></div>
           <h3 data-i18n="b2b_offer1_h">Чай для заведений и офисов</h3>
           <p data-i18n="b2b_offer1_p"></p>
+          <button class="link-arrow b2b-intent" type="button" data-intent="supply"><span data-i18n="b2b_offer1_cta">Обсудить поставку</span> <span aria-hidden="true">→</span></button>
         </article>
         <article class="b2b-offer">
-          <div class="b2b-offer__art"><img src="{{img:master-pour}}" alt="" data-i18n-alt="alt_pour" loading="lazy"></div>
+          <div class="b2b-offer__art"><img src="{{img:master-pour}}" alt="" data-i18n-alt="alt_pour" loading="lazy" width="1100" height="1656"></div>
           <h3 data-i18n="b2b_offer2_h">Выездные чайные церемонии</h3>
           <p data-i18n="b2b_offer2_p"></p>
+          <button class="link-arrow b2b-intent" type="button" data-intent="event"><span data-i18n="b2b_offer2_cta">Обсудить мероприятие</span> <span aria-hidden="true">→</span></button>
         </article>
       </div>
 
@@ -1125,7 +1145,7 @@ select.input{
           <!-- Шаги с фотографиями: чистый текст тут читался как объявление -->
           <div class="bsteps">
             <article class="bstep">
-              <div class="bstep__art"><img src="{{img:hero-master}}" alt="" data-i18n-alt="alt_master" loading="lazy"></div>
+              <div class="bstep__art"><img src="{{img:hero-master}}" alt="" data-i18n-alt="alt_master" loading="lazy" width="1500" height="2255"></div>
               <div class="bstep__body">
                 <div class="step__n num">01</div>
                 <h3 data-i18n="bstep1_h">Дегустация</h3>
@@ -1133,7 +1153,7 @@ select.input{
               </div>
             </article>
             <article class="bstep">
-              <div class="bstep__art"><img src="{{img:hall-shelf}}" alt="" data-i18n-alt="alt_shelf" loading="lazy"></div>
+              <div class="bstep__art"><img src="{{img:hall-shelf}}" alt="" data-i18n-alt="alt_shelf" loading="lazy" width="1300" height="865"></div>
               <div class="bstep__body">
                 <div class="step__n num">02</div>
                 <h3 data-i18n="bstep2_h">Подбор</h3>
@@ -1141,7 +1161,7 @@ select.input{
               </div>
             </article>
             <article class="bstep">
-              <div class="bstep__art"><img src="{{img:hall-bar}}" alt="" data-i18n-alt="alt_bar" loading="lazy"></div>
+              <div class="bstep__art"><img src="{{img:hall-bar}}" alt="" data-i18n-alt="alt_bar" loading="lazy" width="1300" height="865"></div>
               <div class="bstep__body">
                 <div class="step__n num">03</div>
                 <h3 data-i18n="bstep3_h">Поставки</h3>
@@ -1188,7 +1208,7 @@ select.input{
             <label class="label" for="b-note" data-i18n="b_note">Что вам нужно</label>
             <textarea class="input" id="b-note" data-i18n-ph="b_note_ph"></textarea>
           </div>
-          <label class="consent"><input type="checkbox" id="b-privacy"><span><span data-i18n="privacy_accept">Согласен на обработку данных согласно</span> <a href="/privacy.html" target="_blank" data-i18n="privacy_link">политике конфиденциальности</a></span></label>
+          <label class="consent"><input type="checkbox" id="b-privacy"><span><span data-i18n="privacy_accept">Согласен на обработку данных согласно</span> <a href="/privacy.html" target="_blank" rel="noopener" data-i18n="privacy_link">политике конфиденциальности</a></span></label>
           <button class="btn btn--solid btn--wide" id="b2b-submit" data-i18n="b2b_send">Отправить</button>
           <p class="summary__note" data-i18n="b2b_form_note"></p>
         </aside>
@@ -1213,7 +1233,7 @@ select.input{
       <div class="sec__head">
         <div>
           <p class="label" data-i18n="book_label">Бронь</p>
-          <h2 class="display" data-i18n="book_h">Занять стол</h2>
+          <h1 class="display" data-i18n="book_h">Занять стол</h1>
         </div>
         <p class="lead" data-i18n="book_lead"></p>
       </div>
@@ -1352,8 +1372,7 @@ select.input{
     </button>
   </div>
   <div class="sheet__body">
-    <!-- без src: пустой атрибут заставляет браузер грузить саму страницу -->
-    <div class="sheet__art"><img id="ts-img" src="{{img:hero-master}}" alt="" loading="lazy" width="1500" height="2255"></div>
+    <div class="sheet__art"><img id="ts-img" alt="" loading="lazy" width="800" height="800"></div>
     <div class="ts-meta"><span class="ts-stock" id="ts-stock"></span><p class="ts-orig" id="ts-orig"></p></div>
     <p class="ts-desc" id="ts-desc"></p>
     <div class="ts-taste" id="ts-taste" hidden>
@@ -1425,10 +1444,12 @@ select.input{
         <input class="input" type="text" id="c-addr" data-i18n-ph="cart_addr_ph" autocomplete="address-line1">
       </div>
       <div class="field">
-        <label class="label" for="c-payment" data-i18n="cart_payment">Оплата</label>
-        <select class="input" id="c-payment" aria-describedby="c-payment-hint">
-          <option value="bank_card" data-i18n="pay_card">Карта любого российского банка · Т-Банк</option>
-        </select>
+        <span class="label" data-i18n="cart_payment">Оплата</span>
+        <input type="hidden" id="c-payment" value="bank_card">
+        <div class="payment-method" aria-describedby="c-payment-hint">
+          <span class="payment-method__mark" aria-hidden="true">✓</span>
+          <span class="payment-method__copy"><strong data-i18n="pay_card">Карта любого российского банка · Т-Банк</strong><span data-i18n="payment_secure">Защищённая платёжная форма</span></span>
+        </div>
         <p class="field-hint" id="c-payment-hint" data-i18n="payment_hint">Подойдёт карта любого российского банка. Оплата проходит на защищённой форме Т‑Банка.</p>
         <p class="field-hint"><a href="/legal.html" target="_blank" rel="noopener" data-i18n="payment_terms_link">Условия оплаты и возврата</a></p>
       </div>
@@ -1437,13 +1458,13 @@ select.input{
         <label class="label" for="c-note" data-i18n="f_note">Пожелания</label>
         <textarea class="input" id="c-note" data-i18n-ph="cart_note_ph"></textarea>
       </div>
-      <label class="consent"><input type="checkbox" id="c-privacy"><span><span data-i18n="privacy_accept">Согласен на обработку данных согласно</span> <a href="/privacy.html" target="_blank" data-i18n="privacy_link">политике конфиденциальности</a></span></label>
+      <label class="consent"><input type="checkbox" id="c-privacy"><span><span data-i18n="privacy_accept">Согласен на обработку данных согласно</span> <a href="/privacy.html" target="_blank" rel="noopener" data-i18n="privacy_link">политике конфиденциальности</a></span></label>
     </div>
   </div>
   <div class="sheet__foot">
     <div class="sheet__sum"><span data-i18n="cart_total">Итого</span><b class="num" id="cart-total">—</b></div>
     <button class="btn btn--solid btn--wide" id="cart-submit" data-i18n="cart_submit">Оформить заказ</button>
-    <p class="cart-note" data-i18n="cart_pay"></p>
+    <p class="cart-note" id="cart-pay-note"></p>
     <p class="cart-note" id="cart-status" aria-live="polite"></p>
   </div>
 </div>
@@ -1585,8 +1606,9 @@ select.input{
       </div>`).join('');
   }
 
-  /* Что показываем на главной: редкость, флагман и понятный вход */
-  const FEATURED = ['chongshicha', 'dancong', 'gabahoney'];
+  /* Три понятных входа в коллекцию; недоступную позицию ниже заменяем первой
+     доступной, чтобы главная никогда не рекомендовала то, что нельзя купить. */
+  const FEATURED = ['baihao', 'dancong', 'gabahoney'];
 
   /* ─────────────────────────  СЛОВАРЬ  ───────────────────────── */
   const I18N = {
@@ -1625,7 +1647,7 @@ select.input{
     svc2_p:'Даём стол, посуду, воду нужной температуры и подсказку на старте. Дальше завариваете сами и никто не мешает. Для тех, кто уже в теме.',
     svc_time:'2 часа · 2 чая',
     svc3_h:'Выездная церемония', svc3_p:'Привезём чай, посуду и мастера на корпоратив, презентацию, свадьбу или частную встречу. Формат и число гостей соберём под событие.',
-    svc3_price:'По запросу', svc3_time:'мероприятия и частные выезды',
+    svc3_price:'По запросу', svc3_time:'мероприятия и частные выезды', svc3_cta:'Обсудить выезд',
     how_label:'За столом', how_h:'Четыре шага<br>до первого глотка',
     how_lead:'Если никогда не пили чай проливами, готовиться не нужно. Мастер ведёт стол сам и объясняет по ходу.',
     step1_h:'Разговор', step1_p:'Мастер спросит, зачем вы пришли: взбодриться или, наоборот, выдохнуть. Принесёт несколько сухих листов понюхать.',
@@ -1633,7 +1655,7 @@ select.input{
     step3_h:'Проливы', step3_p:'Дальше по кругу: короткий залив, слив в чахай, разлив по чашам. С каждым проливом выдержка растёт, и вкус меняется.',
     step4_h:'Донышко', step4_p:'Когда лист отдал всё, его разворачивают на блюдце. По листу видно, где он рос и как его делали.',
     fromcard_label:'Выбрать чай', fromcard_h:'Начните<br>с этих',
-    fromcard_lead:'Три разных входа в коллекцию: необычный чай, характерный улун и понятная сладкая габа. Откройте карточку, выберите фасовку — остальное посчитаем в корзине.',
+    fromcard_lead:'Три разных входа в коллекцию: лёгкий белый чай, характерный улун и понятная сладкая габа. Откройте карточку, выберите фасовку — остальное посчитаем в корзине.',
     fromcard_link:'Весь каталог · '+TEA_META.length,
     hall_label:'Зал', hall_h:'Где сесть',
     hall_lead:'Стол бронируется на сессию целиком. Мы не подсаживаем гостей и не торопим, даже если вы засиделись.',
@@ -1658,11 +1680,12 @@ select.input{
     cart_dlv:'Получение', cart_city:'Город', cart_city_ph:'Начните вводить город',
     cart_pvz:'Пункт выдачи СДЭК', cart_pvz_ph:'Улица, метро или код пункта',
     cart_addr:'Адрес', cart_addr_ph:'Улица, дом, квартира', cart_payment:'Оплата',
-    pay_card:'Карта любого российского банка · Т-Банк', pay_sbp:'СБП',
+    pay_card:'Карта любого российского банка · Т-Банк', pay_sbp:'СБП', payment_secure:'Защищённая платёжная форма',
     payment_hint:'Подойдёт карта любого российского банка. Оплата проходит на защищённой форме Т‑Банка.', payment_terms_link:'Условия оплаты и возврата',
     cart_note_ph:'Комментарий к заказу', cart_submit:'Оформить заказ', cart_submit_total:a=>`Перейти к оплате · ${a}`,
     cart_decrease:n=>`Уменьшить количество «${n}»`, cart_increase:n=>`Увеличить количество «${n}»`,
     cart_pay:'Стоимость и срок доставки рассчитывает СДЭК перед оплатой.',
+    cart_pay_pickup:'Самовывоз с Острякова, 3 — бесплатно. Оплата проходит на защищённой форме Т‑Банка.',
     cart_city_searching:'Ищем город…', cart_city_empty:'Город не найден',
     cart_pvz_searching:'Загружаем пункты…', cart_pvz_empty:'Пункты не найдены',
     cart_quote_city:'Сначала выберите город из подсказок.',
@@ -1670,17 +1693,22 @@ select.input{
     cart_quote_ready:(a,min,max)=>`СДЭК · ${a} · ${min===max?min:`${min}–${max}`} дн.`,
     cart_quote_error:'Не удалось рассчитать доставку. Проверьте город или попробуйте ещё раз.',
     privacy_accept:'Согласен на обработку данных согласно', privacy_link:'политике конфиденциальности', legal_link:'Реквизиты и условия', privacy_required:'Подтвердите согласие на обработку данных',
-    cart_phone_required:'Укажите телефон, чтобы мы могли подтвердить заказ.', cart_city_required:'Укажите город доставки.',
+    cart_phone_required:'Укажите полный номер телефона, чтобы мы могли подтвердить заказ.', cart_city_required:'Укажите город доставки.',
     cart_pvz_required:'Выберите пункт из подсказок СДЭК.', cart_addr_required:'Укажите адрес доставки.',
+    cart_catalog_checking:'Проверяем цены и наличие…',
+    cart_catalog_unavailable:'Не удалось обновить каталог. Проверьте интернет и попробуйте ещё раз.',
+    cart_catalog_changed:'Каталог обновился. Проверьте корзину и повторите оформление.',
     cart_creating:'Создаём заказ…', cart_create_error:'Не удалось создать заказ. Попробуйте ещё раз.',
-    cart_payment_unavailable:'Онлайн-оплата пока не подключена.', cart_created:id=>`Заказ ${id} создан. Переходим к защищённой форме Т-Банка…`, b2b_error:'Не удалось отправить заявку. Попробуйте ещё раз.',
+    cart_payment_unavailable:'Онлайн-оплата временно недоступна. Попробуйте ещё раз чуть позже.', cart_created:id=>`Заказ ${id} создан. Переходим к защищённой форме Т-Банка…`, b2b_error:'Не удалось отправить заявку. Попробуйте ещё раз.',
     dlv:{ pickup:'Самовывоз · Острякова, 3', cdek_pvz:'СДЭК · пункт выдачи', cdek_courier:'СДЭК · курьер' },
     order_head:'🛒 Заказ чая — Чайня', order_done:'Спасибо! Завершите заказ в нашем боте @chainyabot или позвоните +7 905 590-88-01 — подтвердим и посчитаем доставку.',
     ts_note:'За столом этот чай можно выпить бесплатно: два на выбор входят в стоимость стола.',
     b2b_label:'Для бизнеса и событий', b2b_h:'Чай для команды,<br>гостей и событий',
     b2b_lead:'Поставим листовой чай в заведение или офис, соберём чайную карту и проведём выездную церемонию на вашей площадке.',
     b2b_offer1_h:'Чай для заведений и офисов', b2b_offer1_p:'Подбираем сорта под кухню, формат и бюджет, считаем себестоимость и возим партии по графику.',
+    b2b_offer1_cta:'Обсудить поставку', b2b_supply_prefill:'Интересует поставка чая для заведения или офиса.',
     b2b_offer2_h:'Выездные чайные церемонии', b2b_offer2_p:'Мастер приезжает с чаем и посудой на корпоратив, презентацию, свадьбу или частную встречу. Сценарий, продолжительность и число гостей согласуем заранее.',
+    b2b_offer2_cta:'Обсудить мероприятие', b2b_event_prefill:'Интересует выездная чайная церемония. Расскажите о формате и стоимости.',
     supply_label:'Как устроены поставки',
     brange_label:'Что возим', brange_note:'Любую позицию из нашей карты: белый, зелёный, габа, улуны, красные, пуэр, прессовки. Оптом возьмём и то, чего сейчас нет в зале, — привезём под заказ. Тот же лист, из той же поставки: ароматизаторов и пересорта не будет.',
     tier1_q:'Кому', tier1_d:'Кофейням, ресторанам, чайным и офисам. Возьмём и небольшую партию: сначала лучше проверить, как ваш гость реагирует на живой лист.',
@@ -1696,8 +1724,8 @@ select.input{
     b2b_form_note:'Заявка придёт владельцам в Telegram. Ответим в течение рабочего дня.',
     b2b_done_h:'Заявка у нас', b2b_done_back:'Посмотреть чаи',
     b2bDoneText:(name) => `${name ? name + ', с' : 'С'}пишемся в течение рабочего дня.`,
-    book_label:'Бронь', book_h:'Занять стол',
-    book_lead:'Здесь бронируют церемонию в Чайне на Острякова, 3. Бронь бесплатная: выберите время, а мы откроем Telegram с готовой заявкой.',
+    book_label:'Бронь', book_h:'Забронировать стол',
+    book_lead:'Выберите формат, дату и время. Заявка уйдёт владельцам прямо с сайта — они свяжутся с вами и подтвердят свободный стол.',
     f_format:'Формат',
     fmt_master:'Церемония с мастером', fmt_master_d:'мастер заваривает и ведёт стол',
     fmt_self:'Самостоятельно', fmt_self_d:'посуду и воду даём, завариваете сами',
@@ -1708,14 +1736,16 @@ select.input{
     f_note:'Пожелания', f_note_ph:'Первый раз на чайной церемонии, хотим что-нибудь бодрящее. Или: у нас день рождения, нужна свеча.',
     sum_h:'Ваша бронь', sum_sub:'Чайня · Острякова, 3',
     sum_format:'Формат', sum_date:'Дата', sum_time:'Время', sum_guests:'Гостей', sum_session:'Стол', sum_session_v:'2 часа · 2 чая',
-    book_btn_wait:'Выберите дату и время', book_btn_go:'Отправить бронь в телеграм',
+    book_btn_wait:'Выберите дату и время', book_btn_go:'Отправить заявку',
+    booking_phone_required:'Укажите полный номер телефона, чтобы мы могли подтвердить бронь.',
+    booking_sending:'Отправляем заявку…', booking_error:'Не удалось отправить заявку. Проверьте соединение и попробуйте ещё раз.',
     or:'или', book_call:'Позвонить: +7 905 590-88-01',
     msg_hi:'Здравствуйте! Хочу забронировать стол в Чайне.',
-    sum_note:'Платить ничего не нужно. Заявка уходит нам в телеграм, мы ответим и подтвердим время. Если оно к тому моменту занято, предложим соседнее.',
-    done_h:'Почти готово', done_back:'На главную',
+    sum_note:'Платить сейчас не нужно. Владельцы получат заявку, свяжутся с вами и подтвердят время. Если оно занято, предложат ближайшее.',
+    done_h:'Заявка отправлена', done_back:'На главную',
     guests:['1 гость','2 гостя','3 гостя','4 гостя','5 гостей','6 гостей','7 гостей','8 гостей','9 гостей, весь зал'],
-    doneText:({ name, dateStr, time }) =>
-      `${name ? name + ', бронь' : 'Бронь'} на ${dateStr} в ${time}: завершите её в нашем боте @chainyabot (открылся рядом) или позвоните +7 905 590-88-01 — подтвердим время.`,
+    doneText:({ name, dateStr, time, id }) =>
+      `${name ? name + ', заявка' : 'Заявка'} на ${dateStr} в ${time} принята. Номер заявки: ${id}. Мы свяжемся с вами и подтвердим время.`,
     foot_desc:'Чайная на Острякова. Китайский лист, чайный мастер и никакой спешки.',
     foot_addr_h:'Адрес', foot_addr1:'Москва, ул. Острякова, 3', foot_addr2:'первый этаж, помещение 114', foot_addr3:'метро Аэропорт',
     foot_contact_h:'Связь', foot_bot:'Бот: @chainyabot', foot_tg:'Канал: @chainyamsk', foot_phone:'+7 (905) 590-88-01', foot_ya:'Мы на Яндекс.Картах',
@@ -1792,7 +1822,7 @@ select.input{
     svc2_p:'We give you the table, the ware, water at the right temperature and a nudge to start. After that you brew and nobody hovers. For people already at home with tea.',
     svc_time:'2 hours · 2 teas',
     svc3_h:'Off-site tea ceremony', svc3_p:'We bring tea, teaware and a master to a company event, presentation, wedding or private gathering. The format and guest count are tailored to the occasion.',
-    svc3_price:'On request', svc3_time:'events and private bookings',
+    svc3_price:'On request', svc3_time:'events and private bookings', svc3_cta:'Discuss an event',
     how_label:'At the table', how_h:'Four steps<br>to the first sip',
     how_lead:'New to brewing in pours? Nothing to prepare. The master runs the table and explains as you go.',
     step1_h:'Talk', step1_p:'The master asks what brought you in: waking up or winding down. Then brings a few dry leaves to smell.',
@@ -1800,7 +1830,7 @@ select.input{
     step3_h:'Pours', step3_p:'Then round after round: a short steep, decant into the pitcher, pour into cups. Each round steeps longer, and the taste keeps shifting.',
     step4_h:'The spent leaf', step4_p:'Once the leaf has given everything, it gets unfolded on a saucer. It shows where the tea grew and how it was made.',
     fromcard_label:'Choose tea', fromcard_h:'Start<br>with these',
-    fromcard_lead:'Three different ways into the collection: an unusual tea, a distinctive oolong and an approachable honeyed GABA. Open a card, choose a pack, and the cart handles the rest.',
+    fromcard_lead:'Three different ways into the collection: a light white tea, a distinctive oolong and an approachable honeyed GABA. Open a card, choose a pack, and the cart handles the rest.',
     fromcard_link:'Full catalogue · '+TEA_META.length,
     hall_label:'The room', hall_h:'Where you sit',
     hall_lead:'A table is booked for the whole session. We never seat strangers together and never hurry you out.',
@@ -1825,11 +1855,12 @@ select.input{
     cart_dlv:'Delivery', cart_city:'City', cart_city_ph:'Start typing a city',
     cart_pvz:'CDEK pickup point', cart_pvz_ph:'Street, metro or point code',
     cart_addr:'Address', cart_addr_ph:'Street, building, flat', cart_payment:'Payment',
-    pay_card:'Any Russian bank card · T-Bank', pay_sbp:'SBP',
+    pay_card:'Any Russian bank card · T-Bank', pay_sbp:'SBP', payment_secure:'Secure payment form',
     payment_hint:'Cards issued by any Russian bank are accepted. Payment is completed on T‑Bank’s secure form.', payment_terms_link:'Payment and return terms',
     cart_note_ph:'Order comment', cart_submit:'Place order', cart_submit_total:a=>`Continue to payment · ${a}`,
     cart_decrease:n=>`Decrease quantity of ${n}`, cart_increase:n=>`Increase quantity of ${n}`,
     cart_pay:'CDEK calculates the delivery price and time before payment.',
+    cart_pay_pickup:'Pickup from 3 Ostryakova Street is free. Payment is completed on T‑Bank’s secure form.',
     cart_city_searching:'Searching for the city…', cart_city_empty:'City not found',
     cart_pvz_searching:'Loading pickup points…', cart_pvz_empty:'No pickup points found',
     cart_quote_city:'Choose a city from the suggestions first.',
@@ -1837,17 +1868,22 @@ select.input{
     cart_quote_ready:(a,min,max)=>`CDEK · ${a} · ${min===max?min:`${min}–${max}`} days`,
     cart_quote_error:'Could not calculate delivery. Check the city or try again.',
     privacy_accept:'I consent to data processing under the', privacy_link:'privacy policy', legal_link:'Seller details and terms', privacy_required:'Please accept the data processing terms',
-    cart_phone_required:'Enter a phone number so we can confirm the order.', cart_city_required:'Enter the delivery city.',
+    cart_phone_required:'Enter a complete phone number so we can confirm the order.', cart_city_required:'Enter the delivery city.',
     cart_pvz_required:'Choose a CDEK point from the suggestions.', cart_addr_required:'Enter the delivery address.',
+    cart_catalog_checking:'Checking prices and availability…',
+    cart_catalog_unavailable:'Could not refresh the catalogue. Check your connection and try again.',
+    cart_catalog_changed:'The catalogue has changed. Review your cart and try again.',
     cart_creating:'Creating your order…', cart_create_error:'Could not create the order. Please try again.',
-    cart_payment_unavailable:'Online payment is not connected yet.', cart_created:id=>`Order ${id} created. Opening the secure T-Bank payment form…`, b2b_error:'Could not send your request. Please try again.',
+    cart_payment_unavailable:'Online payment is temporarily unavailable. Please try again shortly.', cart_created:id=>`Order ${id} created. Opening the secure T-Bank payment form…`, b2b_error:'Could not send your request. Please try again.',
     dlv:{ pickup:'Pickup · Ostryakova 3', cdek_pvz:'CDEK · pickup point', cdek_courier:'CDEK · courier' },
     order_head:'🛒 Tea order — Chaynya', order_done:'Thanks! Finish your order in our bot @chainyabot or call +7 905 590-88-01 — we’ll confirm and calculate shipping.',
     ts_note:'Two teas of your choice are included with every table booking.',
     b2b_label:'For business and events', b2b_h:'Tea for teams,<br>guests and events',
     b2b_lead:'We supply loose-leaf tea to venues and offices, build tea menus, and hold off-site ceremonies at your location.',
     b2b_offer1_h:'Tea for venues and offices', b2b_offer1_p:'We match teas to your menu, format and budget, calculate cost per serving, and deliver on a schedule.',
+    b2b_offer1_cta:'Discuss supply', b2b_supply_prefill:'I am interested in tea supply for a venue or office.',
     b2b_offer2_h:'Off-site tea ceremonies', b2b_offer2_p:'A master brings the tea and teaware to a company event, presentation, wedding or private gathering. We agree the programme, duration and guest count in advance.',
+    b2b_offer2_cta:'Discuss an event', b2b_event_prefill:'I am interested in an off-site tea ceremony. Please tell me about formats and pricing.',
     supply_label:'How supply works',
     brange_label:'What we ship', brange_note:'Anything on our menu: white, green, GABA, oolongs, blacks, pu-erh, pressed cakes. Wholesale also covers what is not in the room right now — we bring it to order. The same leaf, out of the same delivery: no flavourings, no second-rate batches.',
     tier1_q:'Who for', tier1_d:'Cafés, restaurants, tea rooms and offices. A small first batch is fine: better to see how your guests take to a real leaf before committing.',
@@ -1863,8 +1899,8 @@ select.input{
     b2b_form_note:'The owners will receive your enquiry in Telegram. We reply within one working day.',
     b2b_done_h:'Enquiry received', b2b_done_back:'See the teas',
     b2bDoneText:(name) => `${name ? name + ', we' : 'We'}’ll get back to you within one working day.`,
-    book_label:'Booking', book_h:'Take a table',
-    book_lead:'This page books a ceremony at Chaynya, 3 Ostryakova Street. Booking is free: pick a time and we open Telegram with the request ready.',
+    book_label:'Booking', book_h:'Book a table',
+    book_lead:'Choose the format, date and time. The owners receive your request directly from the website and contact you to confirm the table.',
     f_format:'Format',
     fmt_master:'Ceremony with a master', fmt_master_d:'the master brews and runs the table',
     fmt_self:'On your own', fmt_self_d:'we give you the ware and water, you brew',
@@ -1875,14 +1911,16 @@ select.input{
     f_note:'Special requests', f_note_ph:'First tea ceremony, something invigorating please. Or: it’s a birthday, we need a candle.',
     sum_h:'Your booking', sum_sub:'Chaynya · Ostryakova 3',
     sum_format:'Format', sum_date:'Date', sum_time:'Time', sum_guests:'Guests', sum_session:'Table', sum_session_v:'2 hours · 2 teas',
-    book_btn_wait:'Pick a date and time', book_btn_go:'Send booking via Telegram',
+    book_btn_wait:'Pick a date and time', book_btn_go:'Send booking request',
+    booking_phone_required:'Enter a complete phone number so we can confirm the booking.',
+    booking_sending:'Sending your request…', booking_error:'Could not send the request. Check your connection and try again.',
     or:'or', book_call:'Call: +7 905 590-88-01',
     msg_hi:'Hello! I’d like to book a table at Chaynya.',
-    sum_note:'Nothing to pay now. The request reaches us on Telegram; we’ll reply and confirm the time. If it’s taken by then, we’ll offer the nearest one.',
-    done_h:'Almost there', done_back:'Back to home',
+    sum_note:'Nothing to pay now. The owners receive your request, contact you and confirm the time. If it is taken, they will offer the nearest slot.',
+    done_h:'Request sent', done_back:'Back to home',
     guests:['1 guest','2 guests','3 guests','4 guests','5 guests','6 guests','7 guests','8 guests','9 guests, the whole room'],
-    doneText:({ name, dateStr, time }) =>
-      `${name ? name + ', your' : 'Your'} booking for ${dateStr} at ${time}: finish it in our bot @chainyabot (just opened) or call +7 905 590-88-01 — we’ll confirm the time.`,
+    doneText:({ name, dateStr, time, id }) =>
+      `${name ? name + ', your' : 'Your'} request for ${dateStr} at ${time} has been received. Reference: ${id}. We will contact you to confirm the time.`,
     foot_desc:'A tea house on Ostryakova. Chinese leaf, a tea master, and no hurry whatsoever.',
     foot_addr_h:'Address', foot_addr1:'Moscow, 3 Ostryakova St', foot_addr2:'ground floor, unit 114', foot_addr3:'Aeroport metro',
     foot_contact_h:'Contact', foot_bot:'Bot: @chainyabot', foot_tg:'Channel: @chainyamsk', foot_phone:'+7 (905) 590-88-01', foot_ya:'Find us on Yandex Maps',
@@ -1959,7 +1997,7 @@ select.input{
     svc2_p:'我们提供茶席、茶具、合适水温的热水，开场稍作指点。之后您自己泡，没人打扰。适合已经懂茶的客人。',
     svc_time:'2小时 · 2款茶',
     svc3_h:'外出茶会', svc3_p:'我们带着茶、茶具和茶艺师前往企业活动、发布会、婚礼或私人聚会。形式与人数会按活动定制。',
-    svc3_price:'按需报价', svc3_time:'活动与私人预约',
+    svc3_price:'按需报价', svc3_time:'活动与私人预约', svc3_cta:'咨询外出茶会',
     how_label:'茶席之上', how_h:'从落座到第一口<br>只需四步',
     how_lead:'没喝过工夫茶也不用准备什么，茶艺师会边泡边讲。',
     step1_h:'聊几句', step1_p:'茶艺师先问您想要什么：提神，还是放松。然后拿几种干茶给您闻。',
@@ -1967,7 +2005,7 @@ select.input{
     step3_h:'冲泡', step3_p:'接着一轮一轮来：快注快出，倒入茶海，再分到各杯。每一泡时间渐长，味道不断变化。',
     step4_h:'看叶底', step4_p:'茶叶泡尽后，摊在碟子上细看。叶底能看出茶树长在哪里、工艺如何。',
     fromcard_label:'选茶', fromcard_h:'可以先从<br>这三款开始',
-    fromcard_lead:'三种不同的入门方式：一款少见的茶、一款个性鲜明的乌龙，以及一款容易入口的蜜香GABA。打开卡片，选择包装，购物车会完成其余计算。',
+    fromcard_lead:'三种不同的入门方式：清爽白茶、个性鲜明的乌龙，以及容易入口的蜜香GABA。打开卡片，选择包装，购物车会完成其余计算。',
     fromcard_link:'完整目录 · '+TEA_META.length+'款',
     hall_label:'茶室', hall_h:'坐在哪里',
     hall_lead:'订座即包下整场茶席。我们不拼桌，也绝不催客。',
@@ -1992,11 +2030,12 @@ select.input{
     cart_dlv:'配送', cart_city:'城市', cart_city_ph:'开始输入城市名称',
     cart_pvz:'CDEK自提点', cart_pvz_ph:'街道、地铁站或网点代码',
     cart_addr:'地址', cart_addr_ph:'街道、门牌号、公寓', cart_payment:'支付',
-    pay_card:'任意俄罗斯银行的银行卡 · T-Bank', pay_sbp:'快速支付系统（SBP）',
+    pay_card:'任意俄罗斯银行的银行卡 · T-Bank', pay_sbp:'快速支付系统（SBP）', payment_secure:'安全支付页面',
     payment_hint:'支持任意俄罗斯银行发行的银行卡。付款将在T‑Bank的安全页面完成。', payment_terms_link:'支付与退款条款',
     cart_note_ph:'订单备注', cart_submit:'提交订单', cart_submit_total:a=>`前往支付 · ${a}`,
     cart_decrease:n=>`减少${n}的数量`, cart_increase:n=>`增加${n}的数量`,
     cart_pay:'付款前由CDEK计算运费和时效。',
+    cart_pay_pickup:'奥斯特里亚科娃街3号自取免费。付款将在T‑Bank安全页面完成。',
     cart_city_searching:'正在查找城市…', cart_city_empty:'未找到城市',
     cart_pvz_searching:'正在加载自提点…', cart_pvz_empty:'未找到自提点',
     cart_quote_city:'请先从提示中选择城市。',
@@ -2004,17 +2043,22 @@ select.input{
     cart_quote_ready:(a,min,max)=>`CDEK · ${a} · ${min===max?min:`${min}–${max}`}天`,
     cart_quote_error:'无法计算运费，请检查城市或重试。',
     privacy_accept:'我同意按照以下条款处理个人数据：', privacy_link:'隐私政策', legal_link:'商家信息与条款', privacy_required:'请同意个人数据处理条款',
-    cart_phone_required:'请填写电话号码，以便我们确认订单。', cart_city_required:'请填写配送城市。',
+    cart_phone_required:'请填写完整的电话号码，以便我们确认订单。', cart_city_required:'请填写配送城市。',
     cart_pvz_required:'请从提示中选择CDEK自提点。', cart_addr_required:'请填写配送地址。',
+    cart_catalog_checking:'正在核对价格和库存…',
+    cart_catalog_unavailable:'无法更新商品目录，请检查网络后重试。',
+    cart_catalog_changed:'商品目录已更新，请检查购物车后重新结算。',
     cart_creating:'正在创建订单…', cart_create_error:'订单创建失败，请重试。',
-    cart_payment_unavailable:'在线支付尚未接入。', cart_created:id=>`订单 ${id} 已创建，正在进入T-Bank安全支付页面…`, b2b_error:'申请发送失败，请重试。',
+    cart_payment_unavailable:'在线支付暂时不可用，请稍后重试。', cart_created:id=>`订单 ${id} 已创建，正在进入T-Bank安全支付页面…`, b2b_error:'申请发送失败，请重试。',
     dlv:{ pickup:'自取 · 奥斯特里亚科娃街3号', cdek_pvz:'CDEK · 自提点', cdek_courier:'CDEK · 送货上门' },
     order_head:'🛒 茶订单 — Chaynya', order_done:'谢谢！请在我们的机器人 @chainyabot 中完成订单，或致电 +7 905 590-88-01，我们会确认并计算运费。',
     ts_note:'在店里喝这款茶不另收费：茶席已含任选两款。',
     b2b_label:'企业与活动', b2b_h:'为团队、宾客<br>与活动准备茶',
     b2b_lead:'我们为餐饮场所和办公室供应散茶、设计茶单，也可以到您的场地举办茶会。',
     b2b_offer1_h:'餐饮与办公室用茶', b2b_offer1_p:'按您的菜单、经营形式和预算配茶，核算单杯成本，并按计划供货。',
+    b2b_offer1_cta:'洽谈供货', b2b_supply_prefill:'我想了解为餐饮场所或办公室供茶。',
     b2b_offer2_h:'外出茶会', b2b_offer2_p:'茶艺师带茶与茶具前往企业活动、发布会、婚礼或私人聚会。流程、时长和宾客人数提前商定。',
+    b2b_offer2_cta:'洽谈活动', b2b_event_prefill:'我想了解外出茶会的形式与费用。',
     supply_label:'供货流程',
     brange_label:'供什么', brange_note:'我们茶单上的任何一款：白茶、绿茶、佳叶龙茶、乌龙、红茶、普洱、紧压茶。批发不限库存：店里暂时没有的也能为您订货。同一份茶叶，同一批到货，不加香精，没有次货。',
     tier1_q:'面向谁', tier1_d:'咖啡馆、餐厅、茶馆和办公室。小批量也可以：先看看您的客人对原叶茶的反应，再决定不迟。',
@@ -2031,7 +2075,7 @@ select.input{
     b2b_done_h:'申请已收到', b2b_done_back:'看茶',
     b2bDoneText:(name) => `${name ? name + '，' : ''}我们将在一个工作日内回复。`,
     book_label:'订座', book_h:'订一张茶桌',
-    book_lead:'这里预订的是奥斯特里亚科娃街3号Chaynya店内茶会。预订免费：选好时间后，我们会打开Telegram并填好申请。',
+    book_lead:'请选择形式、日期和时间。店主会直接从网站收到申请，并联系您确认茶席。',
     f_format:'形式',
     fmt_master:'茶艺师主泡', fmt_master_d:'茶艺师亲自冲泡、掌席',
     fmt_self:'自助冲泡', fmt_self_d:'我们提供茶具和用水，您自己泡',
@@ -2042,14 +2086,16 @@ select.input{
     f_note:'备注', f_note_ph:'第一次喝工夫茶，想要提神的。或者：过生日，需要一支蜡烛。',
     sum_h:'您的预订', sum_sub:'Chaynya · 奥斯特里亚科娃街3号',
     sum_format:'形式', sum_date:'日期', sum_time:'时间', sum_guests:'人数', sum_session:'茶席', sum_session_v:'2小时 · 2款茶',
-    book_btn_wait:'请选择日期和时间', book_btn_go:'用Telegram发送预订',
+    book_btn_wait:'请选择日期和时间', book_btn_go:'提交预订申请',
+    booking_phone_required:'请填写完整的电话号码，以便我们确认预订。',
+    booking_sending:'正在发送申请…', booking_error:'申请发送失败，请检查网络后重试。',
     or:'或者', book_call:'致电：+7 905 590-88-01',
     msg_hi:'您好！我想在Chaynya订一张茶桌。',
-    sum_note:'现在无需付款。预订通过Telegram发给我们，我们会回复并确认时间。若届时该时段已满，将为您推荐前后的时段。',
-    done_h:'就差一步', done_back:'回首页',
+    sum_note:'现在无需付款。店主会收到申请、联系您并确认时间；如该时段已满，会推荐相邻时段。',
+    done_h:'申请已发送', done_back:'回首页',
     guests:['1位','2位','3位','4位','5位','6位','7位','8位','9位（包场）'],
-    doneText:({ name, dateStr, time }) =>
-      `${name ? name + '，' : ''}${dateStr} ${time}的预订：请在我们的机器人 @chainyabot 中完成，或致电 +7 905 590-88-01，我们会确认时间。`,
+    doneText:({ name, dateStr, time, id }) =>
+      `${name ? name + '，' : ''}${dateStr} ${time}的申请已收到。申请编号：${id}。我们会联系您确认时间。`,
     foot_desc:'奥斯特里亚科娃街上的茶馆。中国茶叶、茶艺师，从不催客。',
     foot_addr_h:'地址', foot_addr1:'莫斯科，奥斯特里亚科娃街3号', foot_addr2:'一层114号铺', foot_addr3:'机场地铁站',
     foot_contact_h:'联系', foot_bot:'机器人：@chainyabot', foot_tg:'频道：@chainyamsk', foot_phone:'+7 (905) 590-88-01', foot_ya:'在Yandex地图上找到我们',
@@ -2094,8 +2140,11 @@ select.input{
 
   };
 
-  let LANG = 'ru';
-  try{ const s = localStorage.getItem('chaynya-lang'); if (I18N[s]) LANG = s; }catch(e){}
+  const requestedLang = new URLSearchParams(location.search).get('lang');
+  let LANG = I18N[requestedLang] ? requestedLang : 'ru';
+  if (!I18N[requestedLang]){
+    try{ const savedLang = localStorage.getItem('chaynya-lang'); if (I18N[savedLang]) LANG = savedLang; }catch(e){}
+  }
 
   /* ─────────────  ОБЕЗЛИЧЕННАЯ АНАЛИТИКА  ─────────────
      Только продуктовые события: без cookies, IP, user-agent и сторонних
@@ -2153,6 +2202,10 @@ select.input{
     let ru = digits;
     if (ru.startsWith('8')) ru = `7${ru.slice(1)}`;
     else if (!ru.startsWith('7')) ru = `7${ru}`;
+    // При вставке полного «+7…» в уже подставленное поле браузер получает
+    // «+7 +7…». Убираем только заведомо лишний код: у корректного номера
+    // вместе с кодом страны не больше 11 цифр.
+    if (ru.startsWith('77') && ru.length > 11) ru = ru.slice(1);
     const local = ru.slice(1,11);
     let value = '+7';
     if (local.length) value += ` (${local.slice(0,3)}`;
@@ -2170,6 +2223,19 @@ select.input{
         field.setSelectionRange(field.value.length,field.value.length);
       }
     });
+    field.addEventListener('paste', event => {
+      const pasted = event.clipboardData?.getData('text').trim() || '';
+      const pastedDigits = pasted.replace(/\D/g,'');
+      const onlyPrefill = field.value.replace(/\D/g,'') === '7';
+      // Полный номер из буфера должен заменить автоматический «+7», а не
+      // приписаться после него. Так одинаково корректно вставляются и
+      // российский +7, и международный +357.
+      if (pasted.startsWith('+') || (onlyPrefill && pastedDigits.length === 11)){
+        event.preventDefault();
+        field.value = pasted;
+        field.dispatchEvent(new Event('input',{bubbles:true}));
+      }
+    });
     field.addEventListener('input', () => {
       formatPhoneInput(field);
       field.setSelectionRange(field.value.length,field.value.length);
@@ -2185,8 +2251,7 @@ select.input{
      бронь прямо в бота (sendData), а не открываем чат. В обычном браузере
      window.Telegram.WebApp тоже есть, но platform='unknown' — тогда всё это
      выключено и сайт работает как обычно. */
-  const TG = window.Telegram && window.Telegram.WebApp;
-  const IN_TG = !!(TG && TG.platform && TG.platform !== 'unknown');
+  let TG = null, IN_TG = false, telegramBackBound = false;
   // @chainyamsk — это КАНАЛ (писать нельзя). Живой контакт из браузера — наш бот.
   const BOT_URL = 'https://t.me/chainyabot';
   // Нативная «назад»: видна, когда мы не на главной или открыт паспорт чая
@@ -2196,6 +2261,34 @@ select.input{
       || $('#tea-sheet').classList.contains('on') || $('#cart-sheet').classList.contains('on');
     sub ? TG.BackButton.show() : TG.BackButton.hide();
   }
+  function connectTelegram(){
+    const candidate = window.Telegram && window.Telegram.WebApp;
+    if (!candidate || !candidate.platform || candidate.platform === 'unknown') return false;
+    TG = candidate;
+    IN_TG = true;
+    try{
+      TG.ready();
+      TG.expand();
+      TG.setHeaderColor('#141110');
+      TG.setBackgroundColor('#141110');
+      if (!telegramBackBound){
+        TG.BackButton.onClick(() => {
+          if ($('#cart-sheet').classList.contains('on')) closeCart();
+          else if ($('#tea-sheet').classList.contains('on')) closeTea();
+          else if (($('.view.is-active') || {}).id !== 'view-home') go('home');
+          else TG.close();
+        });
+        telegramBackBound = true;
+      }
+      tgSyncBack();
+      return true;
+    }catch(e){
+      TG = null;
+      IN_TG = false;
+      return false;
+    }
+  }
+  addEventListener('chainya:telegram-ready', connectTelegram);
 
   /* ─────────────  НАВИГАЦИЯ  ───────────── */
   function go(view, updateHistory=true){
@@ -2213,6 +2306,7 @@ select.input{
     // готово» вместо чистой формы.
     $('#book-form').hidden = false; $('#book-done').hidden = true;
     $('#b2b-form-wrap').hidden = false; $('#b2b-done').hidden = true;
+    resetRequestForms();
     closeTea(false);
     if (updateHistory && location.hash !== '#' + view) history.pushState({ view }, '', '#' + view);
     if (changingView) scrollTo({ top:0, behavior:'instant' });
@@ -2255,7 +2349,7 @@ select.input{
     const node = el(`
       <article class="tea" data-type="${m.t}" data-id="${m.id}">
         <div class="tea__art${inStock(m) ? '' : ' tea__art--oos'}">
-          <img src="${m.img}" alt="${escAttr(txt.n)}" loading="lazy" width="360" height="360">
+          <img src="${m.img}" alt="${escAttr(txt.n)}" loading="lazy" width="800" height="800">
           <span class="tea__dot" style="background:${LQ[m.t]}"></span>
           ${inStock(m) ? '' : `<span class="tea__oos">${T().oos}</span>`}
           <button class="tea__fav" data-id="${m.id}" aria-pressed="${isFav(m.id)}" aria-label="${escAttr(T().fav_label)}" title="${escAttr(T().fav_label)}">
@@ -2301,7 +2395,7 @@ select.input{
       if (pick.length >= 8) break;
       if (!pick.includes(m)) pick.push(m);
     }
-    pick.forEach(m => strip.append(el(`<img src="${m.img}" alt="" loading="lazy">`)));
+    pick.forEach(m => strip.append(el(`<img src="${m.img}" alt="" loading="lazy" width="800" height="800">`)));
   }
 
   const HERO_PICS = [
@@ -2320,6 +2414,40 @@ select.input{
   // под скрим), и скрытие фона от скринридера. Панели — <aside> после </main>/
   // <footer>, поэтому сами остаются активными.
   function bgInert(on){ document.querySelectorAll('.skip, header, main, footer').forEach(n => { n.inert = on; }); }
+  const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+  function panelFocusables(panel){
+    return $$(FOCUSABLE, panel).filter(node => node.getClientRects().length && node.getAttribute('aria-hidden') !== 'true');
+  }
+  function focusPanel(panel, preferred){
+    requestAnimationFrame(() => {
+      const target = preferred && !preferred.disabled && preferred.getClientRects().length
+        ? preferred : panelFocusables(panel)[0] || panel;
+      target.focus({ preventScroll:true });
+    });
+  }
+  addEventListener('keydown', event => {
+    if (event.key !== 'Tab') return;
+    const panel = cartSheet.classList.contains('on') ? cartSheet
+      : sheet.classList.contains('on') ? sheet : null;
+    if (!panel) return;
+    const nodes = panelFocusables(panel);
+    if (!nodes.length){
+      event.preventDefault();
+      panel.focus({ preventScroll:true });
+      return;
+    }
+    const first = nodes[0], last = nodes[nodes.length - 1];
+    if (!panel.contains(document.activeElement)){
+      event.preventDefault();
+      (event.shiftKey ? last : first).focus({ preventScroll:true });
+    } else if (event.shiftKey && document.activeElement === first){
+      event.preventDefault();
+      last.focus({ preventScroll:true });
+    } else if (!event.shiftKey && document.activeElement === last){
+      event.preventDefault();
+      first.focus({ preventScroll:true });
+    }
+  });
   /* ─────────────  ИЗБРАННОЕ  ─────────────
      Чистый фронт: список id в localStorage, сердце на карточке и в паспорте,
      отдельный чип-фильтр. Сервер не нужен. */
@@ -2346,10 +2474,63 @@ select.input{
   function buildTeaGrids(){
     const home = $('#home-teas'), menu = $('#menu-teas');
     home.innerHTML = ''; menu.innerHTML = '';
-    const featured = FEATURED.map(id => TEA_META.find(m => m.id === id)).filter(Boolean);
-    home.append(...stockFirst(featured).map(teaCard));
+    const featured = FEATURED.map(id => TEA_META.find(m => m.id === id))
+      .filter(m => m && inStock(m));
+    for (const m of TEA_META){
+      if (featured.length >= 3) break;
+      if (inStock(m) && !featured.includes(m)) featured.push(m);
+    }
+    home.append(...featured.slice(0,3).map(teaCard));
     menu.append(...stockFirst(TEA_META).map(teaCard));
     applyFilter();
+  }
+
+  /* Backend считает заказ по teas.json. Встроенный каталог нужен для быстрой
+     отрисовки и чтения, но checkout разрешаем только после свежей сверки:
+     покупатель не должен увидеть устаревшую цену или наличие. */
+  let catalogRefreshPending = null;
+  function refreshCatalog(){
+    if (catalogRefreshPending) return catalogRefreshPending;
+    catalogRefreshPending = (async () => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      try{
+        const response = await fetch('/api/catalog',{cache:'no-store',signal:controller.signal});
+        if (!response.ok) throw new Error('catalog_http');
+        const data = await response.json();
+        if (!Array.isArray(data.teas) || !data.teas.length) throw new Error('catalog_payload');
+        let changed = false;
+        const live = new Map(data.teas.map(item => [item.id,item]));
+        TEA_META.forEach(tea => {
+          const item = live.get(tea.id);
+          const stock = Boolean(item && item.stock);
+          if (!item){
+            if (inStock(tea)){ tea.stock = false; changed = true; }
+            return;
+          }
+          if (tea.p !== item.price || tea.unit !== item.unit || inStock(tea) !== stock){
+            tea.p = item.price;
+            tea.unit = item.unit;
+            tea.stock = stock;
+            changed = true;
+          }
+        });
+        if (changed){
+          buildTeaGrids();
+          syncCart();
+          // Карточка могла открыться раньше ответа API. Обновляем её на месте,
+          // чтобы цена, фасовка и кнопка наличия всегда совпадали с backend.
+          if (curTea && sheet.classList.contains('on')) openTea(curTea, false);
+        }
+        return true;
+      }catch(e){
+        return false;
+      }finally{
+        clearTimeout(timeout);
+        catalogRefreshPending = null;
+      }
+    })();
+    return catalogRefreshPending;
   }
   function applyFilter(){
     const favs = getFavs();
@@ -2407,6 +2588,7 @@ select.input{
      overflow:hidden на iOS не держит, поэтому фиксируем body и запоминаем скролл. */
   let lockedY = 0;
   function lockScroll(){
+    if (document.body.style.position === 'fixed') return;
     lockedY = scrollY;
     document.body.style.position = 'fixed';
     document.body.style.top = `-${lockedY}px`;
@@ -2425,6 +2607,9 @@ select.input{
   let curTea = null, curPack = null;
 
   function openTea(m, updateHistory=true){
+    const wasOpen = sheet.classList.contains('on');
+    const previousTea = curTea;
+    const previousPack = curPack;
     const txt = T().teas[m.id];
     curTea = m;
     $('#ts-name').textContent = txt.n;
@@ -2462,20 +2647,25 @@ select.input{
         $('#ts-price').textContent = rub(packPrice(m.p, g));
       };
       PACKS.forEach((g, i) => {
-        const b = el(`<button class="pack" aria-pressed="${i === 0}">
+        const b = el(`<button class="pack" data-pack="${g}" aria-pressed="${i === 0}">
           <b>${g} ${T().gram}</b><span>${rub(packPrice(m.p, g))}</span>
         </button>`);
         b.addEventListener('click', () => setPack(g, b));
         packs.append(b);
       });
-      setPack(PACKS[0], $('.pack', packs));
+      // Каталог обновляется асинхронно. Если пользователь уже выбрал фасовку,
+      // не сбрасываем её при обновлении цены/наличия открытой карточки.
+      const preferredPack = previousTea && previousTea.id === m.id && PACKS.includes(Number(previousPack))
+        ? Number(previousPack) : PACKS[0];
+      const preferredButton = $(`.pack[data-pack="${preferredPack}"]`, packs);
+      setPack(preferredPack, preferredButton || $('.pack', packs));
     }
 
     sheet.classList.add('on');
     $('#scrim').classList.add('on');
-    lockScroll();
+    if (!wasOpen) lockScroll();
     bgInert(true);
-    sheet.focus({ preventScroll:true });
+    if (!wasOpen) focusPanel(sheet, $('#ts-close'));
     if (updateHistory && location.hash !== '#tea-' + m.id)
       history.pushState({ tea:m.id }, '', '#tea-' + m.id);
     tgSyncBack();
@@ -2529,20 +2719,66 @@ select.input{
      (обычный браузер) — оплата и подтверждение вручную, как бронь.
      Когда появится бэкенд магазина — сюда встанет отправка на его эндпоинт. */
   const CART_KEY = 'chaynya-cart';
+  const CHECKOUT_ATTEMPT_KEY = 'chaynya-checkout-attempt';
   const cartSheet = $('#cart-sheet');
   const teaById = id => TEA_META.find(m => m.id === id);
   const packLabel = it => it.pack === 'pc' ? T().unit_pc.trim() : `${it.pack} ${T().gram}`;
   const linePrice = it => { const m = teaById(it.id); if (!m) return 0; return it.pack === 'pc' ? m.p : packPrice(m.p, it.pack); };
 
   function getCart(){
-    let a; try{ a = JSON.parse(localStorage.getItem(CART_KEY) || '[]'); }catch(e){ return []; }
-    // самолечение: выкидываем позиции с неизвестным id (меню могли отредактировать
-    // после того, как гость собрал корзину) — иначе оформление падало бы на них
-    return Array.isArray(a) ? a.filter(it => it && it.qty > 0 && teaById(it.id) && inStock(teaById(it.id))) : [];
+    let raw; try{ raw = JSON.parse(localStorage.getItem(CART_KEY) || '[]'); }catch(e){ return []; }
+    if (!Array.isArray(raw)) return [];
+    // Самолечение старой корзины: каталог мог удалить товар или изменить
+    // единицу продажи g↔pc. Собираем канонический список и сразу сохраняем его,
+    // чтобы checkout не получил несовместимую фасовку и не упал с 422.
+    const clean = [];
+    raw.forEach(item => {
+      const tea = item && teaById(item.id);
+      if (!tea || !inStock(tea)) return;
+      const rawQty = Math.trunc(Number(item.qty));
+      if (!Number.isFinite(rawQty) || rawQty <= 0) return;
+      const qty = Math.min(20, rawQty);
+      const pack = tea.unit === 'pc'
+        ? 'pc'
+        : (PACKS.includes(Number(item.pack)) ? Number(item.pack) : PACKS[0]);
+      const existing = clean.find(row => row.id === tea.id && row.pack === pack);
+      if (existing) existing.qty = Math.min(20, existing.qty + qty);
+      else clean.push({ id:tea.id, pack, qty });
+    });
+    try{
+      if (JSON.stringify(raw) !== JSON.stringify(clean))
+        localStorage.setItem(CART_KEY, JSON.stringify(clean));
+    }catch(e){}
+    return clean;
   }
   function setCart(c){ try{ localStorage.setItem(CART_KEY, JSON.stringify(c)); }catch(e){} updateCartBadge(); }
   function cartCount(){ return getCart().reduce((s, it) => s + it.qty, 0); }
   function cartTotal(){ return getCart().reduce((s, it) => s + linePrice(it) * it.qty, 0); }
+  async function checkoutFingerprint(payload){
+    const source = new TextEncoder().encode(JSON.stringify(payload));
+    if (crypto.subtle){
+      const digest = await crypto.subtle.digest('SHA-256',source);
+      return Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('');
+    }
+    // Старые WebView без SubtleCrypto: хеш нужен только для привязки случайного
+    // ключа к тому же payload внутри вкладки, не как криптографическая подпись.
+    let hash = 2166136261;
+    source.forEach(byte => { hash ^= byte; hash = Math.imul(hash,16777619); });
+    return `legacy-${(hash>>>0).toString(16)}`;
+  }
+  function savedCheckoutAttempt(){
+    try{
+      const value = JSON.parse(sessionStorage.getItem(CHECKOUT_ATTEMPT_KEY) || 'null');
+      return value && typeof value.fingerprint === 'string' &&
+        /^[A-Za-z0-9_-]{16,128}$/.test(value.key) ? value : null;
+    }catch(e){ return null; }
+  }
+  function saveCheckoutAttempt(fingerprint,key){
+    try{ sessionStorage.setItem(CHECKOUT_ATTEMPT_KEY,JSON.stringify({fingerprint,key})); }catch(e){}
+  }
+  function clearCheckoutAttempt(){
+    try{ sessionStorage.removeItem(CHECKOUT_ATTEMPT_KEY); }catch(e){}
+  }
   const DLV_PRICE = { pickup:0 };
   let deliveryQuote = null;
   let cityTimer = 0, pvzTimer = 0, citySequence = 0, pvzSequence = 0, quoteSequence = 0;
@@ -2574,15 +2810,17 @@ select.input{
   function cartAdd(id, pack){
     const m = teaById(id);
     if (!m || !inStock(m)) return false;
-    const c = getCart(), it = c.find(x => x.id === id && x.pack === pack);
-    if (it) it.qty++; else c.push({ id, pack, qty:1 });
+    const normalizedPack = m.unit === 'pc' ? 'pc' : (PACKS.includes(Number(pack)) ? Number(pack) : PACKS[0]);
+    const c = getCart(), it = c.find(x => x.id === id && x.pack === normalizedPack);
+    if (it && it.qty >= 20) return false;
+    if (it) it.qty++; else c.push({ id, pack:normalizedPack, qty:1 });
     setCart(c);
     return true;
   }
   function cartStep(id, pack, d){
     const c = getCart(), it = c.find(x => x.id === id && x.pack === pack);
     if (!it) return;
-    it.qty += d;
+    it.qty = Math.min(20, it.qty + d);
     setCart(it.qty <= 0 ? c.filter(x => x !== it) : c);
     renderCart();
   }
@@ -2599,7 +2837,7 @@ select.input{
     c.forEach(it => {
       const m = teaById(it.id); if (!m) return;
       const row = el(`<div class="citem">
-        <img class="citem__img" src="${m.img}" alt="" loading="lazy">
+        <img class="citem__img" src="${m.img}" alt="" loading="lazy" width="800" height="800">
         <div class="citem__info">
           <div class="citem__name">${T().teas[it.id].n}</div>
           <div class="citem__pack">${packLabel(it)} · ${rub(linePrice(it))}</div>
@@ -2607,7 +2845,7 @@ select.input{
         <div class="qty">
           <button class="qty__b" data-d="-1" aria-label="${T().cart_decrease(T().teas[it.id].n)}">−</button>
           <span class="qty__n">${it.qty}</span>
-          <button class="qty__b" data-d="1" aria-label="${T().cart_increase(T().teas[it.id].n)}">+</button>
+          <button class="qty__b" data-d="1" aria-label="${T().cart_increase(T().teas[it.id].n)}"${it.qty >= 20 ? ' disabled' : ''}>+</button>
         </div>
         <button class="citem__rm" aria-label="${T().cart_remove}">×</button>
       </div>`);
@@ -2639,21 +2877,28 @@ select.input{
   function closeDeliveryResults(input, results){
     results.hidden = true;
     input.setAttribute('aria-expanded','false');
+    input.removeAttribute('aria-activedescendant');
+    results.querySelectorAll('[aria-selected]').forEach(option => option.removeAttribute('aria-selected'));
   }
   function openDeliveryResults(input, results){
     results.hidden = false;
     input.setAttribute('aria-expanded','true');
   }
+  let deliveryOptionId = 0;
   function deliveryOption(title, meta, action){
     const button = document.createElement('button');
     button.type = 'button'; button.className = 'delivery-option'; button.setAttribute('role','option');
+    button.id = `delivery-option-${++deliveryOptionId}`;
     const strong = document.createElement('strong'); strong.textContent = title;
     const small = document.createElement('small'); small.textContent = meta;
     button.append(strong,small); button.addEventListener('click',action);
     return button;
   }
   function deliveryMessage(results, text){
-    results.replaceChildren(deliveryOption(text,'',()=>{}));
+    const message = document.createElement('div');
+    message.className = 'delivery-message'; message.setAttribute('role','status');
+    message.textContent = text;
+    results.replaceChildren(message);
   }
   function resetPoint(){
     $('#c-pvz').value = '';
@@ -2712,8 +2957,8 @@ select.input{
       if (!response.ok) throw new Error();
       results.replaceChildren();
       (data.points || []).forEach(point => {
-        const meta = [point.address,point.metro ? `м. ${point.metro}`:'',point.work_time].filter(Boolean).join(' · ');
-        results.append(deliveryOption(point.code,meta,()=>choosePoint(point)));
+        const meta = [point.code,point.metro ? `м. ${point.metro}`:'',point.work_time].filter(Boolean).join(' · ');
+        results.append(deliveryOption(point.address || point.code,meta,()=>choosePoint(point)));
       });
       if (!results.childElementCount) deliveryMessage(results,T().cart_pvz_empty);
       openDeliveryResults(input,results);
@@ -2723,7 +2968,7 @@ select.input{
   }
   function choosePoint(point){
     const input = $('#c-pvz-search'), selected = $('#c-pvz-selected');
-    input.value = `${point.code} · ${point.address}`;
+    input.value = point.address || point.code;
     $('#c-pvz').value = point.code;
     input.removeAttribute('aria-invalid');
     selected.textContent = [point.address,point.work_time].filter(Boolean).join(' · ');
@@ -2766,6 +3011,7 @@ select.input{
     $('#c-city-field').hidden = dlv === 'pickup';
     $('#c-pvz-field').hidden = dlv !== 'cdek_pvz';
     $('#c-addr-field').hidden = dlv !== 'cdek_courier';
+    $('#cart-pay-note').textContent = dlv === 'pickup' ? T().cart_pay_pickup : T().cart_pay;
     deliveryQuote = null;
     if (dlv === 'pickup'){
       setDeliveryStatus('');
@@ -2779,8 +3025,8 @@ select.input{
   }
   function syncCart(){ updateCartBadge(); buildDlv(); if (cartSheet.classList.contains('on')) renderCart(); }
 
-  function requireCartField(selector, message){
-    const field = $(selector), ok = field.value.trim();
+  function requireCartField(selector, message, validate=value=>Boolean(value.trim())){
+    const field = $(selector), ok = validate(field.value);
     field.setAttribute('aria-invalid', ok ? 'false' : 'true');
     if (!ok){ const status=$('#cart-status'); status.textContent=message; status.classList.add('cart-note--error'); field.focus(); }
     return !!ok;
@@ -2796,6 +3042,38 @@ select.input{
     clearTimeout(pvzTimer); pvzTimer=setTimeout(searchPoints,220);
   });
   $('#c-pvz-search').addEventListener('focus',()=>{ if ($('#c-city-code').value) searchPoints(); });
+  function moveDeliveryFocus(input, results, direction){
+    const options = [...results.querySelectorAll('.delivery-option')];
+    if (!options.length) return;
+    const current = document.activeElement === input
+      ? -1
+      : options.indexOf(document.activeElement);
+    const next = options[(current + direction + options.length) % options.length];
+    next.focus();
+    options.forEach(option => option.setAttribute('aria-selected',String(option === next)));
+    input.setAttribute('aria-activedescendant',next.id);
+  }
+  [
+    [$('#c-city'),$('#c-city-results')],
+    [$('#c-pvz-search'),$('#c-pvz-results')],
+  ].forEach(([input,results]) => {
+    input.addEventListener('keydown',event => {
+      if (event.key === 'ArrowDown'){
+        event.preventDefault();
+        if (results.hidden) input === $('#c-city') ? searchCities() : searchPoints();
+        setTimeout(()=>moveDeliveryFocus(input,results,1),0);
+      } else if (event.key === 'Escape'){
+        closeDeliveryResults(input,results);
+      }
+    });
+    results.addEventListener('keydown',event => {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp'){
+        event.preventDefault(); moveDeliveryFocus(input,results,event.key === 'ArrowDown' ? 1 : -1);
+      } else if (event.key === 'Escape'){
+        event.preventDefault(); closeDeliveryResults(input,results); input.focus();
+      }
+    });
+  });
   document.addEventListener('click',e=>{
     if (!e.target.closest('#c-city-field')) closeDeliveryResults($('#c-city'),$('#c-city-results'));
     if (!e.target.closest('#c-pvz-field')) closeDeliveryResults($('#c-pvz-search'),$('#c-pvz-results'));
@@ -2806,7 +3084,7 @@ select.input{
     closeTea();
     renderCart();
     cartSheet.classList.add('on'); $('#scrim').classList.add('on');
-    lockScroll(); bgInert(true); cartSheet.focus({ preventScroll:true }); tgSyncBack();
+    lockScroll(); bgInert(true); focusPanel(cartSheet, $('#cart-close')); tgSyncBack();
     track('cart_open','cart');
   }
   function closeCart(){
@@ -2845,11 +3123,16 @@ select.input{
     setTimeout(() => { b.textContent = T().ts_add; }, 1100);
   });
   $('#cart-submit').addEventListener('click', async () => {
-    const c = getCart();
+    let c = getCart();
     if (!c.length) return;
+    const catalogSnapshot = cart => JSON.stringify(cart.map(it => ({
+      id:it.id, pack:it.pack, qty:it.qty, unit_price:linePrice(it),
+    })));
+    const catalogBeforeRefresh = catalogSnapshot(c);
     trackOnce('checkout_start','cart');
     const status = $('#cart-status'); status.textContent=''; status.classList.remove('cart-note--error');
-    if (!requireCartField('#c-phone',T().cart_phone_required)) return;
+    const submit = $('#cart-submit');
+    if (!requireCartField('#c-phone',T().cart_phone_required,value=>value.replace(/\D/g,'').length>=10)) return;
     if (!$('#c-privacy').checked){ status.textContent = T().privacy_required; status.classList.add('cart-note--error'); $('#c-privacy').focus(); return; }
     const dlv = $('#c-dlv').value;
     if (dlv !== 'pickup' && !requireCartField('#c-city',T().cart_city_required)) return;
@@ -2866,6 +3149,23 @@ select.input{
       status.textContent=T().cart_quote_error; status.classList.add('cart-note--error');
       requestDeliveryQuote(); return;
     }
+    submit.disabled = true;
+    status.textContent = T().cart_catalog_checking;
+    if (!await refreshCatalog()){
+      updateCheckoutTotal();
+      status.textContent = T().cart_catalog_unavailable;
+      status.classList.add('cart-note--error');
+      return;
+    }
+    c = getCart();
+    updateCheckoutTotal();
+    if (!c.length || catalogSnapshot(c) !== catalogBeforeRefresh){
+      renderCart();
+      status.textContent = T().cart_catalog_changed;
+      status.classList.add('cart-note--error');
+      return;
+    }
+    status.textContent = '';
     // компактный payload: id/pack/qty. Названия, цены и итог бот считает из своей
     // же базы — меньше байт для sendData (лимит 4096) и цена не зависит от клиента.
     const payload = {
@@ -2886,28 +3186,44 @@ select.input{
       $('#cart-co').hidden = true; $('#cart-submit').disabled = true; $('#cart-total').textContent = '—';
     };
     if (CHECKOUT_API){
-      const submit = $('#cart-submit');
-      const attemptSignature = JSON.stringify(payload);
+      const attemptSignature = await checkoutFingerprint(payload);
       if (submit.dataset.idempotencyPayload !== attemptSignature){
+        const savedAttempt = savedCheckoutAttempt();
         submit.dataset.idempotencyPayload = attemptSignature;
-        submit.dataset.idempotencyKey = crypto.randomUUID
-          ? crypto.randomUUID()
-          : `web-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+        submit.dataset.idempotencyKey = savedAttempt?.fingerprint === attemptSignature
+          ? savedAttempt.key
+          : (crypto.randomUUID
+            ? crypto.randomUUID()
+            : `web-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`);
+        saveCheckoutAttempt(attemptSignature,submit.dataset.idempotencyKey);
       }
+      const startNewPaymentAttempt = () => {
+        delete submit.dataset.idempotencyPayload;
+        delete submit.dataset.idempotencyKey;
+        clearCheckoutAttempt();
+      };
       submit.disabled = true; status.textContent = T().cart_creating;
+      let publicMessage = T().cart_create_error;
       try {
         const response = await fetch('/api/orders', {
           method:'POST',
           headers:{ 'Content-Type':'application/json', 'Idempotency-Key':submit.dataset.idempotencyKey },
           body:JSON.stringify(payload),
         });
-        const result = await response.json();
+        const result = await response.json().catch(() => ({}));
         if (!response.ok){
-          const detail = typeof result.detail === 'string' ? result.detail : '';
-          throw new Error(response.status === 503 ? T().cart_payment_unavailable : detail || T().cart_create_error);
+          // Даже при 502 сохраняем ключ: банк мог принять Init, а ответ мог
+          // потеряться по дороге. Новый ключ в таком случае создал бы риск
+          // второго заказа/платежа; восстановлением занимается backend.
+          if (response.status === 503) publicMessage = T().cart_payment_unavailable;
+          else if (response.status === 422) publicMessage = T().cart_catalog_changed;
+          throw new Error('order_rejected');
         }
-        if (!result.payment || !result.payment.url) throw new Error(T().cart_payment_unavailable);
-        delete submit.dataset.idempotencyPayload; delete submit.dataset.idempotencyKey;
+        if (!result.payment || !result.payment.url){
+          publicMessage = T().cart_payment_unavailable;
+          throw new Error('payment_url_missing');
+        }
+        startNewPaymentAttempt();
         try{ localStorage.setItem('chaynya-pending-order', result.order.id); }catch(e){}
         status.textContent = T().cart_created(result.order.id);
         // PaymentURL is an opaque, bank-issued redirect. Language is already
@@ -2915,9 +3231,9 @@ select.input{
         location.href = result.payment.url;
         return;
       } catch (e) {
-        status.textContent = e.message || T().cart_create_error;
+        status.textContent = publicMessage;
         status.classList.add('cart-note--error');
-        submit.disabled = !deliveryReady();
+        submit.disabled = !getCart().length || !deliveryReady();
         return;
       }
     }
@@ -2946,23 +3262,33 @@ select.input{
     sync();
   }));
 
-  // Не toISOString: он отдаёт UTC, и после полуночи по Москве «сегодня» становится вчера
-  const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const moscowParts = (date=new Date()) => {
+    const parts = new Intl.DateTimeFormat('en-CA',{
+      timeZone:'Europe/Moscow',year:'numeric',month:'2-digit',day:'2-digit',
+      hour:'2-digit',minute:'2-digit',hourCycle:'h23',
+    }).formatToParts(date);
+    return Object.fromEntries(parts.filter(part => part.type !== 'literal').map(part => [part.type,part.value]));
+  };
+  const isoMoscow = date => {
+    const part = moscowParts(date);
+    return `${part.year}-${part.month}-${part.day}`;
+  };
 
   /* Дни лентой вместо календаря: год в брони не нужен, он всегда текущий.
      Показываем две недели вперёд — на большее в чайную не записываются. */
-  const DAYS_AHEAD = 14;
+  const MAX_BOOKING_DAYS = 14;
   function buildDays(){
     const box = $('#days');
     box.innerHTML = '';
-    const now = new Date();
-    for (let i = 0; i < DAYS_AHEAD; i++){
-      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
-      const key = iso(d);
+    const now = Date.now();
+    for (let i = 0; i <= MAX_BOOKING_DAYS; i++){
+      const d = new Date(now + i * 86400000);
+      const part = moscowParts(d);
+      const key = isoMoscow(d);
       const label = i === 0 ? T().today : i === 1 ? T().tomorrow
-        : d.toLocaleDateString(T().locale, { weekday:'short' });
+        : d.toLocaleDateString(T().locale, { weekday:'short',timeZone:'Europe/Moscow' });
       const b = el(`<button class="day" data-d="${key}" aria-pressed="${B.date === key}">
-        <b class="num">${d.getDate()}</b><span>${label}</span>
+        <b class="num">${Number(part.day)}</b><span>${label}</span>
       </button>`);
       b.addEventListener('click', () => {
         B.date = key;
@@ -2990,9 +3316,9 @@ select.input{
 
   // На сегодняшнюю дату прошедшее время выбрать нельзя
   function refreshSlots(){
-    const now = new Date();
-    const isToday = B.date === iso(now);
-    const cutoff = now.getHours() * 60 + now.getMinutes();
+    const now = moscowParts();
+    const isToday = B.date === `${now.year}-${now.month}-${now.day}`;
+    const cutoff = Number(now.hour) * 60 + Number(now.minute);
     $$('.slot', slots).forEach(s => {
       const [h, m] = s.dataset.t.split(':').map(Number);
       const past = isToday && h * 60 + m <= cutoff;
@@ -3013,11 +3339,11 @@ select.input{
 
   const fmtDate = s => {
     if (!s) return '—';
-    const d = new Date(s + 'T00:00');
+    const d = new Date(s + 'T12:00:00Z');
     const loc = T().locale;
     // «19 июля (сб)», а не «сб, 19 июля»: внутри фразы день недели впереди читается коряво
-    const dm = d.toLocaleDateString(loc, { day:'numeric', month:'long' });
-    const wd = d.toLocaleDateString(loc, { weekday:'short' });
+    const dm = d.toLocaleDateString(loc, { day:'numeric', month:'long',timeZone:'Europe/Moscow' });
+    const wd = d.toLocaleDateString(loc, { weekday:'short',timeZone:'Europe/Moscow' });
     return LANG === 'zh' ? `${dm}（${wd}）` : `${dm} (${wd})`;
   };
 
@@ -3033,58 +3359,116 @@ select.input{
   }
 
   $('#f-guests').addEventListener('change', e => { B.guests = e.target.value; sync(); });
-
-  // Бэкенда нет: бронь уходит готовым сообщением в телеграм заведения, где хозяин
-  // её видит и подтверждает. Это честно (в отличие от формы, которая раньше
-  // рисовала «стол за вами», а заявку никуда не отправляла) и работает без сервера.
-  function bookingMsg(){
-    const t = T();
-    const rows = [t.msg_hi, '',
-      `${t.sum_format}: ${fmtName()} (${FMT[B.format]})`,
-      `${t.sum_date}: ${fmtDate(B.date)}`,
-      `${t.sum_time}: ${B.time}`,
-      `${t.sum_guests}: ${B.guests}`];
-    const add = (label, v) => { const s = v.trim(); if (s) rows.push(`${label}: ${s}`); };
-    add(t.f_name, $('#f-name').value);
-    add(t.f_phone, $('#f-phone').value);
-    add(t.f_note, $('#f-note').value);
-    return rows.join('\n');
-  }
+  $('#f-phone').addEventListener('input', () => {
+    $('#f-phone').removeAttribute('aria-invalid');
+    $('#f-status').textContent = '';
+  });
 
   // Аргументы последних подтверждений храним, чтобы перерисовать их на новом языке
   let lastBook = null, lastB2B = null;
+  let pendingBooking = null, pendingB2B = null;
 
-  $('#submit').addEventListener('click', () => {
+  function requestKey(prefix){
+    if (crypto.randomUUID) return `${prefix}-${crypto.randomUUID()}`;
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    return `${prefix}-${[...bytes].map(byte => byte.toString(16).padStart(2,'0')).join('')}`;
+  }
+
+  function resetRequestForms(){
+    $('#f-status').textContent = '';
+    $('#f-phone').removeAttribute('aria-invalid');
+    sync();
+    const businessSubmit = $('#b2b-submit');
+    businessSubmit.disabled = false;
+    businessSubmit.textContent = T().b2b_send;
+    document.querySelector('#b2b-form-wrap .summary__note').textContent = T().b2b_form_note;
+  }
+
+  function clearBookingForm(){
+    B.format = 'master';
+    B.date = '';
+    B.time = '';
+    B.guests = '2';
+    $$('#fmt .fmt__opt').forEach(option =>
+      option.setAttribute('aria-pressed', option.dataset.fmt === 'master')
+    );
+    buildDays();
+    $$('.slot', slots).forEach(slot => slot.setAttribute('aria-pressed', 'false'));
+    refreshSlots();
+    buildGuests();
+    $('#f-name').value = '';
+    $('#f-phone').value = '';
+    $('#f-note').value = '';
+    $('#f-privacy').checked = false;
+    $('#f-status').textContent = '';
+    $('#f-phone').removeAttribute('aria-invalid');
+    sync();
+  }
+
+  function clearB2BForm(){
+    ['#b-company','#b-name','#b-phone','#b-note'].forEach(selector => {
+      $(selector).value = '';
+    });
+    $('#b-privacy').checked = false;
+    const submit = $('#b2b-submit');
+    submit.disabled = false;
+    submit.textContent = T().b2b_send;
+    document.querySelector('#b2b-form-wrap .summary__note').textContent = T().b2b_form_note;
+  }
+
+  $('#submit').addEventListener('click', async () => {
     if (!B.date || !B.time) return;
-    const privacyStatus = $('#f-status');
-    privacyStatus.textContent = '';
+    const status = $('#f-status'), submit = $('#submit');
+    status.textContent = '';
+    const phone = $('#f-phone').value.trim();
+    if (phone.replace(/\D/g,'').length < 10){
+      status.textContent = T().booking_phone_required;
+      $('#f-phone').setAttribute('aria-invalid','true');
+      $('#f-phone').focus();
+      return;
+    }
     if (!$('#f-privacy').checked){
-      privacyStatus.textContent = T().privacy_required;
+      status.textContent = T().privacy_required;
       $('#f-privacy').focus();
       return;
     }
-    // В телеграм-мини-аппе шлём бронь прямо боту (он перешлёт её заведению и
-    // подтвердит), а не открываем чат. sendData работает, когда мини-апп открыт
-    // кнопкой «Забронировать» из бота; если нет (полный веб-апп/обычный браузер)
-    // — открываем бота @chainyabot (@chainyamsk — канал, писать туда нельзя).
-    if (IN_TG){
-      try {
-        TG.sendData(JSON.stringify({
-          type: 'booking',
-          format: B.format, format_name: fmtName(), price: FMT[B.format],
-          date: B.date, date_h: fmtDate(B.date), time: B.time, guests: +B.guests,
-          name: $('#f-name').value.trim(), phone: $('#f-phone').value.trim(), note: $('#f-note').value.trim(),
-        }));
-        track('booking_sent','book');
-        return; // телеграм закроет мини-апп сам
-      } catch (e){ /* не тот контекст запуска — уходим на запасной путь ниже */ }
+    submit.disabled = true;
+    submit.textContent = T().booking_sending;
+    const payload = {
+      format:B.format,date:B.date,time:B.time,guests:+B.guests,
+      name:$('#f-name').value.trim(),phone,note:$('#f-note').value.trim(),
+      privacy_accepted:true,
+    };
+    const fingerprint = JSON.stringify(payload);
+    if (!pendingBooking || pendingBooking.fingerprint !== fingerprint){
+      pendingBooking = { fingerprint, key:requestKey('booking') };
     }
-    // обычный браузер: @chainyamsk — канал, писать нельзя; открываем бота, где
-    // бронь оформляется нативно (в мини-аппе выше бронь уходит владельцу напрямую)
-    track('booking_handoff','book');
-    window.open(BOT_URL, '_blank', 'noopener');
-    lastBook = { name: $('#f-name').value.trim(), format: B.format, date: B.date, time: B.time, n: +B.guests };
+    let bookingResult;
+    try{
+      const response = await fetch('/api/bookings',{
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json',
+          'Idempotency-Key':pendingBooking.key,
+        },
+        body:fingerprint,
+      });
+      bookingResult = await response.json().catch(() => ({}));
+      if (!response.ok || !bookingResult.id) throw new Error();
+    }catch(e){
+      status.textContent = T().booking_error;
+      submit.disabled = false;
+      submit.textContent = T().book_btn_go;
+      return;
+    }
+    track('booking_sent','book');
+    lastBook = {
+      id:bookingResult.id, name:$('#f-name').value.trim(), format:B.format,
+      date:B.date, time:B.time, n:+B.guests,
+    };
+    pendingBooking = null;
     renderDone();
+    clearBookingForm();
     $('#book-form').hidden = true;
     $('#book-done').hidden = false;
     scrollTo({ top:0, behavior:'instant' });
@@ -3100,8 +3484,19 @@ select.input{
       dateStr: fmtDate(lastBook.date),
       time: lastBook.time,
       n: lastBook.n,
+      id: lastBook.id,
     });
   }
+
+  $$('.b2b-intent').forEach(button => button.addEventListener('click', () => {
+    const eventIntent = button.dataset.intent === 'event';
+    const note = $('#b-note');
+    note.value = eventIntent ? T().b2b_event_prefill : T().b2b_supply_prefill;
+    requestAnimationFrame(() => {
+      document.querySelector('#b2b-form-wrap .summary').scrollIntoView({behavior:'smooth',block:'start'});
+    });
+    setTimeout(()=>$('#b-phone').focus({preventScroll:true}),450);
+  }));
 
   $('#b2b-submit').addEventListener('click', async () => {
     const phone = $('#b-phone').value.trim();
@@ -3112,16 +3507,25 @@ select.input{
     }
     const submit = $('#b2b-submit');
     submit.disabled = true;
+    const payload = {
+      company:$('#b-company').value.trim(), name:$('#b-name').value.trim(),
+      contact:phone, note:$('#b-note').value.trim(), privacy_accepted:true,
+    };
+    const fingerprint = JSON.stringify(payload);
+    if (!pendingB2B || pendingB2B.fingerprint !== fingerprint){
+      pendingB2B = { fingerprint, key:requestKey('business') };
+    }
     try {
       const response = await fetch('/api/business-leads', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-          company:$('#b-company').value.trim(), name:$('#b-name').value.trim(),
-          contact:phone, note:$('#b-note').value.trim(), privacy_accepted:true,
-        }),
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json',
+          'Idempotency-Key':pendingB2B.key,
+        },
+        body:fingerprint,
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(T().b2b_error);
+      if (!response.ok || !result.id) throw new Error(T().b2b_error);
     } catch (e) {
       submit.disabled = false;
       const note = document.querySelector('#b2b-form-wrap .summary__note');
@@ -3129,8 +3533,10 @@ select.input{
       return;
     }
     lastB2B = { name: $('#b-name').value.trim() };
+    pendingB2B = null;
     track('b2b_sent','b2b');
     $('#b2b-done-text').textContent = T().b2bDoneText(lastB2B.name);
+    clearB2BForm();
     $('#b2b-form-wrap').hidden = true;
     $('#b2b-done').hidden = false;
     scrollTo({ top:0, behavior:'instant' });
@@ -3207,22 +3613,13 @@ select.input{
     return ['home','shop','tea','cart','book','b2b','payment'].includes(raw) ? raw : 'home';
   })();
   applyLang();
+  refreshCatalog();
   track('page_view', initialAnalyticsSection);
   goFromHash();
   trackOnce('section_view', initialAnalyticsSection);
 
-  // Инициализация мини-аппа: только когда сайт реально открыт внутри телеграма
-  if (IN_TG){
-    TG.ready();
-    TG.expand();
-    try { TG.setHeaderColor('#141110'); TG.setBackgroundColor('#141110'); } catch(e){}
-    TG.BackButton.onClick(() => {
-      if ($('#cart-sheet').classList.contains('on')) closeCart();
-      else if ($('#tea-sheet').classList.contains('on')) closeTea();
-      else if (($('.view.is-active') || {}).id !== 'view-home') go('home');
-      else TG.close();
-    });
-    tgSyncBack();
-  }
+  // Если SDK уже успел загрузиться — подключаемся сразу; иначе сработает
+  // chainya:telegram-ready. Обычный браузер не ждёт telegram.org.
+  connectTelegram();
 })();
 </script>

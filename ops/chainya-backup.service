@@ -3,7 +3,8 @@ Description=Backup Chainya orders database
 
 [Service]
 Type=oneshot
-User=root
+User=chainya-shop
+Group=chainya-shop
 UMask=0077
 ExecStart=/opt/chainya-shop/.venv/bin/python /opt/chainya-shop/ops/backup-chainya.py
 Nice=10

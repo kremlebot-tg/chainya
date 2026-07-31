@@ -43,8 +43,8 @@ SELLER_REGISTERED_ADDRESS = (
     "д. 6, корп. 2, стр. 2, кв. 233"
 )
 
-# og:image обязан быть абсолютным: по относительному пути телеграм и соцсети
-# картинку не подтянут. Меняется на свой домен, когда он появится.
+# og:image обязан быть абсолютным: по относительному пути Telegram и соцсети
+# картинку не подтянут.
 SITE = "https://chainya.ru/"
 SECURITY_CONTACT = "https://t.me/chainyabot"
 SECURITY_EMAIL = "mailto:chainya@bk.ru"
@@ -88,7 +88,9 @@ HEAD_EXTRA = f"""<meta name="description" content="{DESC}">
             "telephone": "+7 905 590-88-01",
             "address": {
                 "@type": "PostalAddress",
-                "streetAddress": SELLER_REGISTERED_ADDRESS,
+                "postalCode": "129226",
+                "addressLocality": "Москва",
+                "streetAddress": "ул. Сергея Эйзенштейна, д. 6, корп. 2, стр. 2, кв. 233",
                 "addressCountry": "RU",
             },
         },
@@ -176,7 +178,17 @@ def document(body: str, extra_head: str = "", *, telegram_sdk: bool = True) -> s
         style_block = style_match.group(1)
         body = body[style_match.end():]
     sdk = (
-        '<script src="https://telegram.org/js/telegram-web-app.js"></script>\n'
+        """<script>
+(()=>{const source=location.search+location.hash;
+if(!/(?:^|[?&#])tgWebApp(?:Data|Version|Platform)=/i.test(source))return;
+const script=document.createElement('script');
+script.src='https://telegram.org/js/telegram-web-app.js';
+script.async=true;
+script.onload=()=>dispatchEvent(new Event('chainya:telegram-ready'));
+document.head.appendChild(script);
+})();
+</script>
+"""
         if telegram_sdk else ""
     )
     return (
@@ -207,6 +219,7 @@ if web:
     shutil.copy(OG_SRC, dist / OG_NAME)
     shutil.copy(root / "privacy.html", dist / "privacy.html")
     shutil.copy(root / "legal.html", dist / "legal.html")
+    shutil.copy(root / "legal.css", dist / "legal.css")
     well_known = dist / ".well-known"
     well_known.mkdir()
     (well_known / "security.txt").write_text(
@@ -251,6 +264,7 @@ if web:
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
         f"  <url><loc>{SITE}</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>\n"
         f"  <url><loc>{SITE}legal.html</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>\n"
+        f"  <url><loc>{SITE}privacy.html</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>\n"
         "</urlset>\n",
         encoding="utf-8",
     )

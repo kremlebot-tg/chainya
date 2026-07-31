@@ -19,7 +19,7 @@ CHAINYA_TEST_MODE=1 .venv/bin/uvicorn backend.app:app --reload --port 8080
 ## API
 
 - `GET /api/health` — состояние и число позиций каталога.
-- `GET /api/delivery/quote?method=...` — тестовая стоимость получения.
+- `POST /api/delivery/quote` — актуальный расчёт доставки СДЭК по корзине и городу.
 - `POST /api/orders` — серверная проверка, расчёт и сохранение заказа.
 - `GET /api/orders/{id}` — состояние заказа.
 - `POST /api/orders/{id}/test-pay` — имитация webhook успешной оплаты, только
@@ -35,9 +35,10 @@ CHAINYA_TEST_MODE=1 .venv/bin/uvicorn backend.app:app --reload --port 8080
 - `GET /api/admin/orders/{id}/integration-preview?ready_at=YYYY-MM-DD HH:MM:SS` —
   предварительные входные данные интеграций без внешних запросов и записей.
 
-Цены СДЭК сейчас демонстрационные. Перед продакшеном mock-расчёт и test-pay
-заменяются адаптерами СДЭК, эквайринга и Saby. Секреты передаются только через
-переменные окружения.
+В production стоимость и доступность доставки рассчитываются через CDEK API,
+а платежи создаются через Т‑Банк. Mock-оплата существует только при явном
+`CHAINYA_TEST_MODE=1` и недоступна на production-vhost. Секреты передаются
+только через защищённые переменные окружения.
 
 Подготовительные адаптеры находятся в `tbank.py`, `cdek.py` и `saby_sync.py`.
 Они ничего не запускают при импорте. Все будущие внешние записи обязаны идти
@@ -55,7 +56,7 @@ CHAINYA_TEST_MODE=1 .venv/bin/uvicorn backend.app:app --reload --port 8080
 ту же защищённую сессию. Без сессии полноценная HTML-оболочка панели не
 выдаётся. Выход выполняется кнопкой в правом верхнем углу.
 
-Сырые события статистики хранятся не более 400 дней.
+Сырые события статистики хранятся не более 360 дней.
 
 Если заданы `BOT_TOKEN` и `OWNER_CHAT_ID`, после первого перехода заказа в
 `paid` backend отправляет владельцам уведомление через Telegram. Повторный вызов
@@ -82,10 +83,12 @@ CHAINYA_TEST_MODE=1 .venv/bin/uvicorn backend.app:app --reload --port 8080
 `TBANK_CHECKOUT_MODE=off`, `CDEK_INTEGRATION_MODE=off` и
 `SABY_ORDER_SYNC_MODE=off`.
 
-Т-Банк выдал отдельный DEMO-терминал интернет-эквайринга. Режим
+Для локальной проверки поддерживается отдельный DEMO-терминал:
 `TBANK_CHECKOUT_MODE=demo` разрешён только при `CHAINYA_TEST_MODE=1` и только
 для ключа с суффиксом `DEMO`; Saby и CDEK при этом остаются заблокированы.
-Checkout сохраняет `PaymentId`/`PaymentURL`, не повторяет `Init` при повторном
+Боевой терминал работает только при `CHAINYA_TEST_MODE=0`,
+`TBANK_CHECKOUT_MODE=auto` и полностью настроенном онлайн-чеке. Checkout
+сохраняет `PaymentId`/`PaymentURL`, дедуплицирует повторный запрос по
 `Idempotency-Key`, а оплатой считает только подписанный callback `CONFIRMED` на
 `/api/payments/tbank/notification`. Страницы `/payment/success` и
 `/payment/fail` сами статус не меняют.

@@ -42,7 +42,7 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
-    add_header Content-Security-Policy "base-uri 'self'; object-src 'none'; form-action 'self'" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
 
     location /api/admin/ {
         add_header Strict-Transport-Security "max-age=31536000" always;
@@ -51,7 +51,29 @@ server {
         add_header Pragma "no-cache" always;
         add_header Referrer-Policy "no-referrer" always;
         add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
-        add_header Content-Security-Policy "base-uri 'self'; object-src 'none'; form-action 'self'" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
+        proxy_pass http://127.0.0.1:8077;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        client_max_body_size 32k;
+    }
+
+    # Mock-оплата никогда не публикуется на production-vhost, даже если старый
+    # env по ошибке оставил backend в test mode.
+    location ~ ^/api/orders/[^/]+/test-pay/?$ {
+        access_log off;
+        error_log /dev/null crit;
+        return 404;
+    }
+
+    # Все операции с конкретным заказом могут нести bearer-token в query string.
+    # Regex закрывает также trailing slash и будущие дочерние маршруты.
+    location ~ ^/api/orders/ {
+        access_log off;
+        error_log /dev/null crit;
         proxy_pass http://127.0.0.1:8077;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -71,15 +93,21 @@ server {
         client_max_body_size 32k;
     }
 
-    location ^~ /test-payment/ { return 404; }
+    location ^~ /test-payment/ {
+        access_log off;
+        error_log /dev/null crit;
+        return 404;
+    }
 
-    location /payment/ {
+    location ^~ /payment/ {
+        access_log off;
+        error_log /dev/null crit;
         add_header Strict-Transport-Security "max-age=31536000" always;
         add_header X-Content-Type-Options "nosniff" always;
         add_header Cache-Control "no-store" always;
         add_header Referrer-Policy "no-referrer" always;
         add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
-        add_header Content-Security-Policy "base-uri 'self'; object-src 'none'; form-action 'self'" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
         add_header X-Robots-Tag "noindex, nofollow" always;
         proxy_pass http://127.0.0.1:8077;
         proxy_http_version 1.1;
@@ -95,7 +123,7 @@ server {
         add_header Cache-Control "no-store" always;
         add_header Referrer-Policy "no-referrer" always;
         add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
-        add_header Content-Security-Policy "base-uri 'self'; object-src 'none'; form-action 'self'" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
         add_header X-Robots-Tag "noindex, nofollow" always;
         proxy_pass http://127.0.0.1:8077;
         proxy_http_version 1.1;
@@ -111,7 +139,7 @@ server {
         add_header Cache-Control "no-store" always;
         add_header Referrer-Policy "no-referrer" always;
         add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
-        add_header Content-Security-Policy "base-uri 'self'; object-src 'none'; form-action 'self'" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
         add_header X-Robots-Tag "noindex, nofollow" always;
         proxy_pass http://127.0.0.1:8077;
         proxy_http_version 1.1;
@@ -127,7 +155,7 @@ server {
         add_header Cache-Control "no-store" always;
         add_header Referrer-Policy "no-referrer" always;
         add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
-        add_header Content-Security-Policy "base-uri 'self'; object-src 'none'; form-action 'self'" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
         add_header X-Robots-Tag "noindex, nofollow" always;
         proxy_pass http://127.0.0.1:8077;
         proxy_http_version 1.1;
@@ -158,7 +186,7 @@ server {
         add_header Cache-Control "no-cache, no-store, must-revalidate" always;
         add_header Referrer-Policy "strict-origin-when-cross-origin" always;
         add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
-        add_header Content-Security-Policy "base-uri 'self'; object-src 'none'; form-action 'self'" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
         expires -1;
         try_files /index.html =404;
     }
@@ -169,7 +197,7 @@ server {
         add_header Cache-Control "no-cache, no-store, must-revalidate" always;
         add_header Referrer-Policy "strict-origin-when-cross-origin" always;
         add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
-        add_header Content-Security-Policy "base-uri 'self'; object-src 'none'; form-action 'self'" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
         expires -1;
     }
 
@@ -181,7 +209,7 @@ server {
         add_header Cache-Control "no-store" always;
         add_header Referrer-Policy "strict-origin-when-cross-origin" always;
         add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
-        add_header Content-Security-Policy "base-uri 'self'; object-src 'none'; form-action 'self'" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
     }
 
     # Клиентские экраны используют hash-маршруты (#shop, #book), поэтому
@@ -189,13 +217,18 @@ server {
     location / { try_files $uri $uri/ =404; }
 
     location ~* \.(woff2?|ttf)$ {
+        types {
+            font/woff woff;
+            font/woff2 woff2;
+            font/ttf ttf;
+        }
         expires 30d;
         add_header Strict-Transport-Security "max-age=31536000" always;
         add_header X-Content-Type-Options "nosniff" always;
         add_header Cache-Control "public";
         add_header Referrer-Policy "strict-origin-when-cross-origin" always;
         add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
-        add_header Content-Security-Policy "base-uri 'self'; object-src 'none'; form-action 'self'" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
     }
 
     location ~* \.(jpg|jpeg|png|webp|svg|ico)$ {
@@ -205,7 +238,7 @@ server {
         add_header Cache-Control "public";
         add_header Referrer-Policy "strict-origin-when-cross-origin" always;
         add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
-        add_header Content-Security-Policy "base-uri 'self'; object-src 'none'; form-action 'self'" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
     }
 
     gzip on;

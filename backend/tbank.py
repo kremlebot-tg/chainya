@@ -306,6 +306,18 @@ class TBankClient:
     # Name used by the official API while keeping a descriptive application API.
     init_payment = create_payment
 
+    def check_order(self, local_order_id: str) -> dict[str, Any]:
+        """Return all provider payments registered for the merchant OrderId.
+
+        This read is the safe recovery primitive after an ambiguous ``Init``:
+        callers must inspect ``Payments`` instead of blindly repeating Init
+        with an OrderId that the provider requires to be unique.
+        """
+        order_id = self._required_id(
+            local_order_id, "идентификатор заказа", 50
+        )
+        return self._post("CheckOrder", {"OrderId": order_id})
+
     def get_state(
         self,
         payment_id: str | int,

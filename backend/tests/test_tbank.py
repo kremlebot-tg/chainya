@@ -210,6 +210,30 @@ def test_create_payment_calls_init_once_and_uses_local_order_id():
     assert len(calls) == 1
 
 
+def test_check_order_uses_documented_order_id_read():
+    calls = []
+
+    def opener(request, timeout):
+        calls.append((request, timeout))
+        body = json.loads(request.data)
+        assert request.full_url == "https://securepay.tinkoff.ru/v2/CheckOrder"
+        assert body["OrderId"] == "LOCAL-ORDER-1"
+        signed = dict(body)
+        token = signed.pop("Token")
+        assert token == generate_token(signed, "11111111111111")
+        return Response({
+            "Success": True,
+            "OrderId": "LOCAL-ORDER-1",
+            "Payments": [
+                {"PaymentId": 12345, "Status": "NEW", "Amount": 10_000}
+            ],
+        })
+
+    result = TBankClient(settings(), opener=opener).check_order("LOCAL-ORDER-1")
+    assert result["Payments"][0]["PaymentId"] == 12345
+    assert len(calls) == 1
+
+
 def test_create_payment_rejects_untrusted_payment_url_from_success_response():
     client = TBankClient(
         settings(),

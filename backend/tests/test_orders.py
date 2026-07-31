@@ -82,7 +82,10 @@ def test_order_creation_is_idempotent_for_network_retries(tmp_path, monkeypatch)
     headers = {"Idempotency-Key": "checkout-018f6f07-7648-7d6b-a0b1-safe"}
     with client:
         first = client.post("/api/orders", json=payload(), headers=headers)
-        second = client.post("/api/orders", json=payload(), headers=headers)
+        replays = [
+            client.post("/api/orders", json=payload(), headers=headers)
+            for _ in range(15)
+        ]
         conflict = client.post("/api/orders", json=payload(name="Другой"), headers=headers)
         invalid = client.post(
             "/api/orders", json=payload(), headers={"Idempotency-Key": "contains a space"}
@@ -92,11 +95,17 @@ def test_order_creation_is_idempotent_for_network_retries(tmp_path, monkeypatch)
                 "SELECT idempotency_key_hash, request_hash FROM orders"
             ).fetchall()
     assert first.status_code == 201
-    assert second.status_code == 201
-    assert first.json()["order"]["id"] == second.json()["order"]["id"]
-    assert first.json()["payment"]["url"] == second.json()["payment"]["url"]
+    assert all(response.status_code == 201 for response in replays)
+    assert all(
+        first.json()["order"]["id"] == response.json()["order"]["id"]
+        for response in replays
+    )
+    assert all(
+        first.json()["payment"]["url"] == response.json()["payment"]["url"]
+        for response in replays
+    )
     assert first.json()["payment"]["reused"] is False
-    assert second.json()["payment"]["reused"] is True
+    assert all(response.json()["payment"]["reused"] is True for response in replays)
     assert conflict.status_code == 409
     assert invalid.status_code == 422
     assert len(rows) == 1
@@ -234,6 +243,49 @@ def test_business_lead_is_saved_and_notified(tmp_path, monkeypatch):
         with module.db() as con:
             stored = con.execute("SELECT * FROM business_leads").fetchone()
         assert stored["company"] == "Кофейня Утро"
+
+
+def test_business_lead_is_idempotent_before_rate_limit(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    sent = []
+    monkeypatch.setattr(
+        module, "notify_business_lead", lambda lead: sent.append(lead["id"])
+    )
+    lead = {
+        "company": "Кофейня Утро",
+        "name": "Анна",
+        "contact": "@anna",
+        "note": "Нужно 2 кг в месяц",
+        "privacy_accepted": True,
+    }
+    headers = {"Idempotency-Key": "b2b-network-replay-1"}
+    with client:
+        first = client.post("/api/business-leads", json=lead, headers=headers)
+        replays = [
+            client.post("/api/business-leads", json=lead, headers=headers)
+            for _ in range(12)
+        ]
+        conflict = client.post(
+            "/api/business-leads",
+            json={**lead, "note": "Другая заявка"},
+            headers=headers,
+        )
+        with module.db() as con:
+            rows = con.execute(
+                """SELECT id, idempotency_key_hash, request_hash
+                   FROM business_leads"""
+            ).fetchall()
+
+    assert first.status_code == 202
+    assert all(response.status_code == 202 for response in replays)
+    assert all(
+        response.json()["id"] == first.json()["id"] for response in replays
+    )
+    assert conflict.status_code == 409
+    assert len(rows) == 1
+    assert len(rows[0]["idempotency_key_hash"]) == 64
+    assert len(rows[0]["request_hash"]) == 64
+    assert sent == [first.json()["id"]]
 
 
 def test_admin_lists_and_updates_orders(tmp_path, monkeypatch):

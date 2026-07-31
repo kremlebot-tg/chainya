@@ -1,4 +1,5 @@
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -21,7 +22,8 @@ from backend.saby_sync import (
 
 
 ROOT = Path(__file__).resolve().parents[2]
-CATALOG_PATH = ROOT.parent / "telegram-bot" / "teas.json"
+DEFAULT_CATALOG_PATH = ROOT.parent / "telegram-bot" / "teas.json"
+CATALOG_PATH = Path(os.environ.get("CHAINYA_CATALOG_PATH", DEFAULT_CATALOG_PATH))
 
 
 def settings(**changes):

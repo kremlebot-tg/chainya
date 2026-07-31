@@ -162,21 +162,162 @@ def test_demo_mode_rejects_non_demo_credentials_without_network(tmp_path, monkey
 
 def test_malformed_init_never_returns_redirect_or_retries(tmp_path, monkeypatch):
     client, module = demo_app(tmp_path, monkeypatch)
-    calls = []
+    init_calls, check_calls = [], []
     monkeypatch.setattr(
         module.tbank_client,
         "create_payment",
-        lambda *_args, **_kwargs: calls.append(1) or {"Success": True},
+        lambda *_args, **_kwargs: init_calls.append(1) or {"Success": True},
+    )
+    monkeypatch.setattr(
+        module.tbank_client,
+        "check_order",
+        lambda order_id: check_calls.append(order_id) or {
+            "Success": True, "OrderId": order_id, "Payments": []
+        },
     )
     headers = {"Idempotency-Key": "demo-init-malformed"}
     with client:
         first = client.post("/api/orders", json=order_payload(), headers=headers)
         second = client.post("/api/orders", json=order_payload(), headers=headers)
+        third = client.post("/api/orders", json=order_payload(), headers=headers)
     assert first.status_code == 502
     assert first.json()["detail"] == "Тестовая форма Т-Банка временно недоступна"
+    assert second.status_code == 503
+    assert third.status_code == 503
+    assert init_calls == [1]
+    assert len(check_calls) == 1
+    with module.db() as con:
+        stored = con.execute(
+            "SELECT payment_state FROM orders"
+        ).fetchone()
+    assert stored["payment_state"] == "init_ambiguous"
+
+
+def test_failed_init_replay_recovers_payment_url_via_check_order(tmp_path, monkeypatch):
+    client, module = demo_app(tmp_path, monkeypatch)
+    init_calls, check_calls = [], []
+
+    def failed_init(*_args, **_kwargs):
+        init_calls.append(1)
+        raise module.TBankError("Т-Банк временно недоступен")
+
+    monkeypatch.setattr(module.tbank_client, "create_payment", failed_init)
+    monkeypatch.setattr(
+        module.tbank_client,
+        "check_order",
+        lambda order_id: check_calls.append(order_id) or {
+            "Success": True,
+            "OrderId": order_id,
+            "Payments": [{
+                "PaymentId": 7654321,
+                "Status": "NEW",
+                "Amount": 88_000,
+                "PaymentURL": "https://pay.tbank.ru/recovered",
+            }],
+        },
+    )
+    headers = {"Idempotency-Key": "recover-through-check-order"}
+    with client:
+        first = client.post("/api/orders", json=order_payload(), headers=headers)
+        second = client.post("/api/orders", json=order_payload(), headers=headers)
+
+    assert first.status_code == 502
     assert second.status_code == 201
-    assert second.json()["payment"]["url"] is None
-    assert calls == [1]
+    assert second.json()["payment"] == {
+        "mode": "tbank_demo",
+        "url": "https://pay.tbank.ru/recovered",
+        "reused": True,
+    }
+    assert init_calls == [1]
+    assert check_calls == [second.json()["order"]["id"]]
+    with module.db() as con:
+        stored = con.execute(
+            """SELECT provider_payment_id, payment_state, payment_attempts
+               FROM orders"""
+        ).fetchone()
+    assert tuple(stored) == ("7654321", "awaiting", 1)
+
+
+def test_failed_check_order_never_falls_back_to_second_init(tmp_path, monkeypatch):
+    client, module = demo_app(tmp_path, monkeypatch)
+    init_calls, check_calls = [], []
+
+    def failed_init(*_args, **_kwargs):
+        init_calls.append(1)
+        raise module.TBankError("Т-Банк временно недоступен")
+
+    def failed_check(order_id):
+        check_calls.append(order_id)
+        raise module.TBankError("Т-Банк временно недоступен")
+
+    monkeypatch.setattr(module.tbank_client, "create_payment", failed_init)
+    monkeypatch.setattr(module.tbank_client, "check_order", failed_check)
+    headers = {"Idempotency-Key": "check-order-transport-failure"}
+    with client:
+        first = client.post("/api/orders", json=order_payload(), headers=headers)
+        replay = client.post("/api/orders", json=order_payload(), headers=headers)
+
+    assert first.status_code == 502
+    assert replay.status_code == 503
+    assert init_calls == [1]
+    assert len(check_calls) == 1
+    with module.db() as con:
+        stored = con.execute(
+            "SELECT payment_state, provider_payment_id FROM orders"
+        ).fetchone()
+    assert tuple(stored) == ("init_ambiguous", None)
+
+
+def test_stale_init_recovery_keeps_found_payment_ambiguous_without_url(
+    tmp_path, monkeypatch
+):
+    client, module = demo_app(tmp_path, monkeypatch)
+    init_calls = []
+
+    def failed_init(*_args, **_kwargs):
+        init_calls.append(1)
+        raise module.TBankError("Т-Банк временно недоступен")
+
+    monkeypatch.setattr(module.tbank_client, "create_payment", failed_init)
+    headers = {"Idempotency-Key": "stale-init-found-no-url"}
+    with client:
+        first = client.post("/api/orders", json=order_payload(), headers=headers)
+        with module.db() as con:
+            order_id = con.execute("SELECT id FROM orders").fetchone()[0]
+        stale = (
+            module.datetime.now(module.timezone.utc)
+            - module.timedelta(seconds=module.TBANK_INIT_LEASE_SECONDS + 1)
+        ).isoformat()
+        with module.db() as con:
+            con.execute(
+                """UPDATE orders
+                   SET payment_state = 'initializing',
+                       payment_updated_at = ?
+                   WHERE id = ?""",
+                (stale, order_id),
+            )
+        monkeypatch.setattr(
+            module.tbank_client,
+            "check_order",
+            lambda checked_order_id: {
+                "Success": True,
+                "OrderId": checked_order_id,
+                "Payments": [{
+                    "PaymentId": 887766,
+                    "Status": "NEW",
+                    "Amount": 88_000,
+                }],
+            },
+        )
+        replay = client.post("/api/orders", json=order_payload(), headers=headers)
+
+    assert first.status_code == 502
+    assert replay.status_code == 503
+    assert init_calls == [1]
+    stored = module.order_row(order_id)
+    assert stored["provider_payment_id"] == "887766"
+    assert stored["payment_state"] == "init_ambiguous"
+    assert stored["payment_url"] is None
 
 
 def test_live_init_failure_and_notification_have_no_test_wording(tmp_path, monkeypatch):
@@ -214,6 +355,7 @@ def test_signed_confirmed_callback_is_idempotent_and_redirect_is_not_proof(tmp_p
     sent = []
     monkeypatch.setattr(module.tbank_client, "create_payment", lambda *_a, **_k: bank_response())
     monkeypatch.setattr(module, "notify_owners", lambda row: sent.append(row["id"]))
+    monkeypatch.setattr(module, "_telegram_notifications_enabled", lambda: True)
     with client:
         created = client.post("/api/orders", json=order_payload()).json()
         order_id = created["order"]["id"]
@@ -242,6 +384,217 @@ def test_signed_confirmed_callback_is_idempotent_and_redirect_is_not_proof(tmp_p
     assert current["status"] == "paid"
     assert current["payment_state"] == "paid"
     assert sent == [order_id]
+
+
+def test_paid_callback_replay_retries_durable_telegram_effect(tmp_path, monkeypatch):
+    client, module = demo_app(tmp_path, monkeypatch)
+    deliveries = []
+    outcomes = iter((False, True))
+    monkeypatch.setattr(
+        module.tbank_client, "create_payment", lambda *_a, **_k: bank_response()
+    )
+    monkeypatch.setattr(module, "_telegram_notifications_enabled", lambda: True)
+
+    def notify(row):
+        deliveries.append(row["id"])
+        return next(outcomes)
+
+    monkeypatch.setattr(module, "notify_owners", notify)
+    with client:
+        created = client.post("/api/orders", json=order_payload()).json()["order"]
+        notice = signed_notification(
+            module, created["id"], "123456", 88_000, "CONFIRMED"
+        )
+        first = client.post("/api/payments/tbank/notification", json=notice)
+        with module.db() as con:
+            failed = con.execute(
+                """SELECT state, attempts FROM paid_order_effects
+                   WHERE order_id = ? AND effect = 'telegram'""",
+                (created["id"],),
+            ).fetchone()
+        second = client.post("/api/payments/tbank/notification", json=notice)
+        third = client.post("/api/payments/tbank/notification", json=notice)
+        with module.db() as con:
+            sent = con.execute(
+                """SELECT state, attempts, completed_at
+                   FROM paid_order_effects
+                   WHERE order_id = ? AND effect = 'telegram'""",
+                (created["id"],),
+            ).fetchone()
+
+    assert first.status_code == second.status_code == third.status_code == 200
+    assert tuple(failed) == ("failed", 1)
+    assert sent["state"] == "sent"
+    assert sent["attempts"] == 2
+    assert sent["completed_at"]
+    assert deliveries == [created["id"], created["id"]]
+
+
+def test_restart_recovery_delivers_committed_pending_effect(tmp_path, monkeypatch):
+    client, module = demo_app(tmp_path, monkeypatch)
+    delivered = []
+    monkeypatch.setattr(
+        module.tbank_client, "create_payment", lambda *_a, **_k: bank_response()
+    )
+    monkeypatch.setattr(module, "_telegram_notifications_enabled", lambda: True)
+    monkeypatch.setattr(
+        module, "notify_owners",
+        lambda row: delivered.append(row["id"]) or True,
+    )
+
+    with client:
+        created = client.post("/api/orders", json=order_payload()).json()["order"]
+        now = module.now_iso()
+        # This is the durable state left if the process dies immediately after
+        # committing CONFIRMED and before its BackgroundTask starts.
+        with module.db() as con:
+            con.execute(
+                """UPDATE orders
+                   SET status = 'paid', payment_state = 'paid', paid_at = ?
+                   WHERE id = ?""",
+                (now, created["id"]),
+            )
+            module.enqueue_paid_order_effects(con, created["id"], now)
+        module.recover_paid_order_effects()
+        with module.db() as con:
+            effect = con.execute(
+                """SELECT state, attempts FROM paid_order_effects
+                   WHERE order_id = ? AND effect = 'telegram'""",
+                (created["id"],),
+            ).fetchone()
+
+    assert tuple(effect) == ("sent", 1)
+    assert delivered == [created["id"]]
+
+
+def test_disabled_integrations_keep_outbox_pending_without_fake_success(
+    tmp_path, monkeypatch
+):
+    client, module = demo_app(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        module.tbank_client, "create_payment", lambda *_a, **_k: bank_response()
+    )
+    monkeypatch.setattr(module, "BOT_TOKEN", "")
+    monkeypatch.setattr(module, "OWNER_CHAT_IDS", [])
+    monkeypatch.setattr(module, "_saby_auto_sync_enabled", lambda: False)
+
+    with client:
+        created = client.post("/api/orders", json=order_payload()).json()["order"]
+        notice = signed_notification(
+            module, created["id"], "123456", 88_000, "CONFIRMED"
+        )
+        response = client.post("/api/payments/tbank/notification", json=notice)
+        with module.db() as con:
+            effects = con.execute(
+                """SELECT effect, state, attempts FROM paid_order_effects
+                   WHERE order_id = ? ORDER BY effect""",
+                (created["id"],),
+            ).fetchall()
+
+    assert response.status_code == 200
+    assert [tuple(effect) for effect in effects] == [
+        ("saby", "pending", 0),
+        ("telegram", "pending", 0),
+    ]
+
+
+def test_paid_effect_recovery_retries_definite_saby_failure(tmp_path, monkeypatch):
+    client, module = demo_app(tmp_path, monkeypatch)
+    saby_calls = []
+    monkeypatch.setattr(
+        module.tbank_client, "create_payment", lambda *_a, **_k: bank_response()
+    )
+    monkeypatch.setattr(module, "notify_owners", lambda _row: True)
+    monkeypatch.setattr(module, "_saby_auto_sync_enabled", lambda: True)
+
+    with client:
+        created = client.post("/api/orders", json=order_payload()).json()["order"]
+        now = module.now_iso()
+        with module.db() as con:
+            con.execute(
+                """UPDATE orders
+                   SET status = 'paid', payment_state = 'paid', paid_at = ?
+                   WHERE id = ?""",
+                (now, created["id"]),
+            )
+            module.enqueue_paid_order_effects(con, created["id"], now)
+
+        def sync(order_id):
+            saby_calls.append(order_id)
+            next_state = "failed" if len(saby_calls) == 1 else "synced"
+            with module.db() as con:
+                con.execute(
+                    "UPDATE orders SET saby_state = ? WHERE id = ?",
+                    (next_state, order_id),
+                )
+
+        monkeypatch.setattr(module, "sync_paid_order_to_saby", sync)
+        module.process_paid_order_effects(created["id"])
+        with module.db() as con:
+            failed = con.execute(
+                """SELECT state, attempts FROM paid_order_effects
+                   WHERE order_id = ? AND effect = 'saby'""",
+                (created["id"],),
+            ).fetchone()
+        module.recover_paid_order_effects()
+        with module.db() as con:
+            sent = con.execute(
+                """SELECT state, attempts FROM paid_order_effects
+                   WHERE order_id = ? AND effect = 'saby'""",
+                (created["id"],),
+            ).fetchone()
+
+    assert tuple(failed) == ("failed", 1)
+    assert tuple(sent) == ("sent", 2)
+    assert saby_calls == [created["id"], created["id"]]
+
+
+def test_stale_saby_send_is_durable_ambiguous_not_retried(tmp_path, monkeypatch):
+    client, module = demo_app(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        module.tbank_client, "create_payment", lambda *_a, **_k: bank_response()
+    )
+    monkeypatch.setattr(module, "notify_owners", lambda _row: True)
+    monkeypatch.setattr(module, "_saby_auto_sync_enabled", lambda: True)
+    monkeypatch.setattr(
+        module,
+        "sync_paid_order_to_saby",
+        lambda _order_id: pytest.fail("ambiguous Saby write must not be replayed"),
+    )
+
+    with client:
+        created = client.post("/api/orders", json=order_payload()).json()["order"]
+        now = module.now_iso()
+        stale = (
+            module.datetime.now(module.timezone.utc)
+            - module.timedelta(seconds=module.PAID_EFFECT_LEASE_SECONDS + 1)
+        ).isoformat()
+        with module.db() as con:
+            con.execute(
+                """UPDATE orders
+                   SET status = 'paid', payment_state = 'paid', paid_at = ?,
+                       saby_state = 'sending'
+                   WHERE id = ?""",
+                (now, created["id"]),
+            )
+            module.enqueue_paid_order_effects(con, created["id"], now)
+            con.execute(
+                """UPDATE paid_order_effects
+                   SET state = 'sending', updated_at = ?
+                   WHERE order_id = ? AND effect = 'saby'""",
+                (stale, created["id"]),
+            )
+        module.recover_paid_order_effects()
+        with module.db() as con:
+            effect = con.execute(
+                """SELECT state FROM paid_order_effects
+                   WHERE order_id = ? AND effect = 'saby'""",
+                (created["id"],),
+            ).fetchone()
+        current = module.order_row(created["id"])
+
+    assert effect["state"] == "ambiguous"
+    assert current["saby_state"] == "ambiguous"
 
 
 def test_terminal_fallback_result_urls_render_without_order_query(tmp_path, monkeypatch):

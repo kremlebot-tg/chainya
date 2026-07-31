@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Тестовый backend магазина «Чайня».
+"""Backend интернет-магазина и операционной панели «Чайня».
 
-Считает заказ только по серверному каталогу, хранит его в SQLite и имитирует
-платёж. Реальные Saby/CDEK/acquiring адаптеры подключаются вместо mock-функций.
+Сервер проверяет каталог и суммы, хранит заказы в SQLite и безопасно связывает
+оплату Т-Банка, доставку CDEK, учёт Saby и уведомления Telegram. Тестовый режим
+остаётся fail-closed и включается отдельно от боевых интеграций.
 """
 
 from __future__ import annotations
@@ -22,14 +23,15 @@ import urllib.request
 import uuid
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager, contextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import date as datetime_date, datetime, time as datetime_time, timedelta, timezone
 from pathlib import Path
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .cdek import CdekClient, CdekError
 from .cdek_delivery import (
@@ -74,6 +76,9 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "").strip()
 ADMIN_SESSION_COOKIE = "chainya_admin_session"
 ADMIN_SESSION_SECONDS = 12 * 60 * 60
+TBANK_INIT_LEASE_SECONDS = 45
+PAID_EFFECT_LEASE_SECONDS = 90
+PAID_EFFECT_RETRY_SECONDS = 30
 OWNER_CHAT_IDS = [
     value for value in re.split(r"[\s,]+", os.getenv("OWNER_CHAT_ID", "").strip()) if value
 ]
@@ -85,11 +90,24 @@ DELIVERY_LABELS = {
     "cdek_pvz": "СДЭК · пункт выдачи",
     "cdek_courier": "СДЭК · курьер",
 }
+MOSCOW_TZ = ZoneInfo("Europe/Moscow")
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     init_db()
-    yield
+    stop_paid_effect_worker = threading.Event()
+    paid_effect_thread = threading.Thread(
+        target=paid_effect_worker,
+        args=(stop_paid_effect_worker,),
+        name="chainya-paid-effects",
+        daemon=True,
+    )
+    paid_effect_thread.start()
+    try:
+        yield
+    finally:
+        stop_paid_effect_worker.set()
+        paid_effect_thread.join(timeout=1)
 
 
 app = FastAPI(title="Chainya checkout", version="0.1.0", lifespan=lifespan)
@@ -343,12 +361,65 @@ class CreateBusinessLead(BaseModel):
         return value
 
 
+def moscow_now() -> datetime:
+    return datetime.now(MOSCOW_TZ)
+
+
+class CreateBooking(BaseModel):
+    format: Literal["master", "self"]
+    date: datetime_date
+    time: datetime_time
+    guests: int = Field(ge=1, le=9)
+    name: str = Field(default="", max_length=120)
+    phone: str = Field(min_length=7, max_length=40)
+    note: str = Field(default="", max_length=1000)
+    privacy_accepted: Literal[True]
+
+    @field_validator("name", "note")
+    @classmethod
+    def strip_booking_text(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("phone")
+    @classmethod
+    def valid_booking_phone(cls, value: str) -> str:
+        value = value.strip()
+        if len(re.sub(r"\D", "", value)) < 10:
+            raise ValueError("укажите полный номер телефона")
+        return value
+
+    @field_validator("time")
+    @classmethod
+    def valid_booking_slot(cls, value: datetime_time) -> datetime_time:
+        if value.second or value.microsecond or value.minute not in (0, 30):
+            raise ValueError("время брони должно быть указано с шагом 30 минут")
+        if not datetime_time(12, 0) <= value <= datetime_time(20, 0):
+            raise ValueError("время брони должно быть с 12:00 до 20:00")
+        return value
+
+    @model_validator(mode="after")
+    def booking_is_in_future(self):
+        current = moscow_now()
+        if self.date > current.date() + timedelta(days=14):
+            raise ValueError(
+                "бронь доступна не более чем на 14 дней вперёд по московскому времени"
+            )
+        scheduled = datetime.combine(self.date, self.time, tzinfo=MOSCOW_TZ)
+        if scheduled <= current:
+            raise ValueError("дата и время брони уже прошли по московскому времени")
+        return self
+
+
 class UpdateOrderStatus(BaseModel):
     status: Literal["paid", "confirmed", "packing", "shipped", "completed", "cancelled"]
 
 
 class UpdateLeadStatus(BaseModel):
     status: Literal["new", "contacted", "closed"]
+
+
+class UpdateBookingStatus(BaseModel):
+    status: Literal["new", "confirmed", "completed", "cancelled"]
 
 
 class AdminLogin(BaseModel):
@@ -443,10 +514,12 @@ def init_db() -> None:
                 cdek_updated_at TEXT,
                 cdek_quote_json TEXT NOT NULL DEFAULT '{}',
                 idempotency_key_hash TEXT,
-                request_hash TEXT
+                request_hash TEXT,
+                paid_effects_enqueued INTEGER NOT NULL DEFAULT 1
             )
         """)
         columns = {row["name"] for row in con.execute("PRAGMA table_info(orders)")}
+        paid_effects_column_missing = "paid_effects_enqueued" not in columns
         order_migrations = {
             "payment_token": "TEXT",
             "paid_at": "TEXT",
@@ -471,10 +544,21 @@ def init_db() -> None:
             "cdek_quote_json": "TEXT NOT NULL DEFAULT '{}'",
             "idempotency_key_hash": "TEXT",
             "request_hash": "TEXT",
+            # Existing paid orders predate the durable outbox and must not
+            # suddenly resend historical notifications after this migration.
+            # New orders explicitly store 0 in create_order().
+            "paid_effects_enqueued": "INTEGER NOT NULL DEFAULT 1",
         }
         for column, declaration in order_migrations.items():
             if column not in columns:
                 con.execute(f"ALTER TABLE orders ADD COLUMN {column} {declaration}")
+        if paid_effects_column_missing:
+            # Pending legacy orders have not produced paid side effects yet;
+            # they are safe to enqueue when a future CONFIRMED callback arrives.
+            con.execute(
+                """UPDATE orders SET paid_effects_enqueued = 0
+                   WHERE paid_at IS NULL AND status = 'pending_payment'"""
+            )
         con.execute(
             """UPDATE orders
                SET payment_state = CASE
@@ -507,6 +591,23 @@ def init_db() -> None:
             "ON orders(idempotency_key_hash) WHERE idempotency_key_hash IS NOT NULL"
         )
         con.execute("""
+            CREATE TABLE IF NOT EXISTS paid_order_effects (
+                order_id TEXT NOT NULL,
+                effect TEXT NOT NULL,
+                state TEXT NOT NULL DEFAULT 'pending',
+                attempts INTEGER NOT NULL DEFAULT 0,
+                last_error TEXT NOT NULL DEFAULT '',
+                updated_at TEXT NOT NULL,
+                completed_at TEXT,
+                PRIMARY KEY (order_id, effect),
+                FOREIGN KEY (order_id) REFERENCES orders(id)
+            )
+        """)
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_paid_order_effects_state "
+            "ON paid_order_effects(state, updated_at)"
+        )
+        con.execute("""
             CREATE TABLE IF NOT EXISTS business_leads (
                 id TEXT PRIMARY KEY,
                 created_at TEXT NOT NULL,
@@ -515,16 +616,70 @@ def init_db() -> None:
                 contact TEXT NOT NULL,
                 note TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT 'new',
-                updated_at TEXT NOT NULL DEFAULT ''
+                updated_at TEXT NOT NULL DEFAULT '',
+                idempotency_key_hash TEXT,
+                request_hash TEXT
             )
         """)
         lead_columns = {row["name"] for row in con.execute("PRAGMA table_info(business_leads)")}
-        if "status" not in lead_columns:
-            con.execute("ALTER TABLE business_leads ADD COLUMN status TEXT NOT NULL DEFAULT 'new'")
-        if "updated_at" not in lead_columns:
-            con.execute("ALTER TABLE business_leads ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''")
+        lead_migrations = {
+            "status": "TEXT NOT NULL DEFAULT 'new'",
+            "updated_at": "TEXT NOT NULL DEFAULT ''",
+            "idempotency_key_hash": "TEXT",
+            "request_hash": "TEXT",
+        }
+        for column, declaration in lead_migrations.items():
+            if column not in lead_columns:
+                con.execute(
+                    f"ALTER TABLE business_leads ADD COLUMN {column} {declaration}"
+                )
         con.execute("CREATE INDEX IF NOT EXISTS idx_business_leads_created ON business_leads(created_at)")
         con.execute("CREATE INDEX IF NOT EXISTS idx_business_leads_status ON business_leads(status)")
+        con.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_business_leads_idempotency "
+            "ON business_leads(idempotency_key_hash) "
+            "WHERE idempotency_key_hash IS NOT NULL"
+        )
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS bookings (
+                id TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL,
+                booking_date TEXT NOT NULL,
+                booking_time TEXT NOT NULL,
+                format TEXT NOT NULL,
+                guests INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                phone TEXT NOT NULL,
+                note TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'new',
+                updated_at TEXT NOT NULL DEFAULT '',
+                idempotency_key_hash TEXT,
+                request_hash TEXT
+            )
+        """)
+        booking_columns = {
+            row["name"] for row in con.execute("PRAGMA table_info(bookings)")
+        }
+        booking_migrations = {
+            "updated_at": "TEXT NOT NULL DEFAULT ''",
+            "idempotency_key_hash": "TEXT",
+            "request_hash": "TEXT",
+        }
+        for column, declaration in booking_migrations.items():
+            if column not in booking_columns:
+                con.execute(
+                    f"ALTER TABLE bookings ADD COLUMN {column} {declaration}"
+                )
+        con.execute("CREATE INDEX IF NOT EXISTS idx_bookings_created ON bookings(created_at)")
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_bookings_slot "
+            "ON bookings(booking_date, booking_time)"
+        )
+        con.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_idempotency "
+            "ON bookings(idempotency_key_hash) "
+            "WHERE idempotency_key_hash IS NOT NULL"
+        )
         con.execute("""
             CREATE TABLE IF NOT EXISTS analytics_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -690,6 +845,26 @@ def order_request_hash(payload: CreateOrder) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def booking_request_hash(payload: CreateBooking) -> str:
+    encoded = json.dumps(
+        payload.model_dump(mode="json"),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def business_lead_request_hash(payload: CreateBusinessLead) -> str:
+    encoded = json.dumps(
+        payload.model_dump(mode="json"),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def idempotency_hash(value: str) -> str:
     if (
         not value
@@ -751,8 +926,211 @@ def receipt_for_order(row: sqlite3.Row) -> dict | None:
         raise TBankError(str(exc)) from exc
 
 
-def initialize_tbank_payment(row: sqlite3.Row, language: str) -> sqlite3.Row:
-    """Create exactly one bank payment for a freshly persisted local order."""
+def _payment_init_is_stale(row: sqlite3.Row, *, now: datetime | None = None) -> bool:
+    """Whether an Init lease can be reclaimed after a worker/process crash."""
+    raw_updated = row["payment_updated_at"]
+    if not raw_updated:
+        return True
+    try:
+        updated = datetime.fromisoformat(str(raw_updated))
+    except ValueError:
+        return True
+    if updated.tzinfo is None:
+        updated = updated.replace(tzinfo=timezone.utc)
+    current = now or datetime.now(timezone.utc)
+    return current - updated >= timedelta(seconds=TBANK_INIT_LEASE_SECONDS)
+
+
+def recover_tbank_initialization(row: sqlite3.Row, _language: str) -> sqlite3.Row:
+    """Resolve an ambiguous Init through CheckOrder, never a blind re-Init.
+
+    T-Bank requires a unique OrderId for every operation. If Init timed out, a
+    second Init with the same OrderId is therefore unsafe: the first request
+    may already have created a payment. CheckOrder is the documented recovery
+    read. Since its normal Payments objects do not promise PaymentURL, finding
+    a payment can recover its identity/status but may still require manual
+    reconciliation instead of issuing a duplicate operation.
+    """
+    if (
+        row["payment_provider"] not in {"tbank_demo", "tbank"}
+        or row["payment_url"]
+        or row["payment_state"]
+        not in {"failed", "initializing", "checking", "init_ambiguous"}
+    ):
+        return row
+
+    claimed = False
+    claimed_at = now_iso()
+    with db() as con:
+        con.execute("BEGIN IMMEDIATE")
+        current = con.execute(
+            "SELECT * FROM orders WHERE id = ?", (row["id"],)
+        ).fetchone()
+        if (
+            current
+            and not current["payment_url"]
+            and (
+                current["payment_state"] == "failed"
+                or (
+                    current["payment_state"]
+                    in {"initializing", "checking", "init_ambiguous"}
+                    and _payment_init_is_stale(current)
+                )
+            )
+        ):
+            updated = con.execute(
+                """UPDATE orders
+                   SET payment_state = 'checking',
+                       payment_last_error = '',
+                       payment_updated_at = ?, updated_at = ?
+                   WHERE id = ? AND payment_url IS NULL
+                     AND payment_state IN
+                         ('failed','initializing','checking','init_ambiguous')""",
+                (claimed_at, claimed_at, row["id"]),
+            )
+            claimed = updated.rowcount == 1
+    if not claimed:
+        raise HTTPException(503, "Платёжная форма Т-Банка ещё восстанавливается")
+
+    row = order_row(row["id"])
+    try:
+        result = tbank_client.check_order(row["id"])
+        payments = result.get("Payments")
+        if not isinstance(payments, list):
+            raise TBankError("Т-Банк не вернул список платежей заказа")
+    except TBankError as exc:
+        updated = now_iso()
+        with db() as con:
+            con.execute(
+                """UPDATE orders
+                   SET payment_state = 'init_ambiguous',
+                       payment_last_error = ?, payment_updated_at = ?,
+                       updated_at = ?
+                   WHERE id = ? AND payment_state = 'checking'""",
+                (str(exc)[:500], updated, updated, row["id"]),
+            )
+        raise HTTPException(
+            503, "Платёжная форма Т-Банка временно недоступна"
+        ) from exc
+
+    expected_amount = int(row["total"]) * 100
+    candidates: list[tuple[str, str, str | None]] = []
+    for payment in payments:
+        if not isinstance(payment, dict):
+            continue
+        payment_id = str(payment.get("PaymentId", ""))
+        raw_amount = payment.get("Amount")
+        if (
+            payment_id.isdigit()
+            and len(payment_id) <= 20
+            and isinstance(raw_amount, int)
+            and not isinstance(raw_amount, bool)
+            and raw_amount == expected_amount
+        ):
+            raw_url = payment.get("PaymentURL")
+            try:
+                payment_url = (
+                    validate_payment_url(raw_url)
+                    if raw_url is not None
+                    else None
+                )
+            except TBankError:
+                payment_url = None
+            candidates.append(
+                (payment_id, str(payment.get("Status", ""))[:80], payment_url)
+            )
+
+    stored_payment_id = str(row["provider_payment_id"] or "")
+    if stored_payment_id:
+        candidates = [
+            candidate for candidate in candidates
+            if secrets.compare_digest(candidate[0], stored_payment_id)
+        ]
+
+    updated = now_iso()
+    if len(candidates) == 1:
+        payment_id, provider_status, payment_url = candidates[0]
+        with db() as con:
+            duplicate = con.execute(
+                """SELECT id FROM orders
+                   WHERE payment_provider = ? AND provider_payment_id = ?
+                     AND id != ?""",
+                (row["payment_provider"], payment_id, row["id"]),
+            ).fetchone()
+            if not duplicate:
+                con.execute(
+                    """UPDATE orders
+                       SET provider_payment_id = ?, payment_url = ?,
+                           payment_state = ?, payment_provider_status = ?,
+                           payment_last_error = ?, payment_updated_at = ?,
+                           updated_at = ?
+                       WHERE id = ? AND payment_state = 'checking'""",
+                    (
+                        payment_id,
+                        payment_url,
+                        "awaiting" if payment_url else "init_ambiguous",
+                        provider_status,
+                        "" if payment_url else (
+                            "Платёж найден через CheckOrder, но ссылка оплаты недоступна"
+                        ),
+                        updated,
+                        updated,
+                        row["id"],
+                    ),
+                )
+            else:
+                con.execute(
+                    """UPDATE orders
+                       SET payment_state = 'init_ambiguous',
+                           payment_last_error =
+                               'PaymentId уже связан с другим локальным заказом',
+                           payment_updated_at = ?, updated_at = ?
+                       WHERE id = ? AND payment_state = 'checking'""",
+                    (updated, updated, row["id"]),
+                )
+        recovered = order_row(row["id"])
+        if recovered["payment_url"]:
+            return recovered
+    else:
+        reason = (
+            "CheckOrder не нашёл платёж; повторный Init с тем же OrderId запрещён"
+            if not candidates
+            else "CheckOrder вернул несколько подходящих платежей"
+        )
+        with db() as con:
+            con.execute(
+                """UPDATE orders
+                   SET payment_state = 'init_ambiguous',
+                       payment_last_error = ?, payment_updated_at = ?,
+                       updated_at = ?
+                   WHERE id = ? AND payment_state = 'checking'""",
+                (reason, updated, updated, row["id"]),
+            )
+
+    raise HTTPException(
+        503,
+        "Платёж Т-Банка требует безопасной проверки; новый платёж не создан",
+    )
+
+
+def initialize_tbank_payment(
+    row: sqlite3.Row,
+    language: str,
+) -> sqlite3.Row:
+    """Create one bank payment for a freshly persisted local order."""
+    attempted = now_iso()
+    with db() as con:
+        claimed = con.execute(
+            """UPDATE orders
+               SET payment_attempts = payment_attempts + 1,
+                   payment_updated_at = ?, updated_at = ?
+               WHERE id = ? AND provider_payment_id IS NULL
+                 AND payment_state = 'initializing'""",
+            (attempted, attempted, row["id"]),
+        )
+    if claimed.rowcount != 1:
+        return order_row(row["id"])
+
     mode, _valid = rollout_mode("TBANK_CHECKOUT_MODE", allow_demo=True)
     settings = tbank_client.settings
     try:
@@ -800,7 +1178,7 @@ def initialize_tbank_payment(row: sqlite3.Row, language: str) -> sqlite3.Row:
         con.execute(
             """UPDATE orders
                SET provider_payment_id = ?, payment_url = ?, payment_state = 'awaiting',
-                   payment_provider_status = ?, payment_attempts = payment_attempts + 1,
+                   payment_provider_status = ?,
                    payment_last_error = '', payment_updated_at = ?, updated_at = ?
                WHERE id = ? AND provider_payment_id IS NULL AND payment_state = 'initializing'""",
             (
@@ -1022,6 +1400,22 @@ def admin_order(row: sqlite3.Row) -> dict:
     return result
 
 
+def admin_booking(row: sqlite3.Row) -> dict:
+    return {
+        "id": row["id"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+        "date": row["booking_date"],
+        "time": row["booking_time"],
+        "format": row["format"],
+        "guests": row["guests"],
+        "name": row["name"],
+        "phone": row["phone"],
+        "note": row["note"],
+        "status": row["status"],
+    }
+
+
 def paid_notification(row: sqlite3.Row) -> str:
     customer = json.loads(row["customer_json"])
     items = json.loads(row["items_json"])
@@ -1054,11 +1448,13 @@ def paid_notification(row: sqlite3.Row) -> str:
     return "\n".join(lines)
 
 
-def send_to_owners(text: str, label: str) -> None:
+def send_to_owners(text: str, label: str) -> bool:
     if not BOT_TOKEN or not OWNER_CHAT_IDS:
         logging.info("Telegram-уведомление отключено: BOT_TOKEN/OWNER_CHAT_ID не заданы")
-        return
+        return False
+    all_sent = True
     for chat_id in OWNER_CHAT_IDS:
+        sent = False
         for attempt, pause in enumerate((0, 1, 3), start=1):
             if pause:
                 time.sleep(pause)
@@ -1070,17 +1466,20 @@ def send_to_owners(text: str, label: str) -> None:
                 with urllib.request.urlopen(telegram_request, timeout=5) as response:
                     if response.status != 200:
                         raise RuntimeError(f"Telegram HTTP {response.status}")
+                sent = True
                 break
             except Exception:
                 if attempt == 3:
                     logging.exception("Не удалось отправить %s владельцу %s после 3 попыток", label, chat_id)
                 else:
                     logging.warning("Повтор Telegram %s для %s, попытка %s", label, chat_id, attempt + 1)
+        all_sent = all_sent and sent
+    return all_sent
 
 
-def notify_owners(row: sqlite3.Row) -> None:
+def notify_owners(row: sqlite3.Row) -> bool:
     """Отправляет владельцам оплаченный заказ с короткими повторами при сбое."""
-    send_to_owners(paid_notification(row), "заказ")
+    return send_to_owners(paid_notification(row), "заказ")
 
 
 def notify_business_lead(lead: dict) -> None:
@@ -1093,6 +1492,218 @@ def notify_business_lead(lead: dict) -> None:
         f"Комментарий: {lead['note']}" if lead["note"] else "",
     ]))
     send_to_owners(text, "B2B-заявку")
+
+
+def notify_booking(booking: dict) -> None:
+    format_label = (
+        "Церемония с мастером"
+        if booking["format"] == "master"
+        else "Самостоятельно"
+    )
+    text = "\n".join(filter(None, [
+        "🫖 Новая бронь",
+        f"№ {booking['id']}",
+        f"Формат: {format_label}",
+        f"Дата: {booking['date']}",
+        f"Время: {booking['time']}",
+        f"Гостей: {booking['guests']}",
+        f"Имя: {booking['name']}" if booking["name"] else "",
+        f"Телефон: {booking['phone']}",
+        f"Пожелания: {booking['note']}" if booking["note"] else "",
+    ]))
+    send_to_owners(text, "бронь")
+
+
+def enqueue_paid_order_effects(
+    con: sqlite3.Connection, order_id: str, updated_at: str
+) -> None:
+    """Persist post-payment work in the same transaction as CONFIRMED."""
+    for effect in ("telegram", "saby"):
+        con.execute(
+            """INSERT OR IGNORE INTO paid_order_effects
+               (order_id, effect, state, attempts, last_error, updated_at)
+               VALUES (?, ?, 'pending', 0, '', ?)""",
+            (order_id, effect, updated_at),
+        )
+    con.execute(
+        """UPDATE orders SET paid_effects_enqueued = 1
+           WHERE id = ?""",
+        (order_id,),
+    )
+
+
+def _mark_paid_effect(
+    order_id: str,
+    effect: str,
+    state: str,
+    *,
+    error: str = "",
+) -> None:
+    updated = now_iso()
+    with db() as con:
+        con.execute(
+            """UPDATE paid_order_effects
+               SET state = ?, last_error = ?, updated_at = ?,
+                   completed_at = CASE WHEN ? = 'sent' THEN ? ELSE completed_at END
+               WHERE order_id = ? AND effect = ? AND state = 'sending'""",
+            (state, error[:300], updated, state, updated, order_id, effect),
+        )
+
+
+def _claim_paid_effect(order_id: str, effect: str) -> bool:
+    """Claim a retryable effect, safely resolving stale Saby uncertainty."""
+    claimed_at = now_iso()
+    stale_before = (
+        datetime.now(timezone.utc) - timedelta(seconds=PAID_EFFECT_LEASE_SECONDS)
+    ).isoformat()
+    with db() as con:
+        con.execute("BEGIN IMMEDIATE")
+        row = con.execute(
+            """SELECT e.state, e.updated_at, o.saby_state
+               FROM paid_order_effects AS e
+               JOIN orders AS o ON o.id = e.order_id
+               WHERE e.order_id = ? AND e.effect = ?""",
+            (order_id, effect),
+        ).fetchone()
+        if not row:
+            return False
+        if (
+            effect == "saby"
+            and row["state"] == "sending"
+            and str(row["updated_at"]) <= stale_before
+            and row["saby_state"] == "sending"
+        ):
+            # After a process crash we cannot know whether Saby accepted the
+            # write. Retrying could create a duplicate order, so retain a
+            # durable, visible ambiguous state for manual reconciliation.
+            con.execute(
+                """UPDATE paid_order_effects
+                   SET state = 'ambiguous',
+                       last_error = 'Нужна проверка заказа в Saby после прерванной отправки',
+                       updated_at = ?
+                   WHERE order_id = ? AND effect = ? AND state = 'sending'""",
+                (claimed_at, order_id, effect),
+            )
+            con.execute(
+                """UPDATE orders
+                   SET saby_state = 'ambiguous',
+                       saby_last_error = 'Нужна проверка заказа после прерванной отправки',
+                       updated_at = ?
+                   WHERE id = ? AND saby_state = 'sending'""",
+                (claimed_at, order_id),
+            )
+            return False
+        claimed = con.execute(
+            """UPDATE paid_order_effects
+               SET state = 'sending', attempts = attempts + 1,
+                   last_error = '', updated_at = ?
+               WHERE order_id = ? AND effect = ?
+                 AND (
+                   state IN ('pending','failed')
+                   OR (state = 'sending' AND updated_at <= ?)
+                 )""",
+            (claimed_at, order_id, effect, stale_before),
+        )
+        return claimed.rowcount == 1
+
+
+def _saby_auto_sync_enabled() -> bool:
+    try:
+        return sync_mode_from_env().value == "auto"
+    except SabySyncError:
+        return False
+
+
+def _telegram_notifications_enabled() -> bool:
+    return bool(BOT_TOKEN and OWNER_CHAT_IDS)
+
+
+def process_paid_order_effects(order_id: str) -> None:
+    """Deliver durable paid-order effects; safe to call on every callback."""
+    try:
+        row = order_row(order_id)
+    except HTTPException:
+        return
+    if row["payment_state"] != "paid":
+        return
+
+    if _telegram_notifications_enabled() and _claim_paid_effect(
+        order_id, "telegram"
+    ):
+        try:
+            delivered = notify_owners(order_row(order_id))
+        except Exception:
+            logging.exception("Не удалось обработать Telegram-уведомление заказа %s", order_id)
+            delivered = False
+        if delivered is False:
+            _mark_paid_effect(
+                order_id,
+                "telegram",
+                "failed",
+                error="Telegram временно недоступен или не настроен",
+            )
+        else:
+            # Compatibility: existing injected/test notifiers returned None.
+            _mark_paid_effect(order_id, "telegram", "sent")
+
+    if _saby_auto_sync_enabled() and _claim_paid_effect(order_id, "saby"):
+        sync_paid_order_to_saby(order_id)
+        saby_state = order_row(order_id)["saby_state"]
+        if saby_state == "synced":
+            _mark_paid_effect(order_id, "saby", "sent")
+        elif saby_state == "ambiguous":
+            _mark_paid_effect(
+                order_id,
+                "saby",
+                "ambiguous",
+                error="Нужна ручная проверка результата отправки в Saby",
+            )
+        else:
+            _mark_paid_effect(
+                order_id,
+                "saby",
+                "failed",
+                error="Заказ пока не передан в Saby",
+            )
+
+
+def recover_paid_order_effects() -> None:
+    """Enqueue unfinished new paid orders and retry persisted work."""
+    with db() as con:
+        pending_orders = con.execute(
+            """SELECT id FROM orders
+               WHERE paid_effects_enqueued = 0
+                 AND payment_state = 'paid'"""
+        ).fetchall()
+        for pending_order in pending_orders:
+            enqueue_paid_order_effects(con, pending_order["id"], now_iso())
+
+        stale_before = (
+            datetime.now(timezone.utc) - timedelta(seconds=PAID_EFFECT_LEASE_SECONDS)
+        ).isoformat()
+        order_ids = [
+            row["order_id"]
+            for row in con.execute(
+                """SELECT DISTINCT order_id FROM paid_order_effects
+                   WHERE state IN ('pending','failed')
+                      OR (state = 'sending' AND updated_at <= ?)
+                   ORDER BY updated_at ASC""",
+                (stale_before,),
+            ).fetchall()
+        ]
+    for order_id in order_ids:
+        process_paid_order_effects(order_id)
+
+
+def paid_effect_worker(stop: threading.Event) -> None:
+    """Small persistent retry loop started by the FastAPI lifespan."""
+    while not stop.is_set():
+        try:
+            recover_paid_order_effects()
+        except Exception:
+            logging.exception("Ошибка восстановления действий оплаченных заказов")
+        if stop.wait(PAID_EFFECT_RETRY_SECONDS):
+            return
 
 
 PAID_ORDER_STATUSES = ("paid", "confirmed", "packing", "shipped", "completed")
@@ -1197,6 +1808,9 @@ def commerce_summary(con: sqlite3.Connection, start: datetime, end: datetime) ->
     ).fetchone()[0])
     result["new_leads"] = int(con.execute(
         "SELECT COUNT(*) FROM business_leads WHERE status = 'new'"
+    ).fetchone()[0])
+    result["new_bookings"] = int(con.execute(
+        "SELECT COUNT(*) FROM bookings WHERE status = 'new'"
     ).fetchone()[0])
     return result
 
@@ -1355,6 +1969,21 @@ def dashboard_data(days: int) -> dict:
 @app.get("/api/health")
 def health():
     return {"ok": True, "test_mode": TEST_MODE, "catalog_items": len(load_catalog())}
+
+
+@app.get("/api/catalog")
+def public_catalog():
+    return {
+        "teas": [
+            {
+                "id": item["id"],
+                "price": item["price"],
+                "unit": item["unit"],
+                "stock": item.get("stock", True),
+            }
+            for item in load_catalog().values()
+        ]
+    }
 
 
 @app.post("/api/analytics/events", status_code=204)
@@ -1721,6 +2350,69 @@ def admin_update_business_lead(
     return dict(row)
 
 
+@app.get("/api/admin/bookings")
+def admin_bookings(
+    authorization: str = Header(default=""),
+    status: str = "",
+    q: str = Query(default="", max_length=160),
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+):
+    require_admin(authorization)
+    if status and status not in {"new", "confirmed", "completed", "cancelled"}:
+        raise HTTPException(422, "Неизвестный статус")
+    conditions, params = [], []
+    if status:
+        conditions.append("status = ?")
+        params.append(status)
+    query = q.strip()
+    if query:
+        conditions.append(
+            "casefold(id || ' ' || booking_date || ' ' || booking_time || ' ' || "
+            "format || ' ' || name || ' ' || phone || ' ' || note) LIKE ?"
+        )
+        params.append(f"%{query.casefold()}%")
+    where = " WHERE " + " AND ".join(conditions) if conditions else ""
+    with db() as con:
+        con.create_function("casefold", 1, lambda value: (value or "").casefold())
+        total = int(
+            con.execute(f"SELECT COUNT(*) FROM bookings{where}", params).fetchone()[0]
+        )
+        rows = con.execute(
+            f"SELECT * FROM bookings{where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            (*params, limit, offset),
+        ).fetchall()
+    return {
+        "bookings": [admin_booking(row) for row in rows],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+@app.patch("/api/admin/bookings/{booking_id}")
+def admin_update_booking(
+    booking_id: str,
+    payload: UpdateBookingStatus,
+    authorization: str = Header(default=""),
+):
+    require_admin(authorization)
+    with db() as con:
+        exists = con.execute(
+            "SELECT 1 FROM bookings WHERE id = ?", (booking_id,)
+        ).fetchone()
+        if not exists:
+            raise HTTPException(404, "Бронь не найдена")
+        con.execute(
+            "UPDATE bookings SET status = ?, updated_at = ? WHERE id = ?",
+            (payload.status, now_iso(), booking_id),
+        )
+        row = con.execute(
+            "SELECT * FROM bookings WHERE id = ?", (booking_id,)
+        ).fetchone()
+    return admin_booking(row)
+
+
 @app.get("/api/admin/saby/status")
 def admin_saby_status(authorization: str = Header(default="")):
     require_admin(authorization)
@@ -2012,7 +2704,6 @@ def create_order(
     request: Request,
     idempotency_key: str = Header(default="", alias="Idempotency-Key"),
 ):
-    rate_limit(request, "create-order", 12, 600)
     tbank_enabled = tbank_checkout_ready()
     tbank_mode, tbank_mode_valid = rollout_mode("TBANK_CHECKOUT_MODE", allow_demo=True)
     mock_enabled = TEST_MODE and tbank_mode_valid and tbank_mode == "off"
@@ -2029,7 +2720,13 @@ def create_order(
         if existing:
             if existing["request_hash"] != request_fingerprint:
                 raise HTTPException(409, "Idempotency-Key уже использован для другого заказа")
+            if tbank_enabled:
+                existing = recover_tbank_initialization(existing, payload.language)
             return checkout_response(existing, request, reused=True)
+
+    # Повтор ответа на уже созданный заказ не должен расходовать лимит клиента:
+    # идемпотентный replay — нормальная часть восстановления мобильной сети.
+    rate_limit(request, "create-order", 12, 600)
 
     lines, subtotal = price_order(payload)
     cdek_quote: dict = {}
@@ -2073,13 +2770,14 @@ def create_order(
                    (id, status, created_at, updated_at, subtotal, delivery_price, total,
                     payment_method, delivery, customer_json, items_json, provider_payment_id, payment_token,
                     payment_provider, payment_state, payment_updated_at,
-                    cdek_quote_json, idempotency_key_hash, request_hash)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    cdek_quote_json, idempotency_key_hash, request_hash,
+                    paid_effects_enqueued)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (order_id, "pending_payment", created, created, subtotal, delivery_price,
                  subtotal + delivery_price, payload.payment_method, payload.delivery,
                  json.dumps(customer, ensure_ascii=False), json.dumps(lines, ensure_ascii=False), None,
                  payment_token, payment_provider, payment_state, created,
-                 json.dumps(cdek_quote, ensure_ascii=False), key_hash, request_fingerprint),
+                 json.dumps(cdek_quote, ensure_ascii=False), key_hash, request_fingerprint, 0),
             )
         if not reused_row and analytics_session_hash:
             context = con.execute(
@@ -2095,6 +2793,10 @@ def create_order(
                     (created, analytics_session_hash, context["language"], context["device"], context["referrer"]),
                 )
     if reused_row:
+        if tbank_enabled:
+            reused_row = recover_tbank_initialization(
+                reused_row, payload.language
+            )
         return checkout_response(reused_row, request, reused=True)
     created_row = order_row(order_id)
     if tbank_enabled:
@@ -2103,18 +2805,125 @@ def create_order(
 
 
 @app.post("/api/business-leads", status_code=202)
-def create_business_lead(payload: CreateBusinessLead, background_tasks: BackgroundTasks, request: Request):
+def create_business_lead(
+    payload: CreateBusinessLead,
+    background_tasks: BackgroundTasks,
+    request: Request,
+    idempotency_key: str = Header(default="", alias="Idempotency-Key"),
+):
+    key_hash = idempotency_hash(idempotency_key) if idempotency_key else None
+    request_fingerprint = business_lead_request_hash(payload)
+    if key_hash:
+        with db() as con:
+            existing = con.execute(
+                """SELECT * FROM business_leads
+                   WHERE idempotency_key_hash = ?""",
+                (key_hash,),
+            ).fetchone()
+        if existing:
+            if existing["request_hash"] != request_fingerprint:
+                raise HTTPException(
+                    409, "Idempotency-Key уже использован для другой заявки"
+                )
+            return {"id": existing["id"], "accepted": True}
+
+    # Mobile/network replay of an accepted lead is not a new submission and
+    # therefore must be resolved before consuming the per-IP rate limit.
     rate_limit(request, "business-lead", 5, 600)
     lead = {"id": uuid.uuid4().hex[:12].upper(), "created_at": now_iso(), **payload.model_dump()}
+    reused_row = None
     with db() as con:
-        con.execute(
-            """INSERT INTO business_leads
-               (id, created_at, company, name, contact, note, status, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, 'new', ?)""",
-            (lead["id"], lead["created_at"], lead["company"], lead["name"], lead["contact"], lead["note"], lead["created_at"]),
-        )
+        if key_hash:
+            con.execute("BEGIN IMMEDIATE")
+            reused_row = con.execute(
+                """SELECT * FROM business_leads
+                   WHERE idempotency_key_hash = ?""",
+                (key_hash,),
+            ).fetchone()
+            if reused_row and reused_row["request_hash"] != request_fingerprint:
+                raise HTTPException(
+                    409, "Idempotency-Key уже использован для другой заявки"
+                )
+        if not reused_row:
+            con.execute(
+                """INSERT INTO business_leads
+                   (id, created_at, company, name, contact, note, status,
+                    updated_at, idempotency_key_hash, request_hash)
+                   VALUES (?, ?, ?, ?, ?, ?, 'new', ?, ?, ?)""",
+                (
+                    lead["id"], lead["created_at"], lead["company"],
+                    lead["name"], lead["contact"], lead["note"],
+                    lead["created_at"], key_hash, request_fingerprint,
+                ),
+            )
+    if reused_row:
+        return {"id": reused_row["id"], "accepted": True}
     background_tasks.add_task(notify_business_lead, lead)
     return {"id": lead["id"], "accepted": True}
+
+
+@app.post("/api/bookings", status_code=201)
+def create_booking(
+    payload: CreateBooking,
+    background_tasks: BackgroundTasks,
+    request: Request,
+    idempotency_key: str = Header(default="", alias="Idempotency-Key"),
+):
+    key_hash = idempotency_hash(idempotency_key) if idempotency_key else None
+    request_fingerprint = booking_request_hash(payload)
+    if key_hash:
+        with db() as con:
+            existing = con.execute(
+                "SELECT * FROM bookings WHERE idempotency_key_hash = ?",
+                (key_hash,),
+            ).fetchone()
+        if existing:
+            if existing["request_hash"] != request_fingerprint:
+                raise HTTPException(
+                    409, "Idempotency-Key уже использован для другой брони"
+                )
+            return {"id": existing["id"], "accepted": True}
+
+    # Повтор уже принятой идемпотентной заявки не является новой попыткой:
+    # мобильная сеть может запросить тот же ответ много раз после таймаута.
+    # Лимитируем только создание действительно новой брони.
+    rate_limit(request, "booking", 5, 600)
+
+    booking = {
+        "id": uuid.uuid4().hex[:12].upper(),
+        "created_at": now_iso(),
+        **payload.model_dump(mode="json", exclude={"privacy_accepted"}),
+    }
+    reused_row = None
+    with db() as con:
+        if key_hash:
+            con.execute("BEGIN IMMEDIATE")
+            reused_row = con.execute(
+                "SELECT * FROM bookings WHERE idempotency_key_hash = ?",
+                (key_hash,),
+            ).fetchone()
+            if reused_row and reused_row["request_hash"] != request_fingerprint:
+                raise HTTPException(
+                    409, "Idempotency-Key уже использован для другой брони"
+                )
+        if not reused_row:
+            con.execute(
+                """INSERT INTO bookings
+                   (id, created_at, booking_date, booking_time, format, guests,
+                    name, phone, note, status, updated_at,
+                    idempotency_key_hash, request_hash)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?)""",
+                (
+                    booking["id"], booking["created_at"], booking["date"],
+                    booking["time"], booking["format"], booking["guests"],
+                    booking["name"], booking["phone"], booking["note"],
+                    booking["created_at"], key_hash, request_fingerprint,
+                ),
+            )
+    if reused_row:
+        return {"id": reused_row["id"], "accepted": True}
+    background_tasks.add_task(notify_booking, booking)
+    return {"id": booking["id"], "accepted": True}
 
 
 @app.get("/api/orders/{order_id}")
@@ -2165,7 +2974,7 @@ async def tbank_notification(
     except ValueError:
         raise HTTPException(400, "Некорректная сумма уведомления Т-Банка") from None
 
-    should_notify = False
+    process_effects = False
     with db() as con:
         row = con.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
         if not row:
@@ -2188,7 +2997,6 @@ async def tbank_notification(
             if row["payment_state"] not in {
                 "refunding", "refund_ambiguous", "partially_refunded", "refunded",
             }:
-                should_notify = row["paid_at"] is None
                 next_order_status = "paid" if row["status"] == "pending_payment" else row["status"]
                 con.execute(
                     """UPDATE orders
@@ -2198,6 +3006,9 @@ async def tbank_notification(
                        WHERE id = ?""",
                     (next_order_status, updated, provider_status, updated, updated, order_id),
                 )
+                if not row["paid_effects_enqueued"]:
+                    enqueue_paid_order_effects(con, order_id, updated)
+                process_effects = True
         elif success and status == "REFUNDED":
             con.execute(
                 """UPDATE orders
@@ -2230,9 +3041,10 @@ async def tbank_notification(
                 (provider_status, updated, updated, order_id),
             )
 
-    if should_notify:
-        background_tasks.add_task(sync_paid_order_to_saby, order_id)
-        background_tasks.add_task(notify_owners, order_row(order_id))
+    if process_effects:
+        # A replay is also a recovery signal: the paid transition and its
+        # outbox entries may have committed immediately before a process died.
+        background_tasks.add_task(process_paid_order_effects, order_id)
     return "OK"
 
 

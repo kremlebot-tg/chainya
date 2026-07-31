@@ -263,6 +263,9 @@ if web:
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
         f"  <url><loc>{SITE}</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>\n"
+        f"  <url><loc>{SITE}shop</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>\n"
+        f"  <url><loc>{SITE}business</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>\n"
+        f"  <url><loc>{SITE}booking</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>\n"
         f"  <url><loc>{SITE}legal.html</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>\n"
         f"  <url><loc>{SITE}privacy.html</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>\n"
         "</urlset>\n",

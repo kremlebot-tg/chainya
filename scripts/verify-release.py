@@ -40,6 +40,9 @@ SENSITIVE_PATHS = (
 )
 PUBLIC_PATHS = (
     ("/", "text/html"),
+    ("/shop", "text/html"),
+    ("/business", "text/html"),
+    ("/booking", "text/html"),
     ("/privacy.html", "text/html"),
     ("/legal.html", "text/html"),
     ("/api/catalog", "application/json"),
@@ -171,7 +174,7 @@ def check_live(base_url: str) -> list[str]:
         expected_headers = {
             "strict-transport-security": "max-age=",
             "x-content-type-options": "nosniff",
-            "cache-control": "no-store",
+            "cache-control": "no-cache",
         }
         for name, marker in expected_headers.items():
             value = combined_header(root_headers, name)

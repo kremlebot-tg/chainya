@@ -183,7 +183,7 @@ server {
     location = / {
         add_header Strict-Transport-Security "max-age=31536000" always;
         add_header X-Content-Type-Options "nosniff" always;
-        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        add_header Cache-Control "no-cache" always;
         add_header Referrer-Policy "strict-origin-when-cross-origin" always;
         add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
         add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
@@ -193,7 +193,7 @@ server {
     location = /index.html {
         add_header Strict-Transport-Security "max-age=31536000" always;
         add_header X-Content-Type-Options "nosniff" always;
-        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        add_header Cache-Control "no-cache" always;
         add_header Referrer-Policy "strict-origin-when-cross-origin" always;
         add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
         add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
@@ -210,8 +210,18 @@ server {
         add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
     }
 
-    # Клиентские экраны используют hash-маршруты (#shop, #book), поэтому
-    # несуществующие URL-пути не должны получать главную страницу.
+    # Публичные разделы имеют читаемые URL. Отдаём то же приложение только для
+    # известного белого списка; произвольные пути по-прежнему честно получают 404.
+    location ~ ^/(shop|business|booking)/?$ {
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Cache-Control "no-cache" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
+        try_files /index.html =404;
+    }
+
     location / { try_files $uri $uri/ =404; }
 
     location ~* \.(woff2?|ttf)$ {

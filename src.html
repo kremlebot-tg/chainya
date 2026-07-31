@@ -106,6 +106,13 @@ h1, h2, h3, p{ text-wrap:pretty; }
   height:calc(66px + env(safe-area-inset-top)); padding-top:env(safe-area-inset-top);
   display:flex; align-items:center; gap:clamp(16px,3vw,44px);
 }
+@media (max-width:900px){
+  .nav__in,.nav--mob{ transition:min-height .22s var(--ease),height .22s var(--ease),opacity .22s var(--ease),transform .22s var(--ease); }
+  .nav.is-compact .nav__in{
+    height:0; min-height:0; padding-top:0; opacity:0; overflow:hidden; pointer-events:none;
+    transform:translateY(-8px);
+  }
+}
 .brand{
   display:flex; align-items:center; gap:11px; margin-right:auto;
   font-family:'Prata', Georgia, serif; font-size:19px; letter-spacing:.22em;
@@ -331,7 +338,7 @@ h1, h2, h3, p{ text-wrap:pretty; }
 .chip__heart{ width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:1.7; margin-right:1px; }
 .chip--fav[aria-pressed="true"] .chip__heart{ fill:currentColor; }
 .chip__n{ margin-left:4px; opacity:.65; }
-#fav-empty{ margin:26px 0 0; color:var(--text-3); font-size:14.5px; }
+#fav-empty,#shop-empty{ margin:26px 0 0; color:var(--text-3); font-size:14.5px; }
 .tea__body{ padding:16px 18px 18px; display:flex; flex-direction:column; flex:1; }
 .tea__name{ font-family:'Prata',Georgia,serif; font-size:1.18rem; line-height:1.22; letter-spacing:-.01em; overflow-wrap:anywhere; }
 .tea__orig{ margin-top:5px; font-size:12.5px; color:var(--text-3); overflow-wrap:anywhere; }
@@ -367,6 +374,19 @@ h1, h2, h3, p{ text-wrap:pretty; }
 
 /* ── Фильтры карты ── */
 .shop-toolbar{ margin-bottom:28px; }
+.shop-tools{ display:grid; grid-template-columns:minmax(220px,1fr) minmax(190px,.35fr); gap:10px; margin-top:14px; }
+.shop-search{ position:relative; }
+.shop-search svg{ position:absolute; left:14px; top:50%; width:17px; height:17px; transform:translateY(-50%); fill:none; stroke:var(--text-3); stroke-width:1.7; pointer-events:none; }
+.shop-search .input{ padding-left:42px; }
+.sr-only{ position:absolute!important; width:1px!important; height:1px!important; padding:0!important; margin:-1px!important; overflow:hidden!important; clip:rect(0,0,0,0)!important; white-space:nowrap!important; border:0!important; }
+.scroll-shell{ position:relative; min-width:0; }
+.scroll-shell::after{
+  content:''; position:absolute; z-index:2; top:0; right:-1px; bottom:4px; width:38px;
+  background:linear-gradient(90deg,transparent,var(--bg)); pointer-events:none;
+  opacity:0; transition:opacity .18s var(--ease);
+}
+.scroll-shell.has-more::after{ opacity:1; }
+.scroll-shell--days::after{ background:linear-gradient(90deg,transparent,var(--bg-3)); }
 .chips{ display:flex; flex-wrap:wrap; gap:8px; }
 .shop-count{ margin:12px 0 0; color:var(--text-3); font-size:12.5px; }
 .shop-count b{ color:var(--text-2); font-weight:600; margin-left:7px; }
@@ -816,10 +836,14 @@ select.input{
   .hero__cta{ margin-top:24px; }
 }
 @media (max-width:620px){
+  .sec{ padding-block:clamp(42px,12vw,62px); }
   .shop-toolbar{ margin-bottom:20px; }
+  .shop-tools{ grid-template-columns:1fr; gap:8px; margin-top:12px; }
+  .scroll-shell--chips{ margin-inline:calc(var(--pad) * -1); }
+  .scroll-shell--chips::after{ right:0; background:linear-gradient(90deg,transparent,var(--bg) 84%); }
   .chips{
     flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; scroll-snap-type:x proximity;
-    margin-inline:calc(var(--pad) * -1); padding-inline:var(--pad); padding-bottom:4px;
+    padding-inline:var(--pad); padding-bottom:4px;
   }
   .chips::-webkit-scrollbar{ display:none; }
   .chip{ flex:none; scroll-snap-align:start; }
@@ -894,15 +918,15 @@ select.input{
 
 <header class="nav">
   <div class="nav__in">
-    <a class="brand" href="#home" data-go="home">
+    <a class="brand" href="/" data-go="home">
       <img class="brand__mark" src="{{img:logo-mark}}" alt="" data-i18n-alt="alt_logo" width="186" height="377">
       <span><span data-i18n="brand">Чайня</span><sup data-i18n="brand_sup">МСК</sup></span>
     </a>
     <nav class="nav__links" data-i18n-aria="a_nav" aria-label="Разделы сайта">
-      <a class="nav__link" href="#home" data-go="home" data-i18n="nav_home" aria-current="page">Главная</a>
-      <a class="nav__link" href="#shop" data-go="shop" data-i18n="nav_shop">Купить чай</a>
-      <a class="nav__link" href="#b2b" data-go="b2b" data-i18n="nav_b2b">Для бизнеса</a>
-      <a class="nav__link" href="#book" data-go="book" data-i18n="nav_book">Бронь</a>
+      <a class="nav__link" href="/" data-go="home" data-i18n="nav_home" aria-current="page">Главная</a>
+      <a class="nav__link" href="/shop" data-go="shop" data-i18n="nav_shop">Купить чай</a>
+      <a class="nav__link" href="/business" data-go="b2b" data-i18n="nav_b2b">Для бизнеса</a>
+      <a class="nav__link" href="/booking" data-go="book" data-i18n="nav_book">Бронь</a>
     </nav>
     <div class="nav__tools">
       <div class="lang" role="group" data-i18n-aria="a_lang" aria-label="Язык">
@@ -917,10 +941,10 @@ select.input{
     </div>
   </div>
   <nav class="nav--mob" data-i18n-aria="a_nav" aria-label="Разделы сайта">
-    <a class="nav__link" href="#home" data-go="home" data-i18n="nav_home" aria-current="page">Главная</a>
-    <a class="nav__link" href="#shop" data-go="shop" data-i18n="nav_shop">Купить чай</a>
-    <a class="nav__link" href="#b2b" data-go="b2b" data-i18n="nav_b2b">Для бизнеса</a>
-    <a class="nav__link" href="#book" data-go="book" data-i18n="nav_book">Бронь</a>
+    <a class="nav__link" href="/" data-go="home" data-i18n="nav_home" aria-current="page">Главная</a>
+    <a class="nav__link" href="/shop" data-go="shop" data-i18n="nav_shop">Купить чай</a>
+    <a class="nav__link" href="/business" data-go="b2b" data-i18n="nav_b2b">Для бизнеса</a>
+    <a class="nav__link" href="/booking" data-go="book" data-i18n="nav_book">Бронь</a>
   </nav>
 </header>
 
@@ -1115,11 +1139,21 @@ select.input{
       <p class="lead" data-i18n="shop_lead"></p>
     </div>
     <div class="shop-toolbar">
-      <div class="chips" id="filters" role="group" data-i18n-aria="filters_label" aria-label="Фильтры каталога"></div>
+      <div class="scroll-shell scroll-shell--chips"><div class="chips" id="filters" role="group" data-i18n-aria="filters_label" aria-label="Фильтры каталога"></div></div>
+      <div class="shop-tools">
+        <label class="shop-search" for="shop-search">
+          <span class="sr-only" data-i18n="shop_search_label">Поиск по каталогу</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+          <input class="input" id="shop-search" type="search" autocomplete="off" data-i18n-ph="shop_search_ph" placeholder="Название, регион или вкус">
+        </label>
+        <label class="sr-only" for="shop-sort" data-i18n="shop_sort_label">Сортировка</label>
+        <select class="input" id="shop-sort" data-i18n-aria="shop_sort_label" aria-label="Сортировка"></select>
+      </div>
       <p class="shop-count" aria-live="polite"><span data-i18n="shop_count">В подборке</span><b class="num" id="shop-count">0</b></p>
     </div>
     <div class="tea-grid" id="menu-teas"></div>
     <p id="fav-empty" data-i18n="fav_empty" hidden>Здесь появится то, что вы отметите сердечком.</p>
+    <p id="shop-empty" data-i18n="shop_empty" hidden>По этому запросу ничего не найдено. Попробуйте другое название или сбросьте фильтр.</p>
     <p class="shop__foot" data-i18n="shop_foot"></p>
   </div>
 </section>
@@ -1201,29 +1235,29 @@ select.input{
           </div>
         </div>
 
-        <aside class="summary">
+        <form class="summary" id="b2b-form">
           <h3 data-i18n="b2b_form_h">Оставить заявку</h3>
           <p class="summary__sub" data-i18n="b2b_form_sub">Ответим в течение рабочего дня</p>
           <div class="field">
             <label class="label" for="b-company" data-i18n="b_company">Компания или мероприятие</label>
-            <input class="input" type="text" id="b-company" data-i18n-ph="b_company_ph">
+            <input class="input" type="text" id="b-company" name="organization" autocomplete="organization" data-i18n-ph="b_company_ph">
           </div>
           <div class="field">
             <label class="label" for="b-name" data-i18n="b_name">Как вас зовут</label>
-            <input class="input" type="text" id="b-name" autocomplete="given-name">
+            <input class="input" type="text" id="b-name" name="name" autocomplete="given-name">
           </div>
           <div class="field">
             <label class="label" for="b-phone" data-i18n="b_phone">Телефон или телеграм</label>
-            <input class="input" type="text" id="b-phone" data-i18n-ph="b_phone_ph">
+            <input class="input" type="tel" id="b-phone" name="contact" autocomplete="tel" inputmode="tel" data-i18n-ph="b_phone_ph">
           </div>
           <div class="field">
             <label class="label" for="b-note" data-i18n="b_note">Что вам нужно</label>
-            <textarea class="input" id="b-note" data-i18n-ph="b_note_ph"></textarea>
+            <textarea class="input" id="b-note" name="note" data-i18n-ph="b_note_ph"></textarea>
           </div>
-          <label class="consent"><input type="checkbox" id="b-privacy"><span><span data-i18n="privacy_accept">Согласен на обработку данных согласно</span> <a href="/privacy.html" target="_blank" rel="noopener" data-i18n="privacy_link">политике конфиденциальности</a></span></label>
-          <button class="btn btn--solid btn--wide" id="b2b-submit" data-i18n="b2b_send">Отправить</button>
+          <label class="consent"><input type="checkbox" id="b-privacy" name="privacy_accepted" value="yes"><span><span data-i18n="privacy_accept">Согласен на обработку данных согласно</span> <a href="/privacy.html" target="_blank" rel="noopener" data-i18n="privacy_link">политике конфиденциальности</a></span></label>
+          <button class="btn btn--solid btn--wide" id="b2b-submit" type="submit" data-i18n="b2b_send">Отправить</button>
           <p class="summary__note" data-i18n="b2b_form_note"></p>
-        </aside>
+        </form>
       </div>
     </div>
 
@@ -1270,7 +1304,7 @@ select.input{
           </div>
           <div class="field">
             <span class="label" data-i18n="f_date">Дата</span>
-            <div class="days" id="days"></div>
+            <div class="scroll-shell scroll-shell--days"><div class="days" id="days"></div></div>
           </div>
           <div class="field">
             <span class="label" data-i18n="f_time">Время посадки</span>
@@ -1679,6 +1713,8 @@ select.input{
     shop_label:'Купить чай', shop_h:'Тот же лист,<br>что и в зале',
     shop_lead:'Здесь чай продаётся домой: фасуем в пакеты 25, 50 и 100 г и отправляем доставкой. Если вы пришли к нам за стол, платить за чай не нужно: два на выбор уже входят в стоимость.',
     shop_foot:'Цены на пакеты считаются от цены за 10 г. Прессованное продаём целиком: мандарин и квадратик поштучно, блины по запросу.', shop_count:'В подборке',
+    shop_search_label:'Поиск по каталогу', shop_search_ph:'Название, регион или вкус', shop_sort_label:'Сортировка', shop_empty:'По этому запросу ничего не найдено. Попробуйте другое название или сбросьте фильтр.',
+    shop_sort_default:'Сначала рекомендованные', shop_sort_price_asc:'Сначала дешевле', shop_sort_price_desc:'Сначала дороже', shop_sort_name:'По названию',
     types:['Все','Белый','Зелёный','Габа','Улуны Фуцзяни','Улуны Гуандуна','Улуны Уишаня','Красный','Шэн Пуэр','Шу Пуэр','Хэй Ча','Травы и добавки'],
     more:'о чае', per_pc:'за штуку', per_pack25:'за 25 г', gram:'г',
     fav_label:'В избранное', filter_fav:'Избранное', fav_empty:'Здесь появится то, что вы отметите сердечком.',
@@ -1854,6 +1890,8 @@ select.input{
     shop_label:'Buy tea', shop_h:'The same leaf<br>we serve inside',
     shop_lead:'Tea to take home, packed in 25, 50 and 100 g bags and shipped across Russia. Two teas are included with every table booking.',
     shop_foot:'Package prices are calculated from the price per 10 g. Pressed tea is sold whole: the mandarin and mini brick by the piece, cakes on request.', shop_count:'In this selection',
+    shop_search_label:'Search the catalogue', shop_search_ph:'Name, origin or flavour', shop_sort_label:'Sort', shop_empty:'Nothing matches this search. Try another name or reset the filter.',
+    shop_sort_default:'Recommended first', shop_sort_price_asc:'Lowest price first', shop_sort_price_desc:'Highest price first', shop_sort_name:'By name',
     types:['All','White','Green','GABA','Fujian oolong','Guangdong oolong','Wuyi oolong','Black','Sheng pu-erh','Shou pu-erh','Hei cha','Herbs & extras'],
     more:'more', per_pc:'each', per_pack25:'for 25 g', gram:'g',
     fav_label:'Add to favourites', filter_fav:'Favourites', fav_empty:'Teas you save will appear here.',
@@ -2029,6 +2067,8 @@ select.input{
     shop_label:'买茶', shop_h:'与店里<br>同一份茶叶',
     shop_lead:'这里的茶是带回家的：按25、50、100克分装，快递寄出。若您是来店里坐茶席，茶不必另付：两款任选已含在价内。',
     shop_foot:'分装价格按每10克的价格折算。紧压茶整件出售：小青柑和小金砖论个，茶饼可另询。', shop_count:'当前选择',
+    shop_search_label:'搜索茶叶目录', shop_search_ph:'名称、产地或风味', shop_sort_label:'排序', shop_empty:'没有找到符合条件的茶。请尝试其他名称或重置筛选。',
+    shop_sort_default:'推荐优先', shop_sort_price_asc:'价格从低到高', shop_sort_price_desc:'价格从高到低', shop_sort_name:'按名称',
     types:['全部','白茶','绿茶','佳叶龙茶','闽南乌龙','广东乌龙','武夷岩茶','红茶','生普洱','熟普洱','黑茶','花草与配料'],
     more:'详情', per_pc:'每个', per_pack25:'25克装', gram:'克',
     fav_label:'加入收藏', filter_fav:'收藏', fav_empty:'您用爱心标记的茶会显示在这里。',
@@ -2303,6 +2343,8 @@ select.input{
   addEventListener('chainya:telegram-ready', connectTelegram);
 
   /* ─────────────  НАВИГАЦИЯ  ───────────── */
+  const VIEW_PATHS = { home:'/', shop:'/shop', b2b:'/business', book:'/booking' };
+  const PATH_VIEWS = Object.fromEntries(Object.entries(VIEW_PATHS).map(([view,path]) => [path,view]));
   function go(view, updateHistory=true){
     const changingView = ($('.view.is-active') || {}).id !== 'view-' + view;
     $$('.view').forEach(v => v.classList.toggle('is-active', v.id === 'view-' + view));
@@ -2310,6 +2352,11 @@ select.input{
       if (a.dataset.go === view) a.setAttribute('aria-current','page');
       else a.removeAttribute('aria-current');
     });
+    const routeUrl = new URL(VIEW_PATHS[view], location.origin).href;
+    const canonical = document.querySelector('link[rel="canonical"]');
+    const openGraphUrl = document.querySelector('meta[property="og:url"]');
+    if (canonical) canonical.href = routeUrl;
+    if (openGraphUrl) openGraphUrl.content = routeUrl;
     const activeMobileNav = $('.nav--mob .nav__link[aria-current="page"]');
     if (activeMobileNav) requestAnimationFrame(() => activeMobileNav.scrollIntoView({ block:'nearest', inline:'center' }));
     // Разделы «Бронь» и «Для бизнеса» двухшаговые (форма → подтверждение).
@@ -2320,7 +2367,8 @@ select.input{
     $('#b2b-form-wrap').hidden = false; $('#b2b-done').hidden = true;
     resetRequestForms();
     closeTea(false);
-    if (updateHistory && location.hash !== '#' + view) history.pushState({ view }, '', '#' + view);
+    if (updateHistory && (location.pathname !== VIEW_PATHS[view] || location.hash))
+      history.pushState({ view }, '', VIEW_PATHS[view]);
     if (changingView) scrollTo({ top:0, behavior:'instant' });
     scheduleReveal();   // раскрыть блоки нового раздела, попавшие в кадр
     tgSyncBack();
@@ -2334,20 +2382,47 @@ select.input{
     go(t.dataset.go);
   });
 
-  // Глубокие ссылки: #shop / #book / #b2b открывают раздел сразу; #tea-<id>
+  // Читаемые URL — /shop, /business, /booking. Старые #shop / #book / #b2b
+  // продолжают работать для ссылок из переписок; #tea-<id> открывает товар.
   // открывает паспорт конкретного чая. Нужно для кнопок телеграм-бота («Заказать
   // на сайте» ведёт прямо на чай в браузере) и для шаринга на конкретную позицию.
   const HASH_VIEWS = ['home', 'shop', 'b2b', 'book'];
-  function goFromHash(){
+  function goFromLocation(){
     const h = location.hash.replace('#', '');
-    if (!h){ go('home', false); return; }
     if (HASH_VIEWS.includes(h)){ go(h, false); return; }
     if (h.startsWith('tea-')){
       const m = TEA_META.find(x => x.id === h.slice(4));
       if (m){ go('shop', false); openTea(m, false); }
+      else go('shop', false);
+      return;
     }
+    go(PATH_VIEWS[location.pathname.replace(/\/$/,'') || '/'] || 'home', false);
   }
-  addEventListener('hashchange', goFromHash);
+  addEventListener('hashchange', goFromLocation);
+  addEventListener('popstate', goFromLocation);
+
+  const siteNav = $('.nav');
+  let navFrame = 0;
+  function compactNav(){
+    navFrame = 0;
+    siteNav.classList.toggle('is-compact', innerWidth <= 900 && scrollY > 72 && !sheet?.classList.contains('on') && !cartSheet?.classList.contains('on'));
+  }
+  addEventListener('scroll', () => { if (!navFrame) navFrame = requestAnimationFrame(compactNav); }, { passive:true });
+  addEventListener('resize', compactNav, { passive:true });
+
+  function updateScrollCue(scroller){
+    const shell = scroller && scroller.closest('.scroll-shell');
+    if (!shell) return;
+    shell.classList.toggle('has-more', scroller.scrollWidth - scroller.clientWidth - scroller.scrollLeft > 3);
+  }
+  function wireScrollCue(scroller){
+    if (!scroller || scroller.dataset.scrollCue) return;
+    scroller.dataset.scrollCue = '1';
+    scroller.addEventListener('scroll', () => updateScrollCue(scroller), { passive:true });
+    if ('ResizeObserver' in window) new ResizeObserver(() => updateScrollCue(scroller)).observe(scroller);
+    else addEventListener('resize', () => updateScrollCue(scroller), { passive:true });
+    requestAnimationFrame(() => updateScrollCue(scroller));
+  }
 
   /* ─────────────  КАРТОЧКА ЧАЯ  ─────────────
      На карточке показываем цену минимального пакета (25 г), а не «за 10 г»:
@@ -2359,7 +2434,7 @@ select.input{
   function teaCard(m){
     const txt = T().teas[m.id];
     const node = el(`
-      <article class="tea" data-type="${m.t}" data-id="${m.id}">
+      <article class="tea" data-type="${m.t}" data-id="${m.id}" data-price="${m.unit === 'pc' ? m.p : packPrice(m.p, PACKS[0])}" data-stock="${inStock(m) ? 1 : 0}">
         <div class="tea__art${inStock(m) ? '' : ' tea__art--oos'}">
           <img src="${m.img}" alt="${escAttr(txt.n)}" loading="lazy" width="800" height="800">
           <span class="tea__dot" style="background:${LQ[m.t]}"></span>
@@ -2483,7 +2558,7 @@ select.input{
     const el = $('#fav-count'); if (el) el.textContent = n ? n : '';
   }
 
-  let curFilter = 'all';
+  let curFilter = 'all', curSearch = '', curSort = 'default';
   function buildTeaGrids(){
     const home = $('#home-teas'), menu = $('#menu-teas');
     home.innerHTML = ''; menu.innerHTML = '';
@@ -2547,17 +2622,35 @@ select.input{
   }
   function applyFilter(){
     const favs = getFavs();
+    const grid = $('#menu-teas');
+    const query = curSearch.trim().toLocaleLowerCase(LANG);
     let shown = 0;
-    $$('#menu-teas .tea').forEach(c => {
-      const ok = curFilter === 'all' ? true
+    const cards = $$('#menu-teas .tea');
+    cards.forEach(c => {
+      const m = TEA_META.find(item => item.id === c.dataset.id);
+      const txt = m && T().teas[m.id];
+      const category = m ? T().types[TYPE_IDS.indexOf(m.t)] : '';
+      const haystack = txt ? `${txt.n} ${txt.o} ${txt.d} ${category}`.toLocaleLowerCase(LANG) : '';
+      const categoryOk = curFilter === 'all' ? true
         : curFilter === 'fav' ? favs.has(c.dataset.id)
         : c.dataset.type === curFilter;
+      const ok = categoryOk && (!query || haystack.includes(query));
       c.style.display = ok ? '' : 'none';
       if (ok) shown++;
     });
+    const originalOrder = new Map(TEA_META.map((m,index) => [m.id,index]));
+    cards.sort((a,b) => {
+      const stockDelta = Number(b.dataset.stock) - Number(a.dataset.stock);
+      if (stockDelta) return stockDelta;
+      if (curSort === 'price-asc') return Number(a.dataset.price) - Number(b.dataset.price);
+      if (curSort === 'price-desc') return Number(b.dataset.price) - Number(a.dataset.price);
+      if (curSort === 'name') return T().teas[a.dataset.id].n.localeCompare(T().teas[b.dataset.id].n, T().locale);
+      return originalOrder.get(a.dataset.id) - originalOrder.get(b.dataset.id);
+    }).forEach(card => grid.append(card));
     $('#shop-count').textContent = shown;
     // подсказка, когда в избранном пусто
     $('#fav-empty').hidden = !(curFilter === 'fav' && shown === 0);
+    $('#shop-empty').hidden = shown !== 0 || curFilter === 'fav';
     // Фильтр поднимает наверх карточки, которые лежали за кадром и потому ещё не
     // «проявились»: без этого они показывались бы прозрачными до первого скролла.
     // Зовём напрямую, а не через rAF: клик — разовое действие, ждать кадр незачем.
@@ -2589,7 +2682,21 @@ select.input{
       });
       f.append(b);
     });
+    wireScrollCue(f);
+    updateScrollCue(f);
   }
+
+  function buildShopTools(){
+    const search = $('#shop-search'), sort = $('#shop-sort');
+    search.value = curSearch;
+    sort.innerHTML = [
+      ['default',T().shop_sort_default], ['price-asc',T().shop_sort_price_asc],
+      ['price-desc',T().shop_sort_price_desc], ['name',T().shop_sort_name],
+    ].map(([value,label]) => `<option value="${value}">${label}</option>`).join('');
+    sort.value = curSort;
+  }
+  $('#shop-search').addEventListener('input', event => { curSearch = event.target.value; applyFilter(); });
+  $('#shop-sort').addEventListener('change', event => { curSort = event.target.value; applyFilter(); });
 
   /* ─────────────  ПАСПОРТ ЧАЯ  ─────────────
      Фасовка: цена считается пропорционально цене за 10 г. Если у чайной есть
@@ -2692,7 +2799,7 @@ select.input{
     if (lastCard){ lastCard.focus({ preventScroll:true }); lastCard = null; }
     if (updateHistory && location.hash.startsWith('#tea-')){
       if (history.state && history.state.tea) history.back();
-      else history.replaceState({ view:'shop' }, '', '#shop');
+      else history.replaceState({ view:'shop' }, '', VIEW_PATHS.shop);
     }
     tgSyncBack();
   }
@@ -3310,6 +3417,9 @@ select.input{
       });
       box.append(b);
     }
+    wireScrollCue(box);
+    box.scrollLeft = 0;
+    updateScrollCue(box);
   }
 
   const slots = $('#slots');
@@ -3511,7 +3621,8 @@ select.input{
     setTimeout(()=>$('#b-phone').focus({preventScroll:true}),450);
   }));
 
-  $('#b2b-submit').addEventListener('click', async () => {
+  $('#b2b-form').addEventListener('submit', async event => {
+    event.preventDefault();
     const phone = $('#b-phone').value.trim();
     if (!phone){ $('#b-phone').focus(); return; }
     if (!$('#b-privacy').checked){
@@ -3602,6 +3713,7 @@ select.input{
     selectHeroImage();
     buildRange();
     buildFilters();
+    buildShopTools();
     buildTeaGrids();
     buildDays();
     buildGuests();
@@ -3622,13 +3734,14 @@ select.input{
   }));
 
   const initialAnalyticsSection = (() => {
-    const raw = location.hash.replace('#','').split('-')[0] || 'home';
+    const raw = location.hash.replace('#','').split('-')[0] || PATH_VIEWS[location.pathname.replace(/\/$/,'') || '/'] || 'home';
     return ['home','shop','tea','cart','book','b2b','payment'].includes(raw) ? raw : 'home';
   })();
   applyLang();
   refreshCatalog();
   track('page_view', initialAnalyticsSection);
-  goFromHash();
+  goFromLocation();
+  compactNav();
   trackOnce('section_view', initialAnalyticsSection);
 
   // Если SDK уже успел загрузиться — подключаемся сразу; иначе сработает

@@ -49,7 +49,7 @@ body{
   line-height:1.62; letter-spacing:-.005em;
   -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
 }
-img{ max-width:100%; display:block; }
+img{ max-width:100%; height:auto; display:block; }
 button{ font:inherit; color:inherit; background:none; border:0; cursor:pointer; }
 input, select, textarea{ font:inherit; color:inherit; }
 a{ color:inherit; text-decoration:none; }
@@ -390,9 +390,13 @@ a{ color:inherit; text-decoration:none; }
   margin-top:auto; padding-top:24px; display:flex; flex-wrap:wrap; gap:8px 22px;
   font-size:13px; color:var(--text-3); font-variant-numeric:tabular-nums;
 }
-.gallery{ display:grid; grid-template-columns:repeat(3,1fr); gap:clamp(10px,1.2vw,16px); margin-top:clamp(14px,1.6vw,20px); }
+.gallery{
+  display:grid; grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:clamp(10px,1.2vw,16px); width:min(100%,920px);
+  margin-top:clamp(14px,1.6vw,20px);
+}
 .gallery img{
-  width:100%; aspect-ratio:3/2; object-fit:cover;
+  width:100%; height:clamp(160px,15vw,210px); object-fit:cover;
   border:1px solid var(--line-soft); border-radius:var(--r);
 }
 
@@ -644,11 +648,11 @@ select.input{
 .bstep h3{ font-size:1.05rem; font-weight:600; margin:10px 0 8px; letter-spacing:-.01em; }
 .bstep p{ margin:0; font-size:14.5px; color:var(--text-2); line-height:1.6; }
 
-/* Ассортимент показываем листом, а не списком слов */
+/* Ассортимент показываем небольшой редакционной подборкой. Восемь кадров
+   складываются в два ровных ряда и не спорят с формой справа. */
 .brange{ margin-top:clamp(32px,4vw,52px); }
-/* Грид, а не флекс: во флексе восемь картинок ужимались в полоски по 40px */
-.brange__strip{ display:grid; grid-template-columns:repeat(8,1fr); gap:8px; margin-top:14px; }
-.brange__strip img{ width:100%; aspect-ratio:1; object-fit:cover; border-radius:var(--r); }
+.brange__strip{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin-top:14px; }
+.brange__strip img{ width:100%; height:auto; aspect-ratio:1; object-fit:cover; border-radius:var(--r); }
 .brange__note{ margin:14px 0 0; font-size:14.5px; color:var(--text-2); line-height:1.6; max-width:62ch; }
 
 .tiers{ border-top:1px solid var(--line-soft); margin-top:clamp(32px,4vw,52px); }
@@ -676,7 +680,7 @@ select.input{
   font-size:12px; color:var(--text-3);
 }
 /* Подпись студии: по условиям для портфолио она есть, но не лезет в глаза */
-.foot__by{ color:color-mix(in srgb, var(--text-3) 62%, transparent); transition:color .2s var(--ease); }
+.foot__by{ color:var(--text-3); transition:color .2s var(--ease); }
 .foot__by a{ border-bottom:1px solid transparent; }
 .foot__by:hover{ color:var(--text-3); }
 .foot__by:hover a{ border-bottom-color:color-mix(in srgb, var(--text-3) 45%, transparent); }
@@ -758,9 +762,10 @@ select.input{
   .row2{ grid-template-columns:1fr; }
   .hero__cta .btn{ flex:1; }
   .tier{ grid-template-columns:1fr; gap:6px; }
-  .gallery{ grid-template-columns:1fr 1fr; }
-  .gallery img:first-child{ grid-column:1/-1; aspect-ratio:16/9; }
-  .brange__strip{ grid-template-columns:repeat(4,1fr); }
+  .gallery{ grid-template-columns:1fr 1fr; width:100%; }
+  .gallery img{ height:clamp(132px,38vw,180px); }
+  .gallery img:first-child{ grid-column:1/-1; height:clamp(190px,54vw,270px); }
+  .brange__strip{ grid-template-columns:repeat(4,minmax(0,1fr)); }
   .bsteps{ grid-template-columns:1fr; }
   .svcs, .b2b-offers{ grid-template-columns:1fr; }
   .bstep__art{ aspect-ratio:16/9; }
@@ -2387,6 +2392,7 @@ select.input{
     if (strip.childElementCount) return;
     const seen = new Set(), pick = [];
     for (const m of TEA_META){
+      if (pick.length >= 8) break;
       if (seen.has(m.t)) continue;
       seen.add(m.t); pick.push(m);
     }

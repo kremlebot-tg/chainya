@@ -26,11 +26,11 @@ echo "→ сборка и локальная проверка"
 python3 build.py --web
 python3 scripts/verify-release.py --dist dist
 
-COPYFILE_DISABLE=1 tar czf "$TMP/shop.tgz" \
+COPYFILE_DISABLE=1 tar --no-xattrs -czf "$TMP/shop.tgz" \
   --exclude='backend/data' --exclude='backend/__pycache__' --exclude='backend/tests/__pycache__' \
   --exclude='backend/.env' --exclude='backend/.env.*' --exclude='backend/*.env' \
-  backend ops -C "$BOT_ROOT" teas.json
-COPYFILE_DISABLE=1 tar czf "$TMP/web.tgz" \
+  backend ops privacy.html -C "$BOT_ROOT" teas.json
+COPYFILE_DISABLE=1 tar --no-xattrs -czf "$TMP/web.tgz" \
   --exclude='._*' --exclude='.DS_Store' -C dist .
 
 echo "→ загрузка согласованного release"

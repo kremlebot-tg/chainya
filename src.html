@@ -38,6 +38,7 @@
   --motion-fast:160ms;
   --motion-base:280ms;
   --motion-slow:520ms;
+  --section-space:clamp(48px,7vw,92px);
 }
 
 /* ─────────────────────────  БАЗА  ───────────────────────── */
@@ -53,6 +54,7 @@ img{ max-width:100%; height:auto; display:block; }
 button{ font:inherit; color:inherit; background:none; border:0; cursor:pointer; }
 input, select, textarea{ font:inherit; color:inherit; }
 a{ color:inherit; text-decoration:none; }
+h1, h2, h3, p{ text-wrap:pretty; }
 :focus-visible{ outline:2px solid var(--accent); outline-offset:3px; border-radius:2px; }
 /* Скип-линк: спрятан за верхним краем, выезжает при фокусе (первый Tab) */
 .skip{ position:fixed; left:12px; top:-64px; z-index:100; padding:10px 16px; background:var(--accent); color:var(--on-accent); border-radius:var(--r); font-weight:600; transition:top var(--motion-fast) var(--ease); }
@@ -114,7 +116,8 @@ a{ color:inherit; text-decoration:none; }
 .brand sup{ font-family:'Golos Text',sans-serif; font-size:9.5px; font-weight:600; letter-spacing:.1em; color:var(--text-2); top:-.85em; }
 .nav__links{ display:flex; gap:clamp(12px,2vw,30px); }
 .nav__link{
-  padding:6px 0; font-size:15px; font-weight:500; color:var(--text-2);
+  display:inline-flex; align-items:center; min-height:44px; padding:6px 0;
+  font-size:15px; font-weight:500; color:var(--text-2);
   transition:color .2s var(--ease); white-space:nowrap;
 }
 .nav__link:hover{ color:var(--text); }
@@ -222,14 +225,16 @@ a{ color:inherit; text-decoration:none; }
    у .wrap (он объявлен выше и проигрывает по порядку), и на мобиле весь
    контент упирался в края экрана. На десктопе это не видно — там отступ
    даёт margin:auto от max-width. */
-.sec{ padding-block:clamp(56px,8vw,110px); }
+.sec{ padding-block:var(--section-space); }
 .sec--line{ border-top:1px solid var(--line-soft); }
 .sec__head{
   display:grid; grid-template-columns:minmax(0,1fr) minmax(0,.62fr);
-  gap:clamp(20px,4vw,56px); align-items:end; margin-bottom:clamp(32px,4vw,52px);
+  gap:clamp(20px,4vw,56px); align-items:end; margin-bottom:clamp(28px,3.5vw,44px);
 }
-.sec__head h2{ font-size:clamp(1.9rem,3.6vw,3rem); margin:14px 0 0; }
+.sec__head h1, .sec__head h2{ font-size:clamp(2.15rem,4vw,3.35rem); margin:14px 0 0; }
 .sec__head p{ margin:0; }
+.sec__head > .lead{ max-width:44ch; }
+.section-action{ margin-top:clamp(26px,3vw,36px); }
 
 /* ── Чайные услуги: в зале и на выезде ── */
 .svcs{ display:grid; grid-template-columns:repeat(3,1fr); gap:clamp(14px,1.6vw,20px); }
@@ -729,7 +734,7 @@ select.input{
   .brand__mark{ height:28px; }
   /* Тач-зоны: пальцу нужно 44px, мышке хватало 26. Ниже — только мобильные размеры */
   .lang{ padding:2px; }
-  .lang button{ min-height:44px; padding:0 11px; font-size:12px; }
+  .lang button{ min-width:44px; min-height:44px; padding:0 9px; font-size:12px; }
   /* На 375px название почти упиралось в языки — поджимаем языки пораньше */
   @media (max-width:400px){ .lang button{ padding:0 8px; } }
   @media (max-width:360px){
@@ -761,6 +766,8 @@ select.input{
   .foot__grid{ grid-template-columns:1fr; }
   .row2{ grid-template-columns:1fr; }
   .hero__cta .btn{ flex:1; }
+  .sec__head{ margin-bottom:28px; }
+  .sec__head h1, .sec__head h2{ font-size:clamp(2rem,9vw,2.55rem); }
   .tier{ grid-template-columns:1fr; gap:6px; }
   .gallery{ grid-template-columns:1fr 1fr; width:100%; }
   .gallery img{ height:clamp(132px,38vw,180px); }
@@ -835,7 +842,7 @@ select.input{
   #menu-teas .tea__foot{ padding-top:9px; align-items:center; }
   #menu-teas .price{ font-family:'Golos Text',sans-serif; font-size:15px; font-weight:600; }
   #menu-teas .price small{ display:block; margin:2px 0 0; font-size:10.5px; font-weight:400; }
-  #menu-teas .tea__quick{ width:38px; height:38px; }
+  #menu-teas .tea__quick{ width:44px; height:44px; }
 }
 @media (max-width:359px){
   .steps, .facts__in{ grid-template-columns:1fr; }
@@ -969,10 +976,23 @@ select.input{
       <p class="lead" data-i18n="fromcard_lead"></p>
     </div>
     <div class="tea-grid" id="home-teas"></div>
-    <div style="margin-top:30px">
+    <div class="section-action">
       <button class="link-arrow" data-go="shop"><span data-i18n="fromcard_link">Весь каталог</span>
         <svg width="14" height="10" viewBox="0 0 14 10" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M1 5h11M8.5 1.5L12 5l-3.5 3.5"/></svg>
       </button>
+    </div>
+  </div>
+
+  <!-- Сначала объясняем отношение к листу; услуги идут уже после продукта. -->
+  <div class="sec sec--line wrap">
+    <div class="credo">
+      <div class="credo__art"><img src="{{img:master-pour}}" alt="" data-i18n-alt="alt_pour" loading="lazy" width="1100" height="1656"></div>
+      <div class="credo__body">
+        <p class="label" data-i18n="credo_label">Зачем мы это делаем</p>
+        <blockquote class="credo__q display" data-i18n="credo_q"></blockquote>
+        <p class="credo__p" data-i18n="credo_p1"></p>
+        <p class="credo__p" data-i18n="credo_p2"></p>
+      </div>
     </div>
   </div>
 
@@ -1020,19 +1040,6 @@ select.input{
           <button class="link-arrow b2b-intent" type="button" data-go="b2b" data-intent="event"><span data-i18n="svc3_cta">Обсудить выезд</span> <span aria-hidden="true">→</span></button>
         </div>
       </article>
-    </div>
-  </div>
-
-  <!-- Философия: слова владельца из канала, не мой пересказ -->
-  <div class="sec sec--line wrap">
-    <div class="credo">
-      <div class="credo__art"><img src="{{img:master-pour}}" alt="" data-i18n-alt="alt_pour" loading="lazy" width="1100" height="1656"></div>
-      <div class="credo__body">
-        <p class="label" data-i18n="credo_label">Зачем мы это делаем</p>
-        <blockquote class="credo__q display" data-i18n="credo_q"></blockquote>
-        <p class="credo__p" data-i18n="credo_p1"></p>
-        <p class="credo__p" data-i18n="credo_p2"></p>
-      </div>
     </div>
   </div>
 
@@ -1091,7 +1098,7 @@ select.input{
       <img src="{{img:hall-bar}}" alt="" data-i18n-alt="alt_bar" loading="lazy" width="1300" height="865">
       <img src="{{img:hall-shelf}}" alt="" data-i18n-alt="alt_shelf" loading="lazy" width="1300" height="865">
     </div>
-    <div style="margin-top:36px">
+    <div class="section-action">
       <button class="btn btn--solid" data-go="book" data-i18n="hall_cta">Выбрать время</button>
     </div>
   </div>
@@ -1109,7 +1116,7 @@ select.input{
     </div>
     <div class="shop-toolbar">
       <div class="chips" id="filters" role="group" data-i18n-aria="filters_label" aria-label="Фильтры каталога"></div>
-      <p class="shop-count"><span data-i18n="shop_count">В подборке</span><b class="num" id="shop-count">0</b></p>
+      <p class="shop-count" aria-live="polite"><span data-i18n="shop_count">В подборке</span><b class="num" id="shop-count">0</b></p>
     </div>
     <div class="tea-grid" id="menu-teas"></div>
     <p id="fav-empty" data-i18n="fav_empty" hidden>Здесь появится то, что вы отметите сердечком.</p>

@@ -87,6 +87,9 @@ def check_dist(root: pathlib.Path) -> list[str]:
     errors: list[str] = []
     required = {
         "index.html",
+        "shop/index.html",
+        "business/index.html",
+        "booking/index.html",
         "404.html",
         "privacy.html",
         "legal.html",
@@ -97,7 +100,10 @@ def check_dist(root: pathlib.Path) -> list[str]:
     missing = sorted(name for name in required if not (root / name).is_file())
     if missing:
         errors.append("нет обязательных файлов: " + ", ".join(missing))
-    for name in ("index.html", "privacy.html", "legal.html"):
+    for name in (
+        "index.html", "shop/index.html", "business/index.html", "booking/index.html",
+        "privacy.html", "legal.html",
+    ):
         path = root / name
         if not path.is_file():
             continue
@@ -105,7 +111,7 @@ def check_dist(root: pathlib.Path) -> list[str]:
         for detail in SELLER_DETAILS:
             if detail not in text:
                 errors.append(f"{name}: отсутствуют подтверждённые реквизиты {detail!r}")
-        if name == "index.html":
+        if name in {"index.html", "shop/index.html", "business/index.html", "booking/index.html"}:
             for detail in REGISTERED_ADDRESS_PARTS:
                 if detail not in text:
                     errors.append(
@@ -120,6 +126,25 @@ def check_dist(root: pathlib.Path) -> list[str]:
                 errors.append(f"{name}: найдена юридическая заглушка {placeholder.pattern!r}")
         if any(pattern.search(text) for pattern in PRIVATE_BANK_PATTERNS):
             errors.append(f"{name}: обнаружены лишние банковские реквизиты")
+    route_canonicals = {
+        "shop/index.html": "https://chainya.ru/shop",
+        "business/index.html": "https://chainya.ru/business",
+        "booking/index.html": "https://chainya.ru/booking",
+    }
+    route_views = {
+        "shop/index.html": "shop",
+        "business/index.html": "b2b",
+        "booking/index.html": "book",
+    }
+    for name, canonical in route_canonicals.items():
+        text = (root / name).read_text(encoding="utf-8")
+        if f'<link rel="canonical" href="{canonical}">' not in text:
+            errors.append(f"{name}: неверный canonical")
+        if f'<meta property="og:url" content="{canonical}">' not in text:
+            errors.append(f"{name}: неверный og:url")
+        view = route_views[name]
+        if f'<section class="view is-active" id="view-{view}">' not in text:
+            errors.append(f"{name}: неверный исходный активный раздел")
     for path in root.rglob("*"):
         if not path.is_file():
             continue

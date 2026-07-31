@@ -168,7 +168,13 @@ if unused := have - used:
     print("не используются:", ", ".join(sorted(unused)))
 
 
-def document(body: str, extra_head: str = "", *, telegram_sdk: bool = True) -> str:
+def document(
+    body: str,
+    extra_head: str = "",
+    *,
+    telegram_sdk: bool = True,
+    title: str = TITLE,
+) -> str:
     # В исходнике CSS хранится первым блоком, чтобы проект оставался одним
     # редактируемым файлом. В готовом HTML переносим его в <head>: браузер
     # получает стили до body, а документ остаётся валидным.
@@ -195,7 +201,7 @@ document.head.appendChild(script);
         '<!doctype html>\n<html lang="ru">\n<head>\n'
         '<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
-        f"<title>{TITLE}</title>\n"
+        f"<title>{title}</title>\n"
         # Telegram Mini App SDK нужен только основному приложению. Служебная
         # 404-страница не должна выполнять внешний JavaScript.
         f"{sdk}"
@@ -273,6 +279,45 @@ if web:
     )
     (dist / "index.html").write_text(document(content, HEAD_EXTRA), encoding="utf-8")
 
+    route_meta = {
+        "shop": (
+            "Купить китайский чай · Чайня",
+            "Китайский чай в пакетах 25, 50 и 100 г с доставкой СДЭК по Москве и России.",
+        ),
+        "business": (
+            "Чай для бизнеса и мероприятий · Чайня",
+            "Поставки китайского чая для бизнеса и выездные чайные церемонии в Москве.",
+        ),
+        "booking": (
+            "Бронь чайной церемонии · Чайня",
+            "Забронируйте чайную церемонию с мастером или самостоятельное чаепитие на Острякова, 3.",
+        ),
+    }
+    route_views = {"shop": "shop", "business": "b2b", "booking": "book"}
+    for route, (route_title, route_desc) in route_meta.items():
+        route_url = f"{SITE}{route}"
+        route_head = (
+            HEAD_EXTRA
+            .replace(f'<meta name="description" content="{DESC}">', f'<meta name="description" content="{route_desc}">')
+            .replace(f'<meta property="og:title" content="{TITLE}">', f'<meta property="og:title" content="{route_title}">')
+            .replace(f'<meta property="og:description" content="{DESC}">', f'<meta property="og:description" content="{route_desc}">')
+            .replace(f'<meta property="og:url" content="{SITE}">', f'<meta property="og:url" content="{route_url}">')
+            .replace(f'<link rel="canonical" href="{SITE}">', f'<link rel="canonical" href="{route_url}">')
+        )
+        route_dir = dist / route
+        route_dir.mkdir()
+        route_content = content.replace(
+            '<section class="view is-active" id="view-home">',
+            '<section class="view" id="view-home">',
+        ).replace(
+            f'<section class="view" id="view-{route_views[route]}">',
+            f'<section class="view is-active" id="view-{route_views[route]}">',
+        )
+        (route_dir / "index.html").write_text(
+            document(route_content, route_head, title=route_title),
+            encoding="utf-8",
+        )
+
     forbidden = [
         path for path in dist.rglob("*")
         if path.name == ".DS_Store"
@@ -288,11 +333,14 @@ if web:
             + ", ".join(str(path.relative_to(dist)) for path in forbidden)
         )
 
-    html_kb = round((dist / "index.html").stat().st_size / 1024)
-    assets = sum(f.stat().st_size for f in dist.rglob("*") if f.is_file()) - (dist / "index.html").stat().st_size
-    print(f"dist/index.html   {html_kb} KB   (прилетает сразу)")
+    html_files = list(dist.rglob("*.html"))
+    max_html = max(path.stat().st_size for path in html_files)
+    total = sum(path.stat().st_size for path in dist.rglob("*") if path.is_file())
+    html_total = sum(path.stat().st_size for path in html_files)
+    assets = total - html_total
+    print(f"HTML на запрос    {round(max_html / 1024)} KB максимум")
     print(f"dist/img + fonts  {round(assets / 1024)} KB  в {len(used) + 4} файлах (кэшируются)")
-    print(f"итого             {round((html_kb * 1024 + assets) / 1024)} KB")
+    print(f"итого на диске    {round(total / 1024)} KB")
 else:
     (root / "artifact.html").write_text(content, encoding="utf-8")
     (root / "index.html").write_text(document(content), encoding="utf-8")

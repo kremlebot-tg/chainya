@@ -212,14 +212,18 @@ server {
 
     # Публичные разделы имеют читаемые URL. Отдаём то же приложение только для
     # известного белого списка; произвольные пути по-прежнему честно получают 404.
-    location ~ ^/(shop|business|booking)/?$ {
+    location ~ ^/(shop|business|booking)/$ {
+        return 308 /$1;
+    }
+
+    location ~ ^/(shop|business|booking)$ {
         add_header Strict-Transport-Security "max-age=31536000" always;
         add_header X-Content-Type-Options "nosniff" always;
         add_header Cache-Control "no-cache" always;
         add_header Referrer-Policy "strict-origin-when-cross-origin" always;
         add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
         add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
-        try_files /index.html =404;
+        try_files /$1/index.html =404;
     }
 
     location / { try_files $uri $uri/ =404; }

@@ -43,6 +43,7 @@
 
 /* ─────────────────────────  БАЗА  ───────────────────────── */
 *{ box-sizing:border-box; }
+html{ overflow-x:clip; }
 body{
   margin:0; background:var(--bg); color:var(--text);
   font-family:'Golos Text', system-ui, sans-serif;
@@ -1248,7 +1249,7 @@ select.input{
           </div>
           <div class="field">
             <label class="label" for="b-phone" data-i18n="b_phone">Телефон или телеграм</label>
-            <input class="input" type="tel" id="b-phone" name="contact" autocomplete="tel" inputmode="tel" data-i18n-ph="b_phone_ph">
+            <input class="input" type="text" id="b-phone" name="contact" autocomplete="off" data-i18n-ph="b_phone_ph" aria-describedby="b2b-status">
           </div>
           <div class="field">
             <label class="label" for="b-note" data-i18n="b_note">Что вам нужно</label>
@@ -1256,7 +1257,7 @@ select.input{
           </div>
           <label class="consent"><input type="checkbox" id="b-privacy" name="privacy_accepted" value="yes"><span><span data-i18n="privacy_accept">Согласен на обработку данных согласно</span> <a href="/privacy.html" target="_blank" rel="noopener" data-i18n="privacy_link">политике конфиденциальности</a></span></label>
           <button class="btn btn--solid btn--wide" id="b2b-submit" type="submit" data-i18n="b2b_send">Отправить</button>
-          <p class="summary__note" data-i18n="b2b_form_note"></p>
+          <p class="summary__note" id="b2b-status" role="status" aria-live="polite" data-i18n="b2b_form_note"></p>
         </form>
       </div>
     </div>
@@ -1287,8 +1288,8 @@ select.input{
       <div class="book">
         <div>
           <div class="field">
-            <span class="label" data-i18n="f_format">Формат</span>
-            <div class="fmt" id="fmt">
+            <span class="label" id="f-format-label" data-i18n="f_format">Формат</span>
+            <div class="fmt" id="fmt" role="group" aria-labelledby="f-format-label">
               <button class="fmt__opt" type="button" data-fmt="master" aria-pressed="true">
                 <span class="fmt__price num">1500 ₽</span>
                 <span class="fmt__name" data-i18n="fmt_master">Церемония с мастером</span>
@@ -1303,12 +1304,12 @@ select.input{
             <p class="fmt__incl" data-i18n="fmt_incl">В обе цены входят два чая на выбор. Третий — по желанию, на месте.</p>
           </div>
           <div class="field">
-            <span class="label" data-i18n="f_date">Дата</span>
-            <div class="scroll-shell scroll-shell--days"><div class="days" id="days"></div></div>
+            <span class="label" id="f-date-label" data-i18n="f_date">Дата</span>
+            <div class="scroll-shell scroll-shell--days"><div class="days" id="days" role="group" aria-labelledby="f-date-label"></div></div>
           </div>
           <div class="field">
-            <span class="label" data-i18n="f_time">Время посадки</span>
-            <div class="slots" id="slots"></div>
+            <span class="label" id="f-time-label" data-i18n="f_time">Время посадки</span>
+            <div class="slots" id="slots" role="group" aria-labelledby="f-time-label"></div>
           </div>
           <div class="field">
             <label class="label" for="f-guests" data-i18n="f_guests">Гостей</label>
@@ -1662,6 +1663,7 @@ select.input{
   ru: {
     locale:'ru-RU',
     title:'Чайня · китайский чай с доставкой',
+    route_titles:{home:'Чайня · китайский чай с доставкой',shop:'Купить китайский чай · Чайня',b2b:'Чай для бизнеса и мероприятий · Чайня',book:'Бронь чайной церемонии · Чайня'},
     a_lang:'Язык', a_close:'Закрыть', a_tea:'О чае', a_nav:'Разделы сайта', filters_label:'Фильтры каталога', skip:'Перейти к содержимому',
     alt_master:'Чайный мастер разливает настой из чахая по чашкам',
     alt_product:'Сухой китайский чай в чайной посуде',
@@ -1768,7 +1770,7 @@ select.input{
     b_company:'Компания или мероприятие', b_company_ph:'Кофейня «Утро» или летняя свадьба',
     b_name:'Как вас зовут', b_phone:'Телефон или телеграм', b_phone_ph:'+7 или @ник',
     b_note:'Что вам нужно', b_note_ph:'Поставка чая в офис или выездная церемония на 40 гостей.',
-    b2b_send:'Отправить',
+    b2b_send:'Отправить', b2b_contact_required:'Укажите телефон или Telegram, чтобы мы могли ответить.',
     b2b_form_note:'Заявка придёт владельцам в Telegram. Ответим в течение рабочего дня.',
     b2b_done_h:'Заявка у нас', b2b_done_back:'Посмотреть чаи',
     b2bDoneText:(name) => `${name ? name + ', с' : 'С'}пишемся в течение рабочего дня.`,
@@ -1839,6 +1841,7 @@ select.input{
   en: {
     locale:'en-GB',
     title:'Chaynya · Chinese tea delivered',
+    route_titles:{home:'Chaynya · Chinese tea delivered',shop:'Buy Chinese tea · Chaynya',b2b:'Tea for business and events · Chaynya',book:'Book a tea ceremony · Chaynya'},
     a_lang:'Language', a_close:'Close', a_tea:'About the tea', a_nav:'Site sections', filters_label:'Catalogue filters', skip:'Skip to content',
     alt_master:'A tea master pouring the liquor from a pitcher into cups',
     alt_product:'Loose Chinese tea presented in tea ware',
@@ -1945,7 +1948,7 @@ select.input{
     b_company:'Company or event', b_company_ph:'Utro coffee shop or a summer wedding',
     b_name:'Your name', b_phone:'Phone or Telegram', b_phone_ph:'+7 or @handle',
     b_note:'What do you need', b_note_ph:'Tea for the office or an off-site ceremony for 40 guests.',
-    b2b_send:'Send',
+    b2b_send:'Send', b2b_contact_required:'Enter a phone number or Telegram handle so we can reply.',
     b2b_form_note:'The owners will receive your enquiry in Telegram. We reply within one working day.',
     b2b_done_h:'Enquiry received', b2b_done_back:'See the teas',
     b2bDoneText:(name) => `${name ? name + ', we' : 'We'}’ll get back to you within one working day.`,
@@ -2016,6 +2019,7 @@ select.input{
   zh: {
     locale:'zh-CN',
     title:'Chaynya · 中国茶配送',
+    route_titles:{home:'Chaynya · 中国茶配送',shop:'购买中国茶 · Chaynya',b2b:'企业与活动用茶 · Chaynya',book:'预约茶会 · Chaynya'},
     a_lang:'语言', a_close:'关闭', a_tea:'茶叶详情', a_nav:'网站栏目', filters_label:'茶叶分类筛选', skip:'跳到内容',
     alt_master:'茶艺师正把茶汤从茶海分入茶杯',
     alt_product:'茶器中展示的中国散茶',
@@ -2122,7 +2126,7 @@ select.input{
     b_company:'公司或活动', b_company_ph:'「清晨」咖啡馆或夏季婚礼',
     b_name:'怎么称呼您', b_phone:'电话或Telegram', b_phone_ph:'+7 或 @用户名',
     b_note:'您需要什么', b_note_ph:'办公室供茶，或为40位宾客举办外出茶会。',
-    b2b_send:'发送',
+    b2b_send:'发送', b2b_contact_required:'请填写电话号码或 Telegram 用户名，以便我们回复。',
     b2b_form_note:'申请将通过 Telegram 发送给店主。我们将在一个工作日内回复。',
     b2b_done_h:'申请已收到', b2b_done_back:'看茶',
     b2bDoneText:(name) => `${name ? name + '，' : ''}我们将在一个工作日内回复。`,
@@ -2353,6 +2357,7 @@ select.input{
       else a.removeAttribute('aria-current');
     });
     const routeUrl = new URL(VIEW_PATHS[view], location.origin).href;
+    document.title = T().route_titles?.[view] || T().title;
     const canonical = document.querySelector('link[rel="canonical"]');
     const openGraphUrl = document.querySelector('meta[property="og:url"]');
     if (canonical) canonical.href = routeUrl;
@@ -3407,7 +3412,10 @@ select.input{
       const key = isoMoscow(d);
       const label = i === 0 ? T().today : i === 1 ? T().tomorrow
         : d.toLocaleDateString(T().locale, { weekday:'short',timeZone:'Europe/Moscow' });
-      const b = el(`<button class="day" data-d="${key}" aria-pressed="${B.date === key}">
+      const fullDate = d.toLocaleDateString(T().locale, {
+        weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'Europe/Moscow',
+      });
+      const b = el(`<button class="day" type="button" data-d="${key}" aria-label="${escAttr(fullDate)}" aria-pressed="${B.date === key}">
         <b class="num">${Number(part.day)}</b><span>${label}</span>
       </button>`);
       b.addEventListener('click', () => {
@@ -3428,7 +3436,7 @@ select.input{
   // фиктивное «занято» только отпугнуло бы от реально свободного времени.
   for (let m = 12 * 60; m <= 20 * 60; m += 30){
     const time = `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
-    const b = el(`<button class="slot num" data-t="${time}" aria-pressed="false">${time}</button>`);
+    const b = el(`<button class="slot num" type="button" data-t="${time}" aria-pressed="false">${time}</button>`);
     b.addEventListener('click', () => {
       if (b.disabled) return;
       $$('.slot', slots).forEach(s => s.setAttribute('aria-pressed', s === b));
@@ -3502,6 +3510,7 @@ select.input{
     $('#f-phone').removeAttribute('aria-invalid');
     sync();
     const businessSubmit = $('#b2b-submit');
+    $('#b-phone').removeAttribute('aria-invalid');
     businessSubmit.disabled = false;
     businessSubmit.textContent = T().b2b_send;
     document.querySelector('#b2b-form-wrap .summary__note').textContent = T().b2b_form_note;
@@ -3533,6 +3542,7 @@ select.input{
       $(selector).value = '';
     });
     $('#b-privacy').checked = false;
+    $('#b-phone').removeAttribute('aria-invalid');
     const submit = $('#b2b-submit');
     submit.disabled = false;
     submit.textContent = T().b2b_send;
@@ -3624,9 +3634,14 @@ select.input{
   $('#b2b-form').addEventListener('submit', async event => {
     event.preventDefault();
     const phone = $('#b-phone').value.trim();
-    if (!phone){ $('#b-phone').focus(); return; }
+    if (!phone){
+      $('#b-phone').setAttribute('aria-invalid','true');
+      $('#b2b-status').textContent = T().b2b_contact_required;
+      $('#b-phone').focus();
+      return;
+    }
     if (!$('#b-privacy').checked){
-      document.querySelector('#b2b-form-wrap .summary__note').textContent = T().privacy_required;
+      $('#b2b-status').textContent = T().privacy_required;
       $('#b-privacy').focus(); return;
     }
     const submit = $('#b2b-submit');
@@ -3666,6 +3681,14 @@ select.input{
     scrollTo({ top:0, behavior:'instant' });
   });
 
+  $('#b-phone').addEventListener('input', () => {
+    $('#b-phone').removeAttribute('aria-invalid');
+    $('#b2b-status').textContent = T().b2b_form_note;
+  });
+  $('#b-privacy').addEventListener('change', () => {
+    if ($('#b-privacy').checked) $('#b2b-status').textContent = T().b2b_form_note;
+  });
+
   /* ─────────────  ЯЗЫК  ───────────── */
   /* ─────────────  ПОЯВЛЕНИЕ ПРИ СКРОЛЛЕ  ─────────────
      На scroll/resize (rAF-throttle) помечаем вошедшие в кадр блоки классом .in.
@@ -3702,7 +3725,8 @@ select.input{
 
   function applyLang(){
     document.documentElement.lang = LANG;
-    document.title = T().title;
+    const currentRoute = PATH_VIEWS[location.pathname.replace(/\/$/,'') || '/'] || 'home';
+    document.title = T().route_titles?.[currentRoute] || T().title;
     $$('.lang button').forEach(b => b.setAttribute('aria-pressed', b.dataset.lang === LANG));
     $$('[data-i18n]').forEach(n => { const v = T()[n.dataset.i18n]; if (v != null) n.innerHTML = v; });
     $$('[data-i18n-ph]').forEach(n => { const v = T()[n.dataset.i18nPh]; if (v != null) n.placeholder = v; });

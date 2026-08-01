@@ -689,6 +689,42 @@ select.input{
 .tier__q{ font-family:'Prata',Georgia,serif; font-size:1.3rem; }
 .tier__d{ font-size:14.5px; color:var(--text-2); line-height:1.6; }
 
+/* ─────────────────────────  КАК ДОБРАТЬСЯ  ───────────────────────── */
+.visit__panel{
+  display:grid; grid-template-columns:minmax(0,1.45fr) minmax(290px,.7fr);
+  overflow:hidden; border:1px solid var(--line-soft); border-radius:var(--r);
+  background:var(--bg-2);
+}
+.visit__map{ position:relative; min-height:clamp(360px,38vw,500px); background:var(--bg-3); }
+.visit__map iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; }
+.visit__body{
+  display:flex; flex-direction:column; justify-content:space-between; gap:34px;
+  padding:clamp(28px,3.5vw,48px); border-left:1px solid var(--line-soft);
+}
+.visit__eyebrow{
+  margin:0 0 10px; color:var(--accent); font-size:11px; font-weight:600;
+  letter-spacing:.14em; text-transform:uppercase;
+}
+.visit__address{
+  margin:0; max-width:12ch; font-family:'Prata',Georgia,serif; font-size:clamp(1.7rem,2.6vw,2.45rem);
+  font-weight:400; line-height:1.18; letter-spacing:-.025em;
+}
+.visit__place{ margin:10px 0 0; color:var(--text-2); font-size:14px; line-height:1.55; }
+.visit__facts{ margin:0; }
+.visit__fact{
+  display:grid; grid-template-columns:84px 1fr; gap:14px; padding:13px 0;
+  border-top:1px solid var(--line-soft); font-size:14px;
+}
+.visit__fact dt{ color:var(--text-3); }
+.visit__fact dd{ margin:0; color:var(--text); }
+.visit__actions{ display:flex; flex-direction:column; align-items:stretch; gap:12px; }
+.visit__actions .btn{ width:100%; }
+.visit__open{
+  align-self:center; color:var(--text-2); font-size:12.5px; line-height:1.4;
+  border-bottom:1px solid var(--line); transition:color .2s var(--ease),border-color .2s var(--ease);
+}
+.visit__open:hover{ color:var(--accent); border-color:var(--accent); }
+
 /* ─────────────────────────  ПОДВАЛ  ───────────────────────── */
 .foot{ border-top:1px solid var(--line-soft); background:var(--bg-2); padding:clamp(48px,6vw,76px) 0 34px; }
 .foot__grid{ display:grid; grid-template-columns:1.4fr 1fr 1fr 1fr; gap:clamp(24px,3vw,44px); }
@@ -724,6 +760,9 @@ select.input{
   .credo__art img{ object-position:50% 30%; }
   .book, #view-b2b .book{ grid-template-columns:minmax(0,1fr); }
   .summary{ position:static; }
+  .visit__panel{ grid-template-columns:1fr; }
+  .visit__body{ border-left:0; border-top:1px solid var(--line-soft); }
+  .visit__address{ max-width:none; }
   .foot__grid{ grid-template-columns:1fr 1fr; }
   .facts__in{ grid-template-columns:1fr 1fr; }
   .fact:nth-child(3){ border-left:0; padding-left:0; }
@@ -741,6 +780,9 @@ select.input{
   .cart .sheet__body{ padding-bottom:18px; }
   .cart .sheet__foot{ padding-top:14px; padding-bottom:max(18px,env(safe-area-inset-bottom)); background:var(--bg); }
   .cart .field{ margin-bottom:17px; }
+  .visit__map{ min-height:340px; }
+  .visit__body{ padding:26px 22px 28px; gap:28px; }
+  .visit__fact{ grid-template-columns:76px 1fr; }
   .cart-co{ margin-top:16px; }
   .citem{ display:grid; grid-template-columns:52px minmax(0,1fr) auto; gap:10px; }
   .citem__img{ grid-row:1/3; }
@@ -1127,6 +1169,42 @@ select.input{
       <button class="btn btn--solid" data-go="book" data-i18n="hall_cta">Выбрать время</button>
     </div>
   </div>
+
+  <div class="sec sec--line wrap">
+    <div class="sec__head">
+      <div>
+        <p class="label" data-i18n="visit_label">Как добраться</p>
+        <h2 class="display" data-i18n="visit_h">Чайня<br>на Острякова</h2>
+      </div>
+      <p class="lead" data-i18n="visit_lead">Загляните выбрать чай с полки или оставайтесь за столом. Точка на карте ведёт прямо ко входу.</p>
+    </div>
+    <div class="visit__panel">
+      <div class="visit__map">
+        <iframe
+          src="https://yandex.ru/map-widget/v1/?ll=37.526791%2C55.799473&amp;mode=search&amp;oid=49488428011&amp;ol=biz&amp;z=16"
+          title="Чайня на карте Москвы"
+          data-i18n-title="visit_map_title"
+          loading="lazy"
+          referrerpolicy="strict-origin-when-cross-origin"
+          allowfullscreen></iframe>
+      </div>
+      <div class="visit__body">
+        <div>
+          <p class="visit__eyebrow" data-i18n="visit_address_label">Адрес</p>
+          <h3 class="visit__address" data-i18n="visit_address">Москва, ул. Острякова, 3</h3>
+          <p class="visit__place" data-i18n="visit_place">Первый этаж · помещение 114</p>
+        </div>
+        <dl class="visit__facts">
+          <div class="visit__fact"><dt data-i18n="visit_metro_label">Метро</dt><dd data-i18n="visit_metro">Аэропорт</dd></div>
+          <div class="visit__fact"><dt data-i18n="visit_hours_label">Открыты</dt><dd data-i18n="visit_hours">ежедневно, 12:00–22:00</dd></div>
+        </dl>
+        <div class="visit__actions">
+          <a class="btn btn--solid" href="https://yandex.ru/maps/213/moscow/?ll=37.526791%2C55.799473&amp;mode=routes&amp;rtext=~55.799473%2C37.526791&amp;rtt=auto&amp;z=16" target="_blank" rel="noopener" data-i18n="visit_route">Построить маршрут</a>
+          <a class="visit__open" href="https://yandex.ru/maps/org/chaynya/49488428011/" target="_blank" rel="noopener" data-i18n="visit_open">Открыть карточку в Яндекс Картах</a>
+        </div>
+      </div>
+    </div>
+  </div>
 </section>
 
 <!-- ══════════════════  КУПИТЬ ЧАЙ  ══════════════════ -->
@@ -1387,7 +1465,7 @@ select.input{
           <li><a href="https://t.me/chainyamsk" target="_blank" rel="noopener" data-i18n="foot_tg">Канал: @chainyamsk</a></li>
           <li><a href="tel:+79055908801" data-i18n="foot_phone">+7 (905) 590-88-01</a></li>
           <li><a href="mailto:chainya@bk.ru">chainya@bk.ru</a></li>
-          <li><a href="https://yandex.com/maps/org/chaynya/49488428011/" target="_blank" rel="noopener" data-i18n="foot_ya">Мы на Яндекс.Картах</a></li>
+          <li><a href="https://yandex.ru/maps/org/chaynya/49488428011/" target="_blank" rel="noopener" data-i18n="foot_ya">Мы на Яндекс Картах</a></li>
         </ul>
       </div>
       <div>
@@ -1712,6 +1790,11 @@ select.input{
     hall_p2:'Если вас больше девяти, позвоните заранее, что-нибудь придумаем.',
     hall_m1:'9 мест', hall_m2:'без депозита', hall_m3:'чай навынос с полки',
     hall_cta:'Выбрать время',
+    visit_label:'Как добраться', visit_h:'Чайня<br>на Острякова',
+    visit_lead:'Загляните выбрать чай с полки или оставайтесь за столом. Точка на карте ведёт прямо ко входу.',
+    visit_address_label:'Адрес', visit_address:'Москва, ул. Острякова, 3', visit_place:'Первый этаж · помещение 114',
+    visit_metro_label:'Метро', visit_metro:'Аэропорт', visit_hours_label:'Открыты', visit_hours:'ежедневно, 12:00–22:00',
+    visit_route:'Построить маршрут', visit_open:'Открыть карточку в Яндекс Картах', visit_map_title:'Чайня на карте Москвы',
     shop_label:'Купить чай', shop_h:'Тот же лист,<br>что и в зале',
     shop_lead:'Здесь чай продаётся домой: фасуем в пакеты 25, 50 и 100 г и отправляем доставкой. Если вы пришли к нам за стол, платить за чай не нужно: два на выбор уже входят в стоимость.',
     shop_foot:'Цены на пакеты считаются от цены за 10 г. Прессованное продаём целиком: мандарин и квадратик поштучно, блины по запросу.', shop_count:'В подборке',
@@ -1890,6 +1973,11 @@ select.input{
     hall_p2:'If there are more than nine of you, call ahead and we will figure something out.',
     hall_m1:'9 seats', hall_m2:'no deposit', hall_m3:'tea to take home, off the shelf',
     hall_cta:'Pick a time',
+    visit_label:'Directions', visit_h:'Chainya<br>on Ostryakova',
+    visit_lead:'Drop in to choose tea from the shelf or stay for a session. The map pin leads straight to us.',
+    visit_address_label:'Address', visit_address:'3 Ostryakova St., Moscow', visit_place:'Ground floor · unit 114',
+    visit_metro_label:'Metro', visit_metro:'Aeroport', visit_hours_label:'Hours', visit_hours:'daily, 12:00–22:00',
+    visit_route:'Get directions', visit_open:'Open in Yandex Maps', visit_map_title:'Chainya on the Moscow map',
     shop_label:'Buy tea', shop_h:'The same leaf<br>we serve inside',
     shop_lead:'Tea to take home, packed in 25, 50 and 100 g bags and shipped across Russia. Two teas are included with every table booking.',
     shop_foot:'Package prices are calculated from the price per 10 g. Pressed tea is sold whole: the mandarin and mini brick by the piece, cakes on request.', shop_count:'In this selection',
@@ -2068,6 +2156,11 @@ select.input{
     hall_p2:'超过九位请提前来电，我们想办法。',
     hall_m1:'9个座位', hall_m2:'无订金', hall_m3:'货架上的茶可带走',
     hall_cta:'选时间',
+    visit_label:'如何前往', visit_h:'奥斯特里亚科娃街<br>茶室',
+    visit_lead:'欢迎来店选购茶叶，或坐下来喝一席茶。地图标记可直接带您到店。',
+    visit_address_label:'地址', visit_address:'莫斯科奥斯特里亚科娃街3号', visit_place:'一层 · 114室',
+    visit_metro_label:'地铁', visit_metro:'机场站', visit_hours_label:'营业时间', visit_hours:'每天 12:00–22:00',
+    visit_route:'规划路线', visit_open:'在Yandex地图中打开', visit_map_title:'莫斯科茶室地图',
     shop_label:'买茶', shop_h:'与店里<br>同一份茶叶',
     shop_lead:'这里的茶是带回家的：按25、50、100克分装，快递寄出。若您是来店里坐茶席，茶不必另付：两款任选已含在价内。',
     shop_foot:'分装价格按每10克的价格折算。紧压茶整件出售：小青柑和小金砖论个，茶饼可另询。', shop_count:'当前选择',
@@ -3732,6 +3825,7 @@ select.input{
     $$('[data-i18n-ph]').forEach(n => { const v = T()[n.dataset.i18nPh]; if (v != null) n.placeholder = v; });
     $$('[data-i18n-aria]').forEach(n => { const v = T()[n.dataset.i18nAria]; if (v != null) n.setAttribute('aria-label', v); });
     $$('[data-i18n-alt]').forEach(n => { const v = T()[n.dataset.i18nAlt]; if (v != null) n.alt = v; });
+    $$('[data-i18n-title]').forEach(n => { const v = T()[n.dataset.i18nTitle]; if (v != null) n.title = v; });
     $$('a[href^="/privacy.html"]').forEach(a => { a.href = `/privacy.html?lang=${LANG}`; });
     $$('a[href^="/legal.html"]').forEach(a => { a.href = `/legal.html?lang=${LANG}`; });
     selectHeroImage();

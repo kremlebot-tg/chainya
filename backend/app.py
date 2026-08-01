@@ -446,6 +446,11 @@ class AnalyticsEvent(BaseModel):
     language: Literal["ru", "en", "zh"] = "ru"
     device: Literal["mobile", "tablet", "desktop"] = "desktop"
     referrer: str = Field(default="direct", max_length=160, pattern=r"^[A-Za-z0-9.:-]+$")
+    campaign: str = Field(
+        default="organic",
+        max_length=160,
+        pattern=r"^[A-Za-z0-9._:/ -]+$",
+    )
 
 
 def now_iso() -> str:
@@ -699,9 +704,18 @@ def init_db() -> None:
                 section TEXT NOT NULL DEFAULT '',
                 language TEXT NOT NULL DEFAULT 'ru',
                 device TEXT NOT NULL DEFAULT 'desktop',
-                referrer TEXT NOT NULL DEFAULT 'direct'
+                referrer TEXT NOT NULL DEFAULT 'direct',
+                campaign TEXT NOT NULL DEFAULT 'organic'
             )
         """)
+        analytics_columns = {
+            row["name"] for row in con.execute("PRAGMA table_info(analytics_events)")
+        }
+        if "campaign" not in analytics_columns:
+            con.execute(
+                "ALTER TABLE analytics_events "
+                "ADD COLUMN campaign TEXT NOT NULL DEFAULT 'organic'"
+            )
         con.execute("CREATE INDEX IF NOT EXISTS idx_analytics_created ON analytics_events(created_at)")
         con.execute("CREATE INDEX IF NOT EXISTS idx_analytics_event_created ON analytics_events(event, created_at)")
         con.execute(
@@ -1895,7 +1909,7 @@ def dashboard_data(days: int) -> dict:
             })
 
         breakdown = {}
-        for field in ("device", "language", "referrer"):
+        for field in ("device", "language", "referrer", "campaign"):
             rows = con.execute(
                 f"""SELECT {field} AS name, COUNT(DISTINCT session_hash) AS value
                     FROM analytics_events WHERE event = 'page_view' AND created_at >= ? AND created_at < ?
@@ -2010,9 +2024,12 @@ def collect_analytics(payload: AnalyticsEvent, request: Request):
         cleanup_analytics_if_due(con)
         con.execute(
             """INSERT INTO analytics_events
-               (created_at, session_hash, event, section, language, device, referrer)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (now_iso(), session_hash, payload.event, payload.section, payload.language, payload.device, payload.referrer),
+               (created_at, session_hash, event, section, language, device, referrer, campaign)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                now_iso(), session_hash, payload.event, payload.section,
+                payload.language, payload.device, payload.referrer, payload.campaign,
+            ),
         )
     return Response(status_code=204)
 
@@ -2796,16 +2813,19 @@ def create_order(
             )
         if not reused_row and analytics_session_hash:
             context = con.execute(
-                """SELECT language, device, referrer FROM analytics_events
+                """SELECT language, device, referrer, campaign FROM analytics_events
                     WHERE session_hash = ? ORDER BY id DESC LIMIT 1""",
                 (analytics_session_hash,),
             ).fetchone()
             if context:
                 con.execute(
                     """INSERT INTO analytics_events
-                       (created_at, session_hash, event, section, language, device, referrer)
-                       VALUES (?, ?, 'order_created', 'payment', ?, ?, ?)""",
-                    (created, analytics_session_hash, context["language"], context["device"], context["referrer"]),
+                       (created_at, session_hash, event, section, language, device, referrer, campaign)
+                       VALUES (?, ?, 'order_created', 'payment', ?, ?, ?, ?)""",
+                    (
+                        created, analytics_session_hash, context["language"],
+                        context["device"], context["referrer"], context["campaign"],
+                    ),
                 )
     if reused_row:
         if tbank_enabled:

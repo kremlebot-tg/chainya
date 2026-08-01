@@ -655,6 +655,7 @@ def test_anonymous_analytics_feed_dashboard(tmp_path, monkeypatch):
                 "language": "ru",
                 "device": "mobile",
                 "referrer": "direct",
+                "campaign": "yandex / cpc / maps",
             })
             assert response.status_code == 204
         # A later-stage event without a page view is outside the funnel cohort.
@@ -678,6 +679,9 @@ def test_anonymous_analytics_feed_dashboard(tmp_path, monkeypatch):
         assert dashboard["commerce"]["paid_orders"] == 1
         assert dashboard["commerce"]["revenue"] == 880
         assert dashboard["breakdown"]["device"] == [{"name": "mobile", "value": 1}]
+        assert dashboard["breakdown"]["campaign"] == [
+            {"name": "yandex / cpc / maps", "value": 1}
+        ]
         assert dashboard["system"]["catalog_items"] > 0
         assert dashboard["system"]["catalog_active_items"] == 30
         assert len(dashboard["daily"]) == 30
@@ -698,6 +702,7 @@ def test_anonymous_analytics_feed_dashboard(tmp_path, monkeypatch):
         assert "analytics_session_hash" not in order_columns
         assert "ip" not in analytics_columns
         assert "user_agent" not in analytics_columns
+        assert "campaign" in analytics_columns
 
 
 def test_production_dashboard_uses_actual_tbank_write_readiness(tmp_path, monkeypatch):

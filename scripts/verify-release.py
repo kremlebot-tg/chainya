@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import pathlib
 import re
 import sys
@@ -176,6 +177,37 @@ def response_metadata(url: str) -> tuple[int, str, object]:
         return exc.code, exc.headers.get_content_type(), exc.headers
 
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def raw_response_metadata(url: str, method: str = "GET") -> tuple[int, str, object]:
+    request = urllib.request.Request(
+        url,
+        headers={"User-Agent": "ChainyaReleaseVerifier/1.0"},
+        method=method,
+    )
+    opener = urllib.request.build_opener(NoRedirect)
+    try:
+        with opener.open(request, timeout=15) as response:
+            return response.status, response.headers.get_content_type(), response.headers
+    except urllib.error.HTTPError as exc:
+        return exc.code, exc.headers.get_content_type(), exc.headers
+
+
+def json_response(url: str) -> tuple[int, object]:
+    request = urllib.request.Request(
+        url,
+        headers={"User-Agent": "ChainyaReleaseVerifier/1.0"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=15) as response:
+            return response.status, json.load(response)
+    except (urllib.error.URLError, json.JSONDecodeError, ValueError):
+        return 0, {}
+
+
 def status(url: str) -> tuple[int, str]:
     code, content_type, _headers = response_metadata(url)
     return code, content_type
@@ -220,6 +252,33 @@ def check_live(base_url: str) -> list[str]:
         code, _content_type = status(base + path)
         if code not in {403, 404}:
             errors.append(f"{path}: ожидался 403/404, получен {code}")
+    redirect_code, _redirect_type, redirect_headers = raw_response_metadata(
+        base + "/index.html"
+    )
+    if redirect_code not in {301, 308} or combined_header(
+        redirect_headers, "location"
+    ) not in {"/", base + "/"}:
+        errors.append("/index.html: нет канонического redirect на /")
+    for path in ("/manage", "/admin/orders", "/payment/success"):
+        code, content_type, headers = raw_response_metadata(base + path, method="HEAD")
+        # HEAD deliberately has an empty body; Starlette labels that empty
+        # response text/plain even though the corresponding GET is HTML.
+        if code != 200:
+            errors.append(f"{path}: HEAD ожидался 200, получен {code}")
+        csp = combined_header(headers, "content-security-policy")
+        if "frame-ancestors 'none'" not in csp:
+            errors.append(f"{path}: приватная страница допускает встраивание")
+        if "noindex" not in combined_header(headers, "x-robots-tag").lower():
+            errors.append(f"{path}: нет X-Robots-Tag noindex")
+    health_code, health = json_response(base + "/api/health")
+    if health_code != 200 or not isinstance(health, dict) or not health.get("ok"):
+        errors.append("/api/health: backend не подтвердил готовность")
+    elif health.get("test_mode") is not False:
+        errors.append("/api/health: production остался в тестовом режиме")
+    elif not isinstance(health.get("catalog_items"), int) or health["catalog_items"] < 1:
+        errors.append("/api/health: каталог пуст")
+    elif not re.fullmatch(r"[0-9a-f]{7,64}", str(health.get("version", ""))):
+        errors.append("/api/health: отсутствует корректная версия release")
     code, content_type = status(base + "/.well-known/security.txt")
     if code != 200 or content_type != "text/plain":
         errors.append(

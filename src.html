@@ -2314,11 +2314,26 @@ select.input{
     const host = document.referrer && new URL(document.referrer).hostname;
     if (host && host !== location.hostname) analyticsReferrer = host.replace(/[^A-Za-z0-9.:-]/g,'').slice(0,160) || 'direct';
   } catch(e) {}
+  /* Рекламную атрибуцию сохраняем только в пределах вкладки. Уникальный
+     yclid и полный URL намеренно не отправляются и не сохраняются. */
+  let analyticsCampaign = 'organic';
+  try {
+    const cleanAttribution = value => String(value || '')
+      .replace(/[^A-Za-z0-9._:-]/g, '').slice(0, 48);
+    const params = new URLSearchParams(location.search);
+    const source = cleanAttribution(params.get('utm_source')) || (params.has('yclid') ? 'yandex' : '');
+    const medium = cleanAttribution(params.get('utm_medium')) || (params.has('yclid') ? 'cpc' : '');
+    const campaign = cleanAttribution(params.get('utm_campaign'));
+    const fresh = [source, medium, campaign].filter(Boolean).join(' / ');
+    if (fresh) sessionStorage.setItem('chainya-campaign', fresh);
+    analyticsCampaign = fresh || sessionStorage.getItem('chainya-campaign') || 'organic';
+    if (params.has('yclid') && analyticsReferrer === 'direct') analyticsReferrer = 'yandex.ru';
+  } catch(e) {}
   const analyticsDevice = matchMedia('(max-width: 700px)').matches ? 'mobile' : matchMedia('(max-width: 1050px)').matches ? 'tablet' : 'desktop';
   function track(event, section=''){
     if (ANALYTICS_OFF || !analyticsSession) return;
     fetch('/api/analytics/events', {method:'POST',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify({
-      session_id:analyticsSession,event,section,language:LANG,device:analyticsDevice,referrer:analyticsReferrer,
+      session_id:analyticsSession,event,section,language:LANG,device:analyticsDevice,referrer:analyticsReferrer,campaign:analyticsCampaign,
     })}).catch(()=>{});
   }
   function trackOnce(event, section=''){

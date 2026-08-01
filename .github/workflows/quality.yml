@@ -12,6 +12,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      # Production deployment validates the live sibling catalog separately.
+      # CI uses a public, secret-free snapshot so a clean checkout is testable.
+      CHAINYA_CATALOG_PATH: backend/tests/fixtures/catalog.json
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

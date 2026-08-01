@@ -50,6 +50,23 @@ def test_test_mode_parser_fails_closed(monkeypatch, tmp_path):
     assert module.test_mode_from_value("0") is False
 
 
+def test_health_exposes_safe_release_version(tmp_path, monkeypatch):
+    client, _ = app_client(tmp_path, monkeypatch)
+    with client:
+        response = client.get("/api/health")
+    assert response.status_code == 200
+    assert response.json()["version"] in {"development", "unknown"} or len(response.json()["version"]) == 12
+
+
+def test_service_pages_support_head_without_exposing_content(tmp_path, monkeypatch):
+    client, _ = app_client(tmp_path, monkeypatch)
+    with client:
+        for path in ("/manage", "/manage/", "/admin/orders", "/payment/success", "/payment/fail"):
+            response = client.head(path)
+            assert response.status_code == 200
+            assert response.content == b""
+
+
 def test_server_prices_order_and_mock_payment(tmp_path, monkeypatch):
     client, module = app_client(tmp_path, monkeypatch)
     sent = []

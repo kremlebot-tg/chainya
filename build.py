@@ -120,8 +120,8 @@ HEAD_EXTRA = f"""<meta name="description" content="{DESC}">
                 "opens": "12:00",
                 "closes": "22:00",
             },
-            "hasMap": "https://yandex.com/maps/org/chaynya/49488428011/",
-            "sameAs": ["https://t.me/chainyamsk", "https://yandex.com/maps/org/chaynya/49488428011/"],
+            "hasMap": "https://yandex.ru/maps/org/chaynya/49488428011/",
+            "sameAs": ["https://t.me/chainyamsk", "https://yandex.ru/maps/org/chaynya/49488428011/"],
         },
     ],
 }, ensure_ascii=False).join(('<script type="application/ld+json">', '</script>'))}"""

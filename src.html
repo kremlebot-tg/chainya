@@ -350,7 +350,7 @@ h1, h2, h3, p{ text-wrap:pretty; }
 .price{ font-family:'Prata',Georgia,serif; font-size:1.22rem; font-variant-numeric:tabular-nums; }
 .price small{ font-family:'Golos Text',sans-serif; font-size:12px; color:var(--text-3); margin-left:4px; }
 .tea__quick{
-  position:relative; z-index:3; flex:none; width:34px; height:34px; display:grid;
+  position:relative; z-index:3; flex:none; width:44px; height:44px; display:grid;
   place-items:center; border:1px solid var(--line); border-radius:var(--r);
   font-size:20px; line-height:1; color:var(--text); background:var(--bg-3);
   transition:background var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease);
@@ -720,7 +720,8 @@ select.input{
 .visit__actions{ display:flex; flex-direction:column; align-items:stretch; gap:12px; }
 .visit__actions .btn{ width:100%; }
 .visit__open{
-  align-self:center; color:var(--text-2); font-size:12.5px; line-height:1.4;
+  align-self:center; min-height:44px; display:inline-flex; align-items:center; padding:8px 2px;
+  color:var(--text-2); font-size:12.5px; line-height:1.4;
   border-bottom:1px solid var(--line); transition:color .2s var(--ease),border-color .2s var(--ease);
 }
 .visit__open:hover{ color:var(--accent); border-color:var(--accent); }
@@ -772,7 +773,7 @@ select.input{
 @media (max-width:620px){
   body{ font-size:16px; }
   /* поля 16px — иначе iOS Safari при фокусе автоматически зумит страницу */
-  .input{ font-size:16px; }
+  .input, select.input{ font-size:16px; }
   /* тач-зоны корзины и языков до 44px (пальцу нужно 44, на десктопе было меньше) */
   .qty__b{ width:44px; height:44px; }
   .citem__rm{ width:44px; height:44px; }
@@ -1354,7 +1355,7 @@ select.input{
 <!-- ══════════════════  БРОНЬ  ══════════════════ -->
 <section class="view" id="view-book">
   <div class="sec wrap">
-    <div id="book-form">
+    <form id="book-form" novalidate>
       <div class="sec__head">
         <div>
           <p class="label" data-i18n="book_label">Бронь</p>
@@ -1401,14 +1402,14 @@ select.input{
             <div class="field">
               <label class="label" for="f-phone" data-i18n="f_phone">Телефон</label>
               <input class="input" type="tel" id="f-phone" data-i18n-ph="phone_ph"
-                     placeholder="+7 (___) ___-__-__" autocomplete="tel" inputmode="tel" maxlength="25">
+                     placeholder="+7 (___) ___-__-__" autocomplete="tel" inputmode="tel" maxlength="25" required>
             </div>
           </div>
           <div class="field">
             <label class="label" for="f-note" data-i18n="f_note">Пожелания</label>
             <textarea class="input" id="f-note" data-i18n-ph="f_note_ph"></textarea>
           </div>
-          <label class="consent"><input type="checkbox" id="f-privacy"><span><span data-i18n="privacy_accept">Согласен на обработку данных согласно</span> <a href="/privacy.html" target="_blank" rel="noopener" data-i18n="privacy_link">политике конфиденциальности</a></span></label>
+          <label class="consent"><input type="checkbox" id="f-privacy" required><span><span data-i18n="privacy_accept">Согласен на обработку данных согласно</span> <a href="/privacy.html" target="_blank" rel="noopener" data-i18n="privacy_link">политике конфиденциальности</a></span></label>
           <p class="cart-note cart-note--error" id="f-status" role="status" aria-live="polite"></p>
         </div>
 
@@ -1420,7 +1421,7 @@ select.input{
           <div class="srow"><span data-i18n="sum_time">Время</span><span id="s-time">—</span></div>
           <div class="srow"><span data-i18n="sum_guests">Гостей</span><span id="s-guests" class="num">2</span></div>
           <div class="srow muted"><span data-i18n="sum_session">Стол</span><span data-i18n="sum_session_v">2 часа · 2 чая</span></div>
-          <button class="btn btn--solid btn--wide" id="submit" disabled data-i18n="book_btn_wait">Выберите дату и время</button>
+          <button class="btn btn--solid btn--wide" id="submit" type="submit" disabled data-i18n="book_btn_wait">Выберите дату и время</button>
           <p class="or"><span data-i18n="or">или</span></p>
           <a class="btn btn--ghost btn--wide" id="call-link" href="tel:+79055908801" style="margin-top:14px">
             <span data-i18n="book_call">Позвонить: +7 905 590-88-01</span>
@@ -1428,7 +1429,7 @@ select.input{
           <p class="summary__note" data-i18n="sum_note"></p>
         </aside>
       </div>
-    </div>
+    </form>
 
     <div id="book-done" hidden>
       <div class="done-card">
@@ -3642,7 +3643,8 @@ select.input{
     document.querySelector('#b2b-form-wrap .summary__note').textContent = T().b2b_form_note;
   }
 
-  $('#submit').addEventListener('click', async () => {
+  $('#book-form').addEventListener('submit', async event => {
+    event.preventDefault();
     if (!B.date || !B.time) return;
     const status = $('#f-status'), submit = $('#submit');
     status.textContent = '';

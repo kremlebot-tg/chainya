@@ -1,6 +1,7 @@
 # chainya.ru — сайт и checkout «Чайни».
-# X-Frame-Options и CSP frame-ancestors намеренно не задаются: сайт работает
-# как Telegram Mini App. Остальные заголовки не мешают встраиванию.
+# Публичная витрина должна открываться внутри Telegram Mini App, поэтому её
+# нельзя закрывать X-Frame-Options. Админка и платёжные результаты ниже не
+# встраиваются и отдельно получают CSP frame-ancestors 'none'.
 
 server {
     listen 80;
@@ -107,7 +108,7 @@ server {
         add_header Cache-Control "no-store" always;
         add_header Referrer-Policy "no-referrer" always;
         add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
-        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
         add_header X-Robots-Tag "noindex, nofollow" always;
         proxy_pass http://127.0.0.1:8077;
         proxy_http_version 1.1;
@@ -123,7 +124,7 @@ server {
         add_header Cache-Control "no-store" always;
         add_header Referrer-Policy "no-referrer" always;
         add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
-        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
         add_header X-Robots-Tag "noindex, nofollow" always;
         proxy_pass http://127.0.0.1:8077;
         proxy_http_version 1.1;
@@ -139,7 +140,7 @@ server {
         add_header Cache-Control "no-store" always;
         add_header Referrer-Policy "no-referrer" always;
         add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
-        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
         add_header X-Robots-Tag "noindex, nofollow" always;
         proxy_pass http://127.0.0.1:8077;
         proxy_http_version 1.1;
@@ -155,7 +156,7 @@ server {
         add_header Cache-Control "no-store" always;
         add_header Referrer-Policy "no-referrer" always;
         add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
-        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
         add_header X-Robots-Tag "noindex, nofollow" always;
         proxy_pass http://127.0.0.1:8077;
         proxy_http_version 1.1;
@@ -197,6 +198,7 @@ server {
         add_header Referrer-Policy "strict-origin-when-cross-origin" always;
         add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
         add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src https://yandex.ru; base-uri 'self'; object-src 'none'; form-action 'self'" always;
+        return 308 /;
     }
 
     error_page 404 /404.html;

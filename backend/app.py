@@ -64,6 +64,16 @@ CATALOG_PATH = Path(os.getenv("CHAINYA_CATALOG_PATH", PROJECT / "telegram-bot" /
 CDEK_CITIES_PATH = Path(
     os.getenv("CDEK_CITIES_PATH", DATA_DIR / "cdek-cities-ru.json")
 )
+RELEASE_COMMIT_PATH = ROOT / "RELEASE_COMMIT"
+
+
+def release_version() -> str:
+    """Return a non-secret deploy identifier for production diagnostics."""
+    try:
+        commit = RELEASE_COMMIT_PATH.read_text(encoding="ascii").strip().lower()
+    except OSError:
+        return "development"
+    return commit[:12] if re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", commit) else "unknown"
 
 
 def test_mode_from_value(value: str | None) -> bool:
@@ -1968,7 +1978,12 @@ def dashboard_data(days: int) -> dict:
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "test_mode": TEST_MODE, "catalog_items": len(load_catalog())}
+    return {
+        "ok": True,
+        "test_mode": TEST_MODE,
+        "catalog_items": len(load_catalog()),
+        "version": release_version(),
+    }
 
 
 @app.get("/api/catalog")
@@ -3264,6 +3279,12 @@ def tbank_result_page(order_id: str = "", token: str = ""):
     )
 
 
+@app.head("/payment/success")
+@app.head("/payment/fail")
+def tbank_result_page_head():
+    return Response(headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
+
+
 def owner_page(request: Request):
     page = "admin.html" if valid_admin_session(
         request.cookies.get(ADMIN_SESSION_COOKIE, "")
@@ -3288,6 +3309,19 @@ def admin_page(request: Request):
 def management_page(request: Request):
     """Owner dashboard protected by a server-validated HttpOnly session."""
     return owner_page(request)
+
+
+@app.head("/admin/orders")
+@app.head("/manage/")
+@app.head("/manage")
+def management_page_head():
+    return Response(
+        headers={
+            "Cache-Control": "no-store",
+            "Referrer-Policy": "no-referrer",
+            "X-Robots-Tag": "noindex, nofollow",
+        }
+    )
 
 
 if TEST_MODE:

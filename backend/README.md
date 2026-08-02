@@ -6,7 +6,7 @@ SQLite и подключает Т-Банк, CDEK, Saby и Telegram. Тестов
 нет.
 
 ```bash
-cd /Users/mac/Documents/Сайты/Чайня/site
+cd /Users/mac/Desktop/Чайня/site
 python3 -m venv .venv
 .venv/bin/pip install -r backend/requirements.txt
 python3 build.py --web

@@ -8,7 +8,7 @@
 ```bash
 cd /Users/mac/Desktop/Чайня/site
 python3 -m venv .venv
-.venv/bin/pip install -r backend/requirements.txt
+.venv/bin/pip install -r backend/requirements-dev.txt
 python3 build.py --web
 CHAINYA_TEST_MODE=1 .venv/bin/uvicorn backend.app:app --reload --port 8080
 ```

@@ -419,13 +419,23 @@ sudo mkdir "$backend_release"
 backend_release_created=1
 sudo tar xzf "$stage/shop.tgz" -C "$backend_release"
 sudo install -m 0444 "$stage/RELEASE_COMMIT" "$backend_release/RELEASE_COMMIT"
+sudo chmod -R a+rX "$backend_release"
+
+# Проверки запускаются в одноразовом окружении: pytest/httpx не попадают в
+# production-venv и не исполняются от root.
+python3 -m venv "$stage/test-venv"
+"$stage/test-venv/bin/pip" install -q \
+  -r "$backend_release/backend/requirements-dev.txt"
+(
+  cd "$backend_release"
+  CHAINYA_DATA_DIR="$stage/test-data" \
+    "$stage/test-venv/bin/python" -m pytest -q backend/tests
+)
+rm -rf -- "$stage/test-venv" "$stage/test-data"
+
 sudo python3 -m venv "$backend_release/.venv"
 sudo "$backend_release/.venv/bin/pip" install -q \
   -r "$backend_release/backend/requirements.txt"
-(
-  cd "$backend_release"
-sudo "$backend_release/.venv/bin/python" -m pytest -q backend/tests
-)
 sudo chown -R root:root "$backend_release"
 sudo chmod -R a+rX "$backend_release"
 

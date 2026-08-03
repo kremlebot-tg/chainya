@@ -222,6 +222,9 @@ if web:
     for f in ("prata-cyr", "prata-lat", "golos-cyr", "golos-lat"):
         shutil.copy(root / "fonts" / f"{f}.woff2", dist / "fonts" / f"{f}.woff2")
     shutil.copy(root / "src-assets" / "favicon.png", dist / "favicon.png")
+    # Многие браузеры и поисковые роботы всё ещё запрашивают именно этот путь.
+    # PNG корректно распознаётся по сигнатуре даже при историческом расширении.
+    shutil.copy(root / "src-assets" / "favicon.png", dist / "favicon.ico")
     shutil.copy(OG_SRC, dist / OG_NAME)
     shutil.copy(root / "privacy.html", dist / "privacy.html")
     shutil.copy(root / "legal.html", dist / "legal.html")

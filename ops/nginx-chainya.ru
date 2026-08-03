@@ -1,7 +1,6 @@
 # chainya.ru — сайт и checkout «Чайни».
-# Публичная витрина должна открываться внутри Telegram Mini App, поэтому её
-# нельзя закрывать X-Frame-Options. Админка и платёжные результаты ниже не
-# встраиваются и отдельно получают CSP frame-ancestors 'none'.
+# Telegram Mini App отключён. Все страницы закрыты от встраивания через CSP,
+# чтобы чужой сайт не мог наложить свой интерфейс поверх витрины или форм.
 
 server {
     listen 80;
@@ -43,7 +42,7 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
 
     location ~ "^/api/admin/catalog/items/[a-z0-9][a-z0-9-]{0,79}/image$" {
         add_header Strict-Transport-Security "max-age=31536000" always;
@@ -69,7 +68,7 @@ server {
         add_header Pragma "no-cache" always;
         add_header Referrer-Policy "no-referrer" always;
         add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
-        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
         proxy_pass http://127.0.0.1:8077;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -248,7 +247,7 @@ server {
         add_header Cache-Control "no-cache" always;
         add_header Referrer-Policy "strict-origin-when-cross-origin" always;
         add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
-        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src https://yandex.ru; base-uri 'self'; object-src 'none'; form-action 'self'" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src https://yandex.ru; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
         try_files /index.html =404;
     }
 
@@ -258,7 +257,7 @@ server {
         add_header Cache-Control "no-cache" always;
         add_header Referrer-Policy "strict-origin-when-cross-origin" always;
         add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
-        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src https://yandex.ru; base-uri 'self'; object-src 'none'; form-action 'self'" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src https://yandex.ru; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
         return 308 /;
     }
 
@@ -270,7 +269,7 @@ server {
         add_header Cache-Control "no-store" always;
         add_header Referrer-Policy "strict-origin-when-cross-origin" always;
         add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
-        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
     }
 
     # Публичные разделы имеют читаемые URL. Отдаём то же приложение только для
@@ -285,7 +284,7 @@ server {
         add_header Cache-Control "no-cache" always;
         add_header Referrer-Policy "strict-origin-when-cross-origin" always;
         add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
-        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src https://yandex.ru; base-uri 'self'; object-src 'none'; form-action 'self'" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src https://yandex.ru; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
         try_files /$1/index.html =404;
     }
 
@@ -303,7 +302,7 @@ server {
         add_header Cache-Control "public";
         add_header Referrer-Policy "strict-origin-when-cross-origin" always;
         add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
-        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
     }
 
     location ~* \.(jpg|jpeg|png|webp|svg|ico)$ {
@@ -313,7 +312,7 @@ server {
         add_header Cache-Control "public";
         add_header Referrer-Policy "strict-origin-when-cross-origin" always;
         add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
-        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
     }
 
     gzip on;

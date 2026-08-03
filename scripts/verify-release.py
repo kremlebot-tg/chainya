@@ -93,6 +93,7 @@ def check_dist(root: pathlib.Path) -> list[str]:
         "business/index.html",
         "booking/index.html",
         "404.html",
+        "favicon.ico",
         "privacy.html",
         "legal.html",
         "robots.txt",
@@ -285,6 +286,14 @@ def check_live(base_url: str) -> list[str]:
             errors.append(f"{path}: приватная страница допускает встраивание")
         if "noindex" not in combined_header(headers, "x-robots-tag").lower():
             errors.append(f"{path}: нет X-Robots-Tag noindex")
+    for path in ("/", "/shop", "/business", "/booking"):
+        code, _content_type, headers = raw_response_metadata(base + path, method="HEAD")
+        if code != 200:
+            errors.append(f"{path}: HEAD ожидался 200, получен {code}")
+        elif "frame-ancestors 'none'" not in combined_header(
+            headers, "content-security-policy"
+        ):
+            errors.append(f"{path}: публичная страница допускает встраивание")
     health_code, health = json_response(base + "/api/health")
     if health_code != 200 or not isinstance(health, dict) or not health.get("ok"):
         errors.append("/api/health: backend не подтвердил готовность")

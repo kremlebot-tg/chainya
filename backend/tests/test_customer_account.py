@@ -2,8 +2,6 @@ import json
 from datetime import timedelta
 from urllib.parse import parse_qs, urlparse
 
-from fastapi.testclient import TestClient
-
 from backend.tests.test_orders import app_client, payload
 
 

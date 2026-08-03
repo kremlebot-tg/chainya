@@ -1,0 +1,41 @@
+[Unit]
+Description=Chainya Telegram bot (polling)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=chainya-bot
+Group=chainya-bot
+WorkingDirectory=/opt/chainya-bot
+EnvironmentFile=/etc/chainya-bot.env
+Environment=PYTHONUNBUFFERED=1
+Environment=FAVS_PATH=/var/lib/chainya-bot/favs.json
+ExecStart=/opt/chainya-bot/.venv/bin/python /opt/chainya-bot/bot.py
+Restart=always
+RestartSec=3
+UMask=0077
+StateDirectory=chainya-bot
+StateDirectoryMode=0700
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+ReadWritePaths=/var/lib/chainya-bot
+
+[Install]
+WantedBy=multi-user.target

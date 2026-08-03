@@ -12,6 +12,7 @@ def demo_app(tmp_path, monkeypatch):
         "CDEK_CLIENT_ID", "CDEK_CLIENT_SECRET", "CDEK_INTEGRATION_MODE",
         "SABY_APP_CLIENT_ID", "SABY_APP_SECRET", "SABY_SECRET_KEY",
         "SABY_POINT_ID", "SABY_PRICE_LIST_ID", "SABY_ORDER_SYNC_MODE",
+        "SABY_CATALOG_SHADOW_MODE", "SABY_CATALOG_SHADOW_INTERVAL_SECONDS",
     ):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("CHAINYA_DATA_DIR", str(tmp_path))

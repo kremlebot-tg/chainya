@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import hmac
 import io
@@ -74,6 +75,7 @@ from .cdek_delivery import (
 from .integration_guard import ExternalWriteBlocked
 from .integration_writes import IntegrationWriter
 from .saby import SabyClient, SabyError
+from .saby_shadow import SabyShadowSettings, compare_catalogs
 from .saby_sync import (
     SABY_NOMENCLATURE_BY_SITE_ID,
     SabySyncError,
@@ -141,6 +143,9 @@ OWNER_CHAT_IDS = [
 
 DELIVERY_PRICES = {"pickup": 0, "cdek_pvz": 490, "cdek_courier": 790}
 ANALYTICS_RETENTION_DAYS = 360
+SABY_SHADOW_RETENTION_RUNS = 50
+SABY_SHADOW_MANUAL_LIMIT = 3
+SABY_SHADOW_MANUAL_WINDOW_SECONDS = 5 * 60
 DELIVERY_LABELS = {
     "pickup": "Самовывоз · Острякова, 3",
     "cdek_pvz": "СДЭК · пункт выдачи",
@@ -166,9 +171,23 @@ async def lifespan(_app: FastAPI):
         daemon=True,
     )
     paid_effect_thread.start()
+    shadow_settings = SabyShadowSettings.from_env()
+    stop_saby_shadow_worker = threading.Event()
+    saby_shadow_thread = None
+    if shadow_settings.enabled:
+        saby_shadow_thread = threading.Thread(
+            target=saby_shadow_worker,
+            args=(stop_saby_shadow_worker, shadow_settings.interval_seconds),
+            name="chainya-saby-shadow",
+            daemon=True,
+        )
+        saby_shadow_thread.start()
     try:
         yield
     finally:
+        stop_saby_shadow_worker.set()
+        if saby_shadow_thread:
+            saby_shadow_thread.join(timeout=1)
         stop_paid_effect_worker.set()
         paid_effect_thread.join(timeout=1)
 
@@ -188,6 +207,7 @@ _rate_lock = threading.Lock()
 _rate_salt = secrets.token_bytes(16)
 _analytics_cleanup_lock = threading.Lock()
 _analytics_cleanup_after = 0.0
+_saby_shadow_lock = threading.Lock()
 _cdek_cache: dict[str, tuple[float, object]] = {}
 _cdek_cache_lock = threading.Lock()
 _cdek_cities_index: tuple[float, list[dict]] | None = None
@@ -968,6 +988,25 @@ def init_db() -> None:
         con.execute(
             "CREATE INDEX IF NOT EXISTS idx_catalog_audit_created "
             "ON catalog_audit(created_at)"
+        )
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS saby_shadow_runs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                started_at TEXT NOT NULL,
+                completed_at TEXT,
+                trigger TEXT NOT NULL,
+                status TEXT NOT NULL,
+                report_json TEXT NOT NULL DEFAULT '{}',
+                error TEXT NOT NULL DEFAULT ''
+            )
+        """)
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_saby_shadow_runs_started "
+            "ON saby_shadow_runs(started_at DESC)"
+        )
+        con.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_saby_shadow_single_running "
+            "ON saby_shadow_runs(status) WHERE status = 'running'"
         )
         # Сырые обезличенные события нужны только для сравнений и сезонности.
         # Года достаточно; старая телеметрия не должна бесконечно раздувать базу.
@@ -2203,6 +2242,190 @@ def paid_effect_worker(stop: threading.Event) -> None:
             return
 
 
+class SabyShadowBusy(RuntimeError):
+    """Only one read-only Saby comparison may run at a time."""
+
+
+@contextmanager
+def saby_shadow_process_lock():
+    """Cross-process guard for a future multi-worker deployment."""
+
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    lock_path = DATA_DIR / "saby-shadow.lock"
+    handle = lock_path.open("a+", encoding="utf-8")
+    try:
+        lock_path.chmod(0o600)
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise SabyShadowBusy("Сравнение Saby уже выполняется") from exc
+        yield
+    finally:
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        finally:
+            handle.close()
+
+
+def _saby_shadow_row(row: sqlite3.Row | None) -> dict | None:
+    if row is None:
+        return None
+    try:
+        report = json.loads(row["report_json"] or "{}")
+    except (TypeError, json.JSONDecodeError):
+        report = {}
+    return {
+        "id": int(row["id"]),
+        "started_at": row["started_at"],
+        "completed_at": row["completed_at"],
+        "trigger": row["trigger"],
+        "status": row["status"],
+        "report": report,
+        "error": row["error"],
+    }
+
+
+def saby_shadow_status(limit: int = 10) -> dict:
+    settings = SabyShadowSettings.from_env()
+    with db() as con:
+        rows = con.execute(
+            "SELECT * FROM saby_shadow_runs ORDER BY id DESC LIMIT ?",
+            (min(max(limit, 1), 25),),
+        ).fetchall()
+    history = [_saby_shadow_row(row) for row in rows]
+    return {
+        "enabled": settings.enabled,
+        "interval_seconds": settings.interval_seconds,
+        "read_only": True,
+        "writes_enabled": False,
+        "running": bool(history and history[0] and history[0]["status"] == "running"),
+        "latest": history[0] if history else None,
+        "history": history,
+    }
+
+
+def _finish_saby_shadow_run(
+    run_id: int,
+    *,
+    status: str,
+    report: dict | None = None,
+    error: str = "",
+) -> dict:
+    with db() as con:
+        updated = con.execute(
+            """UPDATE saby_shadow_runs
+               SET completed_at = ?, status = ?, report_json = ?, error = ?
+               WHERE id = ? AND status = 'running'""",
+            (
+                now_iso(),
+                status,
+                json.dumps(report or {}, ensure_ascii=False, separators=(",", ":")),
+                error,
+                run_id,
+            ),
+        )
+        if updated.rowcount != 1:
+            raise RuntimeError("Состояние теневой проверки Saby уже изменилось")
+        con.execute(
+            """DELETE FROM saby_shadow_runs
+               WHERE id NOT IN (
+                   SELECT id FROM saby_shadow_runs ORDER BY id DESC LIMIT ?
+               )""",
+            (SABY_SHADOW_RETENTION_RUNS,),
+        )
+        row = con.execute(
+            "SELECT * FROM saby_shadow_runs WHERE id = ?", (run_id,)
+        ).fetchone()
+    result = _saby_shadow_row(row)
+    if result is None:
+        raise RuntimeError("Не удалось сохранить результат теневой проверки Saby")
+    return result
+
+
+def run_saby_shadow_check(trigger: str) -> dict:
+    """Read Saby once, compare it to the site, and persist an audit report.
+
+    No method capable of changing Saby or the storefront is called here.
+    """
+
+    if trigger not in {"manual", "scheduler"}:
+        raise ValueError("Некорректный источник теневой проверки")
+    if not _saby_shadow_lock.acquire(blocking=False):
+        raise SabyShadowBusy("Сравнение Saby уже выполняется")
+    try:
+        with saby_shadow_process_lock():
+            started_at = now_iso()
+            try:
+                with db() as con:
+                    # Holding the process lock proves that an older 'running'
+                    # row has no live owner (for example after a hard restart).
+                    con.execute(
+                        """UPDATE saby_shadow_runs
+                           SET status = 'error', completed_at = ?,
+                               error = 'Проверка прервана перезапуском сервиса'
+                           WHERE status = 'running'""",
+                        (started_at,),
+                    )
+                    cursor = con.execute(
+                        """INSERT INTO saby_shadow_runs
+                           (started_at, trigger, status, report_json, error)
+                           VALUES (?, ?, 'running', '{}', '')""",
+                        (started_at, trigger),
+                    )
+                    run_id = int(cursor.lastrowid)
+            except sqlite3.IntegrityError as exc:
+                raise SabyShadowBusy("Сравнение Saby уже выполняется") from exc
+
+            try:
+                document = get_catalog_store().get()
+                site_catalog = {item["id"]: item for item in document["teas"]}
+                saby_catalog = saby_client.catalog_all(with_balance=True)
+                report = compare_catalogs(site_catalog, saby_catalog)
+                configuration = saby_client.configuration()
+                catalog_bytes = json.dumps(
+                    document, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+                ).encode("utf-8")
+                report["source"] = {
+                    "site_revision": document["revision"],
+                    "site_updated_at": document["updated_at"],
+                    "site_sha256": hashlib.sha256(catalog_bytes).hexdigest(),
+                    "point_id": configuration.get("point_id"),
+                    "price_list_id": configuration.get("price_list_id"),
+                }
+                return _finish_saby_shadow_run(
+                    run_id,
+                    status="ok" if report["state"] == "ok" else "differences",
+                    report=report,
+                )
+            except SabyError as exc:
+                return _finish_saby_shadow_run(run_id, status="error", error=str(exc))
+            except Exception:
+                logging.exception("Ошибка теневого сравнения каталога Saby")
+                return _finish_saby_shadow_run(
+                    run_id,
+                    status="error",
+                    error="Не удалось безопасно сравнить каталоги",
+                )
+    finally:
+        _saby_shadow_lock.release()
+
+
+def saby_shadow_worker(stop: threading.Event, interval_seconds: int) -> None:
+    """Run the read-only comparison immediately and then on a fixed interval."""
+
+    while not stop.is_set():
+        try:
+            result = run_saby_shadow_check("scheduler")
+            if result["status"] == "error":
+                logging.warning("Теневая проверка Saby не выполнена: %s", result["error"])
+        except SabyShadowBusy:
+            logging.info("Теневая проверка Saby уже выполняется")
+        except Exception:
+            logging.exception("Ошибка фонового контроля каталога Saby")
+        if stop.wait(interval_seconds):
+            return
+
+
 PAID_ORDER_STATUSES = ("paid", "confirmed", "packing", "shipped", "completed")
 
 
@@ -3217,6 +3440,49 @@ def admin_update_booking(
 def admin_saby_status(authorization: str = Header(default="")):
     require_admin(authorization)
     return saby_client.configuration()
+
+
+def require_saby_shadow_run_request(request: Request) -> None:
+    """Require an intentional same-origin admin action for the manual read."""
+
+    if request.headers.get("x-chainya-admin") != "saby-shadow":
+        raise HTTPException(403, "Требуется подтверждение запроса админ-панели")
+    origin = request.headers.get("origin", "").rstrip("/")
+    expected = f"{request.url.scheme}://{request.headers.get('host', '')}"
+    if origin and origin != expected:
+        raise HTTPException(403, "Недопустимый источник запроса")
+
+
+@app.get("/api/admin/saby/catalog-shadow")
+def admin_saby_catalog_shadow(
+    response: Response,
+    history_limit: int = Query(default=10, ge=1, le=25),
+    authorization: str = Header(default=""),
+):
+    require_admin(authorization)
+    response.headers["Cache-Control"] = "no-store"
+    return saby_shadow_status(history_limit)
+
+
+@app.post("/api/admin/saby/catalog-shadow/run")
+def admin_run_saby_catalog_shadow(
+    request: Request,
+    response: Response,
+    authorization: str = Header(default=""),
+):
+    require_admin(authorization)
+    require_saby_shadow_run_request(request)
+    rate_limit(
+        request,
+        "admin-saby-shadow",
+        SABY_SHADOW_MANUAL_LIMIT,
+        SABY_SHADOW_MANUAL_WINDOW_SECONDS,
+    )
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return run_saby_shadow_check("manual")
+    except SabyShadowBusy as exc:
+        raise HTTPException(409, str(exc)) from exc
 
 
 @app.post("/api/admin/saby/test")

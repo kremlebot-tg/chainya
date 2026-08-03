@@ -17,6 +17,7 @@ def app_client(tmp_path, monkeypatch, *, test_mode="1"):
         "CDEK_CLIENT_ID", "CDEK_CLIENT_SECRET", "CDEK_INTEGRATION_MODE",
         "SABY_APP_CLIENT_ID", "SABY_APP_SECRET", "SABY_SECRET_KEY",
         "SABY_POINT_ID", "SABY_PRICE_LIST_ID", "SABY_ORDER_SYNC_MODE",
+        "SABY_CATALOG_SHADOW_MODE", "SABY_CATALOG_SHADOW_INTERVAL_SECONDS",
         "BOOKING_BOT_SECRET",
     ):
         monkeypatch.delenv(key, raising=False)
@@ -607,6 +608,202 @@ def test_saby_readiness_rejects_unknown_balance_and_external_id_mismatch(tmp_pat
     assert result["unknown_balance_items"] == [{"id": 1, "name": "Бай Му Дань"}]
     assert "Каталог сайта не совпадает" in " ".join(result["blockers"])
     assert "не вернул числовой остаток" in " ".join(result["blockers"])
+
+
+def matching_saby_catalog(module):
+    site = module.load_catalog()
+    return [
+        {
+            "id": ref.id,
+            "externalId": ref.external_id,
+            "name": site[site_id]["name"],
+            "unit": "шт" if site[site_id]["unit"] == "pc" else "г",
+            "cost": (
+                site[site_id]["price"]
+                if site[site_id]["unit"] == "pc"
+                else site[site_id]["price"] / 10
+            ),
+            "balance": 1000,
+            "published": True,
+        }
+        for site_id, ref in module.SABY_NOMENCLATURE_BY_SITE_ID.items()
+    ]
+
+
+def test_admin_saby_shadow_is_read_only_persistent_and_protected(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    auth = {"Authorization": "Bearer test-admin-token"}
+    action = {**auth, "X-Chainya-Admin": "saby-shadow", "Origin": "https://chainya.ru"}
+    with client:
+        assert client.get("/api/admin/saby/catalog-shadow").status_code == 401
+        empty = client.get("/api/admin/saby/catalog-shadow", headers=auth)
+        assert empty.status_code == 200
+        assert empty.headers["cache-control"] == "no-store"
+        assert empty.json()["latest"] is None
+        assert empty.json()["read_only"] is True
+        assert empty.json()["writes_enabled"] is False
+        assert client.post(
+            "/api/admin/saby/catalog-shadow/run", headers=auth
+        ).status_code == 403
+        assert client.post(
+            "/api/admin/saby/catalog-shadow/run",
+            headers={**action, "Origin": "https://attacker.invalid"},
+        ).status_code == 403
+
+        monkeypatch.setattr(
+            module.saby_client, "catalog_all",
+            lambda with_balance=False: matching_saby_catalog(module),
+        )
+        monkeypatch.setattr(
+            module.saby_client, "configuration",
+            lambda: {"configured": True, "point_id": 274, "price_list_id": 7},
+        )
+        monkeypatch.setattr(
+            module.saby_client, "create_delivery_order",
+            lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("Saby write called")),
+        )
+        before = module.CATALOG_PATH.read_bytes()
+        revision = module.get_catalog_store().get()["revision"]
+        response = client.post("/api/admin/saby/catalog-shadow/run", headers=action)
+        after = module.CATALOG_PATH.read_bytes()
+
+        assert response.status_code == 200
+        assert response.headers["cache-control"] == "no-store"
+        result = response.json()
+        assert result["status"] == "ok"  # three intentionally inactive site items are informational
+        assert result["report"]["counts"]["actionable_differences"] == 0
+        assert result["report"]["counts"]["info"] == 3
+        assert result["report"]["catalog_changed"] is False
+        assert result["report"]["source"]["site_revision"] == revision
+        assert len(result["report"]["source"]["site_sha256"]) == 64
+        assert before == after
+        assert module.get_catalog_store().get()["revision"] == revision
+
+        stored = client.get("/api/admin/saby/catalog-shadow", headers=auth).json()
+        assert stored["latest"]["id"] == result["id"]
+        assert stored["history"][0]["report"]["read_only"] is True
+
+
+def test_admin_shadow_ui_states_read_only_guarantee_without_apply_action(tmp_path, monkeypatch):
+    _, module = app_client(tmp_path, monkeypatch)
+    html = (module.ROOT / "backend" / "admin.html").read_text(encoding="utf-8")
+    assert "Теневая сверка каталога" in html
+    assert "Только чтение. Сайт, касса, цены, остатки и заказы не изменяются." in html
+    assert "Сравнить сейчас" in html
+    assert "Применить изменения Saby" not in html
+    assert 'id="saby-shadow-status"' in html
+    assert 'id="saby-shadow-content" aria-live=' not in html
+
+
+def test_saby_shadow_persists_safe_errors_recovers_stale_run_and_limits_history(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    from backend.saby import SabyError
+
+    action = {
+        "Authorization": "Bearer test-admin-token",
+        "X-Chainya-Admin": "saby-shadow",
+        "Origin": "https://chainya.ru",
+    }
+    monkeypatch.setattr(module, "rate_limit", lambda *_args, **_kwargs: None)
+    with client:
+        with module.db() as con:
+            con.execute(
+                """INSERT INTO saby_shadow_runs
+                   (started_at, trigger, status, report_json, error)
+                   VALUES (?, 'scheduler', 'running', '{}', '')""",
+                (module.now_iso(),),
+            )
+        monkeypatch.setattr(
+            module.saby_client, "catalog_all",
+            lambda with_balance=False: (_ for _ in ()).throw(SabyError("Saby временно недоступен")),
+        )
+        failed = client.post("/api/admin/saby/catalog-shadow/run", headers=action)
+        assert failed.status_code == 200
+        assert failed.json()["status"] == "error"
+        assert failed.json()["error"] == "Saby временно недоступен"
+        with module.db() as con:
+            interrupted = con.execute(
+                "SELECT status, error FROM saby_shadow_runs ORDER BY id ASC LIMIT 1"
+            ).fetchone()
+        assert interrupted["status"] == "error"
+        assert "перезапуском" in interrupted["error"]
+
+        monkeypatch.setattr(module, "SABY_SHADOW_RETENTION_RUNS", 3)
+        monkeypatch.setattr(
+            module.saby_client, "catalog_all",
+            lambda with_balance=False: matching_saby_catalog(module),
+        )
+        for _ in range(4):
+            assert client.post(
+                "/api/admin/saby/catalog-shadow/run", headers=action
+            ).status_code == 200
+        with module.db() as con:
+            assert con.execute("SELECT COUNT(*) FROM saby_shadow_runs").fetchone()[0] == 3
+
+
+def test_saby_shadow_manual_run_returns_conflict_while_busy(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+
+    class BusyLock:
+        def acquire(self, blocking=False):
+            assert blocking is False
+            return False
+
+        def release(self):
+            raise AssertionError("unacquired lock must not be released")
+
+    monkeypatch.setattr(module, "_saby_shadow_lock", BusyLock())
+    with client:
+        response = client.post(
+            "/api/admin/saby/catalog-shadow/run",
+            headers={
+                "Authorization": "Bearer test-admin-token",
+                "X-Chainya-Admin": "saby-shadow",
+                "Origin": "https://chainya.ru",
+            },
+        )
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Сравнение Saby уже выполняется"
+
+
+def test_saby_shadow_manual_run_is_rate_limited(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        module,
+        "run_saby_shadow_check",
+        lambda trigger: {"trigger": trigger, "status": "ok", "report": {}},
+    )
+    action = {
+        "Authorization": "Bearer test-admin-token",
+        "X-Chainya-Admin": "saby-shadow",
+        "Origin": "https://chainya.ru",
+    }
+    with client:
+        for _ in range(module.SABY_SHADOW_MANUAL_LIMIT):
+            assert client.post(
+                "/api/admin/saby/catalog-shadow/run", headers=action
+            ).status_code == 200
+        limited = client.post(
+            "/api/admin/saby/catalog-shadow/run", headers=action
+        )
+    assert limited.status_code == 429
+
+
+def test_saby_shadow_worker_runs_immediately_and_stops_cleanly(tmp_path, monkeypatch):
+    _, module = app_client(tmp_path, monkeypatch)
+    stop = module.threading.Event()
+    triggers = []
+
+    def run_once(trigger):
+        triggers.append(trigger)
+        stop.set()
+        return {"status": "ok"}
+
+    monkeypatch.setattr(module, "run_saby_shadow_check", run_once)
+
+    module.saby_shadow_worker(stop, 300)
+
+    assert triggers == ["scheduler"]
 
 
 def test_paid_order_is_sent_to_saby_once_in_auto_mode(tmp_path, monkeypatch):

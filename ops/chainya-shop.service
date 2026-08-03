@@ -10,7 +10,9 @@ Group=chainya-shop
 UMask=0077
 WorkingDirectory=/opt/chainya-shop
 Environment=CHAINYA_DATA_DIR=/var/lib/chainya-shop
-Environment=CHAINYA_CATALOG_PATH=/opt/chainya-shop/teas.json
+Environment=CHAINYA_CATALOG_PATH=/var/lib/chainya-shop/catalog.json
+Environment=CHAINYA_CATALOG_SEED_PATH=/opt/chainya-shop/backend/catalog.seed.json
+Environment=CHAINYA_CATALOG_MEDIA_DIR=/var/lib/chainya-shop/catalog-media
 EnvironmentFile=-/etc/chainya-shop.env
 EnvironmentFile=-/etc/chainya-shop-admin.env
 EnvironmentFile=-/etc/chainya-shop-saby.env

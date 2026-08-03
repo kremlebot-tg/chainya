@@ -3,13 +3,16 @@
 
 from __future__ import annotations
 
+import io
 import json
 import sqlite3
+import tarfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-
 SOURCE = Path("/var/lib/chainya-shop/orders.sqlite3")
+CATALOG_SOURCE = Path("/var/lib/chainya-shop/catalog.json")
+CATALOG_MEDIA_SOURCE = Path("/var/lib/chainya-shop/catalog-media")
 DESTINATION = Path("/var/backups/chainya-shop")
 KEEP_DAYS = 30
 ANALYTICS_LIVE_DAYS = 360  # с учётом ежедневного удаления — до 32 дней в копиях
@@ -65,6 +68,7 @@ def apply_retention(
         "business_leads_anonymized": 0,
         "bookings_anonymized": 0,
         "orders_anonymized": 0,
+        "customer_sessions_deleted": 0,
     }
 
     if table_exists(connection, "analytics_events"):
@@ -74,6 +78,13 @@ def apply_retention(
             (analytics_cutoff.isoformat(),),
         )
         counts["analytics_deleted"] = cursor.rowcount
+
+    if table_exists(connection, "customer_sessions"):
+        cursor = connection.execute(
+            "DELETE FROM customer_sessions WHERE expires_at <= ?",
+            (current.isoformat(),),
+        )
+        counts["customer_sessions_deleted"] = cursor.rowcount
 
     contact_cutoff = (
         current - timedelta(days=CONTACT_PII_LIVE_DAYS)
@@ -142,8 +153,31 @@ def main(
         if backup.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
             raise RuntimeError("Проверка резервной копии не пройдена")
     target.chmod(0o600)
+    if CATALOG_SOURCE.is_file():
+        # JSON заменяется приложением атомарно, поэтому чтение даёт целую версию.
+        catalog_bytes = CATALOG_SOURCE.read_bytes()
+        catalog = json.loads(catalog_bytes)
+        if not isinstance(catalog.get("teas"), list):
+            raise RuntimeError("Каталог не прошёл проверку перед копированием")
+        catalog_target = destination / f"catalog-{stamp}.tar.gz"
+        temporary = destination / f".catalog-{stamp}.tar.gz"
+        with tarfile.open(temporary, "w:gz") as archive:
+            info = tarfile.TarInfo("catalog.json")
+            info.size = len(catalog_bytes)
+            info.mode = 0o600
+            info.mtime = int(current.timestamp())
+            archive.addfile(info, io.BytesIO(catalog_bytes))
+            if CATALOG_MEDIA_SOURCE.is_dir():
+                for image in sorted(CATALOG_MEDIA_SOURCE.glob("*.webp")):
+                    if image.is_file() and not image.is_symlink():
+                        archive.add(image, arcname=f"catalog-media/{image.name}", recursive=False)
+        temporary.chmod(0o600)
+        temporary.replace(catalog_target)
     cutoff = current - timedelta(days=KEEP_DAYS)
     for old in destination.glob("orders-*.sqlite3"):
+        if datetime.fromtimestamp(old.stat().st_mtime, timezone.utc) < cutoff:
+            old.unlink()
+    for old in destination.glob("catalog-*.tar.gz"):
         if datetime.fromtimestamp(old.stat().st_mtime, timezone.utc) < cutoff:
             old.unlink()
 

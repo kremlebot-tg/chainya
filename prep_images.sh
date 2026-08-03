@@ -45,7 +45,7 @@ square IMG_3121.JPG tea-xiaozhong     800 85
 square IMG_3122.JPG tea-biluogold     800 85
 square IMG_3123.JPG tea-dianhong      800 85
 square IMG_3124.JPG tea-longjinghong  800 85
-square IMG_3125.JPG tea-herbal        800 85
+square IMG_3125.JPG tea-vitamin       800 85
 square IMG_3126.JPG tea-maoxie        800 85
 square IMG_3127.JPG tea-huangjingui   800 85
 square IMG_3128.JPG tea-ginseng       800 85
@@ -62,13 +62,13 @@ square IMG_3102.JPG tea-peacock       800 85
 square IMG_3139.JPG tea-jinhuawang    800 85
 
 echo "— новые чаи (рыжий коврик, поворот 90 по часовой)"
-square IMG_3330.JPG  tea-molisiaobaiya   800 85 90
-square IMG_3331.JPG  tea-biluochun       800 85 90
+square IMG_3329.JPG  tea-molisiaobaiya   800 85 90
+square IMG_3330.JPG  tea-biluochun       800 85 90
+square IMG_3331.JPG  tea-ginseng1s       800 85 90
 square IMG_3326.JPG  tea-dancongmilan    800 85 90
 square IMG_3328.JPG  tea-dancongtongtian 800 85 90
 square IMG_3332.JPG  tea-yeshenghong     800 85 90
 square IMG_3333.JPG  tea-osmanthus       800 85 90
-square IMG_3329.JPG  tea-vitamin         800 85 90
 square IMG_3335.jpg  tea-shengchenxiang  800 85 90
 
 echo "— мастер, зал, логотип"

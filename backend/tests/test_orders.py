@@ -17,6 +17,7 @@ def app_client(tmp_path, monkeypatch, *, test_mode="1"):
         "CDEK_CLIENT_ID", "CDEK_CLIENT_SECRET", "CDEK_INTEGRATION_MODE",
         "SABY_APP_CLIENT_ID", "SABY_APP_SECRET", "SABY_SECRET_KEY",
         "SABY_POINT_ID", "SABY_PRICE_LIST_ID", "SABY_ORDER_SYNC_MODE",
+        "BOOKING_BOT_SECRET",
     ):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("CHAINYA_DATA_DIR", str(tmp_path))
@@ -61,7 +62,7 @@ def test_health_exposes_safe_release_version(tmp_path, monkeypatch):
 def test_service_pages_support_head_without_exposing_content(tmp_path, monkeypatch):
     client, _ = app_client(tmp_path, monkeypatch)
     with client:
-        for path in ("/manage", "/manage/", "/admin/orders", "/payment/success", "/payment/fail"):
+        for path in ("/manage", "/manage/", "/manage/catalog", "/admin/orders", "/account", "/account/", "/payment/success", "/payment/fail"):
             response = client.head(path)
             assert response.status_code == 200
             assert response.content == b""
@@ -92,6 +93,17 @@ def test_server_prices_order_and_mock_payment(tmp_path, monkeypatch):
         assert sent == [order["id"]]
         assert client.post(f"/api/orders/{order['id']}/test-pay", params={"token": payment_token}).status_code == 200
         assert sent == [order["id"]]
+
+
+def test_order_accepts_10_gram_pack_at_base_price(tmp_path, monkeypatch):
+    client, _ = app_client(tmp_path, monkeypatch)
+    with client:
+        response = client.post(
+            "/api/orders",
+            json=payload(items=[{"id": "baihao", "pack": 10, "qty": 1}]),
+        )
+    assert response.status_code == 201
+    assert response.json()["order"]["subtotal"] == 175
 
 
 def test_order_creation_is_idempotent_for_network_retries(tmp_path, monkeypatch):
@@ -459,7 +471,7 @@ def test_admin_reports_secret_free_integration_readiness(tmp_path, monkeypatch):
     assert result["tbank"]["mode"] == "off"
     assert result["tbank"]["writes_enabled"] is False
     assert result["saby"]["mapping_valid"] is True
-    assert result["saby"]["mapping_items"] == 30
+    assert result["saby"]["mapping_items"] == 29
     assert result["saby"]["writes_enabled"] is False
     assert result["cdek"]["adapter_ready"] is True
     assert result["cdek"]["writes_enabled"] is False
@@ -555,9 +567,9 @@ def test_admin_saby_test_reports_catalog_and_delivery_blocker(tmp_path, monkeypa
     assert result["connected"] is True
     assert result["point_found"] is True
     assert result["price_list_found"] is True
-    assert result["catalog_items"] == 31
-    assert result["priced_items"] == 31
-    assert result["in_stock_items"] == 30
+    assert result["catalog_items"] == 30
+    assert result["priced_items"] == 30
+    assert result["in_stock_items"] == 29
     assert result["catalog_mapping_valid"] is True
     assert result["zero_balance_items"] == []
     assert result["warnings"] == ["В Saby есть скрытые на сайте позиции: 1"]
@@ -591,7 +603,7 @@ def test_saby_readiness_rejects_unknown_balance_and_external_id_mismatch(tmp_pat
         result = client.post("/api/admin/saby/test", headers=auth).json()
     assert result["ready_for_orders"] is False
     assert result["catalog_mapping_valid"] is False
-    assert result["in_stock_items"] == 28
+    assert result["in_stock_items"] == 27
     assert result["unknown_balance_items"] == [{"id": 1, "name": "Бай Му Дань"}]
     assert "Каталог сайта не совпадает" in " ".join(result["blockers"])
     assert "не вернул числовой остаток" in " ".join(result["blockers"])
@@ -683,7 +695,7 @@ def test_anonymous_analytics_feed_dashboard(tmp_path, monkeypatch):
             {"name": "yandex / cpc / maps", "value": 1}
         ]
         assert dashboard["system"]["catalog_items"] > 0
-        assert dashboard["system"]["catalog_active_items"] == 30
+        assert dashboard["system"]["catalog_active_items"] == 29
         assert len(dashboard["daily"]) == 30
 
         with module.db() as con:
@@ -769,7 +781,7 @@ def test_revenue_uses_payment_time_and_queue_is_not_period_limited(tmp_path, mon
 def test_management_pages_are_served_without_exposing_token(tmp_path, monkeypatch):
     client, _ = app_client(tmp_path, monkeypatch)
     with client:
-        for path in ("/manage", "/manage/", "/admin/orders"):
+        for path in ("/manage", "/manage/", "/manage/catalog", "/admin/orders"):
             response = client.get(path)
             assert response.status_code == 200
             assert "Вход владельца" in response.text

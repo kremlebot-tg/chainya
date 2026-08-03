@@ -8,14 +8,16 @@
 
 from __future__ import annotations
 
-import json
 import hashlib
 import hmac
+import io
+import json
 import logging
 import os
 import re
 import secrets
 import sqlite3
+import tempfile
 import threading
 import time
 import urllib.parse
@@ -23,26 +25,54 @@ import urllib.request
 import uuid
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager, contextmanager
-from datetime import date as datetime_date, datetime, time as datetime_time, timedelta, timezone
+from datetime import date as datetime_date
+from datetime import datetime, timedelta, timezone
+from datetime import time as datetime_time
 from pathlib import Path
 from typing import Literal
 from zoneinfo import ZoneInfo
 
-from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Query, Request, Response
+from fastapi import (
+    BackgroundTasks,
+    FastAPI,
+    Header,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+)
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
+from PIL import Image, ImageOps, UnidentifiedImageError
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from .catalog_store import (
+    MEDIA_FILE_RE,
+    CatalogConflict,
+    CatalogError,
+    CatalogStore,
+)
+from .catalog_store import (
+    image_url as catalog_image_url,
+)
 from .cdek import CdekClient, CdekError
 from .cdek_delivery import (
     CdekDeliverySettings,
+)
+from .cdek_delivery import (
     build_order_payload as build_cdek_order_payload,
+)
+from .cdek_delivery import (
     normalized_quote as normalize_cdek_quote,
+)
+from .cdek_delivery import (
     package_spec as cdek_package_spec,
+)
+from .cdek_delivery import (
     tariff_payload as cdek_tariff_payload,
 )
-from .integration_writes import IntegrationWriter
 from .integration_guard import ExternalWriteBlocked
+from .integration_writes import IntegrationWriter
 from .saby import SabyClient, SabyError
 from .saby_sync import (
     SABY_NOMENCLATURE_BY_SITE_ID,
@@ -50,17 +80,29 @@ from .saby_sync import (
     build_saby_order,
     sync_mode_from_env,
     validate_mapping_file,
+)
+from .saby_sync import (
     write_allowed as saby_write_allowed,
 )
-from .tbank import TBankClient, TBankError, validate_payment_url, verify_notification_token
+from .tbank import (
+    TBankClient,
+    TBankError,
+    validate_payment_url,
+    verify_notification_token,
+)
 from .tbank_receipt import TBankReceiptError, TBankReceiptSettings, build_receipt
-
 
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT = ROOT.parent
 DATA_DIR = Path(os.getenv("CHAINYA_DATA_DIR", ROOT / "backend" / "data"))
 DB_PATH = DATA_DIR / "orders.sqlite3"
-CATALOG_PATH = Path(os.getenv("CHAINYA_CATALOG_PATH", PROJECT / "telegram-bot" / "teas.json"))
+CATALOG_PATH = Path(os.getenv("CHAINYA_CATALOG_PATH", DATA_DIR / "catalog.json"))
+CATALOG_SEED_PATH = Path(
+    os.getenv("CHAINYA_CATALOG_SEED_PATH", ROOT / "backend" / "catalog.seed.json")
+)
+CATALOG_MEDIA_DIR = Path(
+    os.getenv("CHAINYA_CATALOG_MEDIA_DIR", DATA_DIR / "catalog-media")
+)
 CDEK_CITIES_PATH = Path(
     os.getenv("CDEK_CITIES_PATH", DATA_DIR / "cdek-cities-ru.json")
 )
@@ -83,9 +125,13 @@ def test_mode_from_value(value: str | None) -> bool:
 
 TEST_MODE = test_mode_from_value(os.getenv("CHAINYA_TEST_MODE"))
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
+BOOKING_BOT_SECRET = os.getenv("BOOKING_BOT_SECRET", "").strip()
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "").strip()
 ADMIN_SESSION_COOKIE = "chainya_admin_session"
 ADMIN_SESSION_SECONDS = 12 * 60 * 60
+CUSTOMER_SESSION_COOKIE = "chainya_customer_session"
+CUSTOMER_SESSION_SECONDS = 30 * 24 * 60 * 60
+CUSTOMER_PASSWORD_ITERATIONS = 310_000
 TBANK_INIT_LEASE_SECONDS = 45
 PAID_EFFECT_LEASE_SECONDS = 90
 PAID_EFFECT_RETRY_SECONDS = 30
@@ -101,9 +147,16 @@ DELIVERY_LABELS = {
     "cdek_courier": "СДЭК · курьер",
 }
 MOSCOW_TZ = ZoneInfo("Europe/Moscow")
+BOOKING_SESSION_MINUTES = 120
+BOOKING_SLOT_STEP_MINUTES = 30
+BOOKING_OPEN_MINUTES = 12 * 60
+BOOKING_LAST_START_MINUTES = 20 * 60
+BOOKING_CLOSE_MINUTES = 22 * 60
+BOOKING_BLOCKING_STATUSES = ("new", "confirmed")
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    get_catalog_store().ensure()
     init_db()
     stop_paid_effect_worker = threading.Event()
     paid_effect_thread = threading.Thread(
@@ -139,6 +192,8 @@ _cdek_cache: dict[str, tuple[float, object]] = {}
 _cdek_cache_lock = threading.Lock()
 _cdek_cities_index: tuple[float, list[dict]] | None = None
 _cdek_cities_index_lock = threading.Lock()
+_catalog_stores: dict[tuple[Path, Path, Path], CatalogStore] = {}
+_catalog_stores_lock = threading.Lock()
 
 
 def normalized_search_text(value: object) -> str:
@@ -321,7 +376,7 @@ class OrderItem(BaseModel):
     @field_validator("pack")
     @classmethod
     def valid_pack(cls, value):
-        if value != "pc" and value not in (25, 50, 100):
+        if value != "pc" and value not in (10, 25, 50, 100):
             raise ValueError("неподдерживаемая фасовка")
         return value
 
@@ -379,11 +434,12 @@ class CreateBooking(BaseModel):
     format: Literal["master", "self"]
     date: datetime_date
     time: datetime_time
-    guests: int = Field(ge=1, le=9)
+    guests: int = Field(ge=1, le=7)
     name: str = Field(default="", max_length=120)
-    phone: str = Field(min_length=7, max_length=40)
+    phone: str = Field(min_length=3, max_length=80)
     note: str = Field(default="", max_length=1000)
     privacy_accepted: Literal[True]
+    source: Literal["website", "telegram"] = "website"
 
     @field_validator("name", "note")
     @classmethod
@@ -394,9 +450,13 @@ class CreateBooking(BaseModel):
     @classmethod
     def valid_booking_phone(cls, value: str) -> str:
         value = value.strip()
-        if len(re.sub(r"\D", "", value)) < 10:
-            raise ValueError("укажите полный номер телефона")
-        return value
+        if len(re.sub(r"\D", "", value)) >= 10:
+            return value
+        if re.fullmatch(r"@[A-Za-z0-9_]{5,32}", value):
+            return value
+        if re.fullmatch(r"Telegram ID [1-9][0-9]{3,19}", value):
+            return value
+        raise ValueError("укажите полный номер телефона или контакт Telegram")
 
     @field_validator("time")
     @classmethod
@@ -417,6 +477,8 @@ class CreateBooking(BaseModel):
         scheduled = datetime.combine(self.date, self.time, tzinfo=MOSCOW_TZ)
         if scheduled <= current:
             raise ValueError("дата и время брони уже прошли по московскому времени")
+        if self.source == "website" and len(re.sub(r"\D", "", self.phone)) < 10:
+            raise ValueError("для брони с сайта укажите полный номер телефона")
         return self
 
 
@@ -432,8 +494,101 @@ class UpdateBookingStatus(BaseModel):
     status: Literal["new", "confirmed", "completed", "cancelled"]
 
 
+class CreateBookingBlock(BaseModel):
+    date: datetime_date
+    start: datetime_time
+    end: datetime_time
+    note: str = Field(default="", max_length=240)
+
+    @field_validator("start", "end")
+    @classmethod
+    def valid_half_hour(cls, value: datetime_time) -> datetime_time:
+        if value.second or value.microsecond or value.minute not in (0, 30):
+            raise ValueError("время должно быть указано с шагом 30 минут")
+        return value
+
+    @field_validator("note")
+    @classmethod
+    def strip_note(cls, value: str) -> str:
+        return value.strip()
+
+    @model_validator(mode="after")
+    def valid_interval(self):
+        if not datetime_time(12, 0) <= self.start < self.end <= datetime_time(22, 0):
+            raise ValueError("закрываемое время должно быть внутри часов 12:00–22:00")
+        if self.date < moscow_now().date():
+            raise ValueError("нельзя закрыть прошедшую дату")
+        return self
+
+
 class AdminLogin(BaseModel):
     token: str = Field(min_length=16, max_length=256)
+
+
+class CustomerRegister(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    phone: str = Field(min_length=7, max_length=40)
+    password: str = Field(min_length=10, max_length=128)
+    privacy_accepted: Literal[True]
+
+    @field_validator("name")
+    @classmethod
+    def strip_customer_name(cls, value: str) -> str:
+        value = " ".join(value.split())
+        if not value:
+            raise ValueError("укажите имя")
+        return value
+
+    @field_validator("phone")
+    @classmethod
+    def valid_customer_phone(cls, value: str) -> str:
+        return normalize_customer_phone(value)
+
+
+class CustomerLogin(BaseModel):
+    phone: str = Field(min_length=7, max_length=40)
+    password: str = Field(min_length=1, max_length=128)
+
+    @field_validator("phone")
+    @classmethod
+    def valid_customer_phone(cls, value: str) -> str:
+        return normalize_customer_phone(value)
+
+
+class CustomerOrderClaim(BaseModel):
+    order_id: str = Field(min_length=8, max_length=32, pattern=r"^[A-Za-z0-9_-]+$")
+    token: str = Field(min_length=16, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
+
+
+class CustomerProfileUpdate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+    @field_validator("name")
+    @classmethod
+    def strip_customer_name(cls, value: str) -> str:
+        value = " ".join(value.split())
+        if not value:
+            raise ValueError("укажите имя")
+        return value
+
+
+class CustomerPasswordChange(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=10, max_length=128)
+
+
+class CustomerAccountDelete(BaseModel):
+    password: str = Field(min_length=1, max_length=128)
+
+
+class CatalogMutation(BaseModel):
+    revision: int = Field(ge=1)
+    item: dict
+
+
+class CatalogReorder(BaseModel):
+    revision: int = Field(ge=1)
+    ids: list[str] = Field(min_length=1, max_length=500)
 
 
 class AnalyticsEvent(BaseModel):
@@ -457,6 +612,20 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def normalize_customer_phone(value: str) -> str:
+    """Return one stable E.164-like phone form used only for customer identity."""
+    digits = re.sub(r"\D", "", value)
+    if len(digits) == 10 and digits.startswith("9"):
+        digits = "7" + digits
+    elif len(digits) == 11 and digits.startswith("8"):
+        digits = "7" + digits[1:]
+    elif not value.strip().startswith("+"):
+        raise ValueError("для иностранного номера укажите + и код страны")
+    if not 10 <= len(digits) <= 15:
+        raise ValueError("укажите номер телефона полностью")
+    return "+" + digits
+
+
 def rate_limit(request: Request, bucket: str, limit: int, window: int) -> None:
     """Небольшой per-IP лимит для одного процесса checkout."""
     address = request.client.host if request.client else "unknown"
@@ -471,12 +640,21 @@ def rate_limit(request: Request, bucket: str, limit: int, window: int) -> None:
         hits.append(now)
 
 
+def get_catalog_store() -> CatalogStore:
+    """Return a stable store while still allowing tests to replace env paths."""
+    key = (CATALOG_PATH, CATALOG_SEED_PATH, CATALOG_MEDIA_DIR)
+    with _catalog_stores_lock:
+        if key not in _catalog_stores:
+            _catalog_stores[key] = CatalogStore(*key)
+        return _catalog_stores[key]
+
+
 def load_catalog() -> dict[str, dict]:
     try:
-        data = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+        document = get_catalog_store().get()
+    except CatalogError as exc:
         raise RuntimeError(f"Не удалось загрузить каталог {CATALOG_PATH}: {exc}") from exc
-    return {item["id"]: item for item in data["teas"]}
+    return {item["id"]: item for item in document["teas"]}
 
 
 @contextmanager
@@ -530,7 +708,8 @@ def init_db() -> None:
                 cdek_quote_json TEXT NOT NULL DEFAULT '{}',
                 idempotency_key_hash TEXT,
                 request_hash TEXT,
-                paid_effects_enqueued INTEGER NOT NULL DEFAULT 1
+                paid_effects_enqueued INTEGER NOT NULL DEFAULT 1,
+                customer_account_id TEXT
             )
         """)
         columns = {row["name"] for row in con.execute("PRAGMA table_info(orders)")}
@@ -559,6 +738,7 @@ def init_db() -> None:
             "cdek_quote_json": "TEXT NOT NULL DEFAULT '{}'",
             "idempotency_key_hash": "TEXT",
             "request_hash": "TEXT",
+            "customer_account_id": "TEXT",
             # Existing paid orders predate the durable outbox and must not
             # suddenly resend historical notifications after this migration.
             # New orders explicitly store 0 in create_order().
@@ -605,6 +785,38 @@ def init_db() -> None:
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_idempotency "
             "ON orders(idempotency_key_hash) WHERE idempotency_key_hash IS NOT NULL"
         )
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_orders_customer_created "
+            "ON orders(customer_account_id, created_at)"
+        )
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS customer_accounts (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                phone TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+        con.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_customer_accounts_phone "
+            "ON customer_accounts(phone)"
+        )
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS customer_sessions (
+                token_hash TEXT PRIMARY KEY,
+                account_id TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                FOREIGN KEY (account_id) REFERENCES customer_accounts(id)
+            )
+        """)
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_customer_sessions_account "
+            "ON customer_sessions(account_id, expires_at)"
+        )
+        con.execute("DELETE FROM customer_sessions WHERE expires_at <= ?", (now_iso(),))
         con.execute("""
             CREATE TABLE IF NOT EXISTS paid_order_effects (
                 order_id TEXT NOT NULL,
@@ -631,6 +843,7 @@ def init_db() -> None:
                 contact TEXT NOT NULL,
                 note TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT 'new',
+                source TEXT NOT NULL DEFAULT 'website',
                 updated_at TEXT NOT NULL DEFAULT '',
                 idempotency_key_hash TEXT,
                 request_hash TEXT
@@ -669,16 +882,19 @@ def init_db() -> None:
                 status TEXT NOT NULL DEFAULT 'new',
                 updated_at TEXT NOT NULL DEFAULT '',
                 idempotency_key_hash TEXT,
-                request_hash TEXT
+                request_hash TEXT,
+                customer_account_id TEXT
             )
         """)
         booking_columns = {
             row["name"] for row in con.execute("PRAGMA table_info(bookings)")
         }
         booking_migrations = {
+            "source": "TEXT NOT NULL DEFAULT 'website'",
             "updated_at": "TEXT NOT NULL DEFAULT ''",
             "idempotency_key_hash": "TEXT",
             "request_hash": "TEXT",
+            "customer_account_id": "TEXT",
         }
         for column, declaration in booking_migrations.items():
             if column not in booking_columns:
@@ -694,6 +910,24 @@ def init_db() -> None:
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_idempotency "
             "ON bookings(idempotency_key_hash) "
             "WHERE idempotency_key_hash IS NOT NULL"
+        )
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_bookings_customer_slot "
+            "ON bookings(customer_account_id, booking_date, booking_time)"
+        )
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS booking_blocks (
+                id TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL,
+                booking_date TEXT NOT NULL,
+                start_time TEXT NOT NULL,
+                end_time TEXT NOT NULL,
+                note TEXT NOT NULL DEFAULT ''
+            )
+        """)
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_booking_blocks_slot "
+            "ON booking_blocks(booking_date, start_time, end_time)"
         )
         con.execute("""
             CREATE TABLE IF NOT EXISTS analytics_events (
@@ -722,6 +956,19 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_analytics_session_created "
             "ON analytics_events(session_hash, created_at)"
         )
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS catalog_audit (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                action TEXT NOT NULL,
+                item_id TEXT NOT NULL DEFAULT '',
+                revision INTEGER NOT NULL
+            )
+        """)
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_catalog_audit_created "
+            "ON catalog_audit(created_at)"
+        )
         # Сырые обезличенные события нужны только для сравнений и сезонности.
         # Года достаточно; старая телеметрия не должна бесконечно раздувать базу.
         con.execute(
@@ -744,7 +991,7 @@ def price_order(payload: CreateOrder) -> tuple[list[dict], int]:
     lines, subtotal = [], 0
     for requested in payload.items:
         tea = catalog.get(requested.id)
-        if not tea or tea.get("stock") is False:
+        if not tea or tea.get("stock") is False or tea.get("published") is False:
             raise HTTPException(409, f"Позиция недоступна: {requested.id}")
         if tea["unit"] == "pc":
             if requested.pack != "pc":
@@ -877,6 +1124,106 @@ def booking_request_hash(payload: CreateBooking) -> str:
         separators=(",", ":"),
     ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def booking_time_minutes(value: str | datetime_time) -> int:
+    """Convert a stored/API booking time to minutes after midnight."""
+    if isinstance(value, datetime_time):
+        return value.hour * 60 + value.minute
+    parsed = datetime_time.fromisoformat(value)
+    return parsed.hour * 60 + parsed.minute
+
+
+def booking_time_text(minutes: int) -> str:
+    return f"{minutes // 60:02d}:{minutes % 60:02d}"
+
+
+def booking_intervals(con: sqlite3.Connection, day: datetime_date) -> list[tuple[int, int]]:
+    intervals = [
+        (booking_time_minutes(row["booking_time"]),
+         booking_time_minutes(row["booking_time"]) + BOOKING_SESSION_MINUTES)
+        for row in con.execute(
+            """SELECT booking_time FROM bookings
+               WHERE booking_date = ? AND status IN (?, ?)""",
+            (day.isoformat(), *BOOKING_BLOCKING_STATUSES),
+        ).fetchall()
+    ]
+    intervals.extend(
+        (booking_time_minutes(row["start_time"]), booking_time_minutes(row["end_time"]))
+        for row in con.execute(
+            """SELECT start_time, end_time FROM booking_blocks
+               WHERE booking_date = ?""",
+            (day.isoformat(),),
+        ).fetchall()
+    )
+    return intervals
+
+
+def intervals_overlap(start: int, end: int, other_start: int, other_end: int) -> bool:
+    return start < other_end and end > other_start
+
+
+def booking_interval_conflicts(
+    con: sqlite3.Connection,
+    day: datetime_date,
+    start: int,
+    end: int,
+    *,
+    exclude_booking_id: str = "",
+) -> bool:
+    booking_rows = con.execute(
+        """SELECT id, booking_time FROM bookings
+           WHERE booking_date = ? AND status IN (?, ?)""",
+        (day.isoformat(), *BOOKING_BLOCKING_STATUSES),
+    ).fetchall()
+    for row in booking_rows:
+        if exclude_booking_id and row["id"] == exclude_booking_id:
+            continue
+        other_start = booking_time_minutes(row["booking_time"])
+        if intervals_overlap(
+            start, end, other_start, other_start + BOOKING_SESSION_MINUTES
+        ):
+            return True
+    for row in con.execute(
+        """SELECT start_time, end_time FROM booking_blocks
+           WHERE booking_date = ?""",
+        (day.isoformat(),),
+    ).fetchall():
+        if intervals_overlap(
+            start,
+            end,
+            booking_time_minutes(row["start_time"]),
+            booking_time_minutes(row["end_time"]),
+        ):
+            return True
+    return False
+
+
+def booking_slots(con: sqlite3.Connection, day: datetime_date) -> list[dict]:
+    current = moscow_now()
+    intervals = booking_intervals(con, day)
+    result = []
+    for start in range(
+        BOOKING_OPEN_MINUTES,
+        BOOKING_LAST_START_MINUTES + 1,
+        BOOKING_SLOT_STEP_MINUTES,
+    ):
+        scheduled = datetime.combine(
+            day,
+            datetime_time(start // 60, start % 60),
+            tzinfo=MOSCOW_TZ,
+        )
+        occupied = any(
+            intervals_overlap(
+                start, start + BOOKING_SESSION_MINUTES, other_start, other_end
+            )
+            for other_start, other_end in intervals
+        )
+        result.append({
+            "time": booking_time_text(start),
+            "available": scheduled > current and not occupied,
+        })
+    return result
 
 
 def business_lead_request_hash(payload: CreateBusinessLead) -> str:
@@ -1340,6 +1687,131 @@ def require_order_token(row: sqlite3.Row, token: str) -> None:
         raise HTTPException(403, "Недействительная ссылка заказа")
 
 
+def hash_customer_password(password: str, *, salt: bytes | None = None) -> str:
+    salt = salt or secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac(
+        "sha256", password.encode("utf-8"), salt, CUSTOMER_PASSWORD_ITERATIONS
+    )
+    return (
+        f"pbkdf2_sha256${CUSTOMER_PASSWORD_ITERATIONS}$"
+        f"{salt.hex()}${digest.hex()}"
+    )
+
+
+def valid_customer_password(password: str, stored: str) -> bool:
+    try:
+        algorithm, iterations_raw, salt_raw, digest_raw = stored.split("$", 3)
+        iterations = int(iterations_raw)
+        salt = bytes.fromhex(salt_raw)
+        expected = bytes.fromhex(digest_raw)
+    except (TypeError, ValueError):
+        return False
+    if (
+        algorithm != "pbkdf2_sha256"
+        or iterations != CUSTOMER_PASSWORD_ITERATIONS
+        or len(salt) != 16
+        or len(expected) != 32
+    ):
+        return False
+    actual = hashlib.pbkdf2_hmac(
+        "sha256", password.encode("utf-8"), salt, iterations
+    )
+    return secrets.compare_digest(actual, expected)
+
+
+def customer_session_hash(token: str) -> str:
+    return hashlib.sha256(token.encode("ascii")).hexdigest()
+
+
+def customer_account_for_request(
+    request: Request, *, required: bool = True
+) -> sqlite3.Row | None:
+    token = request.cookies.get(CUSTOMER_SESSION_COOKIE, "")
+    if not token or len(token) > 160:
+        if required:
+            raise HTTPException(401, "Войдите в личный кабинет")
+        return None
+    try:
+        token_hash = customer_session_hash(token)
+    except UnicodeEncodeError:
+        if required:
+            raise HTTPException(401, "Войдите в личный кабинет") from None
+        return None
+    with db() as con:
+        row = con.execute(
+            """SELECT account.* FROM customer_sessions AS session
+               JOIN customer_accounts AS account ON account.id = session.account_id
+               WHERE session.token_hash = ? AND session.expires_at > ?""",
+            (token_hash, now_iso()),
+        ).fetchone()
+    if not row and required:
+        raise HTTPException(401, "Сессия истекла. Войдите снова")
+    return row
+
+
+def create_customer_session(response: Response, account_id: str) -> None:
+    token = secrets.token_urlsafe(32)
+    created = datetime.now(timezone.utc)
+    expires = created + timedelta(seconds=CUSTOMER_SESSION_SECONDS)
+    with db() as con:
+        con.execute("DELETE FROM customer_sessions WHERE expires_at <= ?", (created.isoformat(),))
+        con.execute(
+            """INSERT INTO customer_sessions
+               (token_hash, account_id, created_at, expires_at)
+               VALUES (?, ?, ?, ?)""",
+            (
+                customer_session_hash(token), account_id,
+                created.isoformat(), expires.isoformat(),
+            ),
+        )
+    response.set_cookie(
+        CUSTOMER_SESSION_COOKIE,
+        token,
+        max_age=CUSTOMER_SESSION_SECONDS,
+        httponly=True,
+        secure=not TEST_MODE,
+        samesite="strict",
+        path="/",
+    )
+
+
+def customer_profile(row: sqlite3.Row) -> dict:
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "phone": row["phone"],
+        "created_at": row["created_at"],
+    }
+
+
+def customer_order(row: sqlite3.Row) -> dict:
+    result = public_order(row)
+    result["customer"] = json.loads(row["customer_json"])
+    payment_url = row["payment_url"] or ""
+    parsed_payment_url = urllib.parse.urlsplit(payment_url)
+    result["payment_url"] = payment_url if (
+        row["payment_state"] in {"initializing", "awaiting"}
+        and parsed_payment_url.scheme == "https"
+        and bool(parsed_payment_url.netloc)
+        and not parsed_payment_url.username
+        and not parsed_payment_url.password
+    ) else None
+    return result
+
+
+def customer_booking(row: sqlite3.Row) -> dict:
+    return {
+        "id": row["id"],
+        "created_at": row["created_at"],
+        "date": row["booking_date"],
+        "time": row["booking_time"],
+        "format": row["format"],
+        "guests": row["guests"],
+        "note": row["note"],
+        "status": row["status"],
+    }
+
+
 def admin_session_value(issued_at: int) -> str:
     signature = hmac.new(
         ADMIN_TOKEN.encode("utf-8"),
@@ -1437,6 +1909,7 @@ def admin_booking(row: sqlite3.Row) -> dict:
         "phone": row["phone"],
         "note": row["note"],
         "status": row["status"],
+        "source": row["source"],
     }
 
 
@@ -1525,14 +1998,14 @@ def notify_booking(booking: dict) -> None:
         else "Самостоятельно"
     )
     text = "\n".join(filter(None, [
-        "🫖 Новая бронь",
+        "🫖 Новая бронь" + (" из Telegram-бота" if booking.get("source") == "telegram" else " с сайта"),
         f"№ {booking['id']}",
         f"Формат: {format_label}",
         f"Дата: {booking['date']}",
         f"Время: {booking['time']}",
         f"Гостей: {booking['guests']}",
         f"Имя: {booking['name']}" if booking["name"] else "",
-        f"Телефон: {booking['phone']}",
+        f"{'Telegram' if booking.get('source') == 'telegram' else 'Телефон'}: {booking['phone']}",
         f"Пожелания: {booking['note']}" if booking["note"] else "",
     ]))
     send_to_owners(text, "бронь")
@@ -1983,7 +2456,10 @@ def dashboard_data(days: int) -> dict:
             "telegram_configured": bool(BOT_TOKEN and OWNER_CHAT_IDS),
             "notification_recipients": len(OWNER_CHAT_IDS),
             "catalog_items": len(catalog),
-            "catalog_active_items": sum(item.get("stock") is True for item in catalog.values()),
+            "catalog_active_items": sum(
+                item.get("stock") is True and item.get("published", True)
+                for item in catalog.values()
+            ),
             "analytics_since": first_event,
             "database_size": DB_PATH.stat().st_size if DB_PATH.exists() else 0,
         },
@@ -2002,17 +2478,218 @@ def health():
 
 @app.get("/api/catalog")
 def public_catalog():
+    document = get_catalog_store().get()
     return {
+        "revision": document["revision"],
+        "types": document["types"],
+        "axes": document["axes"],
+        "packs": document["packs"],
         "teas": [
             {
                 "id": item["id"],
+                "type": item["type"],
                 "price": item["price"],
                 "unit": item["unit"],
                 "stock": item.get("stock", True),
+                "image_url": catalog_image_url(item),
+                "taste": item["taste"],
+                "translations": item["translations"],
             }
-            for item in load_catalog().values()
+            for item in document["teas"]
+            if item.get("published", True)
         ]
     }
+
+
+def admin_catalog_response(document: dict) -> dict:
+    result = dict(document)
+    result["teas"] = [
+        {**item, "image_url": catalog_image_url(item)} for item in document["teas"]
+    ]
+    return result
+
+
+def require_catalog_write_request(request: Request) -> None:
+    """Block cross-site form posts even though the owner cookie is SameSite."""
+    if request.headers.get("x-chainya-admin") != "catalog":
+        raise HTTPException(403, "Требуется подтверждение запроса админ-панели")
+    origin = request.headers.get("origin", "").rstrip("/")
+    expected = f"{request.url.scheme}://{request.headers.get('host', '')}"
+    if origin and origin != expected:
+        raise HTTPException(403, "Недопустимый источник запроса")
+
+
+def catalog_error_response(exc: Exception) -> HTTPException:
+    if isinstance(exc, CatalogConflict):
+        return HTTPException(409, str(exc))
+    if isinstance(exc, KeyError):
+        return HTTPException(404, "Товар не найден")
+    return HTTPException(422, str(exc))
+
+
+def audit_catalog(action: str, item_id: str, revision: int) -> None:
+    with db() as con:
+        con.execute(
+            "INSERT INTO catalog_audit (created_at, action, item_id, revision) VALUES (?, ?, ?, ?)",
+            (now_iso(), action, item_id, revision),
+        )
+
+
+@app.get("/api/admin/catalog")
+def admin_catalog(authorization: str = Header(default="")):
+    require_admin(authorization)
+    return admin_catalog_response(get_catalog_store().get())
+
+
+@app.post("/api/admin/catalog/items", status_code=201)
+def admin_create_catalog_item(
+    payload: CatalogMutation,
+    request: Request,
+    authorization: str = Header(default=""),
+):
+    require_admin(authorization)
+    require_catalog_write_request(request)
+    try:
+        document = get_catalog_store().create_item(payload.item, payload.revision)
+    except (CatalogError, KeyError) as exc:
+        raise catalog_error_response(exc) from exc
+    item_id = payload.item.get("id", "")
+    audit_catalog("create", item_id, document["revision"])
+    return admin_catalog_response(document)
+
+
+@app.put("/api/admin/catalog/items/{item_id}")
+def admin_update_catalog_item(
+    item_id: str,
+    payload: CatalogMutation,
+    request: Request,
+    authorization: str = Header(default=""),
+):
+    require_admin(authorization)
+    require_catalog_write_request(request)
+    try:
+        document = get_catalog_store().update_item(item_id, payload.item, payload.revision)
+    except (CatalogError, KeyError) as exc:
+        raise catalog_error_response(exc) from exc
+    audit_catalog("update", item_id, document["revision"])
+    return admin_catalog_response(document)
+
+
+@app.put("/api/admin/catalog/order")
+def admin_reorder_catalog(
+    payload: CatalogReorder,
+    request: Request,
+    authorization: str = Header(default=""),
+):
+    require_admin(authorization)
+    require_catalog_write_request(request)
+    try:
+        document = get_catalog_store().reorder(payload.ids, payload.revision)
+    except (CatalogError, KeyError) as exc:
+        raise catalog_error_response(exc) from exc
+    audit_catalog("reorder", "", document["revision"])
+    return admin_catalog_response(document)
+
+
+async def bounded_request_body(request: Request, maximum: int) -> bytes:
+    content_length = request.headers.get("content-length")
+    if content_length:
+        try:
+            if int(content_length) > maximum:
+                raise HTTPException(413, "Файл больше 8 МБ")
+        except ValueError:
+            raise HTTPException(400, "Некорректный Content-Length") from None
+    chunks, size = [], 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > maximum:
+            raise HTTPException(413, "Файл больше 8 МБ")
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+def prepare_catalog_image(source: bytes) -> bytes:
+    if not source:
+        raise HTTPException(422, "Выберите изображение")
+    try:
+        with Image.open(io.BytesIO(source)) as original:
+            width, height = original.size
+            if width * height > 40_000_000:
+                raise HTTPException(413, "Изображение слишком большое")
+            image = ImageOps.exif_transpose(original)
+            if image.mode not in {"RGB", "RGBA"}:
+                image = image.convert("RGBA" if "transparency" in image.info else "RGB")
+            image.thumbnail((2400, 2400), Image.Resampling.LANCZOS)
+            if image.mode == "RGBA":
+                background = Image.new("RGB", image.size, (246, 241, 232))
+                background.paste(image, mask=image.getchannel("A"))
+                image = background
+            else:
+                image = image.convert("RGB")
+            output = io.BytesIO()
+            image.save(output, "WEBP", quality=88, method=6)
+            return output.getvalue()
+    except (UnidentifiedImageError, OSError, ValueError) as exc:
+        raise HTTPException(422, "Файл не является поддерживаемым изображением") from exc
+
+
+def persist_catalog_image(data: bytes) -> str:
+    filename = hashlib.blake2b(data, digest_size=16).hexdigest() + ".webp"
+    store = get_catalog_store()
+    store.media_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    target = store.media_dir / filename
+    if target.exists():
+        return filename
+    descriptor, temporary = tempfile.mkstemp(prefix=".image-", suffix=".webp", dir=store.media_dir)
+    try:
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(temporary, 0o600)
+        os.replace(temporary, target)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+    return filename
+
+
+@app.post("/api/admin/catalog/items/{item_id}/image")
+async def admin_upload_catalog_image(
+    item_id: str,
+    request: Request,
+    revision: int = Query(ge=1),
+    authorization: str = Header(default=""),
+):
+    require_admin(authorization)
+    require_catalog_write_request(request)
+    current = get_catalog_store().get()
+    if current["revision"] != revision:
+        raise HTTPException(409, "Каталог уже изменён в другой вкладке. Обновите страницу.")
+    if item_id not in {item["id"] for item in current["teas"]}:
+        raise HTTPException(404, "Сначала сохраните новый товар")
+    data = prepare_catalog_image(await bounded_request_body(request, 8 * 1024 * 1024))
+    filename = persist_catalog_image(data)
+    try:
+        document = get_catalog_store().set_image(item_id, filename, revision)
+    except (CatalogError, KeyError) as exc:
+        raise catalog_error_response(exc) from exc
+    audit_catalog("image", item_id, document["revision"])
+    return admin_catalog_response(document)
+
+
+@app.get("/catalog-media/{filename}")
+def catalog_media(filename: str):
+    if not MEDIA_FILE_RE.fullmatch(filename):
+        raise HTTPException(404, "Изображение не найдено")
+    path = get_catalog_store().media_dir / filename
+    if not path.is_file():
+        raise HTTPException(404, "Изображение не найдено")
+    return FileResponse(
+        path,
+        media_type="image/webp",
+        headers={"Cache-Control": "public, max-age=31536000, immutable"},
+    )
 
 
 @app.post("/api/analytics/events", status_code=204)
@@ -2422,6 +3099,86 @@ def admin_bookings(
     }
 
 
+@app.get("/api/admin/booking-blocks")
+def admin_booking_blocks(
+    authorization: str = Header(default=""),
+    date_from: datetime_date | None = None,
+    date_to: datetime_date | None = None,
+):
+    require_admin(authorization)
+    first = date_from or moscow_now().date()
+    last = date_to or first + timedelta(days=30)
+    if last < first or (last - first).days > 366:
+        raise HTTPException(422, "Неверный период закрытых окон")
+    with db() as con:
+        rows = con.execute(
+            """SELECT * FROM booking_blocks
+               WHERE booking_date BETWEEN ? AND ?
+               ORDER BY booking_date, start_time""",
+            (first.isoformat(), last.isoformat()),
+        ).fetchall()
+    return {
+        "blocks": [
+            {
+                "id": row["id"],
+                "created_at": row["created_at"],
+                "date": row["booking_date"],
+                "start": row["start_time"],
+                "end": row["end_time"],
+                "note": row["note"],
+            }
+            for row in rows
+        ]
+    }
+
+
+@app.post("/api/admin/booking-blocks", status_code=201)
+def admin_create_booking_block(
+    payload: CreateBookingBlock,
+    authorization: str = Header(default=""),
+):
+    require_admin(authorization)
+    start = booking_time_minutes(payload.start)
+    end = booking_time_minutes(payload.end)
+    block = {
+        "id": uuid.uuid4().hex[:12].upper(),
+        "created_at": now_iso(),
+        "date": payload.date.isoformat(),
+        "start": payload.start.isoformat(),
+        "end": payload.end.isoformat(),
+        "note": payload.note,
+    }
+    with db() as con:
+        con.execute("BEGIN IMMEDIATE")
+        if booking_interval_conflicts(con, payload.date, start, end):
+            raise HTTPException(409, "Это время пересекается с бронью или другим закрытым окном")
+        con.execute(
+            """INSERT INTO booking_blocks
+               (id, created_at, booking_date, start_time, end_time, note)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (
+                block["id"], block["created_at"], block["date"],
+                block["start"], block["end"], block["note"],
+            ),
+        )
+    return block
+
+
+@app.delete("/api/admin/booking-blocks/{block_id}", status_code=204)
+def admin_delete_booking_block(
+    block_id: str,
+    authorization: str = Header(default=""),
+):
+    require_admin(authorization)
+    with db() as con:
+        deleted = con.execute(
+            "DELETE FROM booking_blocks WHERE id = ?", (block_id,)
+        ).rowcount
+    if not deleted:
+        raise HTTPException(404, "Закрытое окно не найдено")
+    return Response(status_code=204)
+
+
 @app.patch("/api/admin/bookings/{booking_id}")
 def admin_update_booking(
     booking_id: str,
@@ -2430,11 +3187,22 @@ def admin_update_booking(
 ):
     require_admin(authorization)
     with db() as con:
-        exists = con.execute(
-            "SELECT 1 FROM bookings WHERE id = ?", (booking_id,)
+        con.execute("BEGIN IMMEDIATE")
+        current = con.execute(
+            "SELECT * FROM bookings WHERE id = ?", (booking_id,)
         ).fetchone()
-        if not exists:
+        if not current:
             raise HTTPException(404, "Бронь не найдена")
+        if payload.status in BOOKING_BLOCKING_STATUSES:
+            start = booking_time_minutes(current["booking_time"])
+            if booking_interval_conflicts(
+                con,
+                datetime_date.fromisoformat(current["booking_date"]),
+                start,
+                start + BOOKING_SESSION_MINUTES,
+                exclude_booking_id=booking_id,
+            ):
+                raise HTTPException(409, "Время уже занято другой бронью или закрыто владельцем")
         con.execute(
             "UPDATE bookings SET status = ?, updated_at = ? WHERE id = ?",
             (payload.status, now_iso(), booking_id),
@@ -2730,12 +3498,215 @@ def delivery_quote(payload: DeliveryQuoteRequest, request: Request):
     return cdek_quote_for_lines(payload.method, payload.city_code, lines)
 
 
+@app.post("/api/account/register", status_code=201)
+def register_customer(
+    payload: CustomerRegister,
+    request: Request,
+    response: Response,
+):
+    rate_limit(request, "customer-register", 5, 600)
+    account_id = uuid.uuid4().hex
+    created = now_iso()
+    try:
+        with db() as con:
+            con.execute(
+                """INSERT INTO customer_accounts
+                   (id, name, phone, password_hash, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (
+                    account_id, payload.name, payload.phone,
+                    hash_customer_password(payload.password), created, created,
+                ),
+            )
+    except sqlite3.IntegrityError:
+        raise HTTPException(409, "Для этого телефона уже создан личный кабинет") from None
+    create_customer_session(response, account_id)
+    with db() as con:
+        row = con.execute(
+            "SELECT * FROM customer_accounts WHERE id = ?", (account_id,)
+        ).fetchone()
+    return {"account": customer_profile(row)}
+
+
+@app.post("/api/account/login")
+def login_customer(
+    payload: CustomerLogin,
+    request: Request,
+    response: Response,
+):
+    rate_limit(request, "customer-login", 10, 600)
+    with db() as con:
+        row = con.execute(
+            "SELECT * FROM customer_accounts WHERE phone = ?", (payload.phone,)
+        ).fetchone()
+    if row:
+        password_ok = valid_customer_password(payload.password, row["password_hash"])
+    else:
+        # Equal-cost check keeps the response useful without making account
+        # existence visible through a large timing difference.
+        hashlib.pbkdf2_hmac(
+            "sha256", payload.password.encode("utf-8"), b"\0" * 16,
+            CUSTOMER_PASSWORD_ITERATIONS,
+        )
+        password_ok = False
+    if not row or not password_ok:
+        raise HTTPException(401, "Неверный телефон или пароль")
+    create_customer_session(response, row["id"])
+    return {"account": customer_profile(row)}
+
+
+@app.delete("/api/account/session", status_code=204)
+def logout_customer(request: Request, response: Response):
+    token = request.cookies.get(CUSTOMER_SESSION_COOKIE, "")
+    if token and len(token) <= 160:
+        try:
+            token_hash = customer_session_hash(token)
+        except UnicodeEncodeError:
+            token_hash = ""
+        if token_hash:
+            with db() as con:
+                con.execute(
+                    "DELETE FROM customer_sessions WHERE token_hash = ?", (token_hash,)
+                )
+    response.delete_cookie(
+        CUSTOMER_SESSION_COOKIE,
+        path="/",
+        secure=not TEST_MODE,
+        httponly=True,
+        samesite="strict",
+    )
+
+
+@app.get("/api/account")
+def get_customer_account(request: Request, response: Response):
+    account = customer_account_for_request(request)
+    response.headers["Cache-Control"] = "no-store"
+    return {"account": customer_profile(account)}
+
+
+@app.patch("/api/account")
+def update_customer_account(payload: CustomerProfileUpdate, request: Request):
+    account = customer_account_for_request(request)
+    updated = now_iso()
+    with db() as con:
+        con.execute(
+            "UPDATE customer_accounts SET name = ?, updated_at = ? WHERE id = ?",
+            (payload.name, updated, account["id"]),
+        )
+        row = con.execute(
+            "SELECT * FROM customer_accounts WHERE id = ?", (account["id"],)
+        ).fetchone()
+    return {"account": customer_profile(row)}
+
+
+@app.post("/api/account/password", status_code=204)
+def change_customer_password(payload: CustomerPasswordChange, request: Request):
+    account = customer_account_for_request(request)
+    if not valid_customer_password(payload.current_password, account["password_hash"]):
+        raise HTTPException(403, "Текущий пароль указан неверно")
+    token = request.cookies.get(CUSTOMER_SESSION_COOKIE, "")
+    token_hash = customer_session_hash(token)
+    with db() as con:
+        con.execute(
+            """UPDATE customer_accounts SET password_hash = ?, updated_at = ?
+               WHERE id = ?""",
+            (hash_customer_password(payload.new_password), now_iso(), account["id"]),
+        )
+        con.execute(
+            """DELETE FROM customer_sessions
+               WHERE account_id = ? AND token_hash != ?""",
+            (account["id"], token_hash),
+        )
+
+
+@app.delete("/api/account", status_code=204)
+def delete_customer_account(
+    payload: CustomerAccountDelete,
+    request: Request,
+    response: Response,
+):
+    account = customer_account_for_request(request)
+    if not valid_customer_password(payload.password, account["password_hash"]):
+        raise HTTPException(403, "Пароль указан неверно")
+    with db() as con:
+        con.execute("BEGIN IMMEDIATE")
+        con.execute(
+            "UPDATE orders SET customer_account_id = NULL WHERE customer_account_id = ?",
+            (account["id"],),
+        )
+        con.execute(
+            "UPDATE bookings SET customer_account_id = NULL WHERE customer_account_id = ?",
+            (account["id"],),
+        )
+        con.execute("DELETE FROM customer_sessions WHERE account_id = ?", (account["id"],))
+        con.execute("DELETE FROM customer_accounts WHERE id = ?", (account["id"],))
+    response.delete_cookie(
+        CUSTOMER_SESSION_COOKIE,
+        path="/",
+        secure=not TEST_MODE,
+        httponly=True,
+        samesite="strict",
+    )
+
+
+@app.get("/api/account/orders")
+def customer_orders(request: Request, response: Response):
+    account = customer_account_for_request(request)
+    with db() as con:
+        rows = con.execute(
+            """SELECT * FROM orders WHERE customer_account_id = ?
+               ORDER BY created_at DESC LIMIT 100""",
+            (account["id"],),
+        ).fetchall()
+    response.headers["Cache-Control"] = "no-store"
+    return {"orders": [customer_order(row) for row in rows], "total": len(rows)}
+
+
+@app.get("/api/account/bookings")
+def customer_bookings(request: Request, response: Response):
+    account = customer_account_for_request(request)
+    with db() as con:
+        rows = con.execute(
+            """SELECT * FROM bookings WHERE customer_account_id = ?
+               ORDER BY booking_date DESC, booking_time DESC LIMIT 100""",
+            (account["id"],),
+        ).fetchall()
+    response.headers["Cache-Control"] = "no-store"
+    return {"bookings": [customer_booking(row) for row in rows], "total": len(rows)}
+
+
+@app.post("/api/account/orders/claim")
+def claim_customer_order(payload: CustomerOrderClaim, request: Request):
+    account = customer_account_for_request(request)
+    with db() as con:
+        con.execute("BEGIN IMMEDIATE")
+        row = con.execute(
+            "SELECT * FROM orders WHERE id = ?", (payload.order_id.upper(),)
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "Заказ не найден")
+        require_order_token(row, payload.token)
+        linked_account = row["customer_account_id"]
+        if linked_account and linked_account != account["id"]:
+            raise HTTPException(409, "Заказ уже привязан к другому кабинету")
+        if not linked_account:
+            con.execute(
+                """UPDATE orders SET customer_account_id = ?, updated_at = ?
+                   WHERE id = ? AND customer_account_id IS NULL""",
+                (account["id"], now_iso(), row["id"]),
+            )
+        row = con.execute("SELECT * FROM orders WHERE id = ?", (row["id"],)).fetchone()
+    return {"order": customer_order(row)}
+
+
 @app.post("/api/orders", status_code=201)
 def create_order(
     payload: CreateOrder,
     request: Request,
     idempotency_key: str = Header(default="", alias="Idempotency-Key"),
 ):
+    customer_account = customer_account_for_request(request, required=False)
+    customer_account_id = customer_account["id"] if customer_account else None
     tbank_enabled = tbank_checkout_ready()
     tbank_mode, tbank_mode_valid = rollout_mode("TBANK_CHECKOUT_MODE", allow_demo=True)
     mock_enabled = TEST_MODE and tbank_mode_valid and tbank_mode == "off"
@@ -2803,13 +3774,14 @@ def create_order(
                     payment_method, delivery, customer_json, items_json, provider_payment_id, payment_token,
                     payment_provider, payment_state, payment_updated_at,
                     cdek_quote_json, idempotency_key_hash, request_hash,
-                    paid_effects_enqueued)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    paid_effects_enqueued, customer_account_id)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (order_id, "pending_payment", created, created, subtotal, delivery_price,
                  subtotal + delivery_price, payload.payment_method, payload.delivery,
                  json.dumps(customer, ensure_ascii=False), json.dumps(lines, ensure_ascii=False), None,
                  payment_token, payment_provider, payment_state, created,
-                 json.dumps(cdek_quote, ensure_ascii=False), key_hash, request_fingerprint, 0),
+                 json.dumps(cdek_quote, ensure_ascii=False), key_hash,
+                 request_fingerprint, 0, customer_account_id),
             )
         if not reused_row and analytics_session_hash:
             context = con.execute(
@@ -2897,13 +3869,42 @@ def create_business_lead(
     return {"id": lead["id"], "accepted": True}
 
 
+@app.get("/api/bookings/availability")
+def booking_availability(
+    date: datetime_date,
+    response: Response,
+):
+    current_day = moscow_now().date()
+    if not current_day <= date <= current_day + timedelta(days=14):
+        raise HTTPException(422, "Свободные окна доступны только на ближайшие 14 дней")
+    with db() as con:
+        slots = booking_slots(con, date)
+    response.headers["Cache-Control"] = "no-store"
+    return {
+        "date": date.isoformat(),
+        "duration_minutes": BOOKING_SESSION_MINUTES,
+        "slots": slots,
+    }
+
+
 @app.post("/api/bookings", status_code=201)
 def create_booking(
     payload: CreateBooking,
     background_tasks: BackgroundTasks,
     request: Request,
     idempotency_key: str = Header(default="", alias="Idempotency-Key"),
+    booking_bot_secret: str = Header(default="", alias="X-Booking-Bot-Secret"),
 ):
+    customer_account = (
+        customer_account_for_request(request, required=False)
+        if payload.source == "website" else None
+    )
+    customer_account_id = customer_account["id"] if customer_account else None
+    if payload.source == "telegram":
+        if not BOOKING_BOT_SECRET or not hmac.compare_digest(
+            booking_bot_secret, BOOKING_BOT_SECRET
+        ):
+            raise HTTPException(403, "Бот не авторизован для создания брони")
     key_hash = idempotency_hash(idempotency_key) if idempotency_key else None
     request_fingerprint = booking_request_hash(payload)
     if key_hash:
@@ -2922,7 +3923,12 @@ def create_booking(
     # Повтор уже принятой идемпотентной заявки не является новой попыткой:
     # мобильная сеть может запросить тот же ответ много раз после таймаута.
     # Лимитируем только создание действительно новой брони.
-    rate_limit(request, "booking", 5, 600)
+    rate_limit(
+        request,
+        f"booking-{payload.source}",
+        30 if payload.source == "telegram" else 5,
+        600,
+    )
 
     booking = {
         "id": uuid.uuid4().hex[:12].upper(),
@@ -2931,8 +3937,8 @@ def create_booking(
     }
     reused_row = None
     with db() as con:
+        con.execute("BEGIN IMMEDIATE")
         if key_hash:
-            con.execute("BEGIN IMMEDIATE")
             reused_row = con.execute(
                 "SELECT * FROM bookings WHERE idempotency_key_hash = ?",
                 (key_hash,),
@@ -2942,17 +3948,29 @@ def create_booking(
                     409, "Idempotency-Key уже использован для другой брони"
                 )
         if not reused_row:
+            start = booking_time_minutes(payload.time)
+            if booking_interval_conflicts(
+                con,
+                payload.date,
+                start,
+                start + BOOKING_SESSION_MINUTES,
+            ):
+                raise HTTPException(
+                    409,
+                    "Это время уже занято. Выберите другое свободное окно.",
+                )
             con.execute(
                 """INSERT INTO bookings
                    (id, created_at, booking_date, booking_time, format, guests,
-                    name, phone, note, status, updated_at,
-                    idempotency_key_hash, request_hash)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?)""",
+                    name, phone, note, status, source, updated_at,
+                    idempotency_key_hash, request_hash, customer_account_id)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?, ?, ?)""",
                 (
                     booking["id"], booking["created_at"], booking["date"],
                     booking["time"], booking["format"], booking["guests"],
                     booking["name"], booking["phone"], booking["note"],
-                    booking["created_at"], key_hash, request_fingerprint,
+                    booking["source"], booking["created_at"], key_hash,
+                    request_fingerprint, customer_account_id,
                 ),
             )
     if reused_row:
@@ -3305,8 +4323,8 @@ def tbank_result_page_head():
     return Response(headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
 
 
-def owner_page(request: Request):
-    page = "admin.html" if valid_admin_session(
+def owner_page(request: Request, authenticated_page: str = "admin.html"):
+    page = authenticated_page if valid_admin_session(
         request.cookies.get(ADMIN_SESSION_COOKIE, "")
     ) else "admin-login.html"
     return FileResponse(
@@ -3331,10 +4349,42 @@ def management_page(request: Request):
     return owner_page(request)
 
 
+@app.get("/manage/catalog")
+def management_catalog_page(request: Request):
+    """Catalog editor protected by the same owner session as the dashboard."""
+    return owner_page(request, "admin-catalog.html")
+
+
 @app.head("/admin/orders")
 @app.head("/manage/")
 @app.head("/manage")
+@app.head("/manage/catalog")
 def management_page_head():
+    return Response(
+        headers={
+            "Cache-Control": "no-store",
+            "Referrer-Policy": "no-referrer",
+            "X-Robots-Tag": "noindex, nofollow",
+        }
+    )
+
+
+@app.get("/account/")
+@app.get("/account")
+def customer_account_page():
+    return FileResponse(
+        ROOT / "backend" / "account.html",
+        headers={
+            "Cache-Control": "no-store",
+            "Referrer-Policy": "no-referrer",
+            "X-Robots-Tag": "noindex, nofollow",
+        },
+    )
+
+
+@app.head("/account/")
+@app.head("/account")
+def customer_account_page_head():
     return Response(
         headers={
             "Cache-Control": "no-store",

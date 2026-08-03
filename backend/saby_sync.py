@@ -50,7 +50,8 @@ class SabyNomenclatureRef:
 
 
 # Explicit production mapping verified against Saby point 274 / price list 7.
-# The two unavailable website entries (molimaojian and ginseng1s) are omitted.
+# Unavailable website entries are omitted. The former ``herbal`` product was
+# removed from the storefront by the owner's request and is no longer mapped.
 SABY_NOMENCLATURE_BY_SITE_ID: Mapping[str, SabyNomenclatureRef] = {
     "baihao": SabyNomenclatureRef(39, "b4bc9267-241d-4bfe-9fe8-8af23409f4f0"),
     "baimudan": SabyNomenclatureRef(41, "4e638b70-2958-4082-b8fc-fa86cb32aac4"),
@@ -73,7 +74,6 @@ SABY_NOMENCLATURE_BY_SITE_ID: Mapping[str, SabyNomenclatureRef] = {
     "bingdao": SabyNomenclatureRef(50, "de28f7d7-16cf-4072-864d-05d6094288b8"),
     "nuomixiang": SabyNomenclatureRef(33, "5882a4b0-d7ed-4c0f-8e98-4f4151ce85b0"),
     "jinhuawang": SabyNomenclatureRef(51, "f5552ac3-8301-4ce8-a755-267d41f13513"),
-    "herbal": SabyNomenclatureRef(56, "18bd2c1a-c0d9-4212-826c-2fe48d33a359"),
     "molisiaobaiya": SabyNomenclatureRef(81, "c6c855a4-6763-4c9d-b2fe-300c2ace2cef"),
     "biluochun": SabyNomenclatureRef(97, "5a1466f8-540e-41bf-a625-896ab385ab0b"),
     "dancongmilan": SabyNomenclatureRef(90, "35a19c95-c025-459c-baf9-151f40a6af2e"),

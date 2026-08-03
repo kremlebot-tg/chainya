@@ -4,11 +4,11 @@ import importlib.util
 import json
 import os
 import sqlite3
+import tarfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
-
 
 SCRIPT = Path(__file__).parents[2] / "ops" / "backup-chainya.py"
 SPEC = importlib.util.spec_from_file_location("chainya_backup_retention", SCRIPT)
@@ -60,6 +60,12 @@ def create_schema(connection: sqlite3.Connection) -> None:
             payment_url TEXT,
             idempotency_key_hash TEXT,
             request_hash TEXT
+        );
+        CREATE TABLE customer_sessions (
+            token_hash TEXT PRIMARY KEY,
+            account_id TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL
         );
         """
     )
@@ -220,6 +226,13 @@ def test_retention_anonymizes_only_expired_personal_data(tmp_path):
                 (iso(now - timedelta(days=backup_retention.ANALYTICS_LIVE_DAYS)),),
             ],
         )
+        connection.executemany(
+            "INSERT INTO customer_sessions VALUES (?, ?, ?, ?)",
+            [
+                ("expired-session", "account-1", recent, iso(now - timedelta(seconds=1))),
+                ("active-session", "account-1", recent, iso(now + timedelta(days=1))),
+            ],
+        )
 
         counts = backup_retention.apply_retention(connection, now=now)
 
@@ -228,6 +241,7 @@ def test_retention_anonymizes_only_expired_personal_data(tmp_path):
             "business_leads_anonymized": 1,
             "bookings_anonymized": 1,
             "orders_anonymized": 1,
+            "customer_sessions_deleted": 1,
         }
         old_lead = connection.execute(
             "SELECT * FROM business_leads WHERE id = 'lead-old'"
@@ -278,6 +292,9 @@ def test_retention_anonymizes_only_expired_personal_data(tmp_path):
             "SELECT payment_token FROM orders WHERE id = 'order-recent-update'"
         ).fetchone()[0] == "recent-token"
         assert connection.execute("SELECT COUNT(*) FROM analytics_events").fetchone()[0] == 1
+        assert connection.execute(
+            "SELECT token_hash FROM customer_sessions"
+        ).fetchone()[0] == "active-session"
 
 
 def test_main_backs_up_sanitized_database_and_prunes_old_archives(tmp_path):
@@ -334,7 +351,39 @@ def test_retention_is_safe_for_database_without_optional_tables(tmp_path):
             "business_leads_anonymized": 0,
             "bookings_anonymized": 0,
             "orders_anonymized": 0,
+            "customer_sessions_deleted": 0,
         }
+
+
+def test_main_backs_up_persistent_catalog_and_uploaded_media(tmp_path, monkeypatch):
+    now = datetime(2026, 8, 3, 12, tzinfo=timezone.utc)
+    source_path = tmp_path / "orders.sqlite3"
+    destination = tmp_path / "backups"
+    catalog_path = tmp_path / "catalog.json"
+    media_dir = tmp_path / "catalog-media"
+    media_dir.mkdir()
+    catalog_path.write_text(
+        json.dumps({"teas": [{"id": "baihao"}]}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    (media_dir / ("a" * 32 + ".webp")).write_bytes(b"webp-image")
+    with sqlite3.connect(source_path) as connection:
+        create_schema(connection)
+    monkeypatch.setattr(backup_retention, "CATALOG_SOURCE", catalog_path)
+    monkeypatch.setattr(backup_retention, "CATALOG_MEDIA_SOURCE", media_dir)
+
+    backup_retention.main(source_path, destination, now=now)
+
+    archive_path = destination / "catalog-2026-08-03T120000Z.tar.gz"
+    assert archive_path.is_file()
+    assert archive_path.stat().st_mode & 0o777 == 0o600
+    with tarfile.open(archive_path, "r:gz") as archive:
+        assert archive.getnames() == [
+            "catalog.json",
+            "catalog-media/" + "a" * 32 + ".webp",
+        ]
+        archived_catalog = json.load(archive.extractfile("catalog.json"))
+        assert archived_catalog["teas"][0]["id"] == "baihao"
 
 
 def test_retention_rejects_ambiguous_naive_clock(tmp_path):

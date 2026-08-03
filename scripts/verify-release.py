@@ -44,6 +44,7 @@ PUBLIC_PATHS = (
     ("/shop", "text/html"),
     ("/business", "text/html"),
     ("/booking", "text/html"),
+    ("/account", "text/html"),
     ("/privacy.html", "text/html"),
     ("/legal.html", "text/html"),
     ("/api/catalog", "application/json"),
@@ -248,6 +249,20 @@ def check_live(base_url: str) -> list[str]:
                 f"{path}: ожидался 200 {expected_type}, "
                 f"получен {code} {content_type}"
             )
+    catalog_code, catalog = json_response(base + "/api/catalog")
+    catalog_items = catalog.get("teas") if isinstance(catalog, dict) else None
+    if catalog_code != 200 or not isinstance(catalog_items, list) or not catalog_items:
+        errors.append("/api/catalog: отсутствует непустой список teas")
+    elif any(
+        not isinstance(item, dict)
+        or not isinstance(item.get("id"), str)
+        or item.get("unit") not in {"g", "pc"}
+        or not isinstance(item.get("price"), int)
+        or not isinstance(item.get("translations"), dict)
+        or not isinstance(item.get("image_url"), str)
+        for item in catalog_items
+    ):
+        errors.append("/api/catalog: товар не соответствует публичной схеме")
     for path in SENSITIVE_PATHS:
         code, _content_type = status(base + path)
         if code not in {403, 404}:
@@ -259,7 +274,7 @@ def check_live(base_url: str) -> list[str]:
         redirect_headers, "location"
     ) not in {"/", base + "/"}:
         errors.append("/index.html: нет канонического redirect на /")
-    for path in ("/manage", "/admin/orders", "/payment/success"):
+    for path in ("/manage", "/manage/catalog", "/admin/orders", "/account", "/payment/success"):
         code, content_type, headers = raw_response_metadata(base + path, method="HEAD")
         # HEAD deliberately has an empty body; Starlette labels that empty
         # response text/plain even though the corresponding GET is HTML.

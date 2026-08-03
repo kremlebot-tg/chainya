@@ -80,7 +80,7 @@ def test_mapping_is_exactly_the_active_catalog_items():
     catalog = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
     active = {tea["id"] for tea in catalog["teas"] if tea.get("stock") is True}
 
-    assert len(active) == 30
+    assert len(active) == 29
     assert set(SABY_NOMENCLATURE_BY_SITE_ID) == active
     assert "molimaojian" not in SABY_NOMENCLATURE_BY_SITE_ID
     assert "ginseng1s" not in SABY_NOMENCLATURE_BY_SITE_ID

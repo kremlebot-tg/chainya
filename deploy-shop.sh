@@ -23,6 +23,7 @@ REMOTE_STAGE="/tmp/chainya-shop-${STAGE_ID}"
 printf '%s\n' "$RELEASE_COMMIT" > "$TMP/RELEASE_COMMIT"
 
 echo "→ сборка и локальная проверка"
+python3 scripts/build-catalog-seed.py --check
 python3 build.py --web
 python3 scripts/verify-release.py --dist dist
 
@@ -495,10 +496,10 @@ snapshot_file /var/lib/chainya-shop/web-release-commit \
   web-release-commit marker_had_previous
 config_snapshot_ready=1
 
-sudo grep -E "^(BOT_TOKEN|OWNER_CHAT_ID)=" /opt/chainya-bot/.env |
+sudo grep -E "^(BOT_TOKEN|OWNER_CHAT_ID|BOOKING_BOT_SECRET)=" /opt/chainya-bot/.env |
   sudo tee "$stage/chainya-shop.env.next" >/dev/null
 sudo chmod 0600 "$stage/chainya-shop.env.next"
-for required_key in BOT_TOKEN OWNER_CHAT_ID; do
+for required_key in BOT_TOKEN OWNER_CHAT_ID BOOKING_BOT_SECRET; do
   if ! sudo awk -F= -v key="$required_key" \
     '$1 == key && length(substr($0, index($0, "=") + 1)) > 0 { found++ } END { exit(found == 1 ? 0 : 1) }' \
     "$stage/chainya-shop.env.next"; then

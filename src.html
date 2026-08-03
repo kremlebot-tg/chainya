@@ -290,12 +290,6 @@ h1, h2, h3, p{ text-wrap:pretty; }
 .credo__p{ margin:22px 0 0; font-size:15.5px; line-height:1.66; color:var(--text-2); max-width:56ch; }
 
 /* ── Шаги: редакционная линия вместо четырёх одинаковых «виджетов» ── */
-.steps{ display:grid; grid-template-columns:repeat(4,1fr); gap:clamp(18px,2.4vw,34px); }
-.step{ border-top:1px solid var(--line); padding:18px 0 0; }
-.steps--3{ grid-template-columns:repeat(3,1fr); }
-.step__n{ font-size:12px; font-weight:600; letter-spacing:.08em; color:var(--accent); line-height:1; }
-.step h3{ font-size:1.08rem; font-weight:600; margin:22px 0 8px; letter-spacing:-.01em; }
-.step p{ margin:0; font-size:15px; color:var(--text-2); line-height:1.6; }
 
 /* ── Карточка чая ── */
 .tea-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(232px,1fr)); gap:clamp(14px,1.6vw,20px); }
@@ -717,6 +711,7 @@ select.input{
 }
 .visit__fact dt{ color:var(--text-3); }
 .visit__fact dd{ margin:0; color:var(--text); }
+.visit__hours-line{ display:block; white-space:nowrap; }
 .visit__actions{ display:flex; flex-direction:column; align-items:stretch; gap:12px; }
 .visit__actions .btn{ width:100%; }
 .visit__open{
@@ -752,7 +747,6 @@ select.input{
 /* ─────────────────────────  АДАПТИВ  ───────────────────────── */
 @media (max-width:1000px){
   .sec__head{ grid-template-columns:1fr; align-items:start; }
-  .steps{ grid-template-columns:1fr 1fr; }
   .svcs{ grid-template-columns:repeat(2,minmax(0,1fr)); }
   .hall{ grid-template-columns:1fr; }
   .hall__art{ min-height:210px; }
@@ -822,7 +816,6 @@ select.input{
   .btn{ min-height:50px; }
   .foot ul{ gap:2px; }
   .foot li a{ display:inline-flex; align-items:center; min-height:44px; }
-  .steps{ grid-template-columns:1fr 1fr; }
   .facts__in{ grid-template-columns:1fr 1fr; }
   .fact{ border-top:1px solid var(--line-soft); }
   .fact:nth-child(odd){ border-left:0; padding-left:0; }
@@ -913,7 +906,7 @@ select.input{
   #menu-teas .tea__quick{ width:44px; height:44px; }
 }
 @media (max-width:359px){
-  .steps, .facts__in{ grid-template-columns:1fr; }
+  .facts__in{ grid-template-columns:1fr; }
   .fact{ border-left:0; padding-left:0; }
   .fact:nth-child(2){ border-top:1px solid var(--line-soft); }
   .hero__cta .btn{ flex-basis:100%; }
@@ -954,7 +947,7 @@ select.input{
   <div style="max-width:640px;margin:48px auto;padding:0 22px;line-height:1.6;color:#e8e4dc;font-family:system-ui,sans-serif">
     <h1>Чайня — китайский чай с доставкой</h1>
     <p>Москва, ул. Острякова, 3, помещение 114 (метро Аэропорт). Ежедневно 12:00–22:00.</p>
-    <p>Китайский чай в фасовке 25, 50 и 100 г с доставкой по России. В чайной можно попробовать чай за столом с мастером или самостоятельно.</p>
+    <p>Китайский чай в фасовке 10, 25, 50 и 100 г с доставкой по России. В чайной можно попробовать чай за столом с мастером или самостоятельно.</p>
     <p>Телефон <a href="tel:+79055908801">+7 905 590-88-01</a> · канал <a href="https://t.me/chainyamsk">@chainyamsk</a> · бот <a href="https://t.me/chainyabot">@chainyabot</a>.</p>
     <p>Для каталога чая, брони и корзины включите, пожалуйста, JavaScript.</p>
   </div>
@@ -978,6 +971,9 @@ select.input{
         <button data-lang="en" aria-pressed="false">EN</button>
         <button data-lang="zh" aria-pressed="false">中文</button>
       </div>
+      <a class="icon-btn" id="account-open" href="/account" data-i18n-aria="a_account" aria-label="Личный кабинет">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z"/></svg>
+      </a>
       <button class="icon-btn cart-btn" id="cart-open" data-i18n-aria="a_cart" aria-label="Корзина">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4H6zM3 6h18M16 10a4 4 0 0 1-8 0"/></svg>
         <span class="cart-badge" id="cart-count" hidden>0</span>
@@ -1008,8 +1004,8 @@ select.input{
         <h1 class="display" data-i18n="hero_h">Чай,<br>к которому<br><em>возвращаются</em></h1>
         <p class="lead hero__lead" data-i18n="hero_lead"></p>
         <div class="hero__cta">
-          <button class="btn btn--solid" data-go="shop" data-i18n="cta_menu">Выбрать чай</button>
-          <button class="btn btn--ghost" data-go="book" data-i18n="cta_book">Попробовать в Чайне</button>
+          <button class="btn btn--solid" data-go="shop" data-i18n="cta_menu">Купить чай</button>
+          <button class="btn btn--ghost" data-go="book" data-i18n="cta_book">Забронировать стол</button>
         </div>
       </div>
     </div>
@@ -1018,19 +1014,19 @@ select.input{
       <div class="facts__in">
         <div class="fact">
           <p class="label" data-i18n="fact1_k">Ассортимент</p>
-          <p class="fact__v"><span data-i18n="fact1_v">33 позиции</span><br><small data-i18n="fact1_s">от белого чая до выдержанного хэй ча</small></p>
+          <p class="fact__v"><span data-i18n="fact1_v">33 позиции</span><br><small data-i18n="fact1_s">От белого чая до выдержанного хэй ча</small></p>
         </div>
         <div class="fact">
           <p class="label" data-i18n="fact2_k">Фасовка</p>
-          <p class="fact__v num"><span data-i18n="fact2_v">25 · 50 · 100 г</span><br><small data-i18n="fact2_s">можно начать с небольшого пакета</small></p>
+          <p class="fact__v num"><span data-i18n="fact2_v">10 · 25 · 50 · 100 г</span><br><small data-i18n="fact2_s">Можно начать с небольшого пакета</small></p>
         </div>
         <div class="fact">
           <p class="label" data-i18n="fact3_k">Доставка</p>
-          <p class="fact__v num"><span data-i18n="fact3_v">СДЭК</span><br><small data-i18n="fact3_s">по Москве и всей России</small></p>
+          <p class="fact__v num"><span data-i18n="fact3_v">СДЭК</span><br><small data-i18n="fact3_s">По Москве и всей России</small></p>
         </div>
         <div class="fact">
           <p class="label" data-i18n="fact4_k">Попробовать</p>
-          <p class="fact__v num"><span data-i18n="fact4_v">Острякова, 3</span><br><small data-i18n="fact4_s">в чайной у метро Аэропорт</small></p>
+          <p class="fact__v num"><span data-i18n="fact4_v">Острякова, 3</span><br><small data-i18n="fact4_s">В чайной у метро Аэропорт</small></p>
         </div>
       </div>
     </div>
@@ -1039,7 +1035,7 @@ select.input{
     <div class="sec__head">
       <div>
         <p class="label" data-i18n="fromcard_label">Выбрать чай</p>
-        <h2 class="display" data-i18n="fromcard_h">Начните<br>с этих</h2>
+        <h2 class="display" data-i18n="fromcard_h">Чайня рекомендует</h2>
       </div>
       <p class="lead" data-i18n="fromcard_lead"></p>
     </div>
@@ -1069,7 +1065,7 @@ select.input{
     <div class="sec__head">
       <div>
         <p class="label" data-i18n="svc_label">Как это устроено</p>
-        <h2 class="display" data-i18n="svc_h">Стол на два часа<br>плюс чай по выбору</h2>
+        <h2 class="display" data-i18n="svc_h">Формат церемоний</h2>
       </div>
       <p class="lead" data-i18n="svc_lead"></p>
     </div>
@@ -1080,7 +1076,7 @@ select.input{
           <h3 data-i18n="svc1_h">Церемония с мастером</h3>
           <p data-i18n="svc1_p"></p>
           <div class="svc__foot">
-            <span class="svc__p num" data-i18n="svc1_price">1500 ₽</span>
+            <span class="svc__p num" data-i18n="svc1_price">1500 ₽ с гостя</span>
             <span class="svc__t" data-i18n="svc_time">2 часа</span>
           </div>
         </div>
@@ -1091,7 +1087,7 @@ select.input{
           <h3 data-i18n="svc2_h">Самостоятельная церемония</h3>
           <p data-i18n="svc2_p"></p>
           <div class="svc__foot">
-            <span class="svc__p num" data-i18n="svc2_price">1200 ₽</span>
+            <span class="svc__p num" data-i18n="svc2_price">1200 ₽ с гостя</span>
             <span class="svc__t" data-i18n="svc_time">2 часа</span>
           </div>
         </div>
@@ -1103,44 +1099,11 @@ select.input{
           <p data-i18n="svc3_p"></p>
           <div class="svc__foot">
             <span class="svc__p" data-i18n="svc3_price">По запросу</span>
-            <span class="svc__t" data-i18n="svc3_time">мероприятия и частные выезды</span>
+            <span class="svc__t" data-i18n="svc3_time">Мероприятия и частные выезды</span>
           </div>
           <button class="link-arrow b2b-intent" type="button" data-go="b2b" data-intent="event"><span data-i18n="svc3_cta">Обсудить выезд</span> <span aria-hidden="true">→</span></button>
         </div>
       </article>
-    </div>
-  </div>
-
-  <!-- Нумерация настоящая: проливы идут по порядку -->
-  <div class="sec sec--line wrap">
-    <div class="sec__head">
-      <div>
-        <p class="label" data-i18n="how_label">За столом</p>
-        <h2 class="display" data-i18n="how_h">Четыре шага<br>до первого глотка</h2>
-      </div>
-      <p class="lead" data-i18n="how_lead"></p>
-    </div>
-    <div class="steps">
-      <div class="step">
-        <div class="step__n num">01</div>
-        <h3 data-i18n="step1_h">Разговор</h3>
-        <p data-i18n="step1_p"></p>
-      </div>
-      <div class="step">
-        <div class="step__n num">02</div>
-        <h3 data-i18n="step2_h">Выбор</h3>
-        <p data-i18n="step2_p"></p>
-      </div>
-      <div class="step">
-        <div class="step__n num">03</div>
-        <h3 data-i18n="step3_h">Проливы</h3>
-        <p data-i18n="step3_p"></p>
-      </div>
-      <div class="step">
-        <div class="step__n num">04</div>
-        <h3 data-i18n="step4_h">Донышко</h3>
-        <p data-i18n="step4_p"></p>
-      </div>
     </div>
   </div>
 
@@ -1150,15 +1113,13 @@ select.input{
         <p class="label" data-i18n="hall_label">Зал</p>
         <h2 class="display" data-i18n="hall_h">Где сесть</h2>
       </div>
-      <p class="lead" data-i18n="hall_lead"></p>
     </div>
     <div class="hall">
       <div class="hall__art"><img src="{{img:hall-room}}" alt="" data-i18n-alt="alt_room" loading="lazy" width="1600" height="1065"></div>
       <div class="hall__body">
-        <h3 data-i18n="hall_h3">Один зал, девять мест</h3>
+        <h3 data-i18n="hall_h3">Один зал, семь мест</h3>
         <p data-i18n="hall_p1"></p>
-        <p data-i18n="hall_p2"></p>
-        <div class="hall__meta"><span data-i18n="hall_m1">9 мест</span><span data-i18n="hall_m2">без депозита</span><span data-i18n="hall_m3">чай навынос с полки</span></div>
+        <div class="hall__meta"><span data-i18n="hall_m1">7 мест</span><span data-i18n="hall_m2">Без депозита</span><span data-i18n="hall_m3">Чай с собой</span></div>
       </div>
     </div>
     <div class="gallery">
@@ -1197,7 +1158,7 @@ select.input{
         </div>
         <dl class="visit__facts">
           <div class="visit__fact"><dt data-i18n="visit_metro_label">Метро</dt><dd data-i18n="visit_metro">Аэропорт</dd></div>
-          <div class="visit__fact"><dt data-i18n="visit_hours_label">Открыты</dt><dd data-i18n="visit_hours">ежедневно, 12:00–22:00</dd></div>
+          <div class="visit__fact"><dt data-i18n="visit_hours_label">Открыты</dt><dd data-i18n="visit_hours"><span class="visit__hours-line">Ежедневно</span><span class="visit__hours-line num">12:00–22:00</span></dd></div>
         </dl>
         <div class="visit__actions">
           <a class="btn btn--solid" href="https://yandex.ru/maps/213/moscow/?ll=37.526791%2C55.799473&amp;mode=routes&amp;rtext=~55.799473%2C37.526791&amp;rtt=auto&amp;z=16" target="_blank" rel="noopener" data-i18n="visit_route">Построить маршрут</a>
@@ -1245,7 +1206,7 @@ select.input{
       <div class="sec__head">
         <div>
           <p class="label" data-i18n="b2b_label">Для бизнеса</p>
-          <h1 class="display" data-i18n="b2b_h">Чай для команды,<br>гостей и событий</h1>
+          <h1 class="display" data-i18n="b2b_h">Оптовые поставки и мероприятия<br>для вашего бизнеса</h1>
         </div>
         <p class="lead" data-i18n="b2b_lead"></p>
       </div>
@@ -1331,7 +1292,7 @@ select.input{
             <input class="input" type="text" id="b-phone" name="contact" autocomplete="off" data-i18n-ph="b_phone_ph" aria-describedby="b2b-status">
           </div>
           <div class="field">
-            <label class="label" for="b-note" data-i18n="b_note">Что вам нужно</label>
+            <label class="label" for="b-note" data-i18n="b_note">Ваш запрос</label>
             <textarea class="input" id="b-note" name="note" data-i18n-ph="b_note_ph"></textarea>
           </div>
           <label class="consent"><input type="checkbox" id="b-privacy" name="privacy_accepted" value="yes"><span><span data-i18n="privacy_accept">Согласен на обработку данных согласно</span> <a href="/privacy.html" target="_blank" rel="noopener" data-i18n="privacy_link">политике конфиденциальности</a></span></label>
@@ -1370,12 +1331,12 @@ select.input{
             <span class="label" id="f-format-label" data-i18n="f_format">Формат</span>
             <div class="fmt" id="fmt" role="group" aria-labelledby="f-format-label">
               <button class="fmt__opt" type="button" data-fmt="master" aria-pressed="true">
-                <span class="fmt__price num">1500 ₽</span>
+                <span class="fmt__price num" data-i18n="fmt_master_price">1500 ₽ с гостя</span>
                 <span class="fmt__name" data-i18n="fmt_master">Церемония с мастером</span>
                 <span class="fmt__d" data-i18n="fmt_master_d">мастер заваривает и ведёт стол</span>
               </button>
               <button class="fmt__opt" type="button" data-fmt="self" aria-pressed="false">
-                <span class="fmt__price num">1200 ₽</span>
+                <span class="fmt__price num" data-i18n="fmt_self_price">1200 ₽ с гостя</span>
                 <span class="fmt__name" data-i18n="fmt_self">Самостоятельно</span>
                 <span class="fmt__d" data-i18n="fmt_self_d">посуду и воду даём, завариваете сами</span>
               </button>
@@ -1449,7 +1410,7 @@ select.input{
       <div>
         <div class="foot__logo"><img src="{{img:logo-mark}}" alt="" data-i18n-alt="alt_logo" loading="lazy" width="186" height="377"></div>
         <p class="foot__brand" data-i18n="brand">Чайня</p>
-        <p style="margin-top:12px; max-width:32ch" data-i18n="foot_desc"></p>
+        <p style="margin-top:12px; max-width:32ch" data-i18n="foot_desc">Чайная на Острякова. Китайский чай, чайный мастер и никакой спешки.</p>
       </div>
       <div>
         <h3 data-i18n="foot_addr_h">Адрес</h3>
@@ -1479,7 +1440,7 @@ select.input{
     </div>
     <div class="foot__bot">
       <span data-i18n="foot_c">© 2026 Чайня</span>
-      <a href="/privacy.html" data-i18n="privacy_link">Политика конфиденциальности</a>
+      <a href="/privacy.html" data-i18n="privacy_link_footer">Политика конфиденциальности</a>
       <a href="/legal.html" data-i18n="legal_link">Реквизиты и условия</a>
       <span class="foot__by"><a href="https://rednd.ru" target="_blank" rel="noopener">rednd.ru</a></span>
     </div>
@@ -1637,15 +1598,14 @@ select.input{
     { id:'gabamaocha',  t:'gaba',   p:135, unit:'g',  img:'{{img:tea-gaba-maocha}}' },
     { id:'ginseng',     t:'fujian', p:125, unit:'g',  img:'{{img:tea-ginseng}}' },
     // Два разных женьшеневых улуна (подтвердил владелец): фуцзяньский и первый
-    // сорт. У «1с» пока нет своего фото — временно то же, ждём от владельца.
-    { id:'ginseng1s',   t:'fujian', p:110, unit:'g', stock:false, img:'{{img:tea-ginseng}}' },
+    // сорт. Для каждой позиции подтверждено отдельное фото.
+    { id:'ginseng1s',   t:'fujian', p:110, unit:'g', stock:false, img:'{{img:tea-ginseng1s}}' },
     { id:'mandarin',    t:'shu',    p:320, unit:'pc', img:'{{img:tea-mandarin}}' },
     { id:'laochatou',   t:'shu',    p:140, unit:'g',  img:'{{img:tea-laochatou}}' },
     { id:'peacock',     t:'shu',    p:130, unit:'g',  img:'{{img:tea-peacock}}' },
     { id:'bingdao',     t:'shu',    p:115, unit:'g',  img:'{{img:tea-bingdao}}' },
     { id:'nuomixiang',  t:'shu',    p:95,  unit:'pc', img:'{{img:tea-nuomixiang}}' },
     { id:'jinhuawang',  t:'heicha', p:140, unit:'g',  img:'{{img:tea-jinhuawang}}' },
-    { id:'herbal',      t:'herbs',  p:120, unit:'g',  img:'{{img:tea-herbal}}' },
     { id:'molisiaobaiya', t:'green', p:170, unit:'g',  img:'{{img:tea-molisiaobaiya}}' },
     { id:'biluochun', t:'green', p:175, unit:'g',  img:'{{img:tea-biluochun}}' },
     { id:'dancongmilan', t:'dancong', p:230, unit:'g',  img:'{{img:tea-dancongmilan}}' },
@@ -1691,7 +1651,6 @@ select.input{
     bingdao:{floral:1,fruity:1,driedfruit:4,honey:4,nutty:2,roasted:1,spicy:0,woody:3,herbal:0},
     nuomixiang:{floral:0,fruity:1,driedfruit:3,honey:3,nutty:1,roasted:1,spicy:0,woody:4,herbal:3},
     jinhuawang:{floral:0,fruity:1,driedfruit:4,honey:2,nutty:1,roasted:1,spicy:1,woody:4,herbal:2},
-    herbal:{floral:3,fruity:2,driedfruit:1,honey:1,nutty:0,roasted:0,spicy:1,woody:0,herbal:5},
   };
   const inStock = m => m.stock !== false;
   // Доступные позиции всегда идут первыми, но исходный порядок внутри обеих
@@ -1743,7 +1702,7 @@ select.input{
     locale:'ru-RU',
     title:'Чайня · китайский чай с доставкой',
     route_titles:{home:'Чайня · китайский чай с доставкой',shop:'Купить китайский чай · Чайня',b2b:'Чай для бизнеса и мероприятий · Чайня',book:'Бронь чайной церемонии · Чайня'},
-    a_lang:'Язык', a_close:'Закрыть', a_tea:'О чае', a_nav:'Разделы сайта', filters_label:'Фильтры каталога', skip:'Перейти к содержимому',
+    a_lang:'Язык', a_close:'Закрыть', a_tea:'О чае', a_nav:'Разделы сайта', a_account:'Личный кабинет', filters_label:'Фильтры каталога', skip:'Перейти к содержимому',
     alt_master:'Чайный мастер разливает настой из чахая по чашкам',
     alt_product:'Сухой китайский чай в чайной посуде',
     alt_logo:'Знак Чайни: буквы Ч, Н, Я, сложенные под иероглиф',
@@ -1760,49 +1719,49 @@ select.input{
     nav_home:'Главная', nav_shop:'Купить чай', nav_b2b:'Для бизнеса', nav_book:'Бронь',
     hero_label:'Китайский чай · доставка по России',
     hero_h:'Чай,<br>к которому<br><em>возвращаются</em>',
-    hero_lead:'Отбираем китайский чай, который сами пьём и завариваем в Чайне. Можно взять небольшой пакет на пробу, собрать заказ домой или сначала познакомиться с листом за нашим столом. Посуда тоже появится в каталоге — чуть позже.',
-    cta_book:'Попробовать в Чайне', cta_menu:'Выбрать чай',
-    fact1_k:'Ассортимент', fact1_v:TEA_META.length+' позиции', fact1_s:'от белого чая до выдержанного хэй ча',
-    fact2_k:'Фасовка', fact2_v:'25 · 50 · 100 г', fact2_s:'можно начать с небольшого пакета',
-    fact3_k:'Доставка', fact3_v:'СДЭК', fact3_s:'по Москве и всей России',
-    fact4_k:'Попробовать', fact4_v:'Острякова, 3', fact4_s:'в чайной у метро Аэропорт',
-    svc_label:'Чайные услуги', svc_h:'Попробовать лист<br>не только дома',
-    svc_lead:'Если хочется не просто заказать чай, а прожить его вместе с мастером, приходите в Чайню или пригласите нас на своё событие.',
-    svc1_h:'Церемония с мастером', svc1_price:'1500 ₽',
-    svc1_p:'Мастер весь стол работает на вас: греет посуду, следит за временем, наливает и объясняет. Берите, если пришли впервые или хотите разобраться всерьёз.',
-    svc2_h:'Самостоятельная церемония', svc2_price:'1200 ₽',
+    hero_lead:'Отбираем китайский чай, который сами пьём и завариваем в Чайне. Можно взять небольшой пакет на пробу, собрать заказ домой или сначала познакомиться с чаем за нашим столом.',
+    cta_book:'Забронировать стол', cta_menu:'Купить чай',
+    fact1_k:'Ассортимент', fact1_v:TEA_META.length+' позиции', fact1_s:'От белого чая до выдержанного хэй ча',
+    fact2_k:'Фасовка', fact2_v:'10 · 25 · 50 · 100 г', fact2_s:'Можно начать с небольшого пакета',
+    fact3_k:'Доставка', fact3_v:'СДЭК', fact3_s:'По Москве и всей России',
+    fact4_k:'Попробовать', fact4_v:'Острякова, 3', fact4_s:'В чайной у метро Аэропорт',
+    svc_label:'Чайные услуги', svc_h:'Формат церемоний',
+    svc_lead:'',
+    svc1_h:'Церемония с мастером', svc1_price:'1500 ₽ с гостя',
+    svc1_p:'Чайный мастер знакомит Вас с ароматом чая, его историей, тем, как правильно его заваривать, и наполняет пространство Ча Цы. Подойдёт для первого знакомства, свидания или дружеской встречи.',
+    svc2_h:'Самостоятельная церемония', svc2_price:'1200 ₽ с гостя',
     svc2_p:'Даём стол, посуду, воду нужной температуры и подсказку на старте. Дальше завариваете сами и никто не мешает. Для тех, кто уже в теме.',
     svc_time:'2 часа · 2 чая',
-    svc3_h:'Выездная церемония', svc3_p:'Привезём чай, посуду и мастера на корпоратив, презентацию, свадьбу или частную встречу. Формат и число гостей соберём под событие.',
-    svc3_price:'По запросу', svc3_time:'мероприятия и частные выезды', svc3_cta:'Обсудить выезд',
+    svc3_h:'Выездная церемония', svc3_p:'Привезём чай, посуду и мастера на корпоратив, презентацию, свадьбу или частную встречу. Подберём наилучший вариант чайной церемонии под Ваш формат и число гостей.',
+    svc3_price:'По запросу', svc3_time:'Мероприятия и частные выезды', svc3_cta:'Обсудить выезд',
     how_label:'За столом', how_h:'Четыре шага<br>до первого глотка',
     how_lead:'Если никогда не пили чай проливами, готовиться не нужно. Мастер ведёт стол сам и объясняет по ходу.',
     step1_h:'Разговор', step1_p:'Мастер спросит, зачем вы пришли: взбодриться или, наоборот, выдохнуть. Принесёт несколько сухих листов понюхать.',
     step2_h:'Выбор', step2_p:'Выбираете два чая из коллекции. Обычно берут разные: сначала что-то светлое, ближе к концу тёмное и плотное.',
     step3_h:'Проливы', step3_p:'Дальше по кругу: короткий залив, слив в чахай, разлив по чашам. С каждым проливом выдержка растёт, и вкус меняется.',
     step4_h:'Донышко', step4_p:'Когда лист отдал всё, его разворачивают на блюдце. По листу видно, где он рос и как его делали.',
-    fromcard_label:'Выбрать чай', fromcard_h:'Начните<br>с этих',
-    fromcard_lead:'Три разных входа в коллекцию: лёгкий белый чай, характерный улун и понятная сладкая габа. Откройте карточку, выберите фасовку — остальное посчитаем в корзине.',
+    fromcard_label:'Выбрать чай', fromcard_h:'Чайня рекомендует',
+    fromcard_lead:'Рекомендуем начать свой чайный путь с этих позиций:',
     fromcard_link:'Весь каталог · '+TEA_META.length,
     hall_label:'Зал', hall_h:'Где сесть',
-    hall_lead:'Стол бронируется на сессию целиком. Мы не подсаживаем гостей и не торопим, даже если вы засиделись.',
-    hall_h3:'Один зал, девять мест',
-    hall_p1:'Низкие столы, тёплые лампы, окно во двор. Компания до девяти человек занимает зал целиком: так тут проходят дни рождения и спокойные встречи.',
-    hall_p2:'Если вас больше девяти, позвоните заранее, что-нибудь придумаем.',
-    hall_m1:'9 мест', hall_m2:'без депозита', hall_m3:'чай навынос с полки',
+    hall_lead:'',
+    hall_h3:'Один зал, семь мест',
+    hall_p1:'Комфортное камерное пространство для небольших компаний. Семь человек занимает зал целиком: так тут проходят дни рождения и спокойные встречи.',
+    hall_p2:'',
+    hall_m1:'7 мест', hall_m2:'Без депозита', hall_m3:'Чай с собой',
     hall_cta:'Выбрать время',
     visit_label:'Как добраться', visit_h:'Чайня<br>на Острякова',
     visit_lead:'Загляните выбрать чай с полки или оставайтесь за столом. Точка на карте ведёт прямо ко входу.',
     visit_address_label:'Адрес', visit_address:'Москва, ул. Острякова, 3', visit_place:'Первый этаж · помещение 114',
-    visit_metro_label:'Метро', visit_metro:'Аэропорт', visit_hours_label:'Открыты', visit_hours:'ежедневно, 12:00–22:00',
+    visit_metro_label:'Метро', visit_metro:'Аэропорт', visit_hours_label:'Открыты', visit_hours:'<span class="visit__hours-line">Ежедневно</span><span class="visit__hours-line num">12:00–22:00</span>',
     visit_route:'Построить маршрут', visit_open:'Открыть карточку в Яндекс Картах', visit_map_title:'Чайня на карте Москвы',
     shop_label:'Купить чай', shop_h:'Тот же лист,<br>что и в зале',
-    shop_lead:'Здесь чай продаётся домой: фасуем в пакеты 25, 50 и 100 г и отправляем доставкой. Если вы пришли к нам за стол, платить за чай не нужно: два на выбор уже входят в стоимость.',
+    shop_lead:'Здесь чай продаётся домой: фасуем в пакеты 10, 25, 50 и 100 г и отправляем доставкой. Если вы пришли к нам за стол, платить за чай не нужно: два на выбор уже входят в стоимость.',
     shop_foot:'Цены на пакеты считаются от цены за 10 г. Прессованное продаём целиком: мандарин и квадратик поштучно, блины по запросу.', shop_count:'В подборке',
     shop_search_label:'Поиск по каталогу', shop_search_ph:'Название, регион или вкус', shop_sort_label:'Сортировка', shop_empty:'По этому запросу ничего не найдено. Попробуйте другое название или сбросьте фильтр.',
     shop_sort_default:'Сначала рекомендованные', shop_sort_price_asc:'Сначала дешевле', shop_sort_price_desc:'Сначала дороже', shop_sort_name:'По названию',
     types:['Все','Белый','Зелёный','Габа','Улуны Фуцзяни','Улуны Гуандуна','Улуны Уишаня','Красный','Шэн Пуэр','Шу Пуэр','Хэй Ча','Травы и добавки'],
-    more:'о чае', per_pc:'за штуку', per_pack25:'за 25 г', gram:'г',
+    more:'о чае', per_pc:'за штуку', per_pack25:'за 10 г', gram:'г',
     fav_label:'В избранное', filter_fav:'Избранное', fav_empty:'Здесь появится то, что вы отметите сердечком.',
     taste_h:'Вкусовой профиль', in_stock:'в наличии', oos:'нет в наличии',
     unit_pc:'Одна штука', unit_pack:'Пакет {g} г',
@@ -1826,7 +1785,7 @@ select.input{
     cart_quote_loading:'СДЭК рассчитывает стоимость…',
     cart_quote_ready:(a,min,max)=>`СДЭК · ${a} · ${min===max?min:`${min}–${max}`} дн.`,
     cart_quote_error:'Не удалось рассчитать доставку. Проверьте город или попробуйте ещё раз.',
-    privacy_accept:'Согласен на обработку данных согласно', privacy_link:'политике конфиденциальности', legal_link:'Реквизиты и условия', privacy_required:'Подтвердите согласие на обработку данных',
+    privacy_accept:'Согласен на обработку данных согласно', privacy_link:'политике конфиденциальности', privacy_link_footer:'Политика конфиденциальности', legal_link:'Реквизиты и условия', privacy_required:'Подтвердите согласие на обработку данных',
     cart_phone_required:'Укажите полный номер телефона, чтобы мы могли подтвердить заказ.', cart_city_required:'Укажите город доставки.',
     cart_pvz_required:'Выберите пункт из подсказок СДЭК.', cart_addr_required:'Укажите адрес доставки.',
     cart_catalog_checking:'Проверяем цены и наличие…',
@@ -1837,7 +1796,7 @@ select.input{
     dlv:{ pickup:'Самовывоз · Острякова, 3', cdek_pvz:'СДЭК · пункт выдачи', cdek_courier:'СДЭК · курьер' },
     order_head:'🛒 Заказ чая — Чайня', order_done:'Спасибо! Завершите заказ в нашем боте @chainyabot или позвоните +7 905 590-88-01 — подтвердим и посчитаем доставку.',
     ts_note:'За столом этот чай можно выпить бесплатно: два на выбор входят в стоимость стола.',
-    b2b_label:'Для бизнеса и событий', b2b_h:'Чай для команды,<br>гостей и событий',
+    b2b_label:'Для бизнеса и событий', b2b_h:'Оптовые поставки и мероприятия<br>для вашего бизнеса',
     b2b_lead:'Поставим листовой чай в заведение или офис, соберём чайную карту и проведём выездную церемонию на вашей площадке.',
     b2b_offer1_h:'Чай для заведений и офисов', b2b_offer1_p:'Подбираем сорта под кухню, формат и бюджет, считаем себестоимость и возим партии по графику.',
     b2b_offer1_cta:'Обсудить поставку', b2b_supply_prefill:'Интересует поставка чая для заведения или офиса.',
@@ -1853,16 +1812,16 @@ select.input{
     b2b_form_h:'Оставить заявку', b2b_form_sub:'Ответим в течение рабочего дня',
     b_company:'Компания или мероприятие', b_company_ph:'Кофейня «Утро» или летняя свадьба',
     b_name:'Как вас зовут', b_phone:'Телефон или телеграм', b_phone_ph:'+7 или @ник',
-    b_note:'Что вам нужно', b_note_ph:'Поставка чая в офис или выездная церемония на 40 гостей.',
+    b_note:'Ваш запрос', b_note_ph:'Поставка чая в офис или выездная церемония на 40 гостей.',
     b2b_send:'Отправить', b2b_contact_required:'Укажите телефон или Telegram, чтобы мы могли ответить.',
     b2b_form_note:'Заявка придёт владельцам в Telegram. Ответим в течение рабочего дня.',
     b2b_done_h:'Заявка у нас', b2b_done_back:'Посмотреть чаи',
     b2bDoneText:(name) => `${name ? name + ', с' : 'С'}пишемся в течение рабочего дня.`,
     book_label:'Бронь', book_h:'Забронировать стол',
-    book_lead:'Выберите формат, дату и время. Заявка уйдёт владельцам прямо с сайта — они свяжутся с вами и подтвердят свободный стол.',
+    book_lead:'Выберите формат, дату и свободное время. Каждая заявка занимает единственный стол на два часа.',
     f_format:'Формат',
-    fmt_master:'Церемония с мастером', fmt_master_d:'мастер заваривает и ведёт стол',
-    fmt_self:'Самостоятельно', fmt_self_d:'посуду и воду даём, завариваете сами',
+    fmt_master:'Церемония с мастером', fmt_master_d:'мастер заваривает и ведёт стол', fmt_master_price:'1500 ₽ с гостя',
+    fmt_self:'Самостоятельно', fmt_self_d:'посуду и воду даём, завариваете сами', fmt_self_price:'1200 ₽ с гостя',
     fmt_incl:'В обе цены входят два чая на выбор. Третий — по желанию, на месте.',
     f_date:'Дата', today:'сегодня', tomorrow:'завтра', f_time:'Время посадки', f_guests:'Гостей',
     f_name:'Имя', f_name_ph:'Как к вам обращаться', f_phone:'Телефон',
@@ -1873,14 +1832,16 @@ select.input{
     book_btn_wait:'Выберите дату и время', book_btn_go:'Отправить заявку',
     booking_phone_required:'Укажите полный номер телефона, чтобы мы могли подтвердить бронь.',
     booking_sending:'Отправляем заявку…', booking_error:'Не удалось отправить заявку. Проверьте соединение и попробуйте ещё раз.',
+    booking_slots_loading:'Проверяем свободное время…', booking_slots_error:'Не удалось проверить расписание. Обновите страницу или позвоните нам.',
+    booking_slot_busy:'Время занято', booking_slot_taken:'Это время только что заняли. Выберите другое свободное окно.',
     or:'или', book_call:'Позвонить: +7 905 590-88-01',
     msg_hi:'Здравствуйте! Хочу забронировать стол в Чайне.',
-    sum_note:'Платить сейчас не нужно. Владельцы получат заявку, свяжутся с вами и подтвердят время. Если оно занято, предложат ближайшее.',
+    sum_note:'Платить сейчас не нужно. После отправки время закрепится за вашей заявкой, а владельцы свяжутся с вами и подтвердят бронь.',
     done_h:'Заявка отправлена', done_back:'На главную',
-    guests:['1 гость','2 гостя','3 гостя','4 гостя','5 гостей','6 гостей','7 гостей','8 гостей','9 гостей, весь зал'],
+    guests:['1 гость','2 гостя','3 гостя','4 гостя','5 гостей','6 гостей','7 гостей, весь зал'],
     doneText:({ name, dateStr, time, id }) =>
-      `${name ? name + ', заявка' : 'Заявка'} на ${dateStr} в ${time} принята. Номер заявки: ${id}. Мы свяжемся с вами и подтвердим время.`,
-    foot_desc:'Чайная на Острякова. Китайский лист, чайный мастер и никакой спешки.',
+      `${name ? name + ', заявка' : 'Заявка'} на ${dateStr} в ${time} принята, время зарезервировано. Номер заявки: ${id}. Мы свяжемся с вами и подтвердим бронь.`,
+    foot_desc:'Чайная на Острякова. Китайский чай, чайный мастер и никакой спешки.',
     foot_addr_h:'Адрес', foot_addr1:'Москва, ул. Острякова, 3', foot_addr2:'первый этаж, помещение 114', foot_addr3:'метро Аэропорт',
     foot_contact_h:'Связь', foot_bot:'Бот: @chainyabot', foot_tg:'Канал: @chainyamsk', foot_phone:'+7 (905) 590-88-01', foot_ya:'Мы на Яндекс.Картах',
     foot_hours_h:'Часы', foot_hours1:'Ежедневно · 12:00–22:00', foot_hours2:'Последняя посадка в 20:00',
@@ -1910,7 +1871,6 @@ select.input{
       bingdao:{ n:'Шу Пуэр Гунтин Биндао ГуШу', o:'Пуэр · Биндао · старые деревья', d:'Гунтин значит «дворцовый»: самая мелкая и чистая почка. Биндао — это деревня в Линьцане, чьё имя на упаковке стоит так дорого, что часто стоит там незаслуженно. Мягкий, сладкий, без единой земляной ноты.' },
       nuomixiang:{ n:'Квадратик Ноу Ми Сян', o:'Пуэр · плитка на одну заварку', d:'Риса тут нет и в помине: аромат даёт трава номи сян из Сишуанбаньны, её прессуют вместе с пуэром. Не ароматизатор, а живой лист. Разворачиваете фольгу и кидаете плитку целиком.' },
       jinhuawang:{ n:'Цзинь Хуа Ван 2002', o:'Хэй Ча · Аньхуа · выдержка', d:'Аньхуаский хэй ча 2002 года. «Золотые цветки» — это гриб, который в этом чае выращивают нарочно: он даёт сухофруктовый аромат и тот самый вкус погреба и старой библиотеки.' },
-      herbal:{ n:'Травяной сбор «Тонизирующий»', o:'Без кофеина · травы и шиповник', d:'Травы, цветки и шиповник, чайного листа нет вовсе. Кофеина ноль, но бодрит за счёт трав. Берут те, кому нельзя чай или для кого уже поздно.' },
       molisiaobaiya:{ n:"Мо Ли Сяо Бай Я", o:"Жасминовый зелёный · Китай (Фуцзянь / Гуанси) · ворсистые серебряные почки", d:"Зелёный чай из мелких почек в серебристом пушке, ароматизированный живыми цветками жасмина: их несколько раз перекладывают с чайной основой, чтобы почки впитали запах, а потом убирают. Аромат чистый жасминовый, без парфюмерной приторности. Во вкусе мягкая цветочная сладость поверх лёгкой зелёной основы, горечи почти нет. Спокойный, деликатный чай, хорошо держит несколько проливов." },
       biluochun:{ n:"Би Ло Чунь", o:"Зелёный · Дунтин, Сучжоу (Цзянсу) · ворсистые спиральки", d:"Тугие серебристо-ворсистые спиральки, скрученные вручную из самых ранних весенних почек: те самые «изумрудные спирали весны» с гор Дунтин у озера Тайху. Там чайные кусты растут вперемешку с абрикосами, сливами и мушмулой, так что цветочно-фруктовый аромат лист впитывает ещё на ветке. В чашке он свежий и мягко-сладкий, с ясной цветочной нотой и лёгкой фруктовой кислинкой, грубой зелени нет. Заваривайте не крутым кипятком, а водой около 80°, иначе нежный лист начинает горчить." },
       dancongmilan:{ n:"Фэн Хуан Дань Цун Ми Лань Сян", o:"Улун · гора Феникс, Чаочжоу · медово-орхидейный аромат", d:"Фэнхуанский дань цун ароматического типа Ми Лань Сян, что переводят как «медовый аромат орхидеи». В запахе спелая жёлтая слива и мёд поверх орхидеи, во вкусе плотная медовая сладость с характерной для дань цунов горчинкой, которая быстро уходит в долгое цветочное послевкусие. Растёт на горе Феникс в Чаочжоу, кусты там не подрезают, так что лист собирают с отдельных деревьев. Мягкий угольный обжиг держит фрукты в фокусе, а не перекрывает их." },
@@ -1926,7 +1886,7 @@ select.input{
     locale:'en-GB',
     title:'Chaynya · Chinese tea delivered',
     route_titles:{home:'Chaynya · Chinese tea delivered',shop:'Buy Chinese tea · Chaynya',b2b:'Tea for business and events · Chaynya',book:'Book a tea ceremony · Chaynya'},
-    a_lang:'Language', a_close:'Close', a_tea:'About the tea', a_nav:'Site sections', filters_label:'Catalogue filters', skip:'Skip to content',
+    a_lang:'Language', a_close:'Close', a_tea:'About the tea', a_nav:'Site sections', a_account:'Personal account', filters_label:'Catalogue filters', skip:'Skip to content',
     alt_master:'A tea master pouring the liquor from a pitcher into cups',
     alt_product:'Loose Chinese tea presented in tea ware',
     alt_logo:'The Chaynya mark: the letters Ч, Н, Я stacked like a Chinese character',
@@ -1943,17 +1903,17 @@ select.input{
     nav_home:'Home', nav_shop:'Buy tea', nav_b2b:'For business', nav_book:'Booking',
     hero_label:'Chinese tea · delivery across Russia',
     hero_h:'Tea<br>you will want<br><em>to return to</em>',
-    hero_lead:'We select the Chinese teas we drink and brew at Chaynya ourselves. Start with a small bag, build an order for home, or get to know the leaf at our table first. Teaware will join the catalogue soon.',
-    cta_book:'Try it at Chaynya', cta_menu:'Choose tea',
+    hero_lead:'We select the Chinese teas we drink and brew at Chaynya ourselves. Start with a small bag, build an order for home, or get to know the tea at our table first.',
+    cta_book:'Book a table', cta_menu:'Buy tea',
     fact1_k:'Selection', fact1_v:TEA_META.length+' teas', fact1_s:'from white tea to aged hei cha',
-    fact2_k:'Pack sizes', fact2_v:'25 · 50 · 100 g', fact2_s:'start with a small bag',
+    fact2_k:'Pack sizes', fact2_v:'10 · 25 · 50 · 100 g', fact2_s:'Start with a small bag',
     fact3_k:'Delivery', fact3_v:'CDEK', fact3_s:'Moscow and across Russia',
     fact4_k:'Taste in person', fact4_v:'Ostryakova 3', fact4_s:'near Aeroport metro',
-    svc_label:'Tea services', svc_h:'More ways<br>to meet the leaf',
-    svc_lead:'If you want more than a delivery, join the master at our tea house or invite us to brew at your event.',
-    svc1_h:'Ceremony with a master', svc1_price:'1500 ₽',
+    svc_label:'Tea services', svc_h:'Ceremony formats',
+    svc_lead:'',
+    svc1_h:'Ceremony with a master', svc1_price:'1500 ₽ per guest',
     svc1_p:'The master works your table the whole time: warms the ware, watches the clock, pours and explains. Take this if it is your first time or you want to get into it properly.',
-    svc2_h:'Brew it yourself', svc2_price:'1200 ₽',
+    svc2_h:'Brew it yourself', svc2_price:'1200 ₽ per guest',
     svc2_p:'We give you the table, the ware, water at the right temperature and a nudge to start. After that you brew and nobody hovers. For people already at home with tea.',
     svc_time:'2 hours · 2 teas',
     svc3_h:'Off-site tea ceremony', svc3_p:'We bring tea, teaware and a master to a company event, presentation, wedding or private gathering. The format and guest count are tailored to the occasion.',
@@ -1964,28 +1924,28 @@ select.input{
     step2_h:'Choice', step2_p:'You pick two teas from the collection. Most people take contrasting ones: something light to open with, something dark and dense towards the end.',
     step3_h:'Pours', step3_p:'Then round after round: a short steep, decant into the pitcher, pour into cups. Each round steeps longer, and the taste keeps shifting.',
     step4_h:'The spent leaf', step4_p:'Once the leaf has given everything, it gets unfolded on a saucer. It shows where the tea grew and how it was made.',
-    fromcard_label:'Choose tea', fromcard_h:'Start<br>with these',
-    fromcard_lead:'Three different ways into the collection: a light white tea, a distinctive oolong and an approachable honeyed GABA. Open a card, choose a pack, and the cart handles the rest.',
+    fromcard_label:'Choose tea', fromcard_h:'Chainya recommends',
+    fromcard_lead:'We recommend starting your tea journey with these selections:',
     fromcard_link:'Full catalogue · '+TEA_META.length,
     hall_label:'The room', hall_h:'Where you sit',
     hall_lead:'A table is booked for the whole session. We never seat strangers together and never hurry you out.',
-    hall_h3:'One room, nine seats',
-    hall_p1:'Low tables, warm lamps, a window onto the courtyard. A party of up to nine takes the whole room: birthdays and quiet meetings both happen here.',
-    hall_p2:'If there are more than nine of you, call ahead and we will figure something out.',
-    hall_m1:'9 seats', hall_m2:'no deposit', hall_m3:'tea to take home, off the shelf',
+    hall_h3:'One room, seven seats',
+    hall_p1:'A comfortable, intimate space for small groups. Seven guests take the whole room, making it a natural setting for birthdays and quiet get-togethers.',
+    hall_p2:'',
+    hall_m1:'7 seats', hall_m2:'No deposit', hall_m3:'Tea to take away',
     hall_cta:'Pick a time',
     visit_label:'Directions', visit_h:'Chainya<br>on Ostryakova',
     visit_lead:'Drop in to choose tea from the shelf or stay for a session. The map pin leads straight to us.',
     visit_address_label:'Address', visit_address:'3 Ostryakova St., Moscow', visit_place:'Ground floor · unit 114',
-    visit_metro_label:'Metro', visit_metro:'Aeroport', visit_hours_label:'Hours', visit_hours:'daily, 12:00–22:00',
+    visit_metro_label:'Metro', visit_metro:'Aeroport', visit_hours_label:'Hours', visit_hours:'<span class="visit__hours-line">Daily</span><span class="visit__hours-line num">12:00–22:00</span>',
     visit_route:'Get directions', visit_open:'Open in Yandex Maps', visit_map_title:'Chainya on the Moscow map',
     shop_label:'Buy tea', shop_h:'The same leaf<br>we serve inside',
-    shop_lead:'Tea to take home, packed in 25, 50 and 100 g bags and shipped across Russia. Two teas are included with every table booking.',
+    shop_lead:'Tea to take home, packed in 10, 25, 50 and 100 g bags and shipped across Russia. Two teas are included with every table booking.',
     shop_foot:'Package prices are calculated from the price per 10 g. Pressed tea is sold whole: the mandarin and mini brick by the piece, cakes on request.', shop_count:'In this selection',
     shop_search_label:'Search the catalogue', shop_search_ph:'Name, origin or flavour', shop_sort_label:'Sort', shop_empty:'Nothing matches this search. Try another name or reset the filter.',
     shop_sort_default:'Recommended first', shop_sort_price_asc:'Lowest price first', shop_sort_price_desc:'Highest price first', shop_sort_name:'By name',
     types:['All','White','Green','GABA','Fujian oolong','Guangdong oolong','Wuyi oolong','Black','Sheng pu-erh','Shou pu-erh','Hei cha','Herbs & extras'],
-    more:'more', per_pc:'each', per_pack25:'for 25 g', gram:'g',
+    more:'more', per_pc:'each', per_pack25:'for 10 g', gram:'g',
     fav_label:'Add to favourites', filter_fav:'Favourites', fav_empty:'Teas you save will appear here.',
     taste_h:'Flavour profile', in_stock:'in stock', oos:'out of stock',
     unit_pc:'One piece', unit_pack:'A {g} g bag',
@@ -2009,7 +1969,7 @@ select.input{
     cart_quote_loading:'CDEK is calculating delivery…',
     cart_quote_ready:(a,min,max)=>`CDEK · ${a} · ${min===max?min:`${min}–${max}`} days`,
     cart_quote_error:'Could not calculate delivery. Check the city or try again.',
-    privacy_accept:'I consent to data processing under the', privacy_link:'privacy policy', legal_link:'Seller details and terms', privacy_required:'Please accept the data processing terms',
+    privacy_accept:'I consent to data processing under the', privacy_link:'privacy policy', privacy_link_footer:'Privacy policy', legal_link:'Seller details and terms', privacy_required:'Please accept the data processing terms',
     cart_phone_required:'Enter a complete phone number so we can confirm the order.', cart_city_required:'Enter the delivery city.',
     cart_pvz_required:'Choose a CDEK point from the suggestions.', cart_addr_required:'Enter the delivery address.',
     cart_catalog_checking:'Checking prices and availability…',
@@ -2036,16 +1996,16 @@ select.input{
     b2b_form_h:'Make an enquiry', b2b_form_sub:'We reply within one working day',
     b_company:'Company or event', b_company_ph:'Utro coffee shop or a summer wedding',
     b_name:'Your name', b_phone:'Phone or Telegram', b_phone_ph:'+7 or @handle',
-    b_note:'What do you need', b_note_ph:'Tea for the office or an off-site ceremony for 40 guests.',
+    b_note:'Your request', b_note_ph:'Tea for the office or an off-site ceremony for 40 guests.',
     b2b_send:'Send', b2b_contact_required:'Enter a phone number or Telegram handle so we can reply.',
     b2b_form_note:'The owners will receive your enquiry in Telegram. We reply within one working day.',
     b2b_done_h:'Enquiry received', b2b_done_back:'See the teas',
     b2bDoneText:(name) => `${name ? name + ', we' : 'We'}’ll get back to you within one working day.`,
     book_label:'Booking', book_h:'Book a table',
-    book_lead:'Choose the format, date and time. The owners receive your request directly from the website and contact you to confirm the table.',
+    book_lead:'Choose the format, date and an available time. Each request occupies our only table for two hours.',
     f_format:'Format',
-    fmt_master:'Ceremony with a master', fmt_master_d:'the master brews and runs the table',
-    fmt_self:'On your own', fmt_self_d:'we give you the ware and water, you brew',
+    fmt_master:'Ceremony with a master', fmt_master_d:'the master brews and runs the table', fmt_master_price:'1500 ₽ per guest',
+    fmt_self:'On your own', fmt_self_d:'we give you the ware and water, you brew', fmt_self_price:'1200 ₽ per guest',
     fmt_incl:'Both prices already include two teas of your choice. A third one is optional, at the table.',
     f_date:'Date', today:'today', tomorrow:'tomorrow', f_time:'Seating time', f_guests:'Guests',
     f_name:'Name', f_name_ph:'What should we call you', f_phone:'Phone',
@@ -2056,14 +2016,16 @@ select.input{
     book_btn_wait:'Pick a date and time', book_btn_go:'Send booking request',
     booking_phone_required:'Enter a complete phone number so we can confirm the booking.',
     booking_sending:'Sending your request…', booking_error:'Could not send the request. Check your connection and try again.',
+    booking_slots_loading:'Checking available times…', booking_slots_error:'Could not check the schedule. Refresh the page or call us.',
+    booking_slot_busy:'Time unavailable', booking_slot_taken:'That time was just taken. Please choose another available slot.',
     or:'or', book_call:'Call: +7 905 590-88-01',
     msg_hi:'Hello! I’d like to book a table at Chaynya.',
-    sum_note:'Nothing to pay now. The owners receive your request, contact you and confirm the time. If it is taken, they will offer the nearest slot.',
+    sum_note:'Nothing to pay now. After you send the request, the time is held for you while the owners contact you and confirm the booking.',
     done_h:'Request sent', done_back:'Back to home',
-    guests:['1 guest','2 guests','3 guests','4 guests','5 guests','6 guests','7 guests','8 guests','9 guests, the whole room'],
+    guests:['1 guest','2 guests','3 guests','4 guests','5 guests','6 guests','7 guests, the whole room'],
     doneText:({ name, dateStr, time, id }) =>
-      `${name ? name + ', your' : 'Your'} request for ${dateStr} at ${time} has been received. Reference: ${id}. We will contact you to confirm the time.`,
-    foot_desc:'A tea house on Ostryakova. Chinese leaf, a tea master, and no hurry whatsoever.',
+      `${name ? name + ', your' : 'Your'} request for ${dateStr} at ${time} has been received and the time is reserved. Reference: ${id}. We will contact you to confirm the booking.`,
+    foot_desc:'A tea house on Ostryakova. Chinese tea, a tea master, and no hurry whatsoever.',
     foot_addr_h:'Address', foot_addr1:'Moscow, 3 Ostryakova St', foot_addr2:'ground floor, unit 114', foot_addr3:'Aeroport metro',
     foot_contact_h:'Contact', foot_bot:'Bot: @chainyabot', foot_tg:'Channel: @chainyamsk', foot_phone:'+7 (905) 590-88-01', foot_ya:'Find us on Yandex Maps',
     foot_hours_h:'Hours', foot_hours1:'Daily · 12:00–22:00', foot_hours2:'Last seating at 20:00',
@@ -2093,7 +2055,6 @@ select.input{
       bingdao:{ n:'Shu pu-erh Gongting Bingdao Gushu', o:'Pu-erh · Bingdao · old trees', d:'Gongting means “imperial”: the smallest and cleanest bud. Bingdao is a village in Lincang whose name on a wrapper is worth so much that it often ends up there undeserved. Soft and sweet, without a single earthy note.' },
       nuomixiang:{ n:'Nuo Mi Xiang mini brick', o:'Pu-erh · single-serve brick', d:'There is no rice in it whatsoever: the scent comes from the nuo mi xiang herb of Xishuangbanna, pressed together with the pu-erh. A real leaf, not a flavouring. Unwrap the foil and drop the brick in whole.' },
       jinhuawang:{ n:'Jin Hua Wang 2002', o:'Hei cha · Anhua · aged', d:'Anhua hei cha from 2002. The “golden flowers” are a fungus grown in this tea deliberately: it gives the dried-fruit aroma and that cellar-and-old-library taste.' },
-      herbal:{ n:'“Tonic” herbal blend', o:'Caffeine-free · herbs and rosehip', d:'Herbs, flowers and rosehip, with no tea leaf at all. Zero caffeine, yet it picks you up. For people who cannot drink tea, or for whom it is already too late in the day.' },
       molisiaobaiya:{ n:"Mo Li Xiao Bai Ya", o:"Jasmine green · China (Fujian / Guangxi) · downy silver buds", d:"A green tea of small buds covered in silver down, scented with living jasmine blossoms: the flowers are layered with the tea leaf several times so the buds soak up the fragrance, then removed. The aroma is clean jasmine, never soapy or perfumey. The taste is a soft floral sweetness over a light green base with almost no bitterness. A calm, delicate tea that holds up over several infusions." },
       biluochun:{ n:"Bi Luo Chun", o:"Green · Dongting, Suzhou (Jiangsu) · downy spring spirals", d:"Tight, silver-downy spirals hand-rolled from the earliest spring buds, the famous “Green Snail Spring” from the hills of Dongting above Lake Tai. There the tea bushes grow interplanted with apricot, plum and loquat, so the leaf takes on its floral-fruity scent right on the branch. In the cup it is fresh and gently sweet, with a clear floral note and a light fruity tang, none of the coarse green edge. Brew it with cooler water around 80°C, or the delicate leaf turns bitter." },
       dancongmilan:{ n:"Feng Huang Dan Cong Mi Lan Xiang", o:"Oolong · Phoenix Mountain, Chaozhou (Guangdong) · honey-orchid aroma", d:"A Fenghuang Dan Cong of the Mi Lan Xiang type, which translates as “honey-orchid fragrance”. The nose is ripe yellow plum and honey over orchid; the cup is a thick honeyed sweetness with the bitterness typical of dan congs that quickly turns into a long floral finish. It grows on Phoenix Mountain in Chaozhou, where the bushes are left unpruned and the leaf is picked tree by tree. A gentle charcoal roast keeps the fruit in focus rather than covering it." },
@@ -2109,7 +2070,7 @@ select.input{
     locale:'zh-CN',
     title:'Chaynya · 中国茶配送',
     route_titles:{home:'Chaynya · 中国茶配送',shop:'购买中国茶 · Chaynya',b2b:'企业与活动用茶 · Chaynya',book:'预约茶会 · Chaynya'},
-    a_lang:'语言', a_close:'关闭', a_tea:'茶叶详情', a_nav:'网站栏目', filters_label:'茶叶分类筛选', skip:'跳到内容',
+    a_lang:'语言', a_close:'关闭', a_tea:'茶叶详情', a_nav:'网站栏目', a_account:'个人中心', filters_label:'茶叶分类筛选', skip:'跳到内容',
     alt_master:'茶艺师正把茶汤从茶海分入茶杯',
     alt_product:'茶器中展示的中国散茶',
     alt_logo:'Chaynya的标记：Ч、Н、Я三个字母叠成汉字的样子',
@@ -2126,17 +2087,17 @@ select.input{
     nav_home:'首页', nav_shop:'买茶', nav_b2b:'企业合作', nav_book:'订座',
     hero_label:'中国茶 · 俄罗斯境内配送',
     hero_h:'一杯让人<br>愿意一次次<br><em>回来品的茶</em>',
-    hero_lead:'我们只挑自己会喝、也会在Chaynya亲手冲泡的中国茶。可以买一小包试喝，也可以为家里组合一份订单；还可以先到店里坐下来认识这片茶叶。茶具也将稍后加入目录。',
-    cta_book:'到店试茶', cta_menu:'选茶',
+    hero_lead:'我们只挑自己会喝、也会在Chaynya亲手冲泡的中国茶。可以买一小包试喝，也可以为家里组合一份订单；还可以先到店里坐下来认识这款茶。',
+    cta_book:'预订茶席', cta_menu:'买茶',
     fact1_k:'茶品', fact1_v:TEA_META.length+'款', fact1_s:'从白茶到陈年黑茶',
-    fact2_k:'规格', fact2_v:'25 · 50 · 100克', fact2_s:'可以先从小包装开始',
+    fact2_k:'规格', fact2_v:'10 · 25 · 50 · 100克', fact2_s:'可以先从小包装开始',
     fact3_k:'配送', fact3_v:'CDEK', fact3_s:'莫斯科及俄罗斯全境',
     fact4_k:'到店品尝', fact4_v:'奥斯特里亚科娃街3号', fact4_s:'机场地铁站附近',
-    svc_label:'茶服务', svc_h:'不只是在家<br>喝一杯茶',
-    svc_lead:'如果您想亲身感受茶叶，而不只是收取配送，可以来茶馆与茶艺师同席，也可以邀请我们到您的活动现场。',
-    svc1_h:'茶艺师陪泡', svc1_price:'1500 ₽',
+    svc_label:'茶服务', svc_h:'茶会形式',
+    svc_lead:'',
+    svc1_h:'茶艺师陪泡', svc1_price:'每位1500 ₽',
     svc1_p:'茶艺师全程为您服务：温杯、控时、分汤、讲解。第一次来，或者想认真了解，选这个。',
-    svc2_h:'自己冲泡', svc2_price:'1200 ₽',
+    svc2_h:'自己冲泡', svc2_price:'每位1200 ₽',
     svc2_p:'我们提供茶席、茶具、合适水温的热水，开场稍作指点。之后您自己泡，没人打扰。适合已经懂茶的客人。',
     svc_time:'2小时 · 2款茶',
     svc3_h:'外出茶会', svc3_p:'我们带着茶、茶具和茶艺师前往企业活动、发布会、婚礼或私人聚会。形式与人数会按活动定制。',
@@ -2147,28 +2108,28 @@ select.input{
     step2_h:'选茶', step2_p:'从我们的茶里挑两款。多数客人会选反差大的：先来清淡的，收尾用浓厚的。',
     step3_h:'冲泡', step3_p:'接着一轮一轮来：快注快出，倒入茶海，再分到各杯。每一泡时间渐长，味道不断变化。',
     step4_h:'看叶底', step4_p:'茶叶泡尽后，摊在碟子上细看。叶底能看出茶树长在哪里、工艺如何。',
-    fromcard_label:'选茶', fromcard_h:'可以先从<br>这三款开始',
-    fromcard_lead:'三种不同的入门方式：清爽白茶、个性鲜明的乌龙，以及容易入口的蜜香GABA。打开卡片，选择包装，购物车会完成其余计算。',
+    fromcard_label:'选茶', fromcard_h:'Chaynya推荐',
+    fromcard_lead:'我们建议从以下茶品开始您的品茶之旅：',
     fromcard_link:'完整目录 · '+TEA_META.length+'款',
     hall_label:'茶室', hall_h:'坐在哪里',
     hall_lead:'订座即包下整场茶席。我们不拼桌，也绝不催客。',
-    hall_h3:'一间茶室，九个座位',
-    hall_p1:'矮桌、暖灯、朝院子的窗。九人以内可以包下整间：生日聚会和安静的会面都在这里进行。',
-    hall_p2:'超过九位请提前来电，我们想办法。',
-    hall_m1:'9个座位', hall_m2:'无订金', hall_m3:'货架上的茶可带走',
+    hall_h3:'一间茶室，七个座位',
+    hall_p1:'舒适而私密的空间，适合小型聚会。七位客人即可包下整间茶室，适合生日和安静的会面。',
+    hall_p2:'',
+    hall_m1:'7个座位', hall_m2:'无需订金', hall_m3:'茶叶可外带',
     hall_cta:'选时间',
     visit_label:'如何前往', visit_h:'奥斯特里亚科娃街<br>茶室',
     visit_lead:'欢迎来店选购茶叶，或坐下来喝一席茶。地图标记可直接带您到店。',
     visit_address_label:'地址', visit_address:'莫斯科奥斯特里亚科娃街3号', visit_place:'一层 · 114室',
-    visit_metro_label:'地铁', visit_metro:'机场站', visit_hours_label:'营业时间', visit_hours:'每天 12:00–22:00',
+    visit_metro_label:'地铁', visit_metro:'机场站', visit_hours_label:'营业时间', visit_hours:'<span class="visit__hours-line">每天</span><span class="visit__hours-line num">12:00–22:00</span>',
     visit_route:'规划路线', visit_open:'在Yandex地图中打开', visit_map_title:'莫斯科茶室地图',
     shop_label:'买茶', shop_h:'与店里<br>同一份茶叶',
-    shop_lead:'这里的茶是带回家的：按25、50、100克分装，快递寄出。若您是来店里坐茶席，茶不必另付：两款任选已含在价内。',
+    shop_lead:'这里的茶是带回家的：按10、25、50、100克分装，快递寄出。若您是来店里坐茶席，茶不必另付：两款任选已含在价内。',
     shop_foot:'分装价格按每10克的价格折算。紧压茶整件出售：小青柑和小金砖论个，茶饼可另询。', shop_count:'当前选择',
     shop_search_label:'搜索茶叶目录', shop_search_ph:'名称、产地或风味', shop_sort_label:'排序', shop_empty:'没有找到符合条件的茶。请尝试其他名称或重置筛选。',
     shop_sort_default:'推荐优先', shop_sort_price_asc:'价格从低到高', shop_sort_price_desc:'价格从高到低', shop_sort_name:'按名称',
     types:['全部','白茶','绿茶','佳叶龙茶','闽南乌龙','广东乌龙','武夷岩茶','红茶','生普洱','熟普洱','黑茶','花草与配料'],
-    more:'详情', per_pc:'每个', per_pack25:'25克装', gram:'克',
+    more:'详情', per_pc:'每个', per_pack25:'10克装', gram:'克',
     fav_label:'加入收藏', filter_fav:'收藏', fav_empty:'您用爱心标记的茶会显示在这里。',
     taste_h:'风味特征', in_stock:'现货', oos:'暂时售罄',
     unit_pc:'一个', unit_pack:'{g}克装',
@@ -2192,7 +2153,7 @@ select.input{
     cart_quote_loading:'CDEK正在计算运费…',
     cart_quote_ready:(a,min,max)=>`CDEK · ${a} · ${min===max?min:`${min}–${max}`}天`,
     cart_quote_error:'无法计算运费，请检查城市或重试。',
-    privacy_accept:'我同意按照以下条款处理个人数据：', privacy_link:'隐私政策', legal_link:'商家信息与条款', privacy_required:'请同意个人数据处理条款',
+    privacy_accept:'我同意按照以下条款处理个人数据：', privacy_link:'隐私政策', privacy_link_footer:'隐私政策', legal_link:'商家信息与条款', privacy_required:'请同意个人数据处理条款',
     cart_phone_required:'请填写完整的电话号码，以便我们确认订单。', cart_city_required:'请填写配送城市。',
     cart_pvz_required:'请从提示中选择CDEK自提点。', cart_addr_required:'请填写配送地址。',
     cart_catalog_checking:'正在核对价格和库存…',
@@ -2219,16 +2180,16 @@ select.input{
     b2b_form_h:'提交申请', b2b_form_sub:'一个工作日内回复',
     b_company:'公司或活动', b_company_ph:'「清晨」咖啡馆或夏季婚礼',
     b_name:'怎么称呼您', b_phone:'电话或Telegram', b_phone_ph:'+7 或 @用户名',
-    b_note:'您需要什么', b_note_ph:'办公室供茶，或为40位宾客举办外出茶会。',
+    b_note:'您的需求', b_note_ph:'办公室供茶，或为40位宾客举办外出茶会。',
     b2b_send:'发送', b2b_contact_required:'请填写电话号码或 Telegram 用户名，以便我们回复。',
     b2b_form_note:'申请将通过 Telegram 发送给店主。我们将在一个工作日内回复。',
     b2b_done_h:'申请已收到', b2b_done_back:'看茶',
     b2bDoneText:(name) => `${name ? name + '，' : ''}我们将在一个工作日内回复。`,
     book_label:'订座', book_h:'订一张茶桌',
-    book_lead:'请选择形式、日期和时间。店主会直接从网站收到申请，并联系您确认茶席。',
+    book_lead:'请选择形式、日期和可用时间。每份申请都会占用店内唯一茶席两小时。',
     f_format:'形式',
-    fmt_master:'茶艺师主泡', fmt_master_d:'茶艺师亲自冲泡、掌席',
-    fmt_self:'自助冲泡', fmt_self_d:'我们提供茶具和用水，您自己泡',
+    fmt_master:'茶艺师主泡', fmt_master_d:'茶艺师亲自冲泡、掌席', fmt_master_price:'每位1500 ₽',
+    fmt_self:'自助冲泡', fmt_self_d:'我们提供茶具和用水，您自己泡', fmt_self_price:'每位1200 ₽',
     fmt_incl:'两种价格均已含两款自选茶。第三款可在现场按需加点。',
     f_date:'日期', today:'今天', tomorrow:'明天', f_time:'入座时间', f_guests:'人数',
     f_name:'称呼', f_name_ph:'怎么称呼您', f_phone:'电话',
@@ -2239,13 +2200,15 @@ select.input{
     book_btn_wait:'请选择日期和时间', book_btn_go:'提交预订申请',
     booking_phone_required:'请填写完整的电话号码，以便我们确认预订。',
     booking_sending:'正在发送申请…', booking_error:'申请发送失败，请检查网络后重试。',
+    booking_slots_loading:'正在查询可用时间…', booking_slots_error:'无法查询排期，请刷新页面或致电我们。',
+    booking_slot_busy:'该时段不可用', booking_slot_taken:'该时段刚刚被预订，请选择其他可用时间。',
     or:'或者', book_call:'致电：+7 905 590-88-01',
     msg_hi:'您好！我想在Chaynya订一张茶桌。',
-    sum_note:'现在无需付款。店主会收到申请、联系您并确认时间；如该时段已满，会推荐相邻时段。',
+    sum_note:'现在无需付款。提交后该时段将为您的申请保留，店主会联系您并确认预订。',
     done_h:'申请已发送', done_back:'回首页',
-    guests:['1位','2位','3位','4位','5位','6位','7位','8位','9位（包场）'],
+    guests:['1位','2位','3位','4位','5位','6位','7位（包场）'],
     doneText:({ name, dateStr, time, id }) =>
-      `${name ? name + '，' : ''}${dateStr} ${time}的申请已收到。申请编号：${id}。我们会联系您确认时间。`,
+      `${name ? name + '，' : ''}${dateStr} ${time}的申请已收到，该时段已保留。申请编号：${id}。我们会联系您确认预订。`,
     foot_desc:'奥斯特里亚科娃街上的茶馆。中国茶叶、茶艺师，从不催客。',
     foot_addr_h:'地址', foot_addr1:'莫斯科，奥斯特里亚科娃街3号', foot_addr2:'一层114号铺', foot_addr3:'机场地铁站',
     foot_contact_h:'联系', foot_bot:'机器人：@chainyabot', foot_tg:'频道：@chainyamsk', foot_phone:'+7 (905) 590-88-01', foot_ya:'在Yandex地图上找到我们',
@@ -2276,7 +2239,6 @@ select.input{
       bingdao:{ n:'熟普 宫廷冰岛古树', o:'普洱 · 冰岛 · 古树', d:'宫廷指最细最净的芽头。冰岛是临沧的一个村子，这三个字印在棉纸上太值钱，所以常常印得并不名副其实。柔和回甘，没有一丝土味。' },
       nuomixiang:{ n:'糯香小金砖', o:'普洱 · 单泡小砖', d:'里面没有一粒米：香气来自西双版纳的糯米香叶，与普洱一同压制。是真叶子，不是香精。剥开锡纸，整块投入即可。' },
       jinhuawang:{ n:'金花王 2002', o:'黑茶 · 安化 · 陈化', d:'2002年的安化黑茶。「金花」是特意在茶里养出来的菌：它带来果脯般的香气，也带来那股地窖与旧图书馆的味道。' },
-      herbal:{ n:'草本「提神」茶', o:'无咖啡因 · 草药与玫瑰果', d:'草药、花与玫瑰果，完全不含茶叶。零咖啡因，却照样提神。适合不能喝茶的客人，或已经太晚不宜喝茶的时候。' },
       molisiaobaiya:{ n:"茉莉小白芽", o:"茉莉花茶（绿茶）· 中国福建 / 广西 · 银毫嫩芽", d:"以披着银毫的细嫩芽头为底的绿茶，用鲜茉莉花窨制而成：将鲜花与茶坯层层相叠，反复几次让芽头吸香，之后再把花挑出。香气是干净的茉莉花香，不腻不冲。滋味在清淡的绿茶底上带柔和的花香甜意，几乎没有苦涩。风格安静细腻，可以经得起数泡。" },
       biluochun:{ n:"碧螺春", o:"绿茶 · 苏州洞庭（江苏） · 满披白毫的螺形", d:"太湖之滨洞庭山的手工绿茶，芽叶纤细、卷曲成螺，满身银毫，正是有名的洞庭碧螺春。茶树与枇杷、杨梅、桃李等果树交错种植，鲜叶在枝头就带上了天然的花果香。茶汤清鲜甘甜，花香清晰，尾调略带果酸，几乎没有生涩的青草气。冲泡水温不宜太高，八十度左右为佳，否则嫩芽容易发苦。" },
       dancongmilan:{ n:"凤凰单丛 蜜兰香", o:"乌龙 · 广东潮州凤凰山 · 蜜兰花香", d:"凤凰单丛中的蜜兰香，名字意为蜜与兰花的香气。干香与茶汤里是熟黄李和蜂蜜，衬着兰花香；入口是浓厚的蜜甜，带着单丛特有的微苦，很快化开成悠长的花香回甘。茶树长在潮州凤凰山，茶农不修剪茶树，鲜叶按单株采摘。轻炭焙让果香更突出，而不会盖过它。" },
@@ -2412,8 +2374,8 @@ select.input{
 
   /* ─────────────  TELEGRAM MINI APP  ─────────────
      Тот же сайт, открытый ботом внутри телеграма. Если мы там — фиксируем
-     фирменный фон, разворачиваем на весь экран, ведём нативную кнопку «назад» и шлём
-     бронь прямо в бота (sendData), а не открываем чат. В обычном браузере
+     фирменный фон, разворачиваем на весь экран и ведём нативную кнопку «назад».
+     Бронь всегда проходит через единый серверный календарь. В обычном браузере
      window.Telegram.WebApp тоже есть, но platform='unknown' — тогда всё это
      выключено и сайт работает как обычно. */
   let TG = null, IN_TG = false, telegramBackBound = false;
@@ -2585,7 +2547,7 @@ select.input{
   /* Полоса ассортимента на вкладке опта: по одному чаю каждого типа */
   function buildRange(){
     const strip = $('#brange');
-    if (strip.childElementCount) return;
+    strip.replaceChildren();
     const seen = new Set(), pick = [];
     for (const m of TEA_META){
       if (pick.length >= 8) break;
@@ -2687,10 +2649,25 @@ select.input{
     applyFilter();
   }
 
-  /* Backend считает заказ по teas.json. Встроенный каталог нужен для быстрой
-     отрисовки и чтения, но checkout разрешаем только после свежей сверки:
-     покупатель не должен увидеть устаревшую цену или наличие. */
+  /* Встроенный каталог — мгновенный безопасный fallback. После ответа backend
+     заменяем его целиком: так новые позиции, тексты, фото, порядок и наличие из
+     панели владельца появляются на витрине без нового релиза сайта. */
   let catalogRefreshPending = null;
+  function syncCatalogCounters(){
+    I18N.ru.fact1_v = TEA_META.length+' позиции';
+    I18N.ru.fromcard_link = 'Весь каталог · '+TEA_META.length;
+    I18N.en.fact1_v = TEA_META.length+' teas';
+    I18N.en.fromcard_link = 'Full catalogue · '+TEA_META.length;
+    I18N.zh.fact1_v = TEA_META.length+'款';
+    I18N.zh.fromcard_link = '完整目录 · '+TEA_META.length+'款';
+    $$('[data-i18n="fact1_v"], [data-i18n="fromcard_link"]').forEach(node => {
+      const value = T()[node.dataset.i18n];
+      if (value != null) node.textContent = value;
+    });
+  }
+  function validCatalogImage(value){
+    return typeof value === 'string' && (/^\/img\/[A-Za-z0-9_-]+\.webp$/.test(value) || /^\/catalog-media\/[a-f0-9]{32}\.webp$/.test(value));
+  }
   function refreshCatalog(){
     if (catalogRefreshPending) return catalogRefreshPending;
     catalogRefreshPending = (async () => {
@@ -2701,29 +2678,42 @@ select.input{
         if (!response.ok) throw new Error('catalog_http');
         const data = await response.json();
         if (!Array.isArray(data.teas) || !data.teas.length) throw new Error('catalog_payload');
-        let changed = false;
-        const live = new Map(data.teas.map(item => [item.id,item]));
-        TEA_META.forEach(tea => {
-          const item = live.get(tea.id);
-          const stock = Boolean(item && item.stock);
-          if (!item){
-            if (inStock(tea)){ tea.stock = false; changed = true; }
-            return;
+        if (!Array.isArray(data.packs) || !data.packs.length || data.packs.some(pack => !Number.isInteger(pack) || pack <= 0 || pack > 1000)) throw new Error('catalog_packs');
+        PACKS = [...new Set(data.packs)].sort((a,b) => a-b);
+        const languages = ['ru','en','zh'], seen = new Set(), next = [];
+        for (const item of data.teas){
+          if (!item || !/^[a-z0-9][a-z0-9-]{0,79}$/.test(item.id) || seen.has(item.id)) throw new Error('catalog_item');
+          if (!TYPE_IDS.includes(item.type) || !Number.isInteger(item.price) || item.price < 0 || !['g','pc'].includes(item.unit)) throw new Error('catalog_item');
+          if (!validCatalogImage(item.image_url) || !item.taste || !item.translations) throw new Error('catalog_item');
+          for (const language of languages){
+            const text = item.translations[language];
+            if (!text || typeof text.name !== 'string' || !text.name.trim() || typeof text.orig !== 'string' || typeof text.desc !== 'string') throw new Error('catalog_translation');
           }
-          if (tea.p !== item.price || tea.unit !== item.unit || inStock(tea) !== stock){
-            tea.p = item.price;
-            tea.unit = item.unit;
-            tea.stock = stock;
-            changed = true;
-          }
-        });
-        if (changed){
-          buildTeaGrids();
-          syncCart();
-          // Карточка могла открыться раньше ответа API. Обновляем её на месте,
-          // чтобы цена, фасовка и кнопка наличия всегда совпадали с backend.
-          if (curTea && sheet.classList.contains('on')) openTea(curTea, false);
+          seen.add(item.id);
+          next.push({id:item.id,t:item.type,p:item.price,unit:item.unit,stock:Boolean(item.stock),img:item.image_url});
         }
+        if (!next.length) throw new Error('catalog_empty');
+        TEA_META.splice(0,TEA_META.length,...next);
+        for (const id of Object.keys(TASTE)) if (!seen.has(id)) delete TASTE[id];
+        for (const item of data.teas){
+          TASTE[item.id] = item.taste;
+          for (const language of languages){
+            const text = item.translations[language];
+            I18N[language].teas[item.id] = {n:text.name,o:text.orig,d:text.desc};
+          }
+        }
+        for (const language of languages){
+          for (const id of Object.keys(I18N[language].teas)) if (!seen.has(id)) delete I18N[language].teas[id];
+        }
+        syncCatalogCounters();
+        buildRange();
+        buildTeaGrids();
+        syncCart();
+        if (curTea && sheet.classList.contains('on')){
+          curTea = TEA_META.find(item => item.id === curTea.id) || null;
+          if (curTea) openTea(curTea, false); else closeTea(false);
+        }
+        catalogLastSuccess = Date.now();
         return true;
       }catch(e){
         return false;
@@ -2815,7 +2805,7 @@ select.input{
   /* ─────────────  ПАСПОРТ ЧАЯ  ─────────────
      Фасовка: цена считается пропорционально цене за 10 г. Если у чайной есть
      скидка за объём — заменить PACKS на настоящий прайс. */
-  const PACKS = [25, 50, 100];
+  let PACKS = [10, 25, 50, 100];
   const sheet = $('#tea-sheet');
 
   /* Блокировка фона под открытой панелью.
@@ -2837,7 +2827,7 @@ select.input{
   }
 
   // Что сейчас открыто в паспорте — чтобы «В корзину» знал, что и в какой фасовке
-  // добавить. curPack: граммовка (25/50/100) или 'pc' для штучных (мандарин).
+  // добавить. curPack: граммовка (10/25/50/100) или 'pc' для штучных (мандарин).
   let curTea = null, curPack = null;
 
   function openTea(m, updateHistory=true){
@@ -3487,7 +3477,7 @@ select.input{
   const B = { format:'master', date:'', time:'', guests:'2' };
 
   // Цена универсальна (рубли), название — из словаря. Это ядро модели заведения.
-  const FMT = { master:'1500 ₽', self:'1200 ₽' };
+  const fmtPrice = () => B.format === 'master' ? T().fmt_master_price : T().fmt_self_price;
   const fmtName = () => B.format === 'master' ? T().fmt_master : T().fmt_self;
 
   $$('#fmt .fmt__opt').forEach(o => o.addEventListener('click', () => {
@@ -3529,6 +3519,7 @@ select.input{
       </button>`);
       b.addEventListener('click', () => {
         B.date = key;
+        B.time = '';
         $$('.day', box).forEach(x => x.setAttribute('aria-pressed', x === b));
         refreshSlots(); sync();
       });
@@ -3540,9 +3531,8 @@ select.input{
   }
 
   const slots = $('#slots');
-  // Часы настоящие: 12:00–22:00, последняя посадка в 20:00. Занятость не
-  // выдумываем — свободные слоты подтверждает хозяин при ответе (см. sum_note);
-  // фиктивное «занято» только отпугнуло бы от реально свободного времени.
+  // Часы настоящие: 12:00–22:00, последняя посадка в 20:00. Каждая заявка
+  // занимает стол на два часа, поэтому доступность всегда получаем с сервера.
   for (let m = 12 * 60; m <= 20 * 60; m += 30){
     const time = `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
     const b = el(`<button class="slot num" type="button" data-t="${time}" aria-pressed="false">${time}</button>`);
@@ -3554,20 +3544,57 @@ select.input{
     slots.append(b);
   }
 
-  // На сегодняшнюю дату прошедшее время выбрать нельзя
-  function refreshSlots(){
-    const now = moscowParts();
-    const isToday = B.date === `${now.year}-${now.month}-${now.day}`;
-    const cutoff = Number(now.hour) * 60 + Number(now.minute);
-    $$('.slot', slots).forEach(s => {
-      const [h, m] = s.dataset.t.split(':').map(Number);
-      const past = isToday && h * 60 + m <= cutoff;
-      s.disabled = past;
-      if (past && s.getAttribute('aria-pressed') === 'true'){
-        s.setAttribute('aria-pressed', 'false');
-        B.time = '';
+  let availabilitySequence = 0;
+  async function refreshSlots(){
+    const sequence = ++availabilitySequence;
+    const status = $('#f-status');
+    if (!B.date){
+      $$('.slot', slots).forEach(s => {
+        s.disabled = true;
+        s.removeAttribute('title');
+        s.setAttribute('aria-pressed','false');
+      });
+      B.time = '';
+      slots.removeAttribute('aria-busy');
+      sync();
+      return;
+    }
+    slots.setAttribute('aria-busy','true');
+    $$('.slot', slots).forEach(s => { s.disabled = true; });
+    status.textContent = T().booking_slots_loading;
+    try{
+      const response = await fetch(`/api/bookings/availability?date=${encodeURIComponent(B.date)}`,{
+        headers:{'Accept':'application/json'}, cache:'no-store',
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !Array.isArray(result.slots)) throw new Error();
+      if (sequence !== availabilitySequence) return;
+      const available = new Map(result.slots.map(slot => [slot.time, slot.available === true]));
+      $$('.slot', slots).forEach(s => {
+        const open = available.get(s.dataset.t) === true;
+        s.disabled = !open;
+        s.title = open ? '' : T().booking_slot_busy;
+        s.setAttribute('aria-label', open ? s.dataset.t : `${s.dataset.t} — ${T().booking_slot_busy}`);
+        if (!open && s.getAttribute('aria-pressed') === 'true'){
+          s.setAttribute('aria-pressed','false');
+          B.time = '';
+        }
+      });
+      status.textContent = '';
+    }catch(e){
+      if (sequence !== availabilitySequence) return;
+      B.time = '';
+      $$('.slot', slots).forEach(s => {
+        s.disabled = true;
+        s.setAttribute('aria-pressed','false');
+      });
+      status.textContent = T().booking_slots_error;
+    }finally{
+      if (sequence === availabilitySequence){
+        slots.removeAttribute('aria-busy');
+        sync();
       }
-    });
+    }
   }
 
   function buildGuests(){
@@ -3588,7 +3615,7 @@ select.input{
   };
 
   function sync(){
-    $('#s-format').textContent = `${fmtName()} · ${FMT[B.format]}`;
+    $('#s-format').textContent = `${fmtName()} · ${fmtPrice()}`;
     $('#s-date').textContent = fmtDate(B.date);
     $('#s-time').textContent = B.time || '—';
     $('#s-guests').textContent = B.guests;
@@ -3697,11 +3724,23 @@ select.input{
         body:fingerprint,
       });
       bookingResult = await response.json().catch(() => ({}));
+      if (response.status === 409){
+        const conflict = new Error('slot-taken');
+        conflict.slotTaken = true;
+        throw conflict;
+      }
       if (!response.ok || !bookingResult.id) throw new Error();
     }catch(e){
-      status.textContent = T().booking_error;
+      if (e.slotTaken){
+        B.time = '';
+        $$('.slot', slots).forEach(s => s.setAttribute('aria-pressed','false'));
+        await refreshSlots();
+        status.textContent = T().booking_slot_taken;
+      }else{
+        status.textContent = T().booking_error;
+      }
       submit.disabled = false;
-      submit.textContent = T().book_btn_go;
+      submit.textContent = B.time ? T().book_btn_go : T().book_btn_wait;
       return;
     }
     track('booking_sent','book');
@@ -3831,7 +3870,13 @@ select.input{
   }
   addEventListener('scroll', scheduleReveal, { passive: true });
   addEventListener('resize', scheduleReveal, { passive: true });
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) scheduleReveal(); });
+  let catalogLastSuccess = 0;
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden){
+      scheduleReveal();
+      if (Date.now() - catalogLastSuccess > 60000) refreshCatalog();
+    }
+  });
 
   function applyLang(){
     document.documentElement.lang = LANG;
@@ -3845,6 +3890,7 @@ select.input{
     $$('[data-i18n-title]').forEach(n => { const v = T()[n.dataset.i18nTitle]; if (v != null) n.title = v; });
     $$('a[href^="/privacy.html"]').forEach(a => { a.href = `/privacy.html?lang=${LANG}`; });
     $$('a[href^="/legal.html"]').forEach(a => { a.href = `/legal.html?lang=${LANG}`; });
+    $('#account-open').href = `/account?lang=${LANG}`;
     selectHeroImage();
     buildRange();
     buildFilters();
@@ -3852,6 +3898,7 @@ select.input{
     buildTeaGrids();
     buildDays();
     buildGuests();
+    refreshSlots();
     closeTea();
     syncCart();
     setupReveals();
@@ -3868,12 +3915,32 @@ select.input{
     applyLang();
   }));
 
+  async function hydrateCustomerAccount(){
+    try{
+      const response = await fetch('/api/account',{cache:'no-store'});
+      if (!response.ok) return;
+      const data = await response.json(), profile = data.account || {};
+      ['#c-name','#f-name','#b-name'].forEach(selector => {
+        const field = $(selector);
+        if (field && !field.value && profile.name) field.value = profile.name;
+      });
+      ['#c-phone','#f-phone','#b-phone'].forEach(selector => {
+        const field = $(selector);
+        if (!field || field.value || !profile.phone) return;
+        field.value = profile.phone;
+        field.dispatchEvent(new Event('input',{bubbles:true}));
+      });
+    }catch(e){}
+  }
+
   const initialAnalyticsSection = (() => {
     const raw = location.hash.replace('#','').split('-')[0] || PATH_VIEWS[location.pathname.replace(/\/$/,'') || '/'] || 'home';
     return ['home','shop','tea','cart','book','b2b','payment'].includes(raw) ? raw : 'home';
   })();
   applyLang();
+  hydrateCustomerAccount();
   refreshCatalog();
+  setInterval(refreshCatalog, 5 * 60 * 1000);
   track('page_view', initialAnalyticsSection);
   goFromLocation();
   compactNav();

@@ -424,8 +424,7 @@ sudo "$backend_release/.venv/bin/pip" install -q \
   -r "$backend_release/backend/requirements.txt"
 (
   cd "$backend_release"
-sudo env CHAINYA_CATALOG_PATH="$backend_release/teas.json" \
-    "$backend_release/.venv/bin/python" -m pytest -q backend/tests
+sudo "$backend_release/.venv/bin/python" -m pytest -q backend/tests
 )
 sudo chown -R root:root "$backend_release"
 sudo chmod -R a+rX "$backend_release"

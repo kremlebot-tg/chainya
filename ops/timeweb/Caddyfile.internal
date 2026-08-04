@@ -1,0 +1,89 @@
+{
+	admin off
+	auto_https off
+}
+
+(chainya_origin) {
+	reverse_proxy https://79.137.194.101 {
+		transport http {
+			tls_server_name chainya.ru
+		}
+		header_up Host chainya.ru
+		header_up X-Forwarded-Proto {http.request.header.X-Forwarded-Proto}
+		header_up X-Forwarded-For {http.request.header.X-Forwarded-For}
+		header_up X-Real-IP {http.request.header.X-Forwarded-For}
+	}
+}
+
+http://127.0.0.1:8078 {
+	encode zstd gzip
+	root * /var/www/chainya
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src https://yandex.ru; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'"
+		-Server
+	}
+
+	@sensitive path_regexp sensitive (?i)(^|/)(?:\.env(?:\..*)?|\.git(?:/|$)|\.DS_Store$|\._[^/]*$|__pycache__(?:/|$)|README(?:\.[^/]*)?$)
+	respond @sensitive 404
+
+	@sensitiveExtension path_regexp sensitiveExtension (?i)\.(?:py|pyc|zip|tar|gz|sql|sqlite|sqlite3|db|bak|backup|old)$
+	respond @sensitiveExtension 404
+
+	@testPay path_regexp testPay ^/api/orders/[^/]+/test-pay/?$
+	respond @testPay 404
+	respond /test-payment/* 404
+
+	@catalogManage path /manage/catalog /manage/catalog/
+	handle @catalogManage {
+		header {
+			Cache-Control "no-store"
+			Referrer-Policy "no-referrer"
+			X-Robots-Tag "noindex, nofollow"
+			Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'"
+		}
+		import chainya_origin
+	}
+
+	@private path /payment/* /account /account/ /admin/* /manage /manage/
+	handle @private {
+		header {
+			Cache-Control "no-store"
+			Referrer-Policy "no-referrer"
+			X-Robots-Tag "noindex, nofollow"
+			Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'"
+		}
+		import chainya_origin
+	}
+
+	@api path /api/* /catalog-media/*
+	handle @api {
+		header Cache-Control "no-store"
+		import chainya_origin
+	}
+
+	redir /index.html / 308
+	redir /shop/ /shop 308
+	redir /business/ /business 308
+	redir /booking/ /booking 308
+
+	@publicApp path / /shop /business /booking
+	handle @publicApp {
+		header Cache-Control "no-cache"
+		try_files {path}/index.html /index.html
+		file_server
+	}
+
+	handle {
+		file_server
+	}
+
+	handle_errors {
+		rewrite * /404.html
+		file_server
+	}
+}

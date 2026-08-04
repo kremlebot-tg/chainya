@@ -1,0 +1,20 @@
+services:
+  edge:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    network_mode: host
+    read_only: true
+    tmpfs:
+      - /config:size=8m,mode=0700
+      - /data:size=8m,mode=0700
+    volumes:
+      - ./Caddyfile.internal:/etc/caddy/Caddyfile:ro
+      - /var/www:/var/www:ro
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8078/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

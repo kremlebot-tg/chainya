@@ -1,0 +1,8 @@
+# Добавляется к существующему внешнему Caddyfile Re-dnd Scout.
+www.chainya.ru {
+  redir https://chainya.ru{uri} permanent
+}
+
+chainya.ru {
+  reverse_proxy 127.0.0.1:8078
+}

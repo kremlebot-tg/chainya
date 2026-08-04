@@ -36,6 +36,10 @@ def test_catalog_admin_create_update_reorder_and_conflict(tmp_path, monkeypatch)
             language: {
                 **translation,
                 "name": {"ru": "Новый чай", "en": "New tea", "zh": "新茶"}[language],
+                "composition": {"ru": "Чайный лист", "en": "Tea leaves", "zh": "茶叶"}[language],
+                "manufacturer": "ИП Давтян А. К.",
+                "shelf_life": "24 месяца",
+                "storage": "Хранить в сухом месте",
             }
             for language, translation in item["translations"].items()
         }
@@ -77,7 +81,11 @@ def test_catalog_admin_create_update_reorder_and_conflict(tmp_path, monkeypatch)
     assert initial_response.status_code == 200
     assert missing_csrf.status_code == 403
     assert created_response.status_code == 201
-    assert any(tea["id"] == "new-safe-tea" for tea in public["teas"])
+    public_item = next(tea for tea in public["teas"] if tea["id"] == "new-safe-tea")
+    assert public_item["translations"]["ru"]["composition"] == "Чайный лист"
+    assert public_item["translations"]["ru"]["manufacturer"] == "ИП Давтян А. К."
+    assert public_item["translations"]["ru"]["shelf_life"] == "24 месяца"
+    assert public_item["translations"]["ru"]["storage"] == "Хранить в сухом месте"
     assert stale.status_code == 409
     assert hidden_response.status_code == 200
     assert reordered.status_code == 200

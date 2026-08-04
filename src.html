@@ -433,6 +433,10 @@ h1, h2, h3, p{ text-wrap:pretty; }
 .sheet__art img{ width:100%; height:100%; object-fit:cover; }
 .ts-orig{ margin:0; font-size:13.5px; color:var(--text-3); }
 .ts-desc{ margin:14px 0 0; font-size:15px; line-height:1.62; color:var(--text-2); }
+.ts-food{margin-top:22px;padding-top:18px;border-top:1px solid var(--line)}
+.ts-food__h{margin:0 0 12px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-3)}
+.ts-food__row{display:grid;grid-template-columns:minmax(110px,.7fr) minmax(0,1.3fr);gap:14px;padding:9px 0;border-bottom:1px solid color-mix(in srgb,var(--line) 65%,transparent);font-size:13px;line-height:1.5}
+.ts-food__row:last-child{border-bottom:0}.ts-food__row dt{color:var(--text-3)}.ts-food__row dd{margin:0;color:var(--text-2);overflow-wrap:anywhere}
 
 /* Статус наличия в паспорте: спокойная плашка, «нет» — акцентом */
 .ts-meta{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
@@ -1434,6 +1438,10 @@ select.input{
     <div class="sheet__art"><img id="ts-img" alt="" loading="lazy" width="800" height="800"></div>
     <div class="ts-meta"><span class="ts-stock" id="ts-stock"></span><p class="ts-orig" id="ts-orig"></p></div>
     <p class="ts-desc" id="ts-desc"></p>
+    <section class="ts-food" id="ts-food" hidden aria-labelledby="ts-food-title">
+      <h3 class="ts-food__h" id="ts-food-title" data-i18n="food_info_h">Информация о товаре</h3>
+      <dl id="ts-food-rows"></dl>
+    </section>
     <div class="ts-taste" id="ts-taste" hidden>
       <h3 class="ts-taste__h" data-i18n="taste_h">Вкусовой профиль</h3>
       <div class="ts-profile" id="ts-profile"></div>
@@ -1674,8 +1682,11 @@ select.input{
 
   ru: {
     locale:'ru-RU',
+    og_locale:'ru_RU',
     title:'Чайня · китайский чай с доставкой',
     route_titles:{home:'Чайня · китайский чай с доставкой',shop:'Купить китайский чай · Чайня',b2b:'Чай для бизнеса и мероприятий · Чайня',book:'Бронь чайной церемонии · Чайня'},
+    route_descriptions:{home:'Китайский чай с доставкой по Москве и России: белый, зелёный, улуны, красный чай, пуэр и авторские сборы. Чайная на Острякова, 3.',shop:'Китайский чай в пакетах 10, 25, 50 и 100 г с доставкой СДЭК по Москве и России.',b2b:'Поставки китайского чая для бизнеса и выездные чайные церемонии в Москве.',book:'Забронируйте чайную церемонию с мастером или самостоятельное чаепитие на Острякова, 3.'},
+    food_info_h:'Информация о товаре', food_composition:'Состав', food_manufacturer:'Изготовитель и упаковщик', food_shelf_life:'Срок годности', food_storage:'Условия хранения',
     a_lang:'Язык', a_close:'Закрыть', a_tea:'О чае', a_nav:'Разделы сайта', a_account:'Личный кабинет', filters_label:'Фильтры каталога', skip:'Перейти к содержимому',
     alt_master:'Чайный мастер разливает настой из чахая по чашкам',
     alt_product:'Сухой китайский чай в чайной посуде',
@@ -1850,14 +1861,17 @@ select.input{
       yeshenghong:{ n:"Е Шэн Хун", o:"Красный · Юньнань · дикорастущие деревья", d:"Красный чай с дикорастущих деревьев Юньнани, из того самого пурпурнолистного сорта е шэн. В аромате тёмные ягоды и печёная слива, во вкусе спелые косточковые фрукты, чернослив и медовая сладость, на фоне тянется смолистая древесная нота. Настой плотный, тёмно-янтарный, послевкусие чистое и сладкое." },
       shengchenxiang:{ n:"Шэн Пуэр «Чэнсян» 2020", o:"Шэн пуэр · Юньнань · 2020 год, начинает стареть", d:"Молодой сырой пуэр 2020 года. По чайным меркам он ещё подросток, но выдержка уже проступает, и имя Чэнсян как раз про аромат старения. В сухом листе зелень и сено, в настое много юньнаньской горчинки с вяжущестью, которая быстро оборачивается сладостью и медовым хвостом. Тело плотное, ближе к последним проливам вылезают сухофрукты и тёплое дерево. Заваривайте проливами водой около 90 °C, первый пролив слейте." },
       osmanthus:{ n:"Османтус", o:"Цветочный настой · Гуйлинь, Гуанси · сушёные цветки, не чайный лист", d:"Сушёные золотистые цветки коричника душистого, они же гуй хуа. В аромате спелый абрикос и персик со сливочно-медовой сладостью, настой выходит чистый и мягкий, с лёгким хвостиком сушёного абрикоса в конце. Заваривают сами по себе или подмешивают щепоть к улуну или шу пуэру: цветок к ним хорошо ложится и не забивает чайную основу. Родина — Гуйлинь в Гуанси, где османтусом засажены целые улицы, оттого и название города переводится как «османтусовый лес»." },
-      vitamin:{ n:"Травяной сбор «Витаминный»", o:"Травяной сбор · без кофеина · ягодный", d:"Авторский травяной сбор чайной без кофеина, так что пить можно хоть на ночь и предложить детям. Во вкусе ягодная кислинка с лёгкой терпкостью, по аромату угадываются шиповник и облепиха, а следом идёт тёплый, почти луговой травяной тон. Кислосладкое послевкусие держится долго и хорошо утоляет жажду. Состав у нас свой, точный список трав лучше уточнить у хозяев." },
+      vitamin:{ n:"Травяной сбор «Витаминный»", o:"Травяной сбор · без кофеина · ягодный", d:"Авторский травяной сбор чайной без кофеина. Во вкусе ягодная кислинка с лёгкой терпкостью, затем появляются тёплые травяные ноты. Кисло-сладкое послевкусие держится долго; сбор можно пить как горячим, так и охлаждённым." },
     },
   },
 
   en: {
     locale:'en-GB',
+    og_locale:'en_GB',
     title:'Chaynya · Chinese tea delivered',
     route_titles:{home:'Chaynya · Chinese tea delivered',shop:'Buy Chinese tea · Chaynya',b2b:'Tea for business and events · Chaynya',book:'Book a tea ceremony · Chaynya'},
+    route_descriptions:{home:'Chinese tea delivered across Moscow and Russia: white, green, oolong, black tea, pu-erh and house herbal blends. Tea room at 3 Ostryakova Street.',shop:'Chinese tea in 10, 25, 50 and 100 g packs, delivered by CDEK across Moscow and Russia.',b2b:'Wholesale Chinese tea for businesses and off-site tea ceremonies in Moscow.',book:'Book a hosted tea ceremony or a private self-service tea session at 3 Ostryakova Street.'},
+    food_info_h:'Product information', food_composition:'Ingredients', food_manufacturer:'Producer and packer', food_shelf_life:'Shelf life', food_storage:'Storage conditions',
     a_lang:'Language', a_close:'Close', a_tea:'About the tea', a_nav:'Site sections', a_account:'Personal account', filters_label:'Catalogue filters', skip:'Skip to content',
     alt_master:'A tea master pouring the liquor from a pitcher into cups',
     alt_product:'Loose Chinese tea presented in tea ware',
@@ -2032,14 +2046,17 @@ select.input{
       yeshenghong:{ n:"Ye Sheng Hong (Wild Red)", o:"Black · Yunnan · wild-growing trees", d:"A black tea from wild-growing tea trees in Yunnan, made from the same purple-leaf 'ye sheng' varietal. The aroma carries dark berries and baked plum; the cup is ripe stone fruit, prune and honeyed sweetness, with a resinous, woody note underneath. The liquor is thick and dark amber, finishing clean and sweet." },
       shengchenxiang:{ n:"Sheng Pu-erh Chenxiang 2020", o:"Raw pu-erh · Yunnan · 2020, starting to age", d:"A young raw pu-erh from 2020. By tea standards it is still a teenager, but the years are beginning to show, and the name Chenxiang points exactly to that aged aroma. The dry leaf smells of greens and hay; the liquor still carries plenty of Yunnan bitterness and astringency that quickly turns to sweetness and a honeyed finish. The body is full, and toward the later infusions notes of dried fruit and warm wood come through. Brew it gongfu-style with water around 90°C and pour off the first rinse." },
       osmanthus:{ n:"Osmanthus (Gui Hua)", o:"Flower infusion · Guilin, Guangxi · dried blossoms, not tea leaf", d:"The tiny golden dried blossoms of sweet osmanthus, known as gui hua. The aroma is ripe apricot and peach with a creamy, honeyed sweetness; the infusion is clean and soft, trailing off into a faint dried-apricot note. Drink it on its own, or stir a pinch into an oolong or shu pu-erh, where it sits comfortably without burying the tea itself. It comes from Guilin in Guangxi, a city so planted with osmanthus that its name literally means “osmanthus forest”." },
-      vitamin:{ n:"\"Vitamin\" herbal blend", o:"Herbal blend · caffeine-free · berry", d:"Our own house herbal blend with no caffeine, so it's fine late in the evening and safe for kids. The taste is berry-bright and gently tart, with rosehip and sea buckthorn coming through in the aroma, followed by a warm, almost meadow-like herbal note. The sweet-and-sour finish lingers and quenches thirst well. The recipe is our own, so ask the staff for the exact herbs." },
+      vitamin:{ n:"\"Vitamin\" herbal blend", o:"Herbal blend · caffeine-free · berry", d:"Our own caffeine-free herbal blend. The taste is berry-bright and gently tart, followed by warm herbal notes. Its sweet-and-sour finish lingers; the blend can be served hot or chilled." },
     },
   },
 
   zh: {
     locale:'zh-CN',
+    og_locale:'zh_CN',
     title:'Chaynya · 中国茶配送',
     route_titles:{home:'Chaynya · 中国茶配送',shop:'购买中国茶 · Chaynya',b2b:'企业与活动用茶 · Chaynya',book:'预约茶会 · Chaynya'},
+    route_descriptions:{home:'中国茶配送至莫斯科及俄罗斯各地：白茶、绿茶、乌龙茶、红茶、普洱茶和自制草本拼配。茶室位于奥斯特里亚科娃街3号。',shop:'中国茶提供10克、25克、50克和100克包装，由CDEK配送至莫斯科及俄罗斯各地。',b2b:'为企业提供中国茶批发，并在莫斯科承办外出茶会。',book:'预约茶艺师主持的茶会，或在奥斯特里亚科娃街3号自行泡茶。'},
+    food_info_h:'商品信息', food_composition:'配料', food_manufacturer:'生产商及包装商', food_shelf_life:'保质期', food_storage:'储存条件',
     a_lang:'语言', a_close:'关闭', a_tea:'茶叶详情', a_nav:'网站栏目', a_account:'个人中心', filters_label:'茶叶分类筛选', skip:'跳到内容',
     alt_master:'茶艺师正把茶汤从茶海分入茶杯',
     alt_product:'茶器中展示的中国散茶',
@@ -2214,7 +2231,7 @@ select.input{
       yeshenghong:{ n:"野生红", o:"红茶 · 云南 · 野生茶树", d:"采自云南野生茶树的红茶，用的正是带紫芽的野生品种。香气里有深色浆果和烤李子，入口是熟透的核果、西梅和蜜糖般的甜，底下透着一缕松脂般的木质气息。茶汤浓稠、呈深琥珀色，回味干净而甜。" },
       shengchenxiang:{ n:"陈香 生普洱 2020", o:"生普 · 云南 · 2020年，开始转化", d:"2020年的年轻生普。按茶的年纪它还算少年，但陈化已经初露端倪，「陈香」正是指这份随年份而来的气息。干茶有青草和干草的气息，茶汤仍带着云南生普的苦与涩，很快化为甜润，尾韵带蜜香。茶体饱满，到后段渐渐透出干果和暖木的味道。建议用约90℃的水盖碗快出，第一泡先润茶倒掉。" },
       osmanthus:{ n:"桂花", o:"花茶 · 广西桂林 · 干花，非茶叶", d:"金黄色的干桂花，即「桂花」本身，而非茶叶。香气是熟透的杏与桃，带着奶油般的蜜甜；茶汤清澈柔和，尾韵有一丝杏干的味道。可单独冲泡，也可取一撮拌入乌龙或熟普，桂花与它们相处融洽，不会盖过茶底本身。原产广西桂林，此城遍植桂树，城名「桂林」意即「桂花之林」。" },
-      vitamin:{ n:"「维生素」草本拼配茶", o:"草本拼配 · 无咖啡因 · 浆果", d:"茶馆自制的草本拼配茶，不含咖啡因，晚上喝也无妨，孩子也能喝。入口是明亮的浆果酸，带一点涩，香气里能辨出玫瑰果和沙棘，随后是温暖的、近似草甸的草本气息。酸甜的回味悠长，很解渴。配方是我们自己的，具体用了哪些草药可以问店里。" },
+      vitamin:{ n:"「维生素」草本拼配茶", o:"草本拼配 · 无咖啡因 · 浆果", d:"茶馆自制的无咖啡因草本拼配。入口有明亮的浆果酸味和轻微涩感，随后出现温暖的草本气息。酸甜回味持久，既可热饮，也可冷饮。" },
     },
   },
 
@@ -2388,6 +2405,25 @@ select.input{
   /* ─────────────  НАВИГАЦИЯ  ───────────── */
   const VIEW_PATHS = { home:'/', shop:'/shop', b2b:'/business', book:'/booking' };
   const PATH_VIEWS = Object.fromEntries(Object.entries(VIEW_PATHS).map(([view,path]) => [path,view]));
+  function syncDocumentMetadata(view){
+    const title = T().route_titles?.[view] || T().title;
+    const description = T().route_descriptions?.[view] || T().route_descriptions?.home || '';
+    const routeUrl = new URL(VIEW_PATHS[view], location.origin).href;
+    document.title = title;
+    const setMeta = (selector, value) => {
+      const node = document.querySelector(selector);
+      if (node && value) node.content = value;
+    };
+    setMeta('meta[name="description"]', description);
+    setMeta('meta[property="og:title"]', title);
+    setMeta('meta[property="og:description"]', description);
+    setMeta('meta[property="og:locale"]', T().og_locale);
+    setMeta('meta[property="og:url"]', routeUrl);
+    setMeta('meta[name="twitter:title"]', title);
+    setMeta('meta[name="twitter:description"]', description);
+    const canonical = document.querySelector('link[rel="canonical"]');
+    if (canonical) canonical.href = routeUrl;
+  }
   function go(view, updateHistory=true){
     const changingView = ($('.view.is-active') || {}).id !== 'view-' + view;
     $$('.view').forEach(v => v.classList.toggle('is-active', v.id === 'view-' + view));
@@ -2395,12 +2431,7 @@ select.input{
       if (a.dataset.go === view) a.setAttribute('aria-current','page');
       else a.removeAttribute('aria-current');
     });
-    const routeUrl = new URL(VIEW_PATHS[view], location.origin).href;
-    document.title = T().route_titles?.[view] || T().title;
-    const canonical = document.querySelector('link[rel="canonical"]');
-    const openGraphUrl = document.querySelector('meta[property="og:url"]');
-    if (canonical) canonical.href = routeUrl;
-    if (openGraphUrl) openGraphUrl.content = routeUrl;
+    syncDocumentMetadata(view);
     const activeMobileNav = $('.nav--mob .nav__link[aria-current="page"]');
     if (activeMobileNav) requestAnimationFrame(() => activeMobileNav.scrollIntoView({ block:'nearest', inline:'center' }));
     // Разделы «Бронь» и «Для бизнеса» двухшаговые (форма → подтверждение).
@@ -2666,7 +2697,11 @@ select.input{
           TASTE[item.id] = item.taste;
           for (const language of languages){
             const text = item.translations[language];
-            I18N[language].teas[item.id] = {n:text.name,o:text.orig,d:text.desc};
+            I18N[language].teas[item.id] = {
+              n:text.name,o:text.orig,d:text.desc,
+              composition:text.composition || '', manufacturer:text.manufacturer || '',
+              shelf_life:text.shelf_life || '', storage:text.storage || '',
+            };
           }
         }
         for (const language of languages){
@@ -2802,6 +2837,22 @@ select.input{
     $('#ts-name').textContent = txt.n;
     $('#ts-orig').textContent = txt.o;
     $('#ts-desc').textContent = txt.d;
+    const foodFields = [
+      [T().food_composition, txt.composition],
+      [T().food_manufacturer, txt.manufacturer],
+      [T().food_shelf_life, txt.shelf_life],
+      [T().food_storage, txt.storage],
+    ].filter(([,value]) => typeof value === 'string' && value.trim());
+    const food = $('#ts-food'), foodRows = $('#ts-food-rows');
+    foodRows.replaceChildren();
+    foodFields.forEach(([label,value]) => {
+      const row = document.createElement('div');
+      row.className = 'ts-food__row';
+      const term = document.createElement('dt'); term.textContent = label;
+      const detail = document.createElement('dd'); detail.textContent = value;
+      row.append(term, detail); foodRows.append(row);
+    });
+    food.hidden = !foodFields.length;
     $('#ts-img').src = m.img;
     $('#ts-img').alt = txt.n;
     const sf = $('#ts-fav');
@@ -3850,7 +3901,7 @@ select.input{
   function applyLang(){
     document.documentElement.lang = LANG;
     const currentRoute = PATH_VIEWS[location.pathname.replace(/\/$/,'') || '/'] || 'home';
-    document.title = T().route_titles?.[currentRoute] || T().title;
+    syncDocumentMetadata(currentRoute);
     $$('.lang button').forEach(b => b.setAttribute('aria-pressed', b.dataset.lang === LANG));
     $$('[data-i18n]').forEach(n => { const v = T()[n.dataset.i18n]; if (v != null) n.innerHTML = v; });
     $$('[data-i18n-ph]').forEach(n => { const v = T()[n.dataset.i18nPh]; if (v != null) n.placeholder = v; });

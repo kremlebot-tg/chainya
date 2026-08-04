@@ -84,6 +84,7 @@ def main() -> None:
             text = parsed[language][item_id]
             localized[language] = {
                 "name": text["n"], "orig": text["o"], "desc": text["d"],
+                "composition": "", "manufacturer": "", "shelf_life": "", "storage": "",
             }
         ru = localized["ru"]
         image = meta_item["img"].removeprefix("{{img:").removesuffix("}}")
@@ -103,7 +104,7 @@ def main() -> None:
             "translations": localized,
         })
     result = {
-        "schema_version": 2,
+        "schema_version": 3,
         "revision": 1,
         "types": bot["types"],
         "axes": bot["axes"],

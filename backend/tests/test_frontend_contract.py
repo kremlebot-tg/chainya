@@ -50,3 +50,19 @@ def test_public_pages_use_quiet_account_probe_and_eager_hero_image():
 def test_catalog_keeps_a_semantic_heading_without_restoring_visual_clutter():
     assert '<h1 class="sr-only" data-i18n="shop_heading">' in SOURCE
     assert "shop_heading:'Каталог китайского чая'" in SOURCE
+
+
+def test_language_switch_updates_all_document_metadata():
+    assert "function syncDocumentMetadata(view)" in SOURCE
+    assert "meta[name=\"description\"]" in SOURCE
+    assert "meta[property=\"og:description\"]" in SOURCE
+    assert "meta[property=\"og:locale\"]" in SOURCE
+    assert "meta[name=\"twitter:description\"]" in SOURCE
+    assert "route_descriptions:" in SOURCE
+
+
+def test_product_sheet_can_render_food_labelling_fields():
+    assert 'id="ts-food" hidden' in SOURCE
+    assert 'id="ts-food-rows"' in SOURCE
+    for field in ("composition", "manufacturer", "shelf_life", "storage"):
+        assert f"txt.{field}" in SOURCE

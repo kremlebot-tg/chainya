@@ -12,6 +12,16 @@
 		header_up X-Forwarded-Proto {http.request.header.X-Forwarded-Proto}
 		header_up X-Forwarded-For {http.request.header.X-Forwarded-For}
 		header_up X-Real-IP {http.request.header.X-Forwarded-For}
+		# Origin keeps the same headers for direct rollback traffic. At the edge
+		# strip those copies and emit one canonical value below, otherwise private
+		# pages receive the same header two or three times.
+		header_down -Strict-Transport-Security
+		header_down -X-Content-Type-Options
+		header_down -Referrer-Policy
+		header_down -Permissions-Policy
+		header_down -Content-Security-Policy
+		header_down -Cache-Control
+		header_down -X-Robots-Tag
 	}
 }
 
@@ -60,9 +70,15 @@ http://127.0.0.1:8078 {
 		import chainya_origin
 	}
 
-	@api path /api/* /catalog-media/*
+	@api path /api/*
 	handle @api {
 		header Cache-Control "no-store"
+		import chainya_origin
+	}
+
+	@catalogMedia path /catalog-media/*
+	handle @catalogMedia {
+		header Cache-Control "public, max-age=31536000, immutable"
 		import chainya_origin
 	}
 

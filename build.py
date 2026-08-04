@@ -68,6 +68,8 @@ HEAD_EXTRA = f"""<meta name="description" content="{DESC}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{TITLE}">
+<meta name="twitter:description" content="{DESC}">
 <link rel="canonical" href="{SITE}">
 <link rel="icon" href="favicon.png" type="image/png">
 <link rel="apple-touch-icon" href="favicon.png">
@@ -307,6 +309,8 @@ if web:
             .replace(f'<meta name="description" content="{DESC}">', f'<meta name="description" content="{route_desc}">')
             .replace(f'<meta property="og:title" content="{TITLE}">', f'<meta property="og:title" content="{route_title}">')
             .replace(f'<meta property="og:description" content="{DESC}">', f'<meta property="og:description" content="{route_desc}">')
+            .replace(f'<meta name="twitter:title" content="{TITLE}">', f'<meta name="twitter:title" content="{route_title}">')
+            .replace(f'<meta name="twitter:description" content="{DESC}">', f'<meta name="twitter:description" content="{route_desc}">')
             .replace(f'<meta property="og:url" content="{SITE}">', f'<meta property="og:url" content="{route_url}">')
             .replace(f'<link rel="canonical" href="{SITE}">', f'<link rel="canonical" href="{route_url}">')
         )

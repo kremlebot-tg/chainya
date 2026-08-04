@@ -91,6 +91,10 @@ def normalize_item(raw: dict[str, Any], *, existing_id: str | None = None) -> di
             "name": _text(source.get("name", ""), f"{lang}.name", 160, required=True),
             "orig": _text(source.get("orig", ""), f"{lang}.orig", 240),
             "desc": _text(source.get("desc", ""), f"{lang}.desc", 5000),
+            "composition": _text(source.get("composition", ""), f"{lang}.composition", 2000),
+            "manufacturer": _text(source.get("manufacturer", ""), f"{lang}.manufacturer", 1000),
+            "shelf_life": _text(source.get("shelf_life", ""), f"{lang}.shelf_life", 500),
+            "storage": _text(source.get("storage", ""), f"{lang}.storage", 1000),
         }
 
     taste_raw = raw.get("taste", {})
@@ -164,7 +168,7 @@ def normalize_document(raw: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(revision, int) or revision < 1:
         revision = 1
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "revision": revision,
         "updated_at": str(raw.get("updated_at") or utc_now()),
         "types": clean_types,

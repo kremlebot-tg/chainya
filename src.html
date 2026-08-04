@@ -2991,6 +2991,10 @@ select.input{
   function renderCheckoutAvailability(){
     const copy = $('#payment-secure');
     if (copy) copy.textContent = checkoutAvailable ? T().payment_secure : T().cart_payment_unavailable;
+    const note = $('#cart-pay-note'), method = $('#c-dlv').value;
+    if (note) note.textContent = checkoutAvailable
+      ? (method === 'pickup' ? T().cart_pay_pickup : T().cart_pay)
+      : T().cart_payment_unavailable;
     updateCheckoutTotal();
   }
   async function refreshCheckoutStatus(){
@@ -3232,7 +3236,9 @@ select.input{
     $('#c-city-field').hidden = dlv === 'pickup';
     $('#c-pvz-field').hidden = dlv !== 'cdek_pvz';
     $('#c-addr-field').hidden = dlv !== 'cdek_courier';
-    $('#cart-pay-note').textContent = dlv === 'pickup' ? T().cart_pay_pickup : T().cart_pay;
+    $('#cart-pay-note').textContent = checkoutAvailable
+      ? (dlv === 'pickup' ? T().cart_pay_pickup : T().cart_pay)
+      : T().cart_payment_unavailable;
     deliveryQuote = null;
     if (dlv === 'pickup'){
       setDeliveryStatus('');

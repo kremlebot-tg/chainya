@@ -569,8 +569,8 @@ select.input{
 }
 .row2{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
 
-/* Формат церемонии: две радио-карточки, цена сразу на виду. Выбор формата —
-   это и есть модель заведения, в брони он должен быть первым, а не отсутствовать */
+/* Формат церемонии: две радио-карточки. Сначала называем формат и коротко
+   объясняем его, затем показываем цену — так карточка читается сверху вниз. */
 .fmt{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 .fmt__opt{
   display:flex; flex-direction:column; gap:4px; text-align:left;
@@ -583,7 +583,7 @@ select.input{
   border-color:var(--accent);
   background:color-mix(in srgb, var(--accent) 10%, var(--bg-3));
 }
-.fmt__opt .fmt__price{ font-family:'Prata',Georgia,serif; font-size:1.35rem; line-height:1; }
+.fmt__opt .fmt__price{ margin-top:7px; font-family:'Prata',Georgia,serif; font-size:1.35rem; line-height:1.15; }
 .fmt__name{ font-size:14px; font-weight:600; letter-spacing:-.01em; }
 .fmt__d{ font-size:11.5px; color:var(--text-3); line-height:1.45; }
 .fmt__incl{ margin:11px 0 0; font-size:12.5px; color:var(--text-3); line-height:1.5; }
@@ -790,13 +790,8 @@ select.input{
   .slot, .day, .pack{ min-height:46px; }
   .tea__fav, .sheet__fav{ width:44px; height:44px; }
   .fmt{ grid-template-columns:1fr; gap:8px; }
-  /* На узком экране карточка — строка: имя слева, цена справа, описание под
-     ними. В разметке цена стоит первой (для вертикальной десктоп-раскладки),
-     поэтому порядок правим через order, иначе цена повисает по центру */
-  .fmt__opt{ flex-direction:row; align-items:baseline; flex-wrap:wrap; column-gap:10px; min-height:44px; }
-  .fmt__name{ order:1; }
-  .fmt__opt .fmt__price{ order:2; margin-left:auto; }
-  .fmt__d{ order:3; flex-basis:100%; }
+  .fmt__opt{ min-height:44px; padding:15px 16px 16px; }
+  .fmt__opt .fmt__price{ margin-top:8px; font-size:1.3rem; }
   .day{ padding:0 12px; display:flex; flex-direction:column; justify-content:center; }
   .pack{ padding:0; display:flex; flex-direction:column; justify-content:center; }
   .btn{ min-height:50px; }
@@ -1306,14 +1301,14 @@ select.input{
             <span class="label" id="f-format-label" data-i18n="f_format">Формат</span>
             <div class="fmt" id="fmt" role="group" aria-labelledby="f-format-label">
               <button class="fmt__opt" type="button" data-fmt="master" aria-pressed="true">
-                <span class="fmt__price num" data-i18n="fmt_master_price">1500 ₽ за гостя</span>
                 <span class="fmt__name" data-i18n="fmt_master">Церемония с мастером</span>
                 <span class="fmt__d" data-i18n="fmt_master_d">Мастер заваривает и ведёт стол</span>
+                <span class="fmt__price num" data-i18n="fmt_master_price">1500 ₽ за гостя</span>
               </button>
               <button class="fmt__opt" type="button" data-fmt="self" aria-pressed="false">
-                <span class="fmt__price num" data-i18n="fmt_self_price">1200 ₽ за гостя</span>
                 <span class="fmt__name" data-i18n="fmt_self">Самостоятельно</span>
                 <span class="fmt__d" data-i18n="fmt_self_d">Посуду и воду даём, завариваете сами</span>
+                <span class="fmt__price num" data-i18n="fmt_self_price">1200 ₽ за гостя</span>
               </button>
             </div>
             <p class="fmt__incl" data-i18n="fmt_incl">В обе цены входят два чая на выбор. Третий — по желанию, на месте.</p>

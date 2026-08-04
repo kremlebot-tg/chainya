@@ -3860,6 +3860,22 @@ def logout_customer(request: Request, response: Response):
     )
 
 
+@app.get("/api/account/session")
+def customer_session_status(request: Request, response: Response):
+    """Return a quiet authentication probe for public storefront pages.
+
+    The protected ``/api/account`` endpoint intentionally keeps its 401
+    contract.  Public pages use this endpoint instead, so a normal signed-out
+    visit does not create a failed network request in the browser console.
+    """
+    account = customer_account_for_request(request, required=False)
+    response.headers["Cache-Control"] = "no-store"
+    return {
+        "authenticated": account is not None,
+        "account": customer_profile(account) if account else None,
+    }
+
+
 @app.get("/api/account")
 def get_customer_account(request: Request, response: Response):
     account = customer_account_for_request(request)

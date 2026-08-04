@@ -22,7 +22,7 @@ CHAINYA_TEST_MODE=1 .venv/bin/uvicorn backend.app:app --reload --port 8080
 - `POST /api/delivery/quote` — актуальный расчёт доставки СДЭК по корзине и городу.
 - `POST /api/orders` — серверная проверка, расчёт и сохранение заказа.
 - `GET /api/orders/{id}` — состояние заказа.
-- `POST /api/account/register`, `POST /api/account/login`, `DELETE /api/account/session` — регистрация, вход и выход клиента.
+- `POST /api/account/register`, `POST /api/account/login`, `GET/DELETE /api/account/session` — регистрация, вход, тихая проверка сессии и выход клиента.
 - `GET/PATCH/DELETE /api/account` — профиль клиента, изменение имени и удаление кабинета.
 - `GET /api/account/orders`, `POST /api/account/orders/claim` — история и защищённая привязка гостевого заказа.
 - `GET /api/account/bookings` — бронирования, созданные клиентом после входа.

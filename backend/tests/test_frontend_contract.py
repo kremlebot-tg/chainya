@@ -4,11 +4,13 @@ import pytest
 
 
 SOURCE_PATH = Path(__file__).resolve().parents[2] / "src.html"
+BUILD_PATH = Path(__file__).resolve().parents[2] / "build.py"
 pytestmark = pytest.mark.skipif(
     not SOURCE_PATH.exists(),
     reason="frontend source is not part of the production backend artifact",
 )
 SOURCE = SOURCE_PATH.read_text(encoding="utf-8") if SOURCE_PATH.exists() else ""
+BUILD_SOURCE = BUILD_PATH.read_text(encoding="utf-8") if BUILD_PATH.exists() else ""
 
 
 def test_checkout_has_one_clear_payment_method_and_visible_status():
@@ -36,3 +38,15 @@ def test_catalog_explanation_is_short_and_before_the_products():
     assert note < products
     assert "Цены на пакеты считаются от цены за 10 г" not in SOURCE
     assert "Вес выбирается в карточке чая" in SOURCE
+
+
+def test_public_pages_use_quiet_account_probe_and_eager_hero_image():
+    assert "fetch('/api/account/session'" in SOURCE
+    assert "fetch('/api/account',{cache:'no-store'})" not in SOURCE
+    assert 'rel="preload" as="image" href="img/tea-baihao.webp"' in BUILD_SOURCE
+    assert '.replace(HERO_PRELOAD, "")' in BUILD_SOURCE
+
+
+def test_catalog_keeps_a_semantic_heading_without_restoring_visual_clutter():
+    assert '<h1 class="sr-only" data-i18n="shop_heading">' in SOURCE
+    assert "shop_heading:'Каталог китайского чая'" in SOURCE

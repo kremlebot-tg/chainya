@@ -74,6 +74,29 @@ def test_login_profile_password_rotation_and_logout(tmp_path, monkeypatch):
         assert logged_in.json()["account"]["name"] == "Анна Чайная"
 
 
+def test_customer_session_probe_is_quiet_for_guests_and_returns_profile_after_login(
+    tmp_path, monkeypatch
+):
+    client, _ = app_client(tmp_path, monkeypatch)
+    with client:
+        guest = client.get("/api/account/session")
+        assert guest.status_code == 200
+        assert guest.headers["cache-control"] == "no-store"
+        assert guest.json() == {"authenticated": False, "account": None}
+
+        assert register(client).status_code == 201
+        signed_in = client.get("/api/account/session")
+        assert signed_in.status_code == 200
+        assert signed_in.json()["authenticated"] is True
+        assert signed_in.json()["account"]["phone"] == "+79991112233"
+
+        assert client.delete("/api/account/session").status_code == 204
+        assert client.get("/api/account/session").json() == {
+            "authenticated": False,
+            "account": None,
+        }
+
+
 def test_authenticated_checkout_appears_only_in_own_account(tmp_path, monkeypatch):
     client, module = app_client(tmp_path, monkeypatch)
     with client:

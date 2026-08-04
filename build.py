@@ -55,6 +55,7 @@ SECURITY_EMAIL = "mailto:chainya@bk.ru"
 # и ни телеграму, ни CDN нечего отдавать из старого кэша.
 OG_SRC = root / "src-assets" / "og.jpg"
 OG_NAME = f"og.{hashlib.sha256(OG_SRC.read_bytes()).hexdigest()[:8]}.jpg"
+HERO_PRELOAD = '<link rel="preload" as="image" href="img/tea-baihao.webp" fetchpriority="high">'
 
 HEAD_EXTRA = f"""<meta name="description" content="{DESC}">
 <meta name="theme-color" content="#141110">
@@ -70,6 +71,7 @@ HEAD_EXTRA = f"""<meta name="description" content="{DESC}">
 <link rel="canonical" href="{SITE}">
 <link rel="icon" href="favicon.png" type="image/png">
 <link rel="apple-touch-icon" href="favicon.png">
+{HERO_PRELOAD}
 {json.dumps({
     "@context": "https://schema.org",
     "@graph": [
@@ -285,7 +287,7 @@ if web:
     route_meta = {
         "shop": (
             "Купить китайский чай · Чайня",
-            "Китайский чай в пакетах 25, 50 и 100 г с доставкой СДЭК по Москве и России.",
+            "Китайский чай в пакетах 10, 25, 50 и 100 г с доставкой СДЭК по Москве и России.",
         ),
         "business": (
             "Чай для бизнеса и мероприятий · Чайня",
@@ -301,6 +303,7 @@ if web:
         route_url = f"{SITE}{route}"
         route_head = (
             HEAD_EXTRA
+            .replace(HERO_PRELOAD, "")
             .replace(f'<meta name="description" content="{DESC}">', f'<meta name="description" content="{route_desc}">')
             .replace(f'<meta property="og:title" content="{TITLE}">', f'<meta property="og:title" content="{route_title}">')
             .replace(f'<meta property="og:description" content="{DESC}">', f'<meta property="og:description" content="{route_desc}">')

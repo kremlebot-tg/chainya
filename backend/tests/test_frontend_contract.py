@@ -17,6 +17,9 @@ def test_checkout_has_one_clear_payment_method_and_visible_status():
     assert "Оформить заказ · ${a}" in SOURCE
     assert SOURCE.index('id="cart-status"') < SOURCE.index('id="cart-submit"')
     assert "payment-method__mark" not in SOURCE
+    assert "fetch('/api/checkout/status'" in SOURCE
+    assert "!checkoutAvailable || !getCart().length" in SOURCE
+    assert 'id="payment-secure"' in SOURCE
 
 
 def test_pickup_point_map_and_booking_total_are_rendered():

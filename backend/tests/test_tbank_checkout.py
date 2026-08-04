@@ -105,6 +105,14 @@ def test_demo_init_is_once_idempotent_and_uses_server_amount(tmp_path, monkeypat
     assert parse_qs(success.query)["token"]
 
 
+def test_checkout_status_reports_configured_demo_as_available(tmp_path, monkeypatch):
+    client, _ = demo_app(tmp_path, monkeypatch)
+    with client:
+        response = client.get("/api/checkout/status")
+    assert response.status_code == 200
+    assert response.json() == {"available": True, "provider": "tbank"}
+
+
 def test_local_mock_cannot_mark_tbank_order_paid(tmp_path, monkeypatch):
     client, module = demo_app(tmp_path, monkeypatch)
     monkeypatch.setattr(module.tbank_client, "create_payment", lambda *_a, **_k: bank_response())

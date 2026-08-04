@@ -1514,7 +1514,7 @@ select.input{
         <span class="label" data-i18n="cart_payment">Оплата</span>
         <input type="hidden" id="c-payment" value="bank_card">
         <div class="payment-method">
-          <span class="payment-method__copy"><strong data-i18n="pay_card">Оплата картой</strong><span data-i18n="payment_secure">После оформления откроется защищённая страница Т‑Банка. Подойдёт карта любого российского банка.</span></span>
+          <span class="payment-method__copy"><strong data-i18n="pay_card">Оплата картой</strong><span id="payment-secure" data-i18n="payment_secure">После оформления откроется защищённая страница Т‑Банка. Подойдёт карта любого российского банка.</span></span>
         </div>
         <p class="field-hint"><a href="/legal.html" target="_blank" rel="noopener" data-i18n="payment_terms_link">Условия оплаты и возврата</a></p>
       </div>
@@ -1751,7 +1751,7 @@ select.input{
     cart_addr:'Адрес', cart_addr_ph:'Улица, дом, квартира', cart_payment:'Оплата',
     pay_card:'Оплата картой', pay_sbp:'СБП', payment_secure:'После оформления откроется защищённая страница Т‑Банка. Подойдёт карта любого российского банка.',
     payment_terms_link:'Условия оплаты и возврата', cart_pvz_map_title:'Выбранный пункт СДЭК на карте', cart_pvz_map_open:'Открыть пункт в Яндекс Картах',
-    cart_note_ph:'Комментарий к заказу', cart_submit:'Оформить заказ', cart_submit_total:a=>`Оформить заказ · ${a}`,
+    cart_note_ph:'Комментарий к заказу', cart_submit:'Оформить заказ', cart_submit_total:a=>`Оформить заказ · ${a}`, cart_submit_unavailable:'Онлайн-оплата пока недоступна',
     cart_decrease:n=>`Уменьшить количество «${n}»`, cart_increase:n=>`Увеличить количество «${n}»`,
     cart_pay:'Стоимость и срок доставки рассчитывает СДЭК перед оплатой.',
     cart_pay_pickup:'Самовывоз с Острякова, 3 — бесплатно. Оплата проходит на защищённой форме Т‑Банка.',
@@ -1933,7 +1933,7 @@ select.input{
     cart_addr:'Address', cart_addr_ph:'Street, building, flat', cart_payment:'Payment',
     pay_card:'Card payment', pay_sbp:'SBP', payment_secure:'After checkout, T‑Bank’s secure payment page will open. Cards issued by Russian banks are accepted.',
     payment_terms_link:'Payment and return terms', cart_pvz_map_title:'Selected CDEK pickup point on the map', cart_pvz_map_open:'Open pickup point in Yandex Maps',
-    cart_note_ph:'Order comment', cart_submit:'Place order', cart_submit_total:a=>`Place order · ${a}`,
+    cart_note_ph:'Order comment', cart_submit:'Place order', cart_submit_total:a=>`Place order · ${a}`, cart_submit_unavailable:'Online payment is unavailable',
     cart_decrease:n=>`Decrease quantity of ${n}`, cart_increase:n=>`Increase quantity of ${n}`,
     cart_pay:'CDEK calculates the delivery price and time before payment.',
     cart_pay_pickup:'Pickup from 3 Ostryakova Street is free. Payment is completed on T‑Bank’s secure form.',
@@ -2115,7 +2115,7 @@ select.input{
     cart_addr:'地址', cart_addr_ph:'街道、门牌号、公寓', cart_payment:'支付',
     pay_card:'银行卡支付', pay_sbp:'快速支付系统（SBP）', payment_secure:'提交订单后将打开T‑Bank的安全支付页面，支持俄罗斯银行发行的银行卡。',
     payment_terms_link:'支付与退款条款', cart_pvz_map_title:'地图上的所选CDEK自提点', cart_pvz_map_open:'在Yandex地图中打开自提点',
-    cart_note_ph:'订单备注', cart_submit:'提交订单', cart_submit_total:a=>`提交订单 · ${a}`,
+    cart_note_ph:'订单备注', cart_submit:'提交订单', cart_submit_total:a=>`提交订单 · ${a}`, cart_submit_unavailable:'在线支付暂不可用',
     cart_decrease:n=>`减少${n}的数量`, cart_increase:n=>`增加${n}的数量`,
     cart_pay:'付款前由CDEK计算运费和时效。',
     cart_pay_pickup:'奥斯特里亚科娃街3号自取免费。付款将在T‑Bank安全页面完成。',
@@ -2971,6 +2971,7 @@ select.input{
     try{ sessionStorage.removeItem(CHECKOUT_ATTEMPT_KEY); }catch(e){}
   }
   const DLV_PRICE = { pickup:0 };
+  let checkoutAvailable = false;
   let deliveryQuote = null;
   let cityTimer = 0, pvzTimer = 0, citySequence = 0, pvzSequence = 0, quoteSequence = 0;
   function checkoutTotal(){ return cartTotal() + (DLV_PRICE[$('#c-dlv').value] || 0); }
@@ -2984,8 +2985,21 @@ select.input{
   function updateCheckoutTotal(){
     const amount = rub(checkoutTotal());
     $('#cart-total').textContent = amount;
-    $('#cart-submit').textContent = T().cart_submit_total(amount);
-    $('#cart-submit').disabled = !getCart().length || !deliveryReady();
+    $('#cart-submit').textContent = checkoutAvailable ? T().cart_submit_total(amount) : T().cart_submit_unavailable;
+    $('#cart-submit').disabled = !checkoutAvailable || !getCart().length || !deliveryReady();
+  }
+  function renderCheckoutAvailability(){
+    const copy = $('#payment-secure');
+    if (copy) copy.textContent = checkoutAvailable ? T().payment_secure : T().cart_payment_unavailable;
+    updateCheckoutTotal();
+  }
+  async function refreshCheckoutStatus(){
+    try{
+      const response = await fetch('/api/checkout/status',{cache:'no-store'});
+      const result = response.ok ? await response.json() : {};
+      checkoutAvailable = result.available === true;
+    }catch(e){ checkoutAvailable = false; }
+    renderCheckoutAvailability();
   }
   let _cartN = -1;
   function updateCartBadge(){
@@ -3339,6 +3353,7 @@ select.input{
     trackOnce('checkout_start','cart');
     const status = $('#cart-status'); status.textContent=''; status.classList.remove('cart-note--error');
     const submit = $('#cart-submit');
+    if (!checkoutAvailable){ status.textContent=T().cart_payment_unavailable; status.classList.add('cart-note--error'); return; }
     if (!requireCartField('#c-phone',T().cart_phone_required,value=>value.replace(/\D/g,'').length>=10)) return;
     if (!$('#c-privacy').checked){ status.textContent = T().privacy_required; status.classList.add('cart-note--error'); $('#c-privacy').focus(); return; }
     const dlv = $('#c-dlv').value;
@@ -3440,7 +3455,7 @@ select.input{
       } catch (e) {
         status.textContent = publicMessage;
         status.classList.add('cart-note--error');
-        submit.disabled = !getCart().length || !deliveryReady();
+        submit.disabled = !checkoutAvailable || !getCart().length || !deliveryReady();
         return;
       }
     }
@@ -3854,6 +3869,7 @@ select.input{
     closeTea();
     syncCart();
     sync();
+    renderCheckoutAvailability();
     // Экраны подтверждения могут быть на виду — перерисуем их на новом языке
     if (lastBook && !$('#book-done').hidden) renderDone();
     if (lastB2B && !$('#b2b-done').hidden)
@@ -3890,6 +3906,7 @@ select.input{
   })();
   applyLang();
   hydrateCustomerAccount();
+  refreshCheckoutStatus();
   refreshCatalog();
   setInterval(refreshCatalog, 5 * 60 * 1000);
   track('page_view', initialAnalyticsSection);

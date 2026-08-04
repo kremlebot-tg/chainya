@@ -2699,6 +2699,13 @@ def health():
     }
 
 
+@app.get("/api/checkout/status")
+def checkout_status(response: Response):
+    """Expose only whether the public checkout can currently create a payment."""
+    response.headers["Cache-Control"] = "no-store"
+    return {"available": tbank_checkout_ready(), "provider": "tbank"}
+
+
 @app.get("/api/catalog")
 def public_catalog():
     document = get_catalog_store().get()

@@ -60,6 +60,15 @@ def test_health_exposes_safe_release_version(tmp_path, monkeypatch):
     assert response.json()["version"] in {"development", "unknown"} or len(response.json()["version"]) == 12
 
 
+def test_checkout_status_fails_closed_without_live_payment_mode(tmp_path, monkeypatch):
+    client, _ = app_client(tmp_path, monkeypatch, test_mode="0")
+    with client:
+        response = client.get("/api/checkout/status")
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json() == {"available": False, "provider": "tbank"}
+
+
 def test_service_pages_support_head_without_exposing_content(tmp_path, monkeypatch):
     client, _ = app_client(tmp_path, monkeypatch)
     with client:

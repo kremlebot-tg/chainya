@@ -227,6 +227,8 @@ def test_cdek_quote_and_order_use_server_price_and_selected_point(tmp_path, monk
         "location": {
             "city_code": 137,
             "address": "Невский проспект, 1",
+            "longitude": 30.315868,
+            "latitude": 59.939095,
         },
     }])
     request = {
@@ -235,6 +237,7 @@ def test_cdek_quote_and_order_use_server_price_and_selected_point(tmp_path, monk
         "city_code": 137,
     }
     with client:
+        points = client.get("/api/delivery/points", params={"city_code": 137})
         quote = client.post("/api/delivery/quote", json=request)
         order = client.post("/api/orders", json=payload(
             delivery="cdek_pvz",
@@ -242,6 +245,9 @@ def test_cdek_quote_and_order_use_server_price_and_selected_point(tmp_path, monk
             city_code=137,
             pvz_code="SPB1",
         ))
+    assert points.status_code == 200
+    assert points.json()["points"][0]["longitude"] == 30.315868
+    assert points.json()["points"][0]["latitude"] == 59.939095
     assert quote.status_code == 200
     assert quote.json()["price"] == 322
     assert quote.json()["tariff_code"] == 136

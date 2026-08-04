@@ -3719,6 +3719,14 @@ def delivery_points(
         raise HTTPException(502, "Не удалось загрузить пункты CDEK") from exc
     needle = q.strip().casefold()
     result = []
+
+    def coordinate(value, minimum: float, maximum: float):
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return None
+        return number if minimum <= number <= maximum else None
+
     for point in points:
         location = point.get("location") or {}
         if (
@@ -3740,6 +3748,8 @@ def delivery_points(
             "work_time": str(point.get("work_time", "")),
             "metro": str(point.get("nearest_metro_station", "")),
             "type": str(point.get("type", "PVZ")),
+            "longitude": coordinate(location.get("longitude"), -180, 180),
+            "latitude": coordinate(location.get("latitude"), -90, 90),
         })
         if len(result) >= 30:
             break

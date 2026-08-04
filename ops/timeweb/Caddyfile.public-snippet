@@ -4,5 +4,9 @@ www.chainya.ru {
 }
 
 chainya.ru {
-  reverse_proxy 127.0.0.1:8078
+  reverse_proxy 127.0.0.1:8078 {
+    # The private edge intentionally binds to the loopback host only. Preserve
+    # that site label here; it restores its API and sensitive-path matchers.
+    header_up Host 127.0.0.1
+  }
 }

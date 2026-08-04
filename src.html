@@ -356,7 +356,6 @@ h1, h2, h3, p{ text-wrap:pretty; }
 
 /* ── Фильтры карты ── */
 .shop-toolbar{ margin-bottom:28px; }
-.shop__label{ margin:0 0 18px; }
 .shop-tools{ display:grid; grid-template-columns:minmax(220px,1fr) minmax(190px,.35fr); gap:10px; margin-top:14px; }
 .shop-search{ position:relative; }
 .shop-search svg{ position:absolute; left:14px; top:50%; width:17px; height:17px; transform:translateY(-50%); fill:none; stroke:var(--text-3); stroke-width:1.7; pointer-events:none; }
@@ -1152,7 +1151,6 @@ select.input{
 <!-- ══════════════════  КУПИТЬ ЧАЙ  ══════════════════ -->
 <section class="view" id="view-shop">
   <div class="sec wrap">
-    <p class="label shop__label" data-i18n="shop_label">Купить чай</p>
     <div class="shop-toolbar">
       <div class="scroll-shell scroll-shell--chips"><div class="chips" id="filters" role="group" data-i18n-aria="filters_label" aria-label="Фильтры каталога"></div></div>
       <div class="shop-tools">
@@ -1735,7 +1733,6 @@ select.input{
     visit_address_label:'Адрес', visit_address:'Москва, ул. Острякова, 3', visit_place:'Первый этаж · помещение 114',
     visit_metro_label:'Метро', visit_metro:'Аэропорт', visit_hours_label:'Открыты', visit_hours:'<span class="visit__hours-line">Ежедневно</span><span class="visit__hours-line num">12:00–22:00</span>',
     visit_route:'Построить маршрут', visit_open:'Открыть карточку в Яндекс Картах', visit_map_title:'Чайня на карте Москвы',
-    shop_label:'Купить чай',
     shop_note_h:'Фасовка и прессованный чай', shop_note_p:'Вес выбирается в карточке чая. Мандарин и квадратик продаём поштучно, блины — по запросу.', shop_count:'В подборке',
     shop_search_label:'Поиск по каталогу', shop_search_ph:'Название, регион или вкус', shop_sort_label:'Сортировка', shop_empty:'По этому запросу ничего не найдено. Попробуйте другое название или сбросьте фильтр.',
     shop_sort_default:'Сначала рекомендованные', shop_sort_price_asc:'Сначала дешевле', shop_sort_price_desc:'Сначала дороже', shop_sort_name:'По названию',
@@ -1918,7 +1915,6 @@ select.input{
     visit_address_label:'Address', visit_address:'3 Ostryakova St., Moscow', visit_place:'Ground floor · unit 114',
     visit_metro_label:'Metro', visit_metro:'Aeroport', visit_hours_label:'Hours', visit_hours:'<span class="visit__hours-line">Daily</span><span class="visit__hours-line num">12:00–22:00</span>',
     visit_route:'Get directions', visit_open:'Open in Yandex Maps', visit_map_title:'Chainya on the Moscow map',
-    shop_label:'Buy tea',
     shop_note_h:'Pack sizes and pressed tea', shop_note_p:'Choose the weight in each tea card. Mandarin and mini bricks are sold by the piece; cakes are available on request.', shop_count:'In this selection',
     shop_search_label:'Search the catalogue', shop_search_ph:'Name, origin or flavour', shop_sort_label:'Sort', shop_empty:'Nothing matches this search. Try another name or reset the filter.',
     shop_sort_default:'Recommended first', shop_sort_price_asc:'Lowest price first', shop_sort_price_desc:'Highest price first', shop_sort_name:'By name',
@@ -2101,7 +2097,6 @@ select.input{
     visit_address_label:'地址', visit_address:'莫斯科奥斯特里亚科娃街3号', visit_place:'一层 · 114室',
     visit_metro_label:'地铁', visit_metro:'机场站', visit_hours_label:'营业时间', visit_hours:'<span class="visit__hours-line">每天</span><span class="visit__hours-line num">12:00–22:00</span>',
     visit_route:'规划路线', visit_open:'在Yandex地图中打开', visit_map_title:'莫斯科茶室地图',
-    shop_label:'买茶',
     shop_note_h:'分装与紧压茶', shop_note_p:'请在茶品详情中选择重量。小青柑和小金砖按个出售，茶饼可另询。', shop_count:'当前选择',
     shop_search_label:'搜索茶叶目录', shop_search_ph:'名称、产地或风味', shop_sort_label:'排序', shop_empty:'没有找到符合条件的茶。请尝试其他名称或重置筛选。',
     shop_sort_default:'推荐优先', shop_sort_price_asc:'价格从低到高', shop_sort_price_desc:'价格从高到低', shop_sort_name:'按名称',

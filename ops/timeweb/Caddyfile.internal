@@ -25,6 +25,13 @@
 	}
 }
 
+(chainya_public_headers) {
+	header {
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src https://yandex.ru; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'"
+	}
+}
+
 http://127.0.0.1:8078 {
 	encode zstd gzip
 	root * /var/www/chainya
@@ -32,9 +39,7 @@ http://127.0.0.1:8078 {
 	header {
 		Strict-Transport-Security "max-age=31536000"
 		X-Content-Type-Options "nosniff"
-		Referrer-Policy "strict-origin-when-cross-origin"
 		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
-		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src https://yandex.ru; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'"
 		-Server
 	}
 
@@ -72,12 +77,14 @@ http://127.0.0.1:8078 {
 
 	@api path /api/*
 	handle @api {
+		import chainya_public_headers
 		header Cache-Control "no-store"
 		import chainya_origin
 	}
 
 	@catalogMedia path /catalog-media/*
 	handle @catalogMedia {
+		import chainya_public_headers
 		header Cache-Control "public, max-age=31536000, immutable"
 		import chainya_origin
 	}
@@ -89,12 +96,14 @@ http://127.0.0.1:8078 {
 
 	@publicApp path / /shop /business /booking
 	handle @publicApp {
+		import chainya_public_headers
 		header Cache-Control "no-cache"
 		try_files {path}/index.html /index.html
 		file_server
 	}
 
 	handle {
+		import chainya_public_headers
 		file_server
 	}
 

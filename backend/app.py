@@ -2909,6 +2909,7 @@ async def admin_upload_catalog_image(
 
 
 @app.get("/catalog-media/{filename}")
+@app.head("/catalog-media/{filename}")
 def catalog_media(filename: str):
     if not MEDIA_FILE_RE.fullmatch(filename):
         raise HTTPException(404, "Изображение не найдено")

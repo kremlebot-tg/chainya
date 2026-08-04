@@ -116,11 +116,14 @@ def test_catalog_image_is_reencoded_and_served_immutably(tmp_path, monkeypatch):
             tea for tea in uploaded.json()["teas"] if tea["id"] == item_id
         )["image_url"]
         served = client.get(image_url)
+        head = client.head(image_url)
 
     assert uploaded.status_code == 200
     assert image_url.startswith("/catalog-media/")
     assert invalid.status_code == 422
     assert served.status_code == 200
+    assert head.status_code == 200
+    assert head.headers["content-type"] == "image/webp"
     assert served.headers["content-type"] == "image/webp"
     assert "immutable" in served.headers["cache-control"]
     with Image.open(BytesIO(served.content)) as stored:

@@ -20,7 +20,6 @@
 		header_down -Referrer-Policy
 		header_down -Permissions-Policy
 		header_down -Content-Security-Policy
-		header_down -Cache-Control
 		header_down -X-Robots-Tag
 	}
 }
@@ -56,6 +55,7 @@ http://127.0.0.1:8078 {
 	@catalogManage path /manage/catalog /manage/catalog/
 	handle @catalogManage {
 		header {
+			defer
 			Cache-Control "no-store"
 			Referrer-Policy "no-referrer"
 			X-Robots-Tag "noindex, nofollow"
@@ -67,6 +67,7 @@ http://127.0.0.1:8078 {
 	@private path /payment/* /account /account/ /admin/* /manage /manage/
 	handle @private {
 		header {
+			defer
 			Cache-Control "no-store"
 			Referrer-Policy "no-referrer"
 			X-Robots-Tag "noindex, nofollow"
@@ -78,14 +79,13 @@ http://127.0.0.1:8078 {
 	@api path /api/*
 	handle @api {
 		import chainya_public_headers
-		header Cache-Control "no-store"
+		header >Cache-Control "no-store"
 		import chainya_origin
 	}
 
 	@catalogMedia path /catalog-media/*
 	handle @catalogMedia {
 		import chainya_public_headers
-		header Cache-Control "public, max-age=31536000, immutable"
 		import chainya_origin
 	}
 

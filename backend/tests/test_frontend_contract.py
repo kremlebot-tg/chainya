@@ -1,7 +1,14 @@
 from pathlib import Path
 
+import pytest
 
-SOURCE = (Path(__file__).resolve().parents[2] / "src.html").read_text(encoding="utf-8")
+
+SOURCE_PATH = Path(__file__).resolve().parents[2] / "src.html"
+pytestmark = pytest.mark.skipif(
+    not SOURCE_PATH.exists(),
+    reason="frontend source is not part of the production backend artifact",
+)
+SOURCE = SOURCE_PATH.read_text(encoding="utf-8") if SOURCE_PATH.exists() else ""
 
 
 def test_checkout_has_one_clear_payment_method_and_visible_status():

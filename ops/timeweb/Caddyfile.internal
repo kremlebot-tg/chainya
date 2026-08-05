@@ -102,6 +102,16 @@ http://127.0.0.1:8078 {
 		file_server
 	}
 
+	# Статические изображения и шрифты редко меняются, но их URL пока не
+	# версионированы. Часовой cache с обязательной перепроверкой ускоряет
+	# повторные открытия и не оставляет старые файлы у клиента надолго.
+	@staticAssets path /img/* /fonts/* /favicon* /og.*
+	handle @staticAssets {
+		import chainya_public_headers
+		header Cache-Control "public, max-age=3600, must-revalidate"
+		file_server
+	}
+
 	handle {
 		import chainya_public_headers
 		file_server

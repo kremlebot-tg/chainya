@@ -65,7 +65,7 @@ h1, h2, h3, p{ text-wrap:pretty; }
   font-family:'PingFang SC','Microsoft YaHei','Noto Sans CJK SC','Golos Text',sans-serif;
   letter-spacing:0; line-height:1.72;
 }
-:lang(zh) .display, :lang(zh) .tea__name, :lang(zh) .hall h3, :lang(zh) .summary h3,
+:lang(zh) .display, :lang(zh) .tea__name, :lang(zh) .hall h3, :lang(zh) .summary__title,
 :lang(zh) .sheet__head h2, :lang(zh) .done-card h2, :lang(zh) .svc__p,
 :lang(zh) .brand, :lang(zh) .foot__brand, :lang(zh) .tier__q, :lang(zh) .price{
   font-family:'Songti SC','STSong','Noto Serif CJK SC','Noto Serif SC','SimSun',serif;
@@ -589,7 +589,7 @@ select.input{
 }
 .fmt__opt .fmt__price{ margin-top:7px; font-family:'Prata',Georgia,serif; font-size:1.35rem; line-height:1.15; }
 .fmt__name{ font-size:14px; font-weight:600; letter-spacing:-.01em; }
-.fmt__d{ font-size:11.5px; color:var(--text-3); line-height:1.45; }
+.fmt__d{ font-size:11.5px; color:var(--text-2); line-height:1.45; }
 .fmt__incl{ margin:11px 0 0; font-size:12.5px; color:var(--text-3); line-height:1.5; }
 
 /* Дни лентой вместо календаря: год в чайной брони не нужен, он всегда текущий */
@@ -622,7 +622,7 @@ select.input{
   position:sticky; top:90px; background:transparent;
   border-top:1px solid var(--line); border-bottom:1px solid var(--line); border-radius:0; padding:24px 0;
 }
-.summary h3{ font-family:'Prata',Georgia,serif; font-weight:400; font-size:1.5rem; margin:0 0 4px; }
+.summary__title{ font-family:'Prata',Georgia,serif; font-weight:400; font-size:1.5rem; margin:0 0 4px; }
 .summary__sub{ font-size:13px; color:var(--text-3); margin:0 0 20px; }
 .srow{ display:flex; justify-content:space-between; gap:14px; padding:11px 0; border-top:1px solid var(--line-soft); font-size:14px; }
 .srow span:first-child{ color:var(--text-3); }
@@ -1350,7 +1350,7 @@ select.input{
         </div>
 
         <aside class="summary">
-          <h3 data-i18n="sum_h">Ваша бронь</h3>
+          <h2 class="summary__title" data-i18n="sum_h">Ваша бронь</h2>
           <p class="summary__sub" data-i18n="sum_sub">Чайня · Острякова, 3</p>
           <div class="srow"><span data-i18n="sum_format">Формат</span><span id="s-format">—</span></div>
           <div class="srow"><span data-i18n="sum_date">Дата</span><span id="s-date">—</span></div>
@@ -1833,24 +1833,24 @@ select.input{
       chongshicha:{ n:'Чон Ши Ча', o:'Особое · Гуанси', d:'Самый странный чай в карте, и делают его не из листа. Лист складывают слоями, личинки чайной моли его съедают, а в дело идёт то, что остаётся после них. Фекального запаха нет совсем: настой тёмно-красный, сладковатый, с древесной нотой. Прежде чем заказывать, поговорите с мастером.' },
       baihao:{ n:'Бай Хао Инь Чжень', o:'Белый · Юньнань · только почки', d:'«Серебряные иглы с белым ворсом»: одни почки, без листа. Белый чай почти не обрабатывают. В аромате луговые травы, крапива и клевер, во вкусе свежесть с лёгкой кислинкой. Спокойный чай для неспешного разговора и для жары. Завариваем на 70–75°, не горячее.' },
       baimudan:{ n:'Бай Му Дань', o:'Белый · Фудин · почка и первый лист', d:'В отличие от игл здесь идут не только почки, но и первый лист. В аромате цветочно-травяная свежесть с ярким оттенком герани, во вкусе луговые цветы и нектар. Очень стойкий к завариванию: держит много проливов. Хорош днём или ранним вечером.' },
-      longjing:{ n:'Лунцзин Хуан Доу', o:'Зелёный · Чжэцзян · крупный плоский лист', d:'Аромат раскрывается на удивление многогранно: каштан, варёная кукуруза, семечки и характерная бульонность с цветочными нотами. Во вкусе свежая трава, жареные орехи, каштан. Мягко тонизирует, хорошо идёт под работу. Если знакомитесь с зелёным китайским чаем, начните отсюда.' },
+      longjing:{ n:'Лунцзин Хуан Доу', o:'Зелёный · Чжэцзян · крупный плоский лист', d:'В аромате каштан, варёная кукуруза, семечки и лёгкие цветочные ноты. Во вкусе — свежая трава, жареные орехи и каштан. Понятный вариант для первого знакомства с китайским зелёным чаем.' },
       molimaojian:{ n:'Мо Ли Мао Цзянь', o:'Зелёный · с жасмином', d:'Жасминовым чаем наложницы ублажали императора. Технология тонкая: бутон высушивают раскрытым на шестьдесят процентов при постоянных тридцати пяти градусах. В аромате жасмин и цветы магнолии, во вкусе свежая трава и явная сладость. Тем, кто не пьёт чай без сахара, но хочет попробовать настоящий китайский.' },
       biluogold:{ n:'Дянь Хун Би Ло Голд', o:'Красный · Юньнань · золотые почки', d:'По-китайски это «золотая улитка»: лист скатывают в спираль приёмом, взятым у Би Ло Чуня, и золотой ворс выходит наружу. Из одних почек. Мёд, курага, тёплая сдоба.' },
       xiaozhong:{ n:'Сяочжун кат. А', o:'Красный · копчёный · он же Лапсанг Сушонг', d:'Копчёный чай, на европейский манер Лапсанг Сушонг. Считается, что он появился случайно в семнадцатом веке: крестьяне забыли листья на солнце, те перебродили и потемнели, и вместо того чтобы выбросить, их подсушили над сосновыми ветками. В аромате жжёная карамель, печёные фрукты и бородинский хлеб; во вкусе мягкость, компотная сладость и хлебное послевкусие. Окутывает и согревает.' },
       longjinghong:{ n:'Лунцзин Хун Ча', o:'Красный · Чжэцзян', d:'Красный чай с тех же кустов, что и зелёный Лунцзин. Его делают из листа, который снимают уже после короткого весеннего сезона, когда премиальный зелёный не выйдет. Форма скрученная, не плоская, а ореховая нота Лунцзина остаётся.' },
       dianhong:{ n:'Дянь Хун Юньнань', o:'Красный · Юньнань', d:'Если вы искали классический красный чай на каждый день, то это он. В аромате жареные семечки и тёмный изюм, во вкусе орехи и сухофрукты с цветочным сладковатым шлейфом. Максимально понятный и простой чай, долго рассказывать про него нечего.' },
       dancong:{ n:'Фэн Хуан Дань Цун Гаошань Цин Сян', o:'Улун · Гуандун · одинокий куст с горы Феникс', d:'Одинокий куст с горы Феникс. В аромате весна и цветы: жимолость, нарциссы, гиацинты с пряной цикориевой нотой. Во вкусе характерная для дань цунов горчинка, которая переходит в сладость. Из Чаочжоу родом и особая церемония, где чайник набивают доверху и пьют маленькими пиалами: её у нас тоже можно попросить.' },
-      gabahoney:{ n:'Габа «Дикий Мёд»', o:'Улун · Тайвань · год в диком мёде', d:'Та же габа, но с одним поворотом: этот чай год выдерживали в диком мёде, и это видно невооружённым глазом: лист буквально блестит от медовой корочки. В первые проливы идут медовые ноты без приторности, дальше мёд отступает и остаётся габа с чуть большей кислинкой. Чай скорее вкусовой, чем «состоянческий».' },
-      gabaruby:{ n:'Габа «Рубин»', o:'Улун · Тайвань · габа', d:'Скрученные в жемчужину янтарные побеги. В аромате печёные фрукты, фруктовый пирог, пастила и тропические ноты; во вкусе компот, выпечка, папайя и лёгкая ягодная кислинка. По эффекту один из самых ярких чаёв: за счёт ГАМК, кофеина и L-теанина даёт «сосредоточенное спокойствие», когда энергии много, но суеты нет.' },
-      huangjingui:{ n:'Хуан Цзин Гуй', o:'Улун · Аньси, деревня Луоян', d:'Появился при императоре Сяньфэне, в 1850-60-х, в деревне Луоян уезда Аньси. Из этого же сорта делают красный и зелёный чай. Аромат невероятно свежий и изящный, с оттенками османтуса и спелого персика; во вкусе полнотелая травянисто-цветочная ароматика и ягодная кислинка. Успокаивает и умиротворяет: чай для вечера после рабочей недели.' },
+      gabahoney:{ n:'Габа «Дикий Мёд»', o:'Улун · Тайвань · год в диком мёде', d:'Чай год выдерживали в диком мёде. В первых проливах заметны медовые ноты без приторности; затем они становятся тише, а во вкусе появляется лёгкая кислинка.' },
+      gabaruby:{ n:'Габа «Рубин»', o:'Улун · Тайвань · габа', d:'Янтарные побеги скручены в небольшие жемчужины. В аромате печёные фрукты, фруктовый пирог, пастила и тропические ноты. Во вкусе — компот, выпечка, папайя и лёгкая ягодная кислинка.' },
+      huangjingui:{ n:'Хуан Цзин Гуй', o:'Улун · Аньси, деревня Луоян', d:'Свежий цветочный улун с ароматом османтуса и спелого персика. Во вкусе — травянистые и цветочные ноты с лёгкой ягодной кислинкой.' },
       dahongpao:{ n:'Да Хун Пао Жоу Гуй Цин Сян', o:'Улун · Уишань · культивар Жоу Гуй', d:'Сбор с материнских кустов запретили в 2006 году, последнюю партию отправили в музей Гугун в Пекине, так что настоящий Да Хун Пао сегодня не попробовать ни за какие деньги. Всё, что продаётся под этим именем, выращено из их черенков. Культиваров четыре, наш называется Жоу Гуй, «корица». В аромате хлебная корочка, жареные орехи, цитрус и перечная пряность.' },
-      maoxie:{ n:'Тегуаньинь Мао Се', o:'Улун · Аньси · Железная богиня милосердия', d:'Тегуаньинь известна с двенадцатого века. По легенде чаевод Вэй Цинь каждый день подносил богине Гуаньинь три пиалы чая, и однажды увидел во сне дерево с чудесным ароматом. Наутро нашёл его на горе, отщипнул черенок и посадил в железную кастрюлю. Отличительная нота сирени и во вкусе, и в запахе, лёгкая кислинка. Эффект мягкий, приземляющий.' },
-      gabamaocha:{ n:'Габа Мао Ча', o:'Улун · Тайвань · черенки куста', d:'Это не лист и не почки, а черенки чайного куста. В Китае черенковый чай считают самым дешёвым и особо не ценят, поэтому его там немного, а в Москве такого нет больше нигде. При этом габа мощная и многогранная: в аромате свежая выпечка и хлеб, во вкусе сладкий хлеб, печёное яблоко и сухофрукты с карамелью. Тонизирует и сосредотачивает.' },
+      maoxie:{ n:'Тегуаньинь Мао Се', o:'Улун · Аньси · Железная богиня милосердия', d:'Светлый улун из Аньси. В аромате и вкусе хорошо заметна сирень, которую дополняет лёгкая кислинка.' },
+      gabamaocha:{ n:'Габа Мао Ча', o:'Улун · Тайвань · черенки куста', d:'Чай сделан не из листьев и почек, а из черенков чайного куста. В аромате — свежая выпечка и хлеб; во вкусе — печёное яблоко, сухофрукты и карамель.' },
       ginseng:{ n:'Женьшень улун Фуцзянь', o:'Улун · Фуцзянь · женьшень и солодка', d:'В Китае считают, что у чая энергия инь, а у женьшеня ян: чтобы их уравновесить, и сделали женьшень улун. Лист похож на камушки, потому что на этапе скрутки в него добавляют порошок корня женьшеня и солодки. В аромате сладость и тропические фрукты, во вкусе яркая сладость, будто в чай положили сахар. Первые проливы ведёт женьшень, дальше он уходит и раскрывается сам улун.' },
       ginseng1s:{ n:'Женьшень улун 1с', o:'Улун · первый сорт · женьшень и солодка', d:'Тот же приём, что и у фуцзяньского: улун скручен в плотные камушки и обкатан порошком корня женьшеня с солодкой. Настой сладкий, с женьшеневым послевкусием — первые проливы ведёт женьшень, дальше выходит сам улун. От фуцзяньского отличается сортом листа; какой взять под ваш вкус, подскажет мастер.' },
       mandarin:{ n:'Шу Пуэр в мандарине', o:'Пуэр · мандарин целиком', d:'Мандарин выпотрошили, набили шу пуэром и высушили вместе. Заваривается целиком, прямо в корке. Цитрус поверх земли, а к концу сессии корка отдаёт горчинку.' },
       laochatou:{ n:'Да Лао Ча Тоу', o:'Пуэр · Мэнхай · чайные головы', d:'При влажном скирдовании самые сочные листья слипаются в комки. Их не разбивают, а собирают со дна кучи и продают отдельно. Держат десять проливов и не разваливаются: патока и чернослив.' },
-      peacock:{ n:'Шу Пуэр «Дикий Павлин»', o:'Пуэр · Линьцан · блин 357 г', d:'Блин из Линьцана, сырьё со старых деревьев. Настой почти чёрный и густой: земля, влажное дерево, немного шоколада. Скорее успокаивает, чем бодрит.' },
+      peacock:{ n:'Шу Пуэр «Дикий Павлин»', o:'Пуэр · Линьцан · блин 357 г', d:'Блин из Линьцана, сырьё со старых деревьев. Настой почти чёрный и густой; во вкусе — земля, влажное дерево и немного шоколада.' },
       bingdao:{ n:'Шу Пуэр Гунтин Биндао ГуШу', o:'Пуэр · Биндао · старые деревья', d:'Гунтин значит «дворцовый»: самая мелкая и чистая почка. Биндао — это деревня в Линьцане, чьё имя на упаковке стоит так дорого, что часто стоит там незаслуженно. Мягкий, сладкий, без единой земляной ноты.' },
       nuomixiang:{ n:'Квадратик Ноу Ми Сян', o:'Пуэр · плитка на одну заварку', d:'Риса тут нет и в помине: аромат даёт трава номи сян из Сишуанбаньны, её прессуют вместе с пуэром. Не ароматизатор, а живой лист. Разворачиваете фольгу и кидаете плитку целиком.' },
       jinhuawang:{ n:'Цзинь Хуа Ван 2002', o:'Хэй Ча · Аньхуа · выдержка', d:'Аньхуаский хэй ча 2002 года. «Золотые цветки» — это гриб, который в этом чае выращивают нарочно: он даёт сухофруктовый аромат и тот самый вкус погреба и старой библиотеки.' },
@@ -1861,7 +1861,7 @@ select.input{
       yeshenghong:{ n:"Е Шэн Хун", o:"Красный · Юньнань · дикорастущие деревья", d:"Красный чай с дикорастущих деревьев Юньнани, из того самого пурпурнолистного сорта е шэн. В аромате тёмные ягоды и печёная слива, во вкусе спелые косточковые фрукты, чернослив и медовая сладость, на фоне тянется смолистая древесная нота. Настой плотный, тёмно-янтарный, послевкусие чистое и сладкое." },
       shengchenxiang:{ n:"Шэн Пуэр «Чэнсян» 2020", o:"Шэн пуэр · Юньнань · 2020 год, начинает стареть", d:"Молодой сырой пуэр 2020 года. По чайным меркам он ещё подросток, но выдержка уже проступает, и имя Чэнсян как раз про аромат старения. В сухом листе зелень и сено, в настое много юньнаньской горчинки с вяжущестью, которая быстро оборачивается сладостью и медовым хвостом. Тело плотное, ближе к последним проливам вылезают сухофрукты и тёплое дерево. Заваривайте проливами водой около 90 °C, первый пролив слейте." },
       osmanthus:{ n:"Османтус", o:"Цветочный настой · Гуйлинь, Гуанси · сушёные цветки, не чайный лист", d:"Сушёные золотистые цветки коричника душистого, они же гуй хуа. В аромате спелый абрикос и персик со сливочно-медовой сладостью, настой выходит чистый и мягкий, с лёгким хвостиком сушёного абрикоса в конце. Заваривают сами по себе или подмешивают щепоть к улуну или шу пуэру: цветок к ним хорошо ложится и не забивает чайную основу. Родина — Гуйлинь в Гуанси, где османтусом засажены целые улицы, оттого и название города переводится как «османтусовый лес»." },
-      vitamin:{ n:"Травяной сбор «Витаминный»", o:"Травяной сбор · без кофеина · ягодный", d:"Авторский травяной сбор чайной без кофеина. Во вкусе ягодная кислинка с лёгкой терпкостью, затем появляются тёплые травяные ноты. Кисло-сладкое послевкусие держится долго; сбор можно пить как горячим, так и охлаждённым." },
+      vitamin:{ n:"Травяной сбор «Витаминный»", o:"Травяной сбор · ягодный", d:"Авторский травяной сбор чайной. Во вкусе ягодная кислинка с лёгкой терпкостью, затем появляются тёплые травяные ноты. Можно пить горячим или охлаждённым." },
     },
   },
 
@@ -2018,24 +2018,24 @@ select.input{
       chongshicha:{ n:'Chong Shi Cha', o:'Unusual · Guangxi', d:'The strangest tea here, and it is not made from the leaf. Leaves are stacked in layers, moth larvae eat through them, and what the larvae leave behind is what gets brewed. There is no faecal smell at all: the liquor is dark red, faintly sweet, with a woody note. Have a word with the master before you order it.' },
       baihao:{ n:'Bai Hao Yin Zhen', o:'White · Yunnan · buds only', d:'“Silver needles with white down”: buds alone, no leaf. White tea is barely processed at all. The nose is meadow herbs, nettle and clover; the taste is fresh with a faint sourness. A calm tea for unhurried talk and for hot weather. We brew it at 70–75°C, no hotter.' },
       baimudan:{ n:'Bai Mu Dan', o:'White · Fuding · bud and first leaf', d:'Unlike the needles, this picking takes the first leaf as well as the bud. The nose is a floral, grassy freshness with a bright note of geranium; the taste brings meadow flowers and nectar. It stands up to brewing remarkably well and keeps going for many pours. Good in the afternoon or the early evening.' },
-      longjing:{ n:'Longjing Huang Dou', o:'Green · Zhejiang · large flat leaf', d:'The aroma opens up surprisingly wide: chestnut, boiled sweetcorn, sunflower seeds and a characteristic brothiness with floral notes. The taste is fresh grass, roasted nuts, chestnut. It lifts you gently and sits well with work. If you are getting to know Chinese green tea, start here.' },
+      longjing:{ n:'Longjing Huang Dou', o:'Green · Zhejiang · large flat leaf', d:'The aroma has chestnut, boiled sweetcorn, sunflower seeds and light floral notes. The taste brings fresh grass, roasted nuts and chestnut. A clear introduction to Chinese green tea.' },
       molimaojian:{ n:'Mo Li Mao Jian', o:'Green · with jasmine', d:'Concubines once served jasmine tea to the emperor. The method is delicate: the bud is dried when it has opened sixty per cent, at a steady thirty-five degrees. The nose is jasmine and magnolia blossom; the taste is fresh grass with an obvious sweetness. For anyone who cannot drink tea without sugar but wants to try the real Chinese thing.' },
       biluogold:{ n:'Dian Hong Bi Luo Gold', o:'Black · Yunnan · golden buds', d:'In Chinese it is the “golden snail”: the leaf is rolled into a spiral by a technique borrowed from Bi Luo Chun, which brings the golden down to the surface. Buds only. Honey, dried apricot, warm pastry.' },
       xiaozhong:{ n:'Xiaozhong grade A', o:'Black · smoked · Lapsang Souchong', d:'A smoked tea, Lapsang Souchong in the European manner. The story goes that it appeared by accident in the seventeenth century: peasants left the leaves out in the sun, they fermented and darkened, and rather than throw them away someone dried them over pine branches. The nose is burnt caramel, baked fruit and rye bread; the taste is soft but dense, with a compote sweetness and a bready finish. It wraps around you and warms.' },
       longjinghong:{ n:'Longjing Hong Cha', o:'Black · Zhejiang', d:'A black tea from the same bushes as green Longjing. It is made from leaf picked after the short spring season, once a premium green is no longer on the cards. The shape is twisted rather than flat, and the nutty Longjing note survives.' },
       dianhong:{ n:'Dian Hong Yunnan', o:'Black · Yunnan', d:'If you were after a classic everyday black tea, this is it. The nose is roasted seeds and dark raisin; the taste brings nuts and dried fruit with a sweet floral trail. A thoroughly straightforward tea, and there is not much more to say about it.' },
       dancong:{ n:'Feng Huang Dan Cong Gaoshan Qing Xiang', o:'Oolong · Guangdong · a lone bush on Phoenix mountain', d:'A lone bush on Phoenix mountain. The nose is spring and flowers: honeysuckle, narcissus, hyacinth, with a spicy chicory note. The taste carries the bitterness typical of dan congs, which turns into sweetness. Chaozhou also has a ceremony of its own, where the pot is packed full and the tea drunk from tiny bowls: ask and we will run it for you.' },
-      gabahoney:{ n:'GABA “Wild Honey”', o:'Oolong · Taiwan · a year in wild honey', d:'The same GABA with one twist: this tea spent a year ageing in wild honey, and you can see it with the naked eye, the leaf literally glints with a honey crust. The first pours are honeyed without being cloying, then the honey steps back and the GABA remains, a touch tarter. More a tea for the taste than for the state.' },
-      gabaruby:{ n:'GABA “Ruby”', o:'Oolong · Taiwan · GABA', d:'Amber shoots rolled into pearls. The nose is baked fruit, fruit pie, pastila and tropical notes; the taste follows with compote, pastry and papaya, plus a light berry tartness. One of the strongest teas here for effect: between the GABA, the caffeine and the L-theanine it gives a “focused calm”, plenty of energy with none of the fuss.' },
-      huangjingui:{ n:'Huang Jin Gui', o:'Oolong · Anxi, Luoyan village', d:'It appeared under the Xianfeng emperor, in the 1850s and 60s, in the village of Luoyan in Anxi county. The same cultivar also goes into black and green tea. The aroma is remarkably fresh and elegant, with osmanthus and ripe peach; the taste is a full-bodied grassy-floral thing with a berry tartness. It calms and settles you: a tea for the evening after a working week.' },
+      gabahoney:{ n:'GABA “Wild Honey”', o:'Oolong · Taiwan · a year in wild honey', d:'The tea spent a year ageing in wild honey. The first infusions have clear honey notes without excessive sweetness; later they recede and a light tartness appears.' },
+      gabaruby:{ n:'GABA “Ruby”', o:'Oolong · Taiwan · GABA', d:'Amber shoots rolled into small pearls. The aroma has baked fruit, fruit pie, pastila and tropical notes. The taste brings compote, pastry, papaya and a light berry tartness.' },
+      huangjingui:{ n:'Huang Jin Gui', o:'Oolong · Anxi, Luoyan village', d:'A fresh floral oolong with osmanthus and ripe peach in the aroma. The taste combines grassy and floral notes with a light berry tartness.' },
       dahongpao:{ n:'Da Hong Pao Rou Gui Qing Xiang', o:'Oolong · Wuyishan · Rou Gui cultivar', d:'Picking from the mother bushes was banned in 2006 and the last harvest went to the Gugong museum in Beijing, so no amount of money will buy you a real Da Hong Pao today. Everything sold under the name is grown from their cuttings; there are four cultivars, and ours is Rou Gui, “cinnamon”. The nose is bread crust, roasted nuts, citrus and peppery spice.' },
-      maoxie:{ n:'Tieguanyin Mao Xie', o:'Oolong · Anxi · the Iron Goddess of Mercy', d:'Tieguanyin has been known since the twelfth century. The legend says the grower Wei Qin offered the goddess Guanyin three bowls of tea every day, and one night dreamt of a tree with a wonderful scent. In the morning he found it on the mountain, took a cutting and planted it in an iron pot. The signature note is lilac, in both the nose and the taste, with a light tartness. The effect is soft and grounding.' },
-      gabamaocha:{ n:'GABA Mao Cha', o:'Oolong · Taiwan · stem cuttings', d:'Not leaf and not buds, but the cuttings of the tea bush. In China stem tea is considered the cheapest and is not much valued, so there is little of it about, and nowhere else in Moscow has this at all. It is a powerful, many-sided GABA all the same: the nose is fresh baking and bread, the taste sweet bread, baked apple and dried fruit with caramel. It lifts and focuses at once.' },
+      maoxie:{ n:'Tieguanyin Mao Xie', o:'Oolong · Anxi · the Iron Goddess of Mercy', d:'A light oolong from Anxi. Lilac is clear in both the aroma and the taste, joined by a gentle tartness.' },
+      gabamaocha:{ n:'GABA Mao Cha', o:'Oolong · Taiwan · tea-bush stems', d:'This tea is made from tea-bush stems rather than leaves or buds. The aroma recalls fresh bread and baking; the taste has baked apple, dried fruit and caramel.' },
       ginseng:{ n:'Ginseng oolong, Fujian', o:'Oolong · Fujian · ginseng and liquorice', d:'In China tea is held to carry yin energy and ginseng yang; ginseng oolong was made to balance the two. The leaf looks like little pebbles because ginseng root and liquorice powder are added at the rolling stage. The nose is sweetness and tropical fruit; the taste is sweet enough to seem sugared. The first pours are led by ginseng, then it steps back and the oolong itself comes through.' },
       ginseng1s:{ n:'Ginseng oolong, first grade', o:'Oolong · first grade · ginseng and liquorice', d:'Made the same way as the Fujian one: the leaf is rolled into tight pebbles and coated with ginseng root and liquorice powder. The brew is sweet with a ginseng aftertaste — ginseng leads the first pours, then the oolong itself comes through. It differs from the Fujian one in leaf grade; the master will help you pick the one for you.' },
       mandarin:{ n:'Shu pu-erh in a mandarin', o:'Pu-erh · a whole mandarin', d:'A mandarin was hollowed out, packed with shu pu-erh and dried together with it. You brew it whole, peel and all. Citrus over earth, and by the end of the session the peel turns slightly bitter.' },
       laochatou:{ n:'Da Lao Cha Tou', o:'Pu-erh · Menghai · tea nuggets', d:'In wet piling the juiciest leaves stick together into lumps. Nobody breaks them up; they are gathered from the bottom of the heap and sold on their own. Ten pours and they still hold: molasses and prunes.' },
-      peacock:{ n:'Shu pu-erh “Wild Peacock”', o:'Pu-erh · Lincang · 357 g cake', d:'A cake from Lincang, made from old-tree material. The liquor is nearly black and thick: earth, wet wood, a little chocolate. Calms rather than wakes.' },
+      peacock:{ n:'Shu pu-erh “Wild Peacock”', o:'Pu-erh · Lincang · 357 g cake', d:'A cake from Lincang, made from old-tree material. The liquor is nearly black and thick, with earth, wet wood and a little chocolate in the taste.' },
       bingdao:{ n:'Shu pu-erh Gongting Bingdao Gushu', o:'Pu-erh · Bingdao · old trees', d:'Gongting means “imperial”: the smallest and cleanest bud. Bingdao is a village in Lincang whose name on a wrapper is worth so much that it often ends up there undeserved. Soft and sweet, without a single earthy note.' },
       nuomixiang:{ n:'Nuo Mi Xiang mini brick', o:'Pu-erh · single-serve brick', d:'There is no rice in it whatsoever: the scent comes from the nuo mi xiang herb of Xishuangbanna, pressed together with the pu-erh. A real leaf, not a flavouring. Unwrap the foil and drop the brick in whole.' },
       jinhuawang:{ n:'Jin Hua Wang 2002', o:'Hei cha · Anhua · aged', d:'Anhua hei cha from 2002. The “golden flowers” are a fungus grown in this tea deliberately: it gives the dried-fruit aroma and that cellar-and-old-library taste.' },
@@ -2046,7 +2046,7 @@ select.input{
       yeshenghong:{ n:"Ye Sheng Hong (Wild Red)", o:"Black · Yunnan · wild-growing trees", d:"A black tea from wild-growing tea trees in Yunnan, made from the same purple-leaf 'ye sheng' varietal. The aroma carries dark berries and baked plum; the cup is ripe stone fruit, prune and honeyed sweetness, with a resinous, woody note underneath. The liquor is thick and dark amber, finishing clean and sweet." },
       shengchenxiang:{ n:"Sheng Pu-erh Chenxiang 2020", o:"Raw pu-erh · Yunnan · 2020, starting to age", d:"A young raw pu-erh from 2020. By tea standards it is still a teenager, but the years are beginning to show, and the name Chenxiang points exactly to that aged aroma. The dry leaf smells of greens and hay; the liquor still carries plenty of Yunnan bitterness and astringency that quickly turns to sweetness and a honeyed finish. The body is full, and toward the later infusions notes of dried fruit and warm wood come through. Brew it gongfu-style with water around 90°C and pour off the first rinse." },
       osmanthus:{ n:"Osmanthus (Gui Hua)", o:"Flower infusion · Guilin, Guangxi · dried blossoms, not tea leaf", d:"The tiny golden dried blossoms of sweet osmanthus, known as gui hua. The aroma is ripe apricot and peach with a creamy, honeyed sweetness; the infusion is clean and soft, trailing off into a faint dried-apricot note. Drink it on its own, or stir a pinch into an oolong or shu pu-erh, where it sits comfortably without burying the tea itself. It comes from Guilin in Guangxi, a city so planted with osmanthus that its name literally means “osmanthus forest”." },
-      vitamin:{ n:"\"Vitamin\" herbal blend", o:"Herbal blend · caffeine-free · berry", d:"Our own caffeine-free herbal blend. The taste is berry-bright and gently tart, followed by warm herbal notes. Its sweet-and-sour finish lingers; the blend can be served hot or chilled." },
+      vitamin:{ n:"\"Vitamin\" herbal blend", o:"Herbal blend · berry", d:"Our own herbal blend. The taste is berry-bright and gently tart, followed by warm herbal notes. It can be served hot or chilled." },
     },
   },
 
@@ -2203,24 +2203,24 @@ select.input{
       chongshicha:{ n:'虫屎茶', o:'特别 · 广西', d:'茶单上最奇特的一款，而且它不是用茶叶泡的。茶叶层层堆放，让蛾类幼虫吃过，留下来的东西才是冲泡的原料。完全没有异味：汤色深红，微甜，带木质气息。点单之前，先和茶艺师聊两句。' },
       baihao:{ n:'白毫银针', o:'白茶 · 云南 · 只取芽头', d:'「白毫银针」：只用芽头，不带叶。白茶几乎不做加工。香气是草地上的野草、荨麻与三叶草，滋味清鲜，带一点点酸。性子安静，适合慢慢聊天，也适合热天。我们用70–75度冲，不能更烫。' },
       baimudan:{ n:'白牡丹', o:'白茶 · 福鼎 · 一芽一叶', d:'与银针不同，这里除了芽还带第一片叶。香气是花草的清新，带明显的天竺葵气息；滋味有草地野花与花蜜感。极耐冲泡，能撑很多水。白天或傍晚喝正好。' },
-      longjing:{ n:'龙井黄豆', o:'绿茶 · 浙江 · 扁平大叶', d:'香气意外地丰富：板栗、煮玉米、瓜子，还有那股独特的鲜爽与花香。滋味是青草、炒坚果、板栗。提神但温和，适合配着工作喝。想认识中国绿茶，从这里开始。' },
+      longjing:{ n:'龙井黄豆', o:'绿茶 · 浙江 · 扁平大叶', d:'香气中有板栗、煮玉米、瓜子和淡淡花香。滋味带青草、炒坚果与板栗，是认识中国绿茶的一款清楚易懂的茶。' },
       molimaojian:{ n:'茉莉毛尖', o:'绿茶 · 窨制茉莉', d:'从前妃子用茉莉花茶侍奉皇帝。工艺很细：花苞开到六成时，在恒定的三十五度下烘干。香气是茉莉与玉兰，滋味是青草与明显的甜。适合喝茶必须加糖、却又想尝尝真正中国茶的人。' },
       biluogold:{ n:'滇红金螺', o:'红茶 · 云南 · 金芽', d:'中文叫「金螺」：借碧螺春的手法把茶叶揉成螺形，金毫因此显在外面。纯芽头。蜜香、杏干，还有暖烘焙的气息。' },
       xiaozhong:{ n:'小种 甲级', o:'红茶 · 烟熏 · 即正山小种', d:'烟熏茶，西方叫它Lapsang Souchong。据说它是十七世纪偶然出现的：农人把茶叶忘在太阳底下，叶子发酵变深，与其扔掉，不如架在松枝上烘干——于是有了它。香气是焦糖、烤水果和黑麦面包；滋味柔和而厚实，有果茶的甜，尾韵带面包气。它把人裹住，让人暖起来。' },
       longjinghong:{ n:'龙井红茶', o:'红茶 · 浙江', d:'与绿龙井同一批茶树做的红茶。用的是短暂春季之后采下的叶子，那时已做不出高档绿茶。外形是卷曲的，不扁平，而龙井的板栗香还在。' },
       dianhong:{ n:'滇红（云南）', o:'红茶 · 云南', d:'如果您想找一款日常喝的经典红茶，就是它了。香气是炒瓜子与黑葡萄干，滋味是坚果、果脯，尾巴上拖着一缕花香的甜。一款再直白不过的茶，没什么可多说的。' },
       dancong:{ n:'凤凰单丛 高山清香', o:'乌龙 · 广东 · 凤凰山的单株', d:'凤凰山上的一棵独立老树。香气如春，满是花意：忍冬、水仙、风信子，还有一缕菊苣的辛香。滋味带着单丛特有的苦，随即转甜。潮州还有自己的一套泡法：壶里塞满茶，快冲快出，用小盏喝——想试的话跟我们说一声。' },
-      gabahoney:{ n:'GABA「野蜜」', o:'乌龙 · 台湾 · 在野蜜里陈放一年', d:'同样是GABA，只多了一道工序：这款茶在野蜂蜜里陈放了一年，肉眼就能看见——叶子上结着蜜壳，闪着光。前几泡是蜜香，不腻；之后蜜退到后面，留下GABA本身，酸度略高一些。这是一款重味道多过重状态的茶。' },
-      gabaruby:{ n:'GABA「红宝石」', o:'乌龙 · 台湾 · GABA', d:'琥珀色的茶芽揉成珠状。香气是烤水果、水果派、苹果软糕和热带气息；滋味延续下去：果茶、烘焙、木瓜，还有一点浆果的酸。论效果是这里最强的几款之一：GABA、咖啡因与L-茶氨酸一起，给出所谓「专注的平静」——精力充沛，却一点也不慌。' },
-      huangjingui:{ n:'黄金桂', o:'乌龙 · 安溪罗岩村', d:'出现在清咸丰年间（1850–60年代），安溪县罗岩村。同一个品种也用来做红茶和绿茶。香气清新雅致，带桂花与熟桃；滋味饱满，草木花香之外还有一丝浆果的酸。安神、松弛，是忙完一周之后的晚间茶。' },
+      gabahoney:{ n:'GABA「野蜜」', o:'乌龙 · 台湾 · 在野蜜里陈放一年', d:'这款茶在野蜂蜜里陈放了一年。前几泡蜜香清楚而不腻，之后蜜香渐淡，滋味中出现一点轻微酸感。' },
+      gabaruby:{ n:'GABA「红宝石」', o:'乌龙 · 台湾 · GABA', d:'琥珀色茶芽揉成小珠。香气有烤水果、水果派、果糕与热带水果；滋味带果茶、烘焙、木瓜和一点浆果酸。' },
+      huangjingui:{ n:'黄金桂', o:'乌龙 · 安溪罗岩村', d:'清新的花香乌龙，香气中有桂花与熟桃。滋味兼有草木、花香和一点浆果酸。' },
       dahongpao:{ n:'大红袍 肉桂清香', o:'乌龙 · 武夷山 · 肉桂品种', d:'母树的采摘在2006年被禁止，最后一批送进了北京故宫博物院——所以今天花多少钱也喝不到真正的大红袍。市面上叫这个名字的，都是母树扦插的后代；常见品种有四个，我们这款是肉桂。香气是面包皮、炒坚果、柑橘与胡椒的辛香。' },
-      maoxie:{ n:'铁观音 毛蟹', o:'乌龙 · 安溪 · 铁观音', d:'铁观音自十二世纪便为人所知。传说茶农魏钦每日供奉观音三杯茶，一夜梦见山上有株异香的茶树。天亮上山果然寻得，掐下枝条，栽在铁锅里。它的标志是丁香的气息，香与味中都有，还带一点微酸。效果柔和、落地。' },
-      gabamaocha:{ n:'GABA毛茶', o:'乌龙 · 台湾 · 茶树枝梗', d:'不是叶，也不是芽，而是茶树的枝梗。在中国，梗茶被视为最便宜的东西，没什么人看得上，所以数量也不多；而在莫斯科，这款别处根本没有。可它偏偏是一款厚实又多层次的GABA：香气一上来就是新出炉的面包与烤水果，滋味是甜面包、烤苹果、带焦糖的果脯。提神，同时让人集中。' },
+      maoxie:{ n:'铁观音 毛蟹', o:'乌龙 · 安溪 · 铁观音', d:'安溪的清香型乌龙。香气与滋味中都有明显的丁香花香，并带一点轻微酸感。' },
+      gabamaocha:{ n:'GABA毛茶', o:'乌龙 · 台湾 · 茶树枝梗', d:'这款茶用茶树枝梗而不是叶或芽制成。香气像新鲜面包与烘焙，滋味有烤苹果、果干和焦糖。' },
       ginseng:{ n:'人参乌龙 · 福建', o:'乌龙 · 福建 · 人参与甘草', d:'中国人认为茶属阴、人参属阳，为求两者平衡，才有了人参乌龙。茶叶像小石子，是因为在揉捻阶段加入了人参根与甘草的粉末。香气甜润，带热带水果；滋味的甜非常直白，像往茶里放了糖。前几泡是人参当家，之后它退到后面，乌龙自己显出来。' },
       ginseng1s:{ n:'人参乌龙 · 一级', o:'乌龙 · 一级 · 人参与甘草', d:'做法与福建那款相同：茶叶揉成紧实的小石子，外裹人参根与甘草粉。汤感甜润，回味带人参——前几泡人参当家，之后乌龙自己显出来。与福建那款的区别在于原料等级；喝哪一款更合您口味，可以让茶师帮您挑。' },
       mandarin:{ n:'小青柑（熟普）', o:'普洱 · 整颗柑', d:'把柑掏空，填入熟普，再一起晒干。连皮整颗冲泡。柑香浮在土气之上，喝到后段柑皮会透出一丝苦。' },
       laochatou:{ n:'大老茶头', o:'普洱 · 勐海 · 茶头', d:'渥堆时最多汁的叶子会粘结成块。没人去把它敲散，而是从堆底收起来单独卖。十泡不散：糖蜜与西梅。' },
-      peacock:{ n:'熟普「野生孔雀」', o:'普洱 · 临沧 · 357克茶饼', d:'临沧的茶饼，老树原料。汤色近黑而浓稠：泥土、湿木头，还有一点巧克力。安神多于提神。' },
+      peacock:{ n:'熟普「野生孔雀」', o:'普洱 · 临沧 · 357克茶饼', d:'临沧茶饼，采用老树原料。茶汤近黑而浓稠，滋味有泥土、湿木头和一点巧克力。' },
       bingdao:{ n:'熟普 宫廷冰岛古树', o:'普洱 · 冰岛 · 古树', d:'宫廷指最细最净的芽头。冰岛是临沧的一个村子，这三个字印在棉纸上太值钱，所以常常印得并不名副其实。柔和回甘，没有一丝土味。' },
       nuomixiang:{ n:'糯香小金砖', o:'普洱 · 单泡小砖', d:'里面没有一粒米：香气来自西双版纳的糯米香叶，与普洱一同压制。是真叶子，不是香精。剥开锡纸，整块投入即可。' },
       jinhuawang:{ n:'金花王 2002', o:'黑茶 · 安化 · 陈化', d:'2002年的安化黑茶。「金花」是特意在茶里养出来的菌：它带来果脯般的香气，也带来那股地窖与旧图书馆的味道。' },
@@ -2231,7 +2231,7 @@ select.input{
       yeshenghong:{ n:"野生红", o:"红茶 · 云南 · 野生茶树", d:"采自云南野生茶树的红茶，用的正是带紫芽的野生品种。香气里有深色浆果和烤李子，入口是熟透的核果、西梅和蜜糖般的甜，底下透着一缕松脂般的木质气息。茶汤浓稠、呈深琥珀色，回味干净而甜。" },
       shengchenxiang:{ n:"陈香 生普洱 2020", o:"生普 · 云南 · 2020年，开始转化", d:"2020年的年轻生普。按茶的年纪它还算少年，但陈化已经初露端倪，「陈香」正是指这份随年份而来的气息。干茶有青草和干草的气息，茶汤仍带着云南生普的苦与涩，很快化为甜润，尾韵带蜜香。茶体饱满，到后段渐渐透出干果和暖木的味道。建议用约90℃的水盖碗快出，第一泡先润茶倒掉。" },
       osmanthus:{ n:"桂花", o:"花茶 · 广西桂林 · 干花，非茶叶", d:"金黄色的干桂花，即「桂花」本身，而非茶叶。香气是熟透的杏与桃，带着奶油般的蜜甜；茶汤清澈柔和，尾韵有一丝杏干的味道。可单独冲泡，也可取一撮拌入乌龙或熟普，桂花与它们相处融洽，不会盖过茶底本身。原产广西桂林，此城遍植桂树，城名「桂林」意即「桂花之林」。" },
-      vitamin:{ n:"「维生素」草本拼配茶", o:"草本拼配 · 无咖啡因 · 浆果", d:"茶馆自制的无咖啡因草本拼配。入口有明亮的浆果酸味和轻微涩感，随后出现温暖的草本气息。酸甜回味持久，既可热饮，也可冷饮。" },
+      vitamin:{ n:"「维生素」草本拼配茶", o:"草本拼配 · 浆果", d:"茶馆自制的草本拼配。入口有浆果酸味和轻微涩感，随后出现温暖的草本气息。可热饮，也可冷饮。" },
     },
   },
 
@@ -2505,7 +2505,7 @@ select.input{
     ? rub(m.p) + `<small>${T().per_pc}</small>`
     : rub(packPrice(m.p, PACKS[0])) + `<small>${T().per_pack25}</small>`;
 
-  function teaCard(m){
+  function teaCard(m, headingTag='h3'){
     const txt = T().teas[m.id];
     const node = el(`
       <article class="tea" data-type="${m.t}" data-id="${m.id}" data-price="${m.unit === 'pc' ? m.p : packPrice(m.p, PACKS[0])}" data-stock="${inStock(m) ? 1 : 0}">
@@ -2518,7 +2518,7 @@ select.input{
           </button>
         </div>
         <div class="tea__body">
-          <h3 class="tea__name">${txt.n}</h3>
+          <${headingTag} class="tea__name">${txt.n}</${headingTag}>
           <p class="tea__orig">${txt.o}</p>
           <div class="tea__foot">
             <span class="price num">${priceOf(m)}</span>
@@ -2642,8 +2642,8 @@ select.input{
       if (featured.length >= 3) break;
       if (inStock(m) && !featured.includes(m)) featured.push(m);
     }
-    home.append(...featured.slice(0,3).map(teaCard));
-    menu.append(...stockFirst(TEA_META).map(teaCard));
+    home.append(...featured.slice(0,3).map(m => teaCard(m, 'h3')));
+    menu.append(...stockFirst(TEA_META).map(m => teaCard(m, 'h2')));
     applyFilter();
   }
 
@@ -3565,8 +3565,8 @@ select.input{
       const fullDate = d.toLocaleDateString(T().locale, {
         weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'Europe/Moscow',
       });
-      const b = el(`<button class="day" type="button" data-d="${key}" aria-label="${escAttr(fullDate)}" aria-pressed="${B.date === key}">
-        <b class="num">${Number(part.day)}</b><span>${label}</span>
+      const b = el(`<button class="day" type="button" data-d="${key}" aria-pressed="${B.date === key}">
+        <b class="num">${Number(part.day)}</b><span>${label}</span><span class="sr-only">, ${fullDate}</span>
       </button>`);
       b.addEventListener('click', () => {
         B.date = key;

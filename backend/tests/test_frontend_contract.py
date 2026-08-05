@@ -50,6 +50,25 @@ def test_public_pages_use_quiet_account_probe_and_eager_hero_image():
 def test_catalog_keeps_a_semantic_heading_without_restoring_visual_clutter():
     assert '<h1 class="sr-only" data-i18n="shop_heading">' in SOURCE
     assert "shop_heading:'Каталог китайского чая'" in SOURCE
+    assert "teaCard(m, 'h2')" in SOURCE
+
+
+def test_booking_controls_have_accessible_names_and_heading_order():
+    assert '<h2 class="summary__title" data-i18n="sum_h">' in SOURCE
+    assert '<span class="sr-only">, ${fullDate}</span>' in SOURCE
+    assert 'data-d="${key}" aria-label=' not in SOURCE
+    assert '.fmt__d{ font-size:11.5px; color:var(--text-2);' in SOURCE
+
+
+def test_catalog_copy_does_not_promise_unverified_effects():
+    for unsupported in (
+        'за счёт ГАМК, кофеина и L-теанина',
+        'Тонизирует и сосредотачивает',
+        'Успокаивает и умиротворяет',
+        'Эффект мягкий, приземляющий',
+        'Скорее успокаивает, чем бодрит',
+    ):
+        assert unsupported not in SOURCE
 
 
 def test_language_switch_updates_all_document_metadata():

@@ -41,7 +41,7 @@
 
 /* ─────────────────────────  БАЗА  ───────────────────────── */
 *{ box-sizing:border-box; }
-html{ overflow-x:clip; }
+html,body{ overflow-x:hidden; overflow-x:clip; }
 body{
   margin:0; background:var(--bg); color:var(--text);
   font-family:'Golos Text', system-ui, sans-serif;
@@ -362,6 +362,7 @@ h1, h2, h3, p{ text-wrap:pretty; }
 .shop-search .input{ padding-left:42px; }
 .sr-only{ position:absolute!important; width:1px!important; height:1px!important; padding:0!important; margin:-1px!important; overflow:hidden!important; clip:rect(0,0,0,0)!important; white-space:nowrap!important; border:0!important; }
 .scroll-shell{ position:relative; min-width:0; }
+.scroll-shell--days{ overflow:hidden; }
 .scroll-shell::after{
   content:''; position:absolute; z-index:2; top:0; right:-1px; bottom:4px; width:38px;
   background:linear-gradient(90deg,transparent,var(--bg)); pointer-events:none;
@@ -2453,11 +2454,11 @@ select.input{
   }
 
   /* ─────────────  КАРТОЧКА ЧАЯ  ─────────────
-     На карточке показываем цену минимального пакета (25 г), а не «за 10 г»:
+     На карточке показываем цену минимального пакета (10 г):
      покупателю важно, сколько он отдаст на кассе. */
   const priceOf = m => m.unit === 'pc'
-    ? rub(m.p) + `<small>${T().per_pc}</small>`
-    : rub(packPrice(m.p, PACKS[0])) + `<small>${T().per_pack25}</small>`;
+    ? rub(m.p) + `&nbsp;<small>${T().per_pc}</small>`
+    : rub(packPrice(m.p, PACKS[0])) + `&nbsp;<small>${T().per_pack25}</small>`;
 
   let catalogImagesWired = false, catalogImageFrame = 0;
   function loadCatalogImagesNearViewport(){

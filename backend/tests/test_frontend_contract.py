@@ -60,6 +60,13 @@ def test_booking_controls_have_accessible_names_and_heading_order():
     assert '<span class="sr-only">, ${fullDate}</span>' in SOURCE
     assert 'data-d="${key}" aria-label=' not in SOURCE
     assert '.fmt__d{ font-size:11.5px; color:var(--text-2);' in SOURCE
+    assert ".scroll-shell--days{ overflow:hidden; }" in SOURCE
+    assert "html,body{ overflow-x:hidden; overflow-x:clip; }" in SOURCE
+
+
+def test_catalog_price_keeps_a_text_separator_before_its_unit():
+    assert "`&nbsp;<small>${T().per_pc}</small>`" in SOURCE
+    assert "`&nbsp;<small>${T().per_pack25}</small>`" in SOURCE
 
 
 def test_catalog_copy_does_not_promise_unverified_effects():

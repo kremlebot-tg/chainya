@@ -118,7 +118,14 @@ http://127.0.0.1:8078 {
 	}
 
 	handle_errors {
-		rewrite * /404.html
-		file_server
+		@notFound expression {err.status_code} == 404
+		handle @notFound {
+			rewrite * /404.html
+			file_server
+		}
+		handle {
+			rewrite * /50x.html
+			file_server
+		}
 	}
 }

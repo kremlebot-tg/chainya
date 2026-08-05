@@ -93,6 +93,7 @@ def check_dist(root: pathlib.Path) -> list[str]:
         "business/index.html",
         "booking/index.html",
         "404.html",
+        "50x.html",
         "favicon.ico",
         "privacy.html",
         "legal.html",
@@ -103,6 +104,21 @@ def check_dist(root: pathlib.Path) -> list[str]:
     missing = sorted(name for name in required if not (root / name).is_file())
     if missing:
         errors.append("нет обязательных файлов: " + ", ".join(missing))
+    error_page_markers = {
+        "404.html": "Лист сбился с пути",
+        "50x.html": "Чайнику нужна минута",
+    }
+    for name, marker in error_page_markers.items():
+        path = root / name
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        if marker not in text:
+            errors.append(f"{name}: потерян фирменный текст")
+        if '<meta name="robots" content="noindex,nofollow">' not in text:
+            errors.append(f"{name}: нет noindex,nofollow")
+        if "<script" in text.lower():
+            errors.append(f"{name}: служебная страница не должна выполнять JavaScript")
     for name in (
         "index.html", "shop/index.html", "business/index.html", "booking/index.html",
         "privacy.html", "legal.html",

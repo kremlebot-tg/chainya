@@ -81,7 +81,7 @@ switched=1
 test "$(readlink -f "$active")" = "$release"
 test "$(docker inspect chainya-edge-edge-1 --format '{{.State.Health.Status}}')" = healthy
 curl -fsS http://127.0.0.1:8078/shop -o "$stage/internal-shop.html"
-grep -Fq 'Если выбираете впервые, начните с этих трёх чаёв:' "$stage/internal-shop.html"
+grep -Fq 'Рекомендуем начать свой чайный путь с этих позиций:' "$stage/internal-shop.html"
 ! grep -Eq 'id="ts-taste"|renderRadar' "$stage/internal-shop.html"
 
 rm -rf -- "$stage"
@@ -91,7 +91,7 @@ REMOTE
 
 echo "→ публичная проверка edge"
 curl -fsS https://chainya.ru/shop -o "$TMP/public-shop.html"
-grep -Fq 'Если выбираете впервые, начните с этих трёх чаёв:' "$TMP/public-shop.html"
+grep -Fq 'Рекомендуем начать свой чайный путь с этих позиций:' "$TMP/public-shop.html"
 ! grep -Eq 'id="ts-taste"|renderRadar' "$TMP/public-shop.html"
 curl -fsS https://chainya.ru/business -o "$TMP/public-business.html"
 grep -Fq 'Можно начать с небольшой партии и проверить спрос.' "$TMP/public-business.html"

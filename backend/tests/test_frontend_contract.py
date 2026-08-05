@@ -42,6 +42,13 @@ def test_catalog_explanation_is_short_and_before_the_products():
     assert "Вес выбирается в карточке чая" in SOURCE
 
 
+def test_owner_approved_home_copy_is_preserved():
+    assert "Рекомендуем начать свой чайный путь с этих позиций:" in SOURCE
+    assert "наполняя пространство Ча Цы" in SOURCE
+    assert "Подойдёт для первого знакомства, свидания или дружеской встречи." in SOURCE
+    assert "Четыре шага<br>до первого глотка" not in SOURCE
+
+
 def test_public_pages_use_quiet_account_probe_and_eager_hero_image():
     assert "fetch('/api/account/session'" in SOURCE
     assert "fetch('/api/account',{cache:'no-store'})" not in SOURCE

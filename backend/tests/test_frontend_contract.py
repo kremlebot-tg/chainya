@@ -71,6 +71,11 @@ def test_catalog_copy_does_not_promise_unverified_effects():
         assert unsupported not in SOURCE
 
 
+def test_business_offer_headings_follow_the_page_heading():
+    assert '<h2 data-i18n="b2b_offer1_h">' in SOURCE
+    assert '<h2 data-i18n="b2b_offer2_h">' in SOURCE
+
+
 def test_language_switch_updates_all_document_metadata():
     assert "function syncDocumentMetadata(view)" in SOURCE
     assert "meta[name=\"description\"]" in SOURCE

@@ -651,4 +651,8 @@ fi
 if ! python3 scripts/verify-release.py --dist dist --base-url https://chainya.ru; then
   echo "⚠ локальная внешняя release-проверка недоступна; remote-проверка уже пройдена" >&2
 fi
-echo "✓ сайт и checkout развёрнуты одним release"
+
+echo "→ обновление публичного Timeweb edge"
+"$ROOT/deploy-edge.sh"
+
+echo "✓ сайт, публичный edge и checkout развёрнуты одним release"

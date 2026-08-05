@@ -5,12 +5,14 @@ import pytest
 
 SOURCE_PATH = Path(__file__).resolve().parents[2] / "src.html"
 BUILD_PATH = Path(__file__).resolve().parents[2] / "build.py"
+ADMIN_CATALOG_PATH = Path(__file__).resolve().parents[1] / "admin-catalog.html"
 pytestmark = pytest.mark.skipif(
     not SOURCE_PATH.exists(),
     reason="frontend source is not part of the production backend artifact",
 )
 SOURCE = SOURCE_PATH.read_text(encoding="utf-8") if SOURCE_PATH.exists() else ""
 BUILD_SOURCE = BUILD_PATH.read_text(encoding="utf-8") if BUILD_PATH.exists() else ""
+ADMIN_CATALOG = ADMIN_CATALOG_PATH.read_text(encoding="utf-8")
 
 
 def test_checkout_has_one_clear_payment_method_and_visible_status():
@@ -50,7 +52,7 @@ def test_public_pages_use_quiet_account_probe_and_eager_hero_image():
 def test_catalog_keeps_a_semantic_heading_without_restoring_visual_clutter():
     assert '<h1 class="sr-only" data-i18n="shop_heading">' in SOURCE
     assert "shop_heading:'Каталог китайского чая'" in SOURCE
-    assert "teaCard(m, 'h2')" in SOURCE
+    assert "teaCard(m, 'h2', true, index < 8)" in SOURCE
 
 
 def test_booking_controls_have_accessible_names_and_heading_order():
@@ -90,3 +92,28 @@ def test_product_sheet_can_render_food_labelling_fields():
     assert 'id="ts-food-rows"' in SOURCE
     for field in ("composition", "manufacturer", "shelf_life", "storage"):
         assert f"txt.{field}" in SOURCE
+
+
+def test_public_catalog_does_not_restore_taste_profile_ui():
+    assert 'id="ts-taste"' not in SOURCE
+    assert "renderRadar" not in SOURCE
+    assert "tea-radar" not in SOURCE
+
+
+def test_shop_defers_images_below_the_initial_catalog_view():
+    assert "function activateCatalogImages()" in SOURCE
+    assert "teaCard(m, 'h2', true, index < 8)" in SOURCE
+    assert 'data-catalog-src="${m.img}"' in SOURCE
+    assert 'data-catalog-eager="1"' in SOURCE
+    assert "rect.top > innerHeight + 600" in SOURCE
+    assert "if (view === 'shop') activateCatalogImages()" in SOURCE
+    assert "if ($('#view-shop').classList.contains('is-active')) activateCatalogImages()" in SOURCE
+    assert "$('#shop-empty').hidden = shown !== 0 || curFilter === 'fav';\n    scheduleCatalogImages();" in SOURCE
+
+
+def test_admin_catalog_surfaces_incomplete_food_labelling():
+    assert 'id="stat-incomplete"' in ADMIN_CATALOG
+    assert 'id="catalog-filter"' in ADMIN_CATALOG
+    assert "function missingLabelFields(item)" in ADMIN_CATALOG
+    assert "Маркировка заполнена не полностью" in ADMIN_CATALOG
+    assert "Всё равно показывать товар на сайте?" in ADMIN_CATALOG

@@ -2398,6 +2398,7 @@ select.input{
     if (updateHistory && (location.pathname !== VIEW_PATHS[view] || location.hash))
       history.pushState({ view }, '', VIEW_PATHS[view]);
     if (changingView) scrollTo({ top:0, behavior:'instant' });
+    if (view === 'shop') activateCatalogImages();
     tgSyncBack();
     trackOnce('section_view', view);
     if (view === 'book') trackOnce('booking_start', 'book');
@@ -2458,12 +2459,36 @@ select.input{
     ? rub(m.p) + `<small>${T().per_pc}</small>`
     : rub(packPrice(m.p, PACKS[0])) + `<small>${T().per_pack25}</small>`;
 
-  function teaCard(m, headingTag='h3'){
+  let catalogImagesWired = false, catalogImageFrame = 0;
+  function loadCatalogImagesNearViewport(){
+    catalogImageFrame = 0;
+    $$('img[data-catalog-src]').forEach(image => {
+      const rect = image.closest('.tea').getBoundingClientRect();
+      const eager = image.dataset.catalogEager === '1';
+      if (!eager && (!rect.height || rect.bottom < -600 || rect.top > innerHeight + 600)) return;
+      image.src = image.dataset.catalogSrc;
+      delete image.dataset.catalogSrc;
+      delete image.dataset.catalogEager;
+    });
+  }
+  function scheduleCatalogImages(){
+    if (!catalogImageFrame) catalogImageFrame = requestAnimationFrame(loadCatalogImagesNearViewport);
+  }
+  function activateCatalogImages(){
+    if (!catalogImagesWired){
+      catalogImagesWired = true;
+      addEventListener('scroll', scheduleCatalogImages, { passive:true });
+      addEventListener('resize', scheduleCatalogImages, { passive:true });
+    }
+    scheduleCatalogImages();
+  }
+
+  function teaCard(m, headingTag='h3', deferImage=false, eagerImage=false){
     const txt = T().teas[m.id];
     const node = el(`
       <article class="tea" data-type="${m.t}" data-id="${m.id}" data-price="${m.unit === 'pc' ? m.p : packPrice(m.p, PACKS[0])}" data-stock="${inStock(m) ? 1 : 0}">
         <div class="tea__art${inStock(m) ? '' : ' tea__art--oos'}">
-          <img src="${m.img}" alt="${escAttr(txt.n)}" loading="lazy" width="800" height="800">
+          <img ${deferImage ? `data-catalog-src="${m.img}"${eagerImage ? ' data-catalog-eager="1"' : ''}` : `src="${m.img}"`} alt="${escAttr(txt.n)}" loading="lazy" decoding="async"${deferImage ? ' fetchpriority="low"' : ''} width="800" height="800">
           <span class="tea__dot" style="background:${LQ[m.t]}"></span>
           ${inStock(m) ? '' : `<span class="tea__oos">${T().oos}</span>`}
           <button class="tea__fav" data-id="${m.id}" aria-pressed="${isFav(m.id)}" aria-label="${escAttr(T().fav_label)}" title="${escAttr(T().fav_label)}">
@@ -2596,7 +2621,8 @@ select.input{
       if (inStock(m) && !featured.includes(m)) featured.push(m);
     }
     home.append(...featured.slice(0,3).map(m => teaCard(m, 'h3')));
-    menu.append(...stockFirst(TEA_META).map(m => teaCard(m, 'h2')));
+    menu.append(...stockFirst(TEA_META).map((m,index) => teaCard(m, 'h2', true, index < 8)));
+    if ($('#view-shop').classList.contains('is-active')) activateCatalogImages();
     applyFilter();
   }
 
@@ -2710,6 +2736,7 @@ select.input{
     // подсказка, когда в избранном пусто
     $('#fav-empty').hidden = !(curFilter === 'fav' && shown === 0);
     $('#shop-empty').hidden = shown !== 0 || curFilter === 'fav';
+    scheduleCatalogImages();
   }
   function buildFilters(){
     const f = $('#filters');

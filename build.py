@@ -25,6 +25,7 @@ import sys
 
 root = pathlib.Path(__file__).parent
 web = "--web" in sys.argv
+asset_root = "/" if web else ""
 
 src = (root / "src.html").read_text(encoding="utf-8")
 assert "/*@FONTS@*/" in src, "маркер /*@FONTS@*/ пропал из src.html"
@@ -55,7 +56,10 @@ SECURITY_EMAIL = "mailto:chainya@bk.ru"
 # и ни телеграму, ни CDN нечего отдавать из старого кэша.
 OG_SRC = root / "src-assets" / "og.jpg"
 OG_NAME = f"og.{hashlib.sha256(OG_SRC.read_bytes()).hexdigest()[:8]}.jpg"
-HERO_PRELOAD = '<link rel="preload" as="image" href="img/tea-baihao.webp" fetchpriority="high">'
+HERO_PRELOAD = (
+    f'<link rel="preload" as="image" href="{asset_root}img/tea-baihao.webp" '
+    'fetchpriority="high">'
+)
 
 HEAD_EXTRA = f"""<meta name="description" content="{DESC}">
 <meta name="theme-color" content="#141110">
@@ -71,8 +75,8 @@ HEAD_EXTRA = f"""<meta name="description" content="{DESC}">
 <meta name="twitter:title" content="{TITLE}">
 <meta name="twitter:description" content="{DESC}">
 <link rel="canonical" href="{SITE}">
-<link rel="icon" href="favicon.png" type="image/png">
-<link rel="apple-touch-icon" href="favicon.png">
+<link rel="icon" href="{asset_root}favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="{asset_root}favicon.png">
 {HERO_PRELOAD}
 {json.dumps({
     "@context": "https://schema.org",
@@ -142,7 +146,7 @@ def font_css(inline: bool) -> str:
     assert len(parts) == len(names) + 1, "не совпало число @font-face со списком файлов"
     out = parts[0]
     for name, tail in zip(names, parts[1:]):
-        out += f"url(fonts/{name}.woff2)" + tail
+        out += f"url(/fonts/{name}.woff2)" + tail
     return out
 
 
@@ -157,7 +161,7 @@ def img_ref(m):
         return ""
     used.add(name)
     if web:
-        return f"img/{name}.webp"
+        return f"/img/{name}.webp"
     return "data:image/webp;base64," + base64.b64encode(f.read_bytes()).decode()
 
 

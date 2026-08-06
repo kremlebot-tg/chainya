@@ -164,6 +164,15 @@ def check_dist(root: pathlib.Path) -> list[str]:
         view = route_views[name]
         if f'<section class="view is-active" id="view-{view}">' not in text:
             errors.append(f"{name}: неверный исходный активный раздел")
+        relative_assets = re.findall(
+            r'(?:src|href)=["\'](?:img/|fonts/|favicon\.(?:png|ico))',
+            text,
+        )
+        relative_assets += re.findall(r'url\((?:img/|fonts/)', text)
+        if relative_assets:
+            errors.append(
+                f"{name}: относительные ассеты ломаются при URL с завершающим слэшем"
+            )
     for path in root.rglob("*"):
         if not path.is_file():
             continue

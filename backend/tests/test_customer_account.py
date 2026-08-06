@@ -203,13 +203,17 @@ def test_production_customer_cookie_is_secure(tmp_path, monkeypatch):
     assert "secure" in response.headers["set-cookie"].lower()
 
 
-def test_account_page_is_no_store_and_not_indexed(tmp_path, monkeypatch):
+def test_account_page_is_no_store_not_indexed_and_uses_real_photo(tmp_path, monkeypatch):
     client, _ = app_client(tmp_path, monkeypatch)
     with client:
         page = client.get("/account")
         head = client.head("/account/")
     assert page.status_code == 200
     assert "Личный кабинет" in page.text
+    assert '/img/hall-room.webp' in page.text
+    assert 'alt="Интерьер Чайни на улице Острякова"' in page.text
+    assert 'loading="lazy"' in page.text
+    assert page.text.index('class="auth-card"') < page.text.index('class="auth-photo"')
     assert page.headers["cache-control"] == "no-store"
     assert page.headers["x-robots-tag"] == "noindex, nofollow"
     assert head.status_code == 200

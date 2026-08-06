@@ -52,7 +52,8 @@ def test_owner_approved_home_copy_is_preserved():
 def test_public_pages_use_quiet_account_probe_and_eager_hero_image():
     assert "fetch('/api/account/session'" in SOURCE
     assert "fetch('/api/account',{cache:'no-store'})" not in SOURCE
-    assert 'rel="preload" as="image" href="img/tea-baihao.webp"' in BUILD_SOURCE
+    assert 'asset_root = "/" if web else ""' in BUILD_SOURCE
+    assert 'href="{asset_root}img/tea-baihao.webp"' in BUILD_SOURCE
     assert '.replace(HERO_PRELOAD, "")' in BUILD_SOURCE
 
 
@@ -123,6 +124,12 @@ def test_shop_defers_images_below_the_initial_catalog_view():
     assert "if (view === 'shop') activateCatalogImages()" in SOURCE
     assert "if ($('#view-shop').classList.contains('is-active')) activateCatalogImages()" in SOURCE
     assert "$('#shop-empty').hidden = shown !== 0 || curFilter === 'fav';\n    scheduleCatalogImages();" in SOURCE
+
+
+def test_web_build_uses_root_relative_assets_for_clean_routes():
+    assert 'return f"/img/{name}.webp"' in BUILD_SOURCE
+    assert 'url(/fonts/{name}.woff2)' in BUILD_SOURCE
+    assert '<link rel="icon" href="{asset_root}favicon.png"' in BUILD_SOURCE
 
 
 def test_admin_catalog_surfaces_incomplete_food_labelling():

@@ -9,6 +9,12 @@ TMP="$(mktemp -d)"
 RELEASE_COMMIT="$(git -C "$ROOT" rev-parse HEAD)"
 STAGE_ID="${RELEASE_COMMIT}-$(date -u +%Y%m%dT%H%M%SZ)-$$"
 REMOTE_STAGE="/tmp/chainya-edge-${STAGE_ID}"
+MAINTENANCE_MODE="${CHAINYA_EDGE_MAINTENANCE:-0}"
+
+case "$MAINTENANCE_MODE" in
+  (0|1) ;;
+  (*) echo "CHAINYA_EDGE_MAINTENANCE должен быть 0 или 1" >&2; exit 64 ;;
+esac
 
 cleanup() {
   rm -rf -- "$TMP"
@@ -41,10 +47,11 @@ rsync -az \
   "$EDGE_HOST:$REMOTE_STAGE/"
 
 echo "→ атомарное переключение edge"
-ssh "$EDGE_HOST" "CHAINYA_EDGE_STAGE='$REMOTE_STAGE' bash -se" <<'REMOTE'
+ssh "$EDGE_HOST" "CHAINYA_EDGE_STAGE='$REMOTE_STAGE' CHAINYA_EDGE_MAINTENANCE='$MAINTENANCE_MODE' bash -se" <<'REMOTE'
 set -Eeuo pipefail
 
 stage=${CHAINYA_EDGE_STAGE:?}
+maintenance=${CHAINYA_EDGE_MAINTENANCE:?}
 releases=/var/www/chainya-releases
 active=/var/www/chainya
 commit=$(cat "$stage/RELEASE_COMMIT")
@@ -80,9 +87,15 @@ switched=1
 
 test "$(readlink -f "$active")" = "$release"
 test "$(docker inspect chainya-edge-edge-1 --format '{{.State.Health.Status}}')" = healthy
-curl -fsS http://127.0.0.1:8078/shop -o "$stage/internal-shop.html"
-grep -Fq 'Рекомендуем начать свой чайный путь с этих позиций:' "$stage/internal-shop.html"
-! grep -Eq 'id="ts-taste"|renderRadar' "$stage/internal-shop.html"
+curl -fsS http://127.0.0.1:8078/__chainya_edge_health >/dev/null
+grep -Fq 'Рекомендуем начать свой чайный путь с этих позиций:' "$release/index.html"
+! grep -Eq 'id="ts-taste"|renderRadar' "$release/index.html"
+if [ "$maintenance" = 1 ]; then
+  test -f /var/www/chainya-maintenance.enabled
+  test "$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:8078/api/health)" = 503
+else
+  curl -fsS http://127.0.0.1:8078/api/health >/dev/null
+fi
 
 rm -rf -- "$stage"
 trap - ERR
@@ -90,6 +103,11 @@ printf '✓ edge release: %s\n' "$release"
 REMOTE
 
 echo "→ публичная проверка edge"
+if [ "$MAINTENANCE_MODE" = 1 ]; then
+  test "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 https://chainya.ru/api/health)" = 503
+  echo "✓ edge обновлён за Chainya-only maintenance"
+  exit 0
+fi
 curl -fsS https://chainya.ru/shop -o "$TMP/public-shop.html"
 grep -Fq 'Рекомендуем начать свой чайный путь с этих позиций:' "$TMP/public-shop.html"
 ! grep -Eq 'id="ts-taste"|renderRadar' "$TMP/public-shop.html"

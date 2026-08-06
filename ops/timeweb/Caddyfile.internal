@@ -42,6 +42,31 @@ http://127.0.0.1:8078 {
 		-Server
 	}
 
+	# Docker проверяет только сам внутренний edge. Этот endpoint не уходит на
+	# production-origin и остаётся доступен во время Chainya-only maintenance.
+	handle /__chainya_edge_health {
+		respond 200
+	}
+
+	# Marker создаётся на host в /var/www и виден через read-only mount. Внешний
+	# Caddy направляет на этот listener только chainya.ru, поэтому остальные
+	# сайты и VPN-транспорты на сервере не затрагиваются.
+	@maintenance {
+		not path /__chainya_edge_health
+		file {
+			root /var/www
+			try_files /chainya-maintenance.enabled
+		}
+	}
+	handle @maintenance {
+		header {
+			Cache-Control "no-store"
+			Retry-After "120"
+			X-Robots-Tag "noindex, nofollow"
+		}
+		respond "Чайня обновляется. Пожалуйста, попробуйте снова через пару минут." 503
+	}
+
 	@sensitive path_regexp sensitive (?i)(^|/)(?:\.env(?:\..*)?|\.git(?:/|$)|\.DS_Store$|\._[^/]*$|__pycache__(?:/|$)|README(?:\.[^/]*)?$)
 	respond @sensitive 404
 

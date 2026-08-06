@@ -1,0 +1,221 @@
+from __future__ import annotations
+
+import io
+import os
+import subprocess
+import tarfile
+from pathlib import Path
+
+import pytest
+
+
+ROOT = Path(__file__).resolve().parents[2]
+REMOTE = ROOT / "ops/deploy-shop-remote.sh"
+
+
+def write_tar(path: Path, files: dict[str, bytes]) -> None:
+    with tarfile.open(path, "w:gz") as archive:
+        for name, content in files.items():
+            info = tarfile.TarInfo(name)
+            info.size = len(content)
+            archive.addfile(info, io.BytesIO(content))
+
+
+def make_candidate(tmp_path: Path, *, nginx_changed: bool = False) -> tuple[Path, Path]:
+    root = tmp_path / "root"
+    stage = tmp_path / "stage"
+    for path in (
+        root / "opt/chainya-shop-releases/old-backend",
+        root / "var/www/chainya-releases/old-web",
+        root / "var/lib/chainya-shop",
+        root / "var/backups/chainya-shop",
+        root / "etc/systemd/system",
+        root / "etc/nginx/sites-available",
+        root / "run",
+        stage,
+    ):
+        path.mkdir(parents=True, exist_ok=True)
+    (root / "opt/chainya-shop").symlink_to(
+        root / "opt/chainya-shop-releases/old-backend"
+    )
+    (root / "var/www/chainya").symlink_to(root / "var/www/chainya-releases/old-web")
+    (root / "var/lib/chainya-shop/orders.sqlite3").write_bytes(b"old-db")
+    (root / "var/lib/chainya-shop/catalog.json").write_text(
+        '{"revision":1,"teas":[]}', encoding="utf-8"
+    )
+    (root / "var/lib/chainya-shop").chmod(0o750)
+    (root / "var/lib/chainya-shop/web-release-commit").write_text(
+        "0" * 40 + "\n", encoding="ascii"
+    )
+    for state in (
+        "chainya-shop.active",
+        "chainya-backup.timer.active",
+        "chainya-backup.timer.enabled",
+    ):
+        (root / "run" / state).touch()
+
+    units = {
+        "chainya-shop.service": "old shop unit\n",
+        "chainya-backup.service": "old backup unit\n",
+        "chainya-backup.timer": "old backup timer\n",
+    }
+    for name, content in units.items():
+        (root / "etc/systemd/system" / name).write_text(content, encoding="utf-8")
+        (stage / name).write_text(content, encoding="utf-8")
+    active_nginx = "server { server_name chainya.ru; }\n"
+    candidate_nginx = active_nginx + ("# candidate change\n" if nginx_changed else "")
+    (root / "etc/nginx/sites-available/chainya.ru").write_text(
+        active_nginx, encoding="utf-8"
+    )
+    (stage / "nginx-chainya.ru").write_text(candidate_nginx, encoding="utf-8")
+    (stage / "RELEASE_COMMIT").write_text("a" * 40 + "\n", encoding="ascii")
+    write_tar(stage / "shop.tgz", {"backend/app.py": b"pass\n"})
+    write_tar(stage / "web.tgz", {"index.html": b"new web\n"})
+    return root, stage
+
+
+def invoke(root: Path, stage: Path, action: str, *, failpoint: str = "") -> subprocess.CompletedProcess[str]:
+    env = os.environ.copy()
+    env.update(
+        {
+            "CHAINYA_DEPLOY_TEST_ROOT": str(root),
+            "CHAINYA_STAGE": str(stage),
+            "CHAINYA_DEPLOY_FAILPOINT": failpoint,
+        }
+    )
+    return subprocess.run(
+        ["bash", str(REMOTE), action],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+
+def assert_old_release_restored(root: Path) -> None:
+    assert (root / "opt/chainya-shop").resolve().name == "old-backend"
+    assert (root / "var/www/chainya").resolve().name == "old-web"
+    assert (root / "var/lib/chainya-shop/orders.sqlite3").read_bytes() == b"old-db"
+    assert (root / "var/lib/chainya-shop/web-release-commit").read_text().strip() == "0" * 40
+    assert (root / "var/lib/chainya-shop").stat().st_mode & 0o777 == 0o750
+    assert (root / "run/chainya-shop.active").exists()
+    assert (root / "run/chainya-backup.timer.active").exists()
+
+
+def test_static_deploy_contract() -> None:
+    result = subprocess.run(
+        ["python3", str(ROOT / "scripts/check-deploy-contract.py")],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    deploy = (ROOT / "deploy-shop.sh").read_text(encoding="utf-8")
+    assert "remote_uploaded=1" in deploy
+    assert 'rm -rf -- \'$REMOTE_STAGE\'' in deploy
+
+
+def test_maintenance_is_chainya_only_and_returns_503() -> None:
+    internal = (ROOT / "ops/timeweb/Caddyfile.internal").read_text(encoding="utf-8")
+    public = (ROOT / "ops/timeweb/Caddyfile.public-snippet").read_text(encoding="utf-8")
+    compose = (ROOT / "ops/timeweb/docker-compose.edge.yml").read_text(encoding="utf-8")
+    assert "http://127.0.0.1:8078" in internal
+    assert "chainya-maintenance.enabled" in internal
+    assert " 503" in internal
+    assert "chainya.ru" in public and "127.0.0.1:8078" in public
+    assert "__chainya_edge_health" in internal
+    assert "__chainya_edge_health" in compose
+    assert "/api/health" not in compose
+
+
+def test_successful_cutover_and_commit(tmp_path: Path) -> None:
+    root, stage = make_candidate(tmp_path)
+    assert invoke(root, stage, "stage").returncode == 0
+    result = invoke(root, stage, "cutover")
+    assert result.returncode == 0, result.stderr
+    assert (root / "opt/chainya-shop").resolve().name.startswith("a" * 12)
+    assert (root / "var/www/chainya").resolve().name.startswith("a" * 12)
+    assert (root / "run/chainya-shop.active").exists()
+    assert (stage / "transaction/phase").read_text().strip() == "prepared"
+    assert invoke(root, stage, "commit").returncode == 0
+    assert not stage.exists()
+    actions = (root / "run/service-actions.log").read_text()
+    assert "stop nginx" not in actions
+    assert "start nginx" not in actions
+    assert "restart nginx" not in actions
+    assert "reload nginx" not in actions
+    assert "test nginx" not in actions
+
+
+def test_stage_failpoint_removes_partial_transaction(tmp_path: Path) -> None:
+    root, stage = make_candidate(tmp_path)
+    result = invoke(root, stage, "stage", failpoint="after_stage")
+    assert result.returncode != 0
+    assert_old_release_restored(root)
+    assert not (root / "run/chainya-deploy.transaction").exists()
+    assert not (stage / "transaction").exists()
+
+
+@pytest.mark.parametrize(
+    "failpoint",
+    [
+        "after_stop",
+        "after_state_snapshot",
+        "after_config",
+        "after_symlink",
+        "after_start",
+        "after_health",
+    ],
+)
+def test_failpoints_restore_old_release(tmp_path: Path, failpoint: str) -> None:
+    root, stage = make_candidate(tmp_path)
+    assert invoke(root, stage, "stage").returncode == 0
+    result = invoke(root, stage, "cutover", failpoint=failpoint)
+    assert result.returncode != 0
+    assert_old_release_restored(root)
+    assert (stage / "transaction/phase").read_text().strip() == "rolled_back"
+
+
+def test_nginx_change_uses_reload_and_rollback_reload_only(tmp_path: Path) -> None:
+    root, stage = make_candidate(tmp_path, nginx_changed=True)
+    original = (root / "etc/nginx/sites-available/chainya.ru").read_text()
+    assert invoke(root, stage, "stage").returncode == 0
+    assert invoke(root, stage, "cutover").returncode == 0
+    changed = (root / "etc/nginx/sites-available/chainya.ru").read_text()
+    assert changed != original
+    assert invoke(root, stage, "rollback").returncode == 0
+    assert (root / "etc/nginx/sites-available/chainya.ru").read_text() == original
+    actions = (root / "run/service-actions.log").read_text().splitlines()
+    assert actions.count("reload nginx") == 2
+    assert actions.count("test nginx") == 4
+    assert all(action not in {"stop nginx", "start nginx", "restart nginx"} for action in actions)
+
+
+def test_failure_after_nginx_reload_restores_config_and_reloads(tmp_path: Path) -> None:
+    root, stage = make_candidate(tmp_path, nginx_changed=True)
+    original = (root / "etc/nginx/sites-available/chainya.ru").read_text()
+    assert invoke(root, stage, "stage").returncode == 0
+    result = invoke(root, stage, "cutover", failpoint="after_config")
+    assert result.returncode != 0
+    assert_old_release_restored(root)
+    assert (root / "etc/nginx/sites-available/chainya.ru").read_text() == original
+    actions = (root / "run/service-actions.log").read_text().splitlines()
+    assert actions.count("reload nginx") == 2
+
+
+def test_invalid_nginx_candidate_rolls_back_before_reload(tmp_path: Path) -> None:
+    root, stage = make_candidate(tmp_path, nginx_changed=True)
+    original = (root / "etc/nginx/sites-available/chainya.ru").read_text()
+    with (stage / "nginx-chainya.ru").open("a", encoding="utf-8") as target:
+        target.write("INVALID_NGINX_TEST\n")
+    assert invoke(root, stage, "stage").returncode == 0
+    result = invoke(root, stage, "cutover")
+    assert result.returncode != 0
+    assert_old_release_restored(root)
+    assert (root / "etc/nginx/sites-available/chainya.ru").read_text() == original
+    actions = (root / "run/service-actions.log").read_text().splitlines()
+    assert actions.count("reload nginx") == 1
+    assert actions.count("test nginx") == 4

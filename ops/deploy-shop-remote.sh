@@ -100,17 +100,33 @@ backend_health() {
   if [ -n "$test_root" ]; then
     service_is_active chainya-shop
   else
-    curl -fsS --max-time 5 http://127.0.0.1:8077/api/health |
-      python3 -c 'import json,sys; d=json.load(sys.stdin); raise SystemExit(0 if d.get("ok") is True and d.get("test_mode") is False else 1)'
+    local payload _attempt
+    for _attempt in {1..30}; do
+      payload=$(curl -fsS --max-time 2 http://127.0.0.1:8077/api/health 2>/dev/null || true)
+      if [ -n "$payload" ] && python3 -c \
+        'import json,sys; d=json.load(sys.stdin); raise SystemExit(0 if d.get("ok") is True and d.get("test_mode") is False else 1)' \
+        <<<"$payload"; then
+        return 0
+      fi
+      sleep 1
+    done
+    return 1
   fi
 }
 origin_health() {
   if [ -n "$test_root" ]; then
     backend_health
   else
-    curl -fkSs --max-time 10 \
-      --resolve chainya.ru:443:127.0.0.1 \
-      https://chainya.ru/api/health >/dev/null
+    local _attempt
+    for _attempt in {1..15}; do
+      if curl -fkSs --max-time 3 \
+        --resolve chainya.ru:443:127.0.0.1 \
+        https://chainya.ru/api/health >/dev/null 2>&1; then
+        return 0
+      fi
+      sleep 1
+    done
+    return 1
   fi
 }
 maybe_fail() {

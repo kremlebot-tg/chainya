@@ -122,6 +122,10 @@ def test_static_deploy_contract() -> None:
     assert "scripts/check-deploy-contract.py" in archive_command
     assert "deploy-edge.sh" in archive_command
     assert "deploy-shop.sh" in archive_command
+    remote = REMOTE.read_text(encoding="utf-8")
+    assert "for _attempt in {1..30}" in remote
+    assert "payload=$(curl" in remote
+    assert "return 1" in remote
 
 
 def test_maintenance_is_chainya_only_and_returns_503() -> None:

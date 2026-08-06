@@ -146,7 +146,8 @@ COPYFILE_DISABLE=1 tar --no-xattrs -czf "$TMP/shop.tgz" \
   --exclude='backend/data' --exclude='backend/__pycache__' \
   --exclude='backend/tests/__pycache__' --exclude='backend/.env' \
   --exclude='backend/.env.*' --exclude='backend/*.env' \
-  backend ops privacy.html -C "$BOT_ROOT" teas.json
+  backend ops scripts/check-deploy-contract.py deploy-edge.sh deploy-shop.sh \
+  privacy.html -C "$BOT_ROOT" teas.json
 COPYFILE_DISABLE=1 tar --no-xattrs -czf "$TMP/web.tgz" \
   --exclude='._*' --exclude='.DS_Store' -C dist .
 

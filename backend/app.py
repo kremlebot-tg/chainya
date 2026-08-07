@@ -514,6 +514,11 @@ class UpdateBookingStatus(BaseModel):
     status: Literal["new", "confirmed", "completed", "cancelled"]
 
 
+class SabyShadowAcknowledgement(BaseModel):
+    fingerprint: str = Field(pattern=r"^[0-9a-f]{64}$")
+    acknowledged: bool = True
+
+
 class CreateBookingBlock(BaseModel):
     date: datetime_date
     start: datetime_time
@@ -1008,6 +1013,12 @@ def init_db() -> None:
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_saby_shadow_single_running "
             "ON saby_shadow_runs(status) WHERE status = 'running'"
         )
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS saby_shadow_acknowledgements (
+                fingerprint TEXT PRIMARY KEY,
+                acknowledged_at TEXT NOT NULL
+            )
+        """)
         # Сырые обезличенные события нужны только для сравнений и сезонности.
         # Года достаточно; старая телеметрия не должна бесконечно раздувать базу.
         con.execute(
@@ -2285,6 +2296,51 @@ def _saby_shadow_row(row: sqlite3.Row | None) -> dict | None:
     }
 
 
+def _saby_difference_fingerprint(item: dict) -> str:
+    """Identify one exact observed difference without including display copy."""
+
+    identity = {
+        "kind": item.get("kind"),
+        "site_id": item.get("site_id"),
+        "saby_id": item.get("saby_id"),
+        "site_value": item.get("site_value"),
+        "saby_value": item.get("saby_value"),
+    }
+    payload = json.dumps(
+        identity, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _annotate_saby_acknowledgements(latest: dict | None) -> None:
+    if not latest or not isinstance(latest.get("report"), dict):
+        return
+    differences = latest["report"].get("differences")
+    if not isinstance(differences, list):
+        return
+    fingerprints = [_saby_difference_fingerprint(item) for item in differences]
+    with db() as con:
+        acknowledged = {
+            row["fingerprint"]
+            for row in con.execute(
+                "SELECT fingerprint FROM saby_shadow_acknowledgements"
+            ).fetchall()
+        }
+    pending = 0
+    acknowledged_actionable = 0
+    for item, fingerprint in zip(differences, fingerprints, strict=True):
+        item["fingerprint"] = fingerprint
+        item["acknowledged"] = fingerprint in acknowledged
+        if item.get("severity") != "info":
+            if item["acknowledged"]:
+                acknowledged_actionable += 1
+            else:
+                pending += 1
+    counts = latest["report"].setdefault("counts", {})
+    counts["unacknowledged_actionable_differences"] = pending
+    counts["acknowledged_actionable_differences"] = acknowledged_actionable
+
+
 def saby_shadow_status(limit: int = 10) -> dict:
     settings = SabyShadowSettings.from_env()
     with db() as con:
@@ -2293,6 +2349,7 @@ def saby_shadow_status(limit: int = 10) -> dict:
             (min(max(limit, 1), 25),),
         ).fetchall()
     history = [_saby_shadow_row(row) for row in rows]
+    _annotate_saby_acknowledgements(history[0] if history else None)
     return {
         "enabled": settings.enabled,
         "interval_seconds": settings.interval_seconds,
@@ -3461,6 +3518,17 @@ def require_saby_shadow_run_request(request: Request) -> None:
         raise HTTPException(403, "Недопустимый источник запроса")
 
 
+def require_saby_shadow_ack_request(request: Request) -> None:
+    """Require an intentional same-origin acknowledgement from the admin UI."""
+
+    if request.headers.get("x-chainya-admin") != "saby-shadow-ack":
+        raise HTTPException(403, "Требуется подтверждение запроса админ-панели")
+    origin = request.headers.get("origin", "").rstrip("/")
+    expected = f"{request.url.scheme}://{request.headers.get('host', '')}"
+    if origin and origin != expected:
+        raise HTTPException(403, "Недопустимый источник запроса")
+
+
 @app.get("/api/admin/saby/catalog-shadow")
 def admin_saby_catalog_shadow(
     response: Response,
@@ -3491,6 +3559,45 @@ def admin_run_saby_catalog_shadow(
         return run_saby_shadow_check("manual")
     except SabyShadowBusy as exc:
         raise HTTPException(409, str(exc)) from exc
+
+
+@app.post("/api/admin/saby/catalog-shadow/acknowledge")
+def admin_acknowledge_saby_catalog_difference(
+    payload: SabyShadowAcknowledgement,
+    request: Request,
+    response: Response,
+    authorization: str = Header(default=""),
+):
+    require_admin(authorization)
+    require_saby_shadow_ack_request(request)
+    response.headers["Cache-Control"] = "no-store"
+    with db() as con:
+        row = con.execute(
+            """SELECT * FROM saby_shadow_runs
+               WHERE status IN ('ok', 'differences') ORDER BY id DESC LIMIT 1"""
+        ).fetchone()
+        latest = _saby_shadow_row(row)
+        differences = (latest or {}).get("report", {}).get("differences", [])
+        current = {
+            _saby_difference_fingerprint(item)
+            for item in differences
+            if item.get("severity") != "info"
+        }
+        if payload.fingerprint not in current:
+            raise HTTPException(409, "Расхождение уже изменилось. Обновите сверку.")
+        if payload.acknowledged:
+            con.execute(
+                """INSERT INTO saby_shadow_acknowledgements
+                   (fingerprint, acknowledged_at) VALUES (?, ?)
+                   ON CONFLICT(fingerprint) DO UPDATE SET acknowledged_at=excluded.acknowledged_at""",
+                (payload.fingerprint, now_iso()),
+            )
+        else:
+            con.execute(
+                "DELETE FROM saby_shadow_acknowledgements WHERE fingerprint = ?",
+                (payload.fingerprint,),
+            )
+    return {"ok": True, "acknowledged": payload.acknowledged}
 
 
 @app.post("/api/admin/saby/test")

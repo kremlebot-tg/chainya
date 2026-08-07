@@ -699,6 +699,84 @@ def test_admin_saby_shadow_is_read_only_persistent_and_protected(tmp_path, monke
         assert stored["history"][0]["report"]["read_only"] is True
 
 
+def test_admin_can_acknowledge_only_the_current_exact_saby_difference(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    auth = {"Authorization": "Bearer test-admin-token"}
+    run_headers = {
+        **auth,
+        "X-Chainya-Admin": "saby-shadow",
+        "Origin": "https://chainya.ru",
+    }
+    ack_headers = {
+        **auth,
+        "X-Chainya-Admin": "saby-shadow-ack",
+        "Origin": "https://chainya.ru",
+    }
+    catalog = matching_saby_catalog(module)
+    catalog[0]["cost"] = float(catalog[0]["cost"]) + 10
+    monkeypatch.setattr(
+        module.saby_client, "catalog_all", lambda with_balance=False: catalog
+    )
+    monkeypatch.setattr(
+        module.saby_client,
+        "configuration",
+        lambda: {"configured": True, "point_id": 274, "price_list_id": 7},
+    )
+
+    with client:
+        assert client.post(
+            "/api/admin/saby/catalog-shadow/run", headers=run_headers
+        ).status_code == 200
+        report = client.get(
+            "/api/admin/saby/catalog-shadow", headers=auth
+        ).json()["latest"]["report"]
+        difference = next(
+            item for item in report["differences"] if item["severity"] != "info"
+        )
+        assert difference["acknowledged"] is False
+        assert report["counts"]["unacknowledged_actionable_differences"] == 1
+
+        payload = {"fingerprint": difference["fingerprint"], "acknowledged": True}
+        assert client.post(
+            "/api/admin/saby/catalog-shadow/acknowledge",
+            headers=auth,
+            json=payload,
+        ).status_code == 403
+        acknowledged = client.post(
+            "/api/admin/saby/catalog-shadow/acknowledge",
+            headers=ack_headers,
+            json=payload,
+        )
+        assert acknowledged.status_code == 200
+        assert acknowledged.json() == {"ok": True, "acknowledged": True}
+
+        report = client.get(
+            "/api/admin/saby/catalog-shadow", headers=auth
+        ).json()["latest"]["report"]
+        assert report["counts"]["unacknowledged_actionable_differences"] == 0
+        assert report["counts"]["acknowledged_actionable_differences"] == 1
+        assert next(
+            item for item in report["differences"] if item["fingerprint"] == payload["fingerprint"]
+        )["acknowledged"] is True
+
+        assert client.post(
+            "/api/admin/saby/catalog-shadow/acknowledge",
+            headers=ack_headers,
+            json={"fingerprint": "0" * 64, "acknowledged": True},
+        ).status_code == 409
+        restored = client.post(
+            "/api/admin/saby/catalog-shadow/acknowledge",
+            headers=ack_headers,
+            json={**payload, "acknowledged": False},
+        )
+        assert restored.status_code == 200
+        assert restored.json() == {"ok": True, "acknowledged": False}
+        report = client.get(
+            "/api/admin/saby/catalog-shadow", headers=auth
+        ).json()["latest"]["report"]
+        assert report["counts"]["unacknowledged_actionable_differences"] == 1
+
+
 def test_admin_shadow_ui_states_read_only_guarantee_without_apply_action(tmp_path, monkeypatch):
     _, module = app_client(tmp_path, monkeypatch)
     html = (module.ROOT / "backend" / "admin.html").read_text(encoding="utf-8")
@@ -711,9 +789,22 @@ def test_admin_shadow_ui_states_read_only_guarantee_without_apply_action(tmp_pat
     assert "Проверить фактический остаток в Saby." in html
     assert "Информационные отличия" in html
     assert "document.visibilityState==='visible'" in html
+    assert "Проверено · скрыть" in html
+    assert "Вернуть предупреждение" in html
+    assert "saby-shadow-ack" in html
     assert "Применить изменения Saby" not in html
     assert 'id="saby-shadow-status"' in html
     assert 'id="saby-shadow-content" aria-live=' not in html
+
+
+def test_admin_uses_readable_typography_scale(tmp_path, monkeypatch):
+    _, module = app_client(tmp_path, monkeypatch)
+    html = (module.ROOT / "backend" / "admin.html").read_text(encoding="utf-8")
+    assert '<body class="admin-readable">' in html
+    assert ".admin-readable{font-size:16px;line-height:1.55}" in html
+    assert ".admin-readable .saby-alert__title{font-size:20px" in html
+    assert ".admin-readable .saby-alert__item{padding:5px 8px;font-size:12px" in html
+    assert "@media(max-width:760px){.admin-readable{font-size:16px}" in html
 
 
 def test_saby_shadow_persists_safe_errors_recovers_stale_run_and_limits_history(tmp_path, monkeypatch):

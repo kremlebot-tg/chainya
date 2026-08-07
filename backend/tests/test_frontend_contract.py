@@ -6,6 +6,7 @@ import pytest
 SOURCE_PATH = Path(__file__).resolve().parents[2] / "src.html"
 BUILD_PATH = Path(__file__).resolve().parents[2] / "build.py"
 ADMIN_CATALOG_PATH = Path(__file__).resolve().parents[1] / "admin-catalog.html"
+LEGAL_CSS_PATH = Path(__file__).resolve().parents[2] / "legal.css"
 pytestmark = pytest.mark.skipif(
     not SOURCE_PATH.exists(),
     reason="frontend source is not part of the production backend artifact",
@@ -13,6 +14,7 @@ pytestmark = pytest.mark.skipif(
 SOURCE = SOURCE_PATH.read_text(encoding="utf-8") if SOURCE_PATH.exists() else ""
 BUILD_SOURCE = BUILD_PATH.read_text(encoding="utf-8") if BUILD_PATH.exists() else ""
 ADMIN_CATALOG = ADMIN_CATALOG_PATH.read_text(encoding="utf-8")
+LEGAL_CSS = LEGAL_CSS_PATH.read_text(encoding="utf-8") if LEGAL_CSS_PATH.exists() else ""
 
 
 def test_checkout_has_one_clear_payment_method_and_visible_status():
@@ -138,3 +140,9 @@ def test_admin_catalog_surfaces_incomplete_food_labelling():
     assert "function missingLabelFields(item)" in ADMIN_CATALOG
     assert "Маркировка заполнена не полностью" in ADMIN_CATALOG
     assert "Всё равно показывать товар на сайте?" in ADMIN_CATALOG
+
+
+def test_mobile_legal_header_has_accessible_touch_targets():
+    assert ".brand{min-width:44px;min-height:44px}" in LEGAL_CSS
+    assert ".back{display:inline-flex;align-items:center;min-height:44px}" in LEGAL_CSS
+    assert ".langs a{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px}" in LEGAL_CSS

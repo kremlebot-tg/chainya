@@ -785,12 +785,14 @@ def test_admin_shadow_ui_states_read_only_guarantee_without_apply_action(tmp_pat
     assert "Сравнить сейчас" in html
     assert 'id="saby-attention"' in html
     assert "Каталог требует проверки" in html
-    assert "Проверить цену и единицу продажи в карточке Saby." in html
-    assert "Проверить фактический остаток в Saby." in html
+    assert "сайт и СБИС по-разному оценивают одно и то же количество товара" in html
+    assert "проверьте цену вместе с единицей продажи: грамм или упаковка" in html
+    assert "Сверьте фактический остаток в СБИС" in html
     assert "Информационные отличия" in html
     assert "document.visibilityState==='visible'" in html
-    assert "Проверено · скрыть" in html
-    assert "Вернуть предупреждение" in html
+    assert "Скрыть как проверенное" in html
+    assert "Вернуть в активные" in html
+    assert "Эта кнопка не исправляет и не синхронизирует данные." in html
     assert "saby-shadow-ack" in html
     assert "Применить изменения Saby" not in html
     assert 'id="saby-shadow-status"' in html

@@ -44,8 +44,8 @@ def gram_line(**changes):
         "name": "Бай Хао Инь Чжень",
         "pack": 25,
         "qty": 2,
-        "unit_price": 440,
-        "total": 880,
+        "unit_price": 4375,
+        "total": 8750,
     }
     values.update(changes)
     return values
@@ -76,12 +76,13 @@ def pickup_order(**changes):
     return values
 
 
-def test_mapping_is_exactly_the_active_catalog_items():
+def test_mapping_covers_active_items_and_keeps_stable_out_of_stock_links():
     catalog = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
     active = {tea["id"] for tea in catalog["teas"] if tea.get("stock") is True}
 
-    assert len(active) == 29
-    assert set(SABY_NOMENCLATURE_BY_SITE_ID) == active
+    assert len(active) == 28
+    assert active < set(SABY_NOMENCLATURE_BY_SITE_ID)
+    assert set(SABY_NOMENCLATURE_BY_SITE_ID) - active == {"gabamaocha"}
     assert "molimaojian" not in SABY_NOMENCLATURE_BY_SITE_ID
     assert "ginseng1s" not in SABY_NOMENCLATURE_BY_SITE_ID
     assert "chongshicha" not in SABY_NOMENCLATURE_BY_SITE_ID
@@ -89,7 +90,7 @@ def test_mapping_is_exactly_the_active_catalog_items():
     validate_mapping_file(CATALOG_PATH)
 
 
-def test_mapping_validator_reports_missing_and_extra_ids():
+def test_mapping_validator_reports_missing_but_allows_stable_inactive_ids():
     catalog = {"teas": [
         {"id": "baihao", "stock": True},
         {"id": "disabled", "stock": False},
@@ -99,7 +100,12 @@ def test_mapping_validator_reports_missing_and_extra_ids():
     }
     with pytest.raises(SabySyncError, match="нет соответствий: baihao") as error:
         validate_mapping_against_catalog(catalog, mapping)
-    assert "лишние соответствия: different" in str(error.value)
+    assert "different" not in str(error.value)
+
+    validate_mapping_against_catalog(
+        {"teas": [{"id": "baihao", "stock": False}]},
+        {"baihao": SABY_NOMENCLATURE_BY_SITE_ID["baihao"]},
+    )
 
 
 def test_gram_and_piece_lines_use_the_checkout_amounts():
@@ -109,7 +115,7 @@ def test_gram_and_piece_lines_use_the_checkout_amounts():
         "id": 39,
         "externalId": "b4bc9267-241d-4bfe-9fe8-8af23409f4f0",
         "count": 50,
-        "cost": 17.6,
+        "cost": 175.0,
         "name": "Бай Хао Инь Чжень",
     }
     assert piece["id"] == 44

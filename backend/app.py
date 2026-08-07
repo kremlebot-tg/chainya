@@ -3659,24 +3659,34 @@ def admin_saby_test(authorization: str = Header(default="")):
         len(live_external_id_rows) == len(set(live_external_id_rows))
         and not missing_external_ids
     )
-    active_products = [
+    mapped_products = [
         item for item in products
         if str(item.get("externalId") or "") in expected_external_ids
     ]
+    sellable_external_ids = {
+        ref.external_id
+        for site_id, ref in SABY_NOMENCLATURE_BY_SITE_ID.items()
+        if site_catalog.get(site_id, {}).get("published", True)
+        and site_catalog.get(site_id, {}).get("stock", True)
+    }
+    sellable_products = [
+        item for item in mapped_products
+        if str(item.get("externalId") or "") in sellable_external_ids
+    ]
     zero_balance_products = [
-        item for item in active_products
+        item for item in sellable_products
         if isinstance(item.get("balance"), (int, float))
         and not isinstance(item.get("balance"), bool)
         and item.get("balance") <= 0
     ]
     in_stock_products = [
-        item for item in active_products
+        item for item in sellable_products
         if isinstance(item.get("balance"), (int, float))
         and not isinstance(item.get("balance"), bool)
         and item.get("balance") > 0
     ]
     unknown_balance_products = [
-        item for item in active_products
+        item for item in sellable_products
         if not isinstance(item.get("balance"), (int, float))
         or isinstance(item.get("balance"), bool)
     ]

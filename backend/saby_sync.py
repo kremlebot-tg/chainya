@@ -154,14 +154,14 @@ def validate_mapping_against_catalog(
     active_ids = {str(tea.get("id", "")) for tea in teas if tea.get("stock") is True}
     mapped_ids = set(mapping)
     missing = sorted(active_ids - mapped_ids)
-    extra = sorted(mapped_ids - active_ids)
-    if missing or extra:
+    if missing:
         parts = []
-        if missing:
-            parts.append("нет соответствий: " + ", ".join(missing))
-        if extra:
-            parts.append("лишние соответствия: " + ", ".join(extra))
+        parts.append("нет соответствий: " + ", ".join(missing))
         raise SabySyncError("Таблица Saby не совпадает с активным каталогом; " + "; ".join(parts))
+
+    # A stable Saby mapping must survive a temporary stock-out. Extra mapped
+    # IDs are allowed for unavailable products; ``stock=false`` still blocks
+    # them from new storefront orders.
 
     refs = list(mapping.values())
     if len({ref.id for ref in refs}) != len(refs):

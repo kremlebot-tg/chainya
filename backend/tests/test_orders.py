@@ -87,8 +87,8 @@ def test_server_prices_order_and_mock_payment(tmp_path, monkeypatch):
         assert response.status_code == 201
         body = response.json()
         order = body["order"]
-        assert order["subtotal"] == 2 * 440  # 175 ₽ / 10 г → 440 ₽ / 25 г
-        assert order["total"] == 880
+        assert order["subtotal"] == 2 * 4375  # 1750 ₽ / 10 г → 4375 ₽ / 25 г
+        assert order["total"] == 8750
         assert order["status"] == "pending_payment"
         assert order["payment_state"] == "awaiting"
         payment_token = parse_qs(urlparse(body["payment"]["url"]).query)["token"][0]
@@ -113,7 +113,7 @@ def test_order_accepts_10_gram_pack_at_base_price(tmp_path, monkeypatch):
             json=payload(items=[{"id": "baihao", "pack": 10, "qty": 1}]),
         )
     assert response.status_code == 201
-    assert response.json()["order"]["subtotal"] == 175
+    assert response.json()["order"]["subtotal"] == 1750
 
 
 def test_order_creation_is_idempotent_for_network_retries(tmp_path, monkeypatch):
@@ -262,7 +262,7 @@ def test_cdek_quote_and_order_use_server_price_and_selected_point(tmp_path, monk
     assert quote.json()["tariff_code"] == 136
     assert order.status_code == 201
     assert order.json()["order"]["delivery_price"] == 322
-    assert order.json()["order"]["total"] == 1202
+    assert order.json()["order"]["total"] == 9072
     assert order.json()["order"]["delivery_quote"]["period_max"] == 3
 
 
@@ -526,7 +526,7 @@ def test_integration_preview_is_network_free_and_builds_pickup_saby_payload(tmp_
     assert response.status_code == 200
     result = response.json()
     assert result["external_writes_locked"] is True
-    assert result["payment"]["amount_kopeks"] == 88_000
+    assert result["payment"]["amount_kopeks"] == 875_000
     assert result["payment"]["network_called"] is False
     assert result["saby"]["ready"] is True
     assert result["saby"]["payload"]["pointId"] == 274
@@ -585,7 +585,7 @@ def test_admin_saby_test_reports_catalog_and_delivery_blocker(tmp_path, monkeypa
     assert result["price_list_found"] is True
     assert result["catalog_items"] == 30
     assert result["priced_items"] == 30
-    assert result["in_stock_items"] == 29
+    assert result["in_stock_items"] == 28
     assert result["catalog_mapping_valid"] is True
     assert result["zero_balance_items"] == []
     assert result["warnings"] == ["В Saby есть скрытые на сайте позиции: 1"]
@@ -619,7 +619,7 @@ def test_saby_readiness_rejects_unknown_balance_and_external_id_mismatch(tmp_pat
         result = client.post("/api/admin/saby/test", headers=auth).json()
     assert result["ready_for_orders"] is False
     assert result["catalog_mapping_valid"] is False
-    assert result["in_stock_items"] == 27
+    assert result["in_stock_items"] == 26
     assert result["unknown_balance_items"] == [{"id": 1, "name": "Бай Му Дань"}]
     assert "Каталог сайта не совпадает" in " ".join(result["blockers"])
     assert "не вернул числовой остаток" in " ".join(result["blockers"])
@@ -638,7 +638,7 @@ def matching_saby_catalog(module):
                 if site[site_id]["unit"] == "pc"
                 else site[site_id]["price"] / 10
             ),
-            "balance": 1000,
+            "balance": 1000 if site[site_id].get("stock", True) else 0,
             "published": True,
         }
         for site_id, ref in module.SABY_NOMENCLATURE_BY_SITE_ID.items()
@@ -1009,13 +1009,13 @@ def test_anonymous_analytics_feed_dashboard(tmp_path, monkeypatch):
         assert dashboard["traffic"]["cart_visitors"] == 1
         assert dashboard["traffic"]["order_conversion"] == 100
         assert dashboard["commerce"]["paid_orders"] == 1
-        assert dashboard["commerce"]["revenue"] == 880
+        assert dashboard["commerce"]["revenue"] == 8750
         assert dashboard["breakdown"]["device"] == [{"name": "mobile", "value": 1}]
         assert dashboard["breakdown"]["campaign"] == [
             {"name": "yandex / cpc / maps", "value": 1}
         ]
         assert dashboard["system"]["catalog_items"] > 0
-        assert dashboard["system"]["catalog_active_items"] == 29
+        assert dashboard["system"]["catalog_active_items"] == 28
         assert len(dashboard["daily"]) == 30
 
         with module.db() as con:
@@ -1094,7 +1094,7 @@ def test_revenue_uses_payment_time_and_queue_is_not_period_limited(tmp_path, mon
         client.patch(f"/api/admin/orders/{created['id']}", headers=auth, json={"status": "paid"})
         after_payment = client.get("/api/admin/dashboard", params={"days": 7}, headers=auth).json()
         assert after_payment["commerce"]["paid_orders"] == 1
-        assert after_payment["commerce"]["revenue"] == 880
+        assert after_payment["commerce"]["revenue"] == 8750
         assert after_payment["commerce"]["needs_attention"] == 1
 
 

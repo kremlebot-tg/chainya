@@ -565,9 +565,9 @@ def test_admin_saby_test_reports_catalog_and_delivery_blocker(tmp_path, monkeypa
     monkeypatch.setattr(module.saby_client, "sales_points", lambda product="retail": {
         "salesPoints": [{"id": 274, "name": "Чайня"}] if product == "retail" else {},
     })
-    monkeypatch.setattr(module.saby_client, "price_lists", lambda: {
-        "priceLists": [{"id": 7, "name": "Сайт chainya.ru"}],
-    })
+    monkeypatch.setattr(module.saby_client, "price_lists", lambda: [
+        {"id": 7, "name": "Сайт chainya.ru"},
+    ])
     monkeypatch.setattr(module.saby_client, "catalog_all", lambda with_balance=False: [
         {"id": index, "name": f"Чай {index}", "cost": 10 + index,
          "balance": 100, "externalId": ref.external_id}

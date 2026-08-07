@@ -3609,8 +3609,17 @@ def admin_saby_test(authorization: str = Header(default="")):
         raise HTTPException(502, str(exc)) from exc
 
     def rows(result: object, key: str) -> list[dict]:
-        value = result.get(key, []) if isinstance(result, dict) else []
-        return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
+        if isinstance(result, list):
+            return [item for item in result if isinstance(item, dict)]
+        if not isinstance(result, dict):
+            return []
+        value = result.get(key)
+        if isinstance(value, list):
+            return [item for item in value if isinstance(item, dict)]
+        # Some Saby Retail responses return a single result row without a
+        # resource-specific wrapper. Keep the readiness check compatible with
+        # both documented response forms.
+        return [result] if result.get("id") is not None else []
 
     configuration = saby_client.configuration()
     point_id, price_list_id = configuration.get("point_id"), configuration.get("price_list_id")

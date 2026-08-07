@@ -705,6 +705,12 @@ def test_admin_shadow_ui_states_read_only_guarantee_without_apply_action(tmp_pat
     assert "Теневая сверка каталога" in html
     assert "Только чтение. Сайт, касса, цены, остатки и заказы не изменяются." in html
     assert "Сравнить сейчас" in html
+    assert 'id="saby-attention"' in html
+    assert "Каталог требует проверки" in html
+    assert "Проверить цену и единицу продажи в карточке Saby." in html
+    assert "Проверить фактический остаток в Saby." in html
+    assert "Информационные отличия" in html
+    assert "document.visibilityState==='visible'" in html
     assert "Применить изменения Saby" not in html
     assert 'id="saby-shadow-status"' in html
     assert 'id="saby-shadow-content" aria-live=' not in html

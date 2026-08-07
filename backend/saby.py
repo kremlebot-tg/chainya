@@ -137,6 +137,13 @@ class SabyClient:
     def sales_points(self, product: str = "retail") -> Any:
         return self.api("/retail/point/list", {"product": product, "withPrices": "true", "pageSize": 500})
 
+    def delivery_calendar(self, point_id: int | None = None) -> Any:
+        """Return delivery availability without creating or changing an order."""
+        point = point_id or self.settings.point_id
+        if not point:
+            raise SabyError("Не выбран идентификатор точки продаж Saby")
+        return self.api("/retail/delivery/calendar", {"pointId": point})
+
     def price_lists(self, point_id: int | None = None) -> Any:
         point = point_id or self.settings.point_id
         if not point:

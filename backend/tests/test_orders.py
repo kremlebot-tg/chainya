@@ -17,6 +17,7 @@ def app_client(tmp_path, monkeypatch, *, test_mode="1"):
         "CDEK_CLIENT_ID", "CDEK_CLIENT_SECRET", "CDEK_INTEGRATION_MODE",
         "SABY_APP_CLIENT_ID", "SABY_APP_SECRET", "SABY_SECRET_KEY",
         "SABY_POINT_ID", "SABY_PRICE_LIST_ID", "SABY_ORDER_SYNC_MODE",
+        "SABY_ORDER_SYNC_STARTED_AT",
         "SABY_CATALOG_SHADOW_MODE", "SABY_CATALOG_SHADOW_INTERVAL_SECONDS",
         "BOOKING_BOT_SECRET",
     ):
@@ -565,6 +566,7 @@ def test_admin_saby_test_reports_catalog_and_delivery_blocker(tmp_path, monkeypa
     monkeypatch.setattr(module.saby_client, "sales_points", lambda product="retail": {
         "salesPoints": [{"id": 274, "name": "Чайня"}] if product == "retail" else {},
     })
+    monkeypatch.setattr(module.saby_client, "delivery_calendar", lambda point_id=None: {})
     monkeypatch.setattr(module.saby_client, "price_lists", lambda: [
         {"id": 7, "name": "Сайт chainya.ru"},
     ])
@@ -590,6 +592,7 @@ def test_admin_saby_test_reports_catalog_and_delivery_blocker(tmp_path, monkeypa
     assert result["zero_balance_items"] == []
     assert result["warnings"] == ["В Saby есть скрытые на сайте позиции: 1"]
     assert result["delivery_configured"] is False
+    assert result["delivery_confirmation"] == ""
     assert result["ready_for_orders"] is False
     assert result["blockers"] == ["Точка «Чайня» ещё не включена для продукта delivery"]
 
@@ -604,6 +607,7 @@ def test_saby_readiness_rejects_unknown_balance_and_external_id_mismatch(tmp_pat
     monkeypatch.setattr(module.saby_client, "sales_points", lambda product="retail": {
         "salesPoints": [{"id": 274, "name": "Чайня"}],
     })
+    monkeypatch.setattr(module.saby_client, "delivery_calendar", lambda point_id=None: {})
     monkeypatch.setattr(module.saby_client, "price_lists", lambda: {
         "priceLists": [{"id": 7, "name": "Сайт chainya.ru"}],
     })
@@ -643,6 +647,35 @@ def matching_saby_catalog(module):
         }
         for site_id, ref in module.SABY_NOMENCLATURE_BY_SITE_ID.items()
     ]
+
+
+def test_saby_readiness_accepts_live_delivery_calendar_fallback(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    auth = {"Authorization": "Bearer test-admin-token"}
+    monkeypatch.setattr(module.saby_client, "configuration", lambda: {
+        "configured": True, "point_id": 274, "price_list_id": 7, "missing": [],
+    })
+    monkeypatch.setattr(module.saby_client, "sales_points", lambda product="retail": {
+        "salesPoints": [{"id": 274, "name": "Чайня"}] if product == "retail" else {},
+    })
+    monkeypatch.setattr(module.saby_client, "delivery_calendar", lambda point_id=None: {
+        "dates": [{"date": "2026-08-08", "IntervalInfo": []}],
+    })
+    monkeypatch.setattr(module.saby_client, "price_lists", lambda: {
+        "priceLists": [{"id": 7, "name": "Сайт chainya.ru"}],
+    })
+    monkeypatch.setattr(
+        module.saby_client, "catalog_all",
+        lambda with_balance=False: matching_saby_catalog(module),
+    )
+
+    with client:
+        result = client.post("/api/admin/saby/test", headers=auth).json()
+
+    assert result["delivery_configured"] is True
+    assert result["delivery_confirmation"] == "calendar"
+    assert result["ready_for_orders"] is True
+    assert result["blockers"] == []
 
 
 def test_admin_saby_shadow_is_read_only_persistent_and_protected(tmp_path, monkeypatch):
@@ -967,6 +1000,45 @@ def test_paid_order_is_sent_to_saby_once_in_auto_mode(tmp_path, monkeypatch):
     assert current["integrations"]["saby"]["state"] == "synced"
     assert current["integrations"]["saby"]["external_id"] == "saby-order-123"
     assert current["integrations"]["saby"]["attempts"] == 1
+
+
+def test_saby_rollout_cutoff_never_backfills_older_paid_order(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    monkeypatch.setenv("SABY_ORDER_SYNC_MODE", "auto")
+    monkeypatch.setenv("SABY_ORDER_SYNC_STARTED_AT", "2999-01-01T00:00:00+00:00")
+    monkeypatch.setattr(module.saby_client, "settings", SabySettings(
+        app_client_id="configured", app_secret="configured", secret_key="configured",
+        point_id=274, price_list_id=7,
+    ))
+    sent = []
+    monkeypatch.setattr(
+        module.saby_client,
+        "create_delivery_order",
+        lambda data: sent.append(data) or {"externalId": "must-not-exist"},
+    )
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        monkeypatch.setattr(module, "TEST_MODE", False)
+        monkeypatch.setattr(
+            module,
+            "integration_writer",
+            module.IntegrationWriter(
+                test_mode=False, exposed_providers=frozenset({"tbank", "saby", "cdek"})
+            ),
+        )
+        with module.db() as con:
+            paid_at = module.now_iso()
+            con.execute(
+                """UPDATE orders SET status = 'paid', payment_state = 'paid',
+                       paid_at = ?, updated_at = ? WHERE id = ?""",
+                (paid_at, paid_at, order["id"]),
+            )
+        module.sync_paid_order_to_saby(order["id"])
+        current = module.admin_order(module.order_row(order["id"]))
+
+    assert sent == []
+    assert current["integrations"]["saby"]["state"] == "not_queued"
+    assert current["integrations"]["saby"]["attempts"] == 0
 
 
 def test_anonymous_analytics_feed_dashboard(tmp_path, monkeypatch):

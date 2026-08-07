@@ -75,6 +75,23 @@ def test_saby_catalog_all_reads_every_page_and_deduplicates():
     assert "withBalance=false" in calls[1].full_url
 
 
+def test_saby_delivery_calendar_is_read_only_and_uses_selected_point():
+    calls = []
+
+    def opener(request, timeout):
+        calls.append(request)
+        if request.full_url.endswith("/oauth/service/"):
+            return Response({"token": "access"})
+        assert request.method == "GET"
+        assert "/retail/delivery/calendar?" in request.full_url
+        assert parse_qs(urlparse(request.full_url).query)["pointId"] == ["10"]
+        return Response({"dates": [{"date": "2026-08-08"}]})
+
+    client = SabyClient(settings(), opener=opener)
+    assert client.delivery_calendar()["dates"] == [{"date": "2026-08-08"}]
+    assert len(calls) == 2
+
+
 def test_saby_reports_missing_configuration_without_network():
     client = SabyClient(SabySettings())
     assert client.configuration()["configured"] is False

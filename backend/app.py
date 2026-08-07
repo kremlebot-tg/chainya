@@ -1663,6 +1663,7 @@ def sync_paid_order_to_saby(order_id: str) -> None:
         if (
             not row
             or row["payment_state"] != "paid"
+            or not _saby_order_is_after_rollout_cutoff(row)
             or row["status"] not in {"paid", "confirmed", "packing", "shipped", "completed"}
             or row["saby_state"] not in {"not_queued", "failed"}
         ):
@@ -2159,6 +2160,28 @@ def _saby_auto_sync_enabled() -> bool:
         return sync_mode_from_env().value == "auto"
     except SabySyncError:
         return False
+
+
+def _saby_order_is_after_rollout_cutoff(row: sqlite3.Row) -> bool:
+    """Fail closed for paid orders created before the explicitly chosen rollout.
+
+    This prevents enabling ``auto`` from replaying historical/test payments that
+    accumulated while Saby writes were disabled.  An absent cutoff preserves the
+    previous behaviour for existing installations and tests.
+    """
+    raw_cutoff = os.getenv("SABY_ORDER_SYNC_STARTED_AT", "").strip()
+    if not raw_cutoff:
+        return True
+    try:
+        cutoff = datetime.fromisoformat(raw_cutoff.replace("Z", "+00:00"))
+        paid_at = datetime.fromisoformat(str(row["paid_at"] or "").replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        logging.error("Некорректный SABY_ORDER_SYNC_STARTED_AT или paid_at; запись в Saby заблокирована")
+        return False
+    if cutoff.tzinfo is None or paid_at.tzinfo is None:
+        logging.error("SABY_ORDER_SYNC_STARTED_AT и paid_at должны содержать часовой пояс")
+        return False
+    return paid_at >= cutoff
 
 
 def _telegram_notifications_enabled() -> bool:
@@ -3641,6 +3664,20 @@ def admin_saby_test(authorization: str = Header(default="")):
 
     point_found = any(str(point.get("id")) == str(point_id) for point in points)
     delivery_found = any(str(point.get("id")) == str(point_id) for point in delivery_points)
+    delivery_confirmation = "point_list" if delivery_found else ""
+    # Saby can temporarily omit an enabled Retail point from point/list while
+    # still returning its live delivery calendar.  The calendar endpoint is
+    # read-only and is also a documented prerequisite for creating an order,
+    # so use it as a conservative secondary readiness signal.
+    if point_id and point_found and not delivery_found:
+        try:
+            delivery_calendar = rows(saby_client.delivery_calendar(point_id), "dates")
+        except SabyError as exc:
+            errors["delivery_calendar"] = str(exc)
+        else:
+            if delivery_calendar:
+                delivery_found = True
+                delivery_confirmation = "calendar"
     price_list_found = any(str(item.get("id")) == str(price_list_id) for item in price_lists)
     products = [item for item in catalog if not item.get("isParent")]
     priced_products = [item for item in products if item.get("cost") is not None]
@@ -3744,6 +3781,7 @@ def admin_saby_test(authorization: str = Header(default="")):
             for item in unknown_balance_products[:20]
         ],
         "delivery_configured": delivery_found,
+        "delivery_confirmation": delivery_confirmation,
         "ready_for_orders": not blockers,
         "blockers": blockers,
         "warnings": (

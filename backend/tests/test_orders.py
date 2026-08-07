@@ -807,6 +807,15 @@ def test_admin_uses_readable_typography_scale(tmp_path, monkeypatch):
     assert "@media(max-width:760px){.admin-readable{font-size:16px}" in html
 
 
+def test_admin_uses_refined_responsive_header(tmp_path, monkeypatch):
+    _, module = app_client(tmp_path, monkeypatch)
+    html = (module.ROOT / "backend" / "admin.html").read_text(encoding="utf-8")
+    assert '<header class="topbar topbar--refined">' in html
+    assert "grid-template-columns:repeat(5,minmax(0,1fr))" in html
+    assert ".topbar--refined .nav__count{display:none}" in html
+    assert ".topbar--refined .nav__button[aria-selected=true]" in html
+
+
 def test_saby_shadow_persists_safe_errors_recovers_stale_run_and_limits_history(tmp_path, monkeypatch):
     client, module = app_client(tmp_path, monkeypatch)
     from backend.saby import SabyError

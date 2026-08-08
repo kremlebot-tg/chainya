@@ -97,7 +97,7 @@ def test_demo_init_is_once_idempotent_and_uses_server_amount(tmp_path, monkeypat
     assert second.json()["payment"]["reused"] is True
     assert len(calls) == 1
     assert calls[0][0][0] == first.json()["order"]["id"]
-    assert calls[0][0][1] == 875_000
+    assert calls[0][0][1] == 88_000
     assert calls[0][1]["notification_url"].endswith("/notification")
     success = urlparse(calls[0][1]["success_url"])
     assert success.path == "/payment/success"
@@ -220,7 +220,7 @@ def test_failed_init_replay_recovers_payment_url_via_check_order(tmp_path, monke
             "Payments": [{
                 "PaymentId": 7654321,
                 "Status": "NEW",
-                "Amount": 875_000,
+                "Amount": 88_000,
                 "PaymentURL": "https://pay.tbank.ru/recovered",
             }],
         },
@@ -314,7 +314,7 @@ def test_stale_init_recovery_keeps_found_payment_ambiguous_without_url(
                 "Payments": [{
                     "PaymentId": 887766,
                     "Status": "NEW",
-                    "Amount": 875_000,
+                    "Amount": 88_000,
                 }],
             },
         )
@@ -381,7 +381,7 @@ def test_signed_confirmed_callback_is_idempotent_and_redirect_is_not_proof(tmp_p
             f"/api/orders/{order_id}", params={"token": row["payment_token"]}
         ).json()["payment_state"] == "awaiting"
 
-        notice = signed_notification(module, order_id, "123456", 875_000, "CONFIRMED")
+        notice = signed_notification(module, order_id, "123456", 88_000, "CONFIRMED")
         first = client.post("/api/payments/tbank/notification", json=notice)
         second = client.post("/api/payments/tbank/notification", json=notice)
         current = client.get(
@@ -412,7 +412,7 @@ def test_paid_callback_replay_retries_durable_telegram_effect(tmp_path, monkeypa
     with client:
         created = client.post("/api/orders", json=order_payload()).json()["order"]
         notice = signed_notification(
-            module, created["id"], "123456", 875_000, "CONFIRMED"
+            module, created["id"], "123456", 88_000, "CONFIRMED"
         )
         first = client.post("/api/payments/tbank/notification", json=notice)
         with module.db() as con:
@@ -490,7 +490,7 @@ def test_disabled_integrations_keep_outbox_pending_without_fake_success(
     with client:
         created = client.post("/api/orders", json=order_payload()).json()["order"]
         notice = signed_notification(
-            module, created["id"], "123456", 875_000, "CONFIRMED"
+            module, created["id"], "123456", 88_000, "CONFIRMED"
         )
         response = client.post("/api/payments/tbank/notification", json=notice)
         with module.db() as con:
@@ -625,7 +625,7 @@ def test_callback_rejects_bad_signature_amount_and_nonfinal_status(tmp_path, mon
     with client:
         created = client.post("/api/orders", json=order_payload()).json()["order"]
         authorized = signed_notification(
-            module, created["id"], "123456", 875_000, "AUTHORIZED"
+            module, created["id"], "123456", 88_000, "AUTHORIZED"
         )
         assert client.post("/api/payments/tbank/notification", json=authorized).text == "OK"
         with module.db() as con:
@@ -660,7 +660,7 @@ def test_admin_full_refund_calls_cancel_once(tmp_path, monkeypatch):
     auth = {"Authorization": "Bearer test-admin-token"}
     with client:
         created = client.post("/api/orders", json=order_payload()).json()["order"]
-        notice = signed_notification(module, created["id"], "123456", 875_000, "CONFIRMED")
+        notice = signed_notification(module, created["id"], "123456", 88_000, "CONFIRMED")
         client.post("/api/payments/tbank/notification", json=notice)
         first = client.post(
             f"/api/admin/orders/{created['id']}/tbank/refund", headers=auth
@@ -696,7 +696,7 @@ def test_admin_cannot_fake_or_cancel_tbank_payment_state(tmp_path, monkeypatch):
         )
         client.post(
             "/api/payments/tbank/notification",
-            json=signed_notification(module, created["id"], "123456", 875_000, "CONFIRMED"),
+            json=signed_notification(module, created["id"], "123456", 88_000, "CONFIRMED"),
         )
         paid_cancel = client.patch(
             f"/api/admin/orders/{created['id']}", json={"status": "cancelled"}, headers=auth
@@ -733,7 +733,7 @@ def test_configured_receipt_is_sent_for_sale_but_not_full_refund(tmp_path, monke
         created = client.post("/api/orders", json=order_payload()).json()["order"]
         client.post(
             "/api/payments/tbank/notification",
-            json=signed_notification(module, created["id"], "123456", 875_000, "CONFIRMED"),
+            json=signed_notification(module, created["id"], "123456", 88_000, "CONFIRMED"),
         )
         response = client.post(
             f"/api/admin/orders/{created['id']}/tbank/refund",
@@ -742,6 +742,6 @@ def test_configured_receipt_is_sent_for_sale_but_not_full_refund(tmp_path, monke
     assert response.status_code == 200
     assert len(sale_receipts) == 1
     assert refund_receipts == [None]
-    assert sale_receipts[0]["Items"][0]["Amount"] == 875_000
+    assert sale_receipts[0]["Items"][0]["Amount"] == 88_000
     assert sale_receipts[0]["Items"][0]["Name"].endswith(" · 25 г")
     assert sale_receipts[0]["Items"][0]["MeasurementUnit"] == "шт"

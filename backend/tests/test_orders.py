@@ -88,8 +88,8 @@ def test_server_prices_order_and_mock_payment(tmp_path, monkeypatch):
         assert response.status_code == 201
         body = response.json()
         order = body["order"]
-        assert order["subtotal"] == 2 * 4375  # 1750 ₽ / 10 г → 4375 ₽ / 25 г
-        assert order["total"] == 8750
+        assert order["subtotal"] == 2 * 440  # 175 ₽ / 10 г → 440 ₽ / 25 г
+        assert order["total"] == 880
         assert order["status"] == "pending_payment"
         assert order["payment_state"] == "awaiting"
         payment_token = parse_qs(urlparse(body["payment"]["url"]).query)["token"][0]
@@ -114,7 +114,7 @@ def test_order_accepts_10_gram_pack_at_base_price(tmp_path, monkeypatch):
             json=payload(items=[{"id": "baihao", "pack": 10, "qty": 1}]),
         )
     assert response.status_code == 201
-    assert response.json()["order"]["subtotal"] == 1750
+    assert response.json()["order"]["subtotal"] == 175
 
 
 def test_order_creation_is_idempotent_for_network_retries(tmp_path, monkeypatch):
@@ -263,7 +263,7 @@ def test_cdek_quote_and_order_use_server_price_and_selected_point(tmp_path, monk
     assert quote.json()["tariff_code"] == 136
     assert order.status_code == 201
     assert order.json()["order"]["delivery_price"] == 322
-    assert order.json()["order"]["total"] == 9072
+    assert order.json()["order"]["total"] == 1202
     assert order.json()["order"]["delivery_quote"]["period_max"] == 3
 
 
@@ -527,7 +527,7 @@ def test_integration_preview_is_network_free_and_builds_pickup_saby_payload(tmp_
     assert response.status_code == 200
     result = response.json()
     assert result["external_writes_locked"] is True
-    assert result["payment"]["amount_kopeks"] == 875_000
+    assert result["payment"]["amount_kopeks"] == 88_000
     assert result["payment"]["network_called"] is False
     assert result["saby"]["ready"] is True
     assert result["saby"]["payload"]["pointId"] == 274
@@ -1081,7 +1081,7 @@ def test_anonymous_analytics_feed_dashboard(tmp_path, monkeypatch):
         assert dashboard["traffic"]["cart_visitors"] == 1
         assert dashboard["traffic"]["order_conversion"] == 100
         assert dashboard["commerce"]["paid_orders"] == 1
-        assert dashboard["commerce"]["revenue"] == 8750
+        assert dashboard["commerce"]["revenue"] == 880
         assert dashboard["breakdown"]["device"] == [{"name": "mobile", "value": 1}]
         assert dashboard["breakdown"]["campaign"] == [
             {"name": "yandex / cpc / maps", "value": 1}
@@ -1166,7 +1166,7 @@ def test_revenue_uses_payment_time_and_queue_is_not_period_limited(tmp_path, mon
         client.patch(f"/api/admin/orders/{created['id']}", headers=auth, json={"status": "paid"})
         after_payment = client.get("/api/admin/dashboard", params={"days": 7}, headers=auth).json()
         assert after_payment["commerce"]["paid_orders"] == 1
-        assert after_payment["commerce"]["revenue"] == 8750
+        assert after_payment["commerce"]["revenue"] == 880
         assert after_payment["commerce"]["needs_attention"] == 1
 
 

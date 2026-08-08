@@ -44,8 +44,8 @@ def gram_line(**changes):
         "name": "Бай Хао Инь Чжень",
         "pack": 25,
         "qty": 2,
-        "unit_price": 4375,
-        "total": 8750,
+        "unit_price": 440,
+        "total": 880,
     }
     values.update(changes)
     return values
@@ -115,12 +115,21 @@ def test_gram_and_piece_lines_use_the_checkout_amounts():
         "id": 39,
         "externalId": "b4bc9267-241d-4bfe-9fe8-8af23409f4f0",
         "count": 50,
-        "cost": 175.0,
+        "cost": 17.6,
         "name": "Бай Хао Инь Чжень",
     }
     assert piece["id"] == 44
     assert piece["count"] == 3
     assert piece["cost"] == 320
+
+
+def test_saby_rows_preserve_the_server_checkout_total():
+    lines = [gram_line(), piece_line(qty=1, total=320)]
+    rows = build_nomenclatures(lines)
+
+    checkout_total = sum(line["total"] for line in lines)
+    saby_total = sum(row["count"] * row["cost"] for row in rows)
+    assert saby_total == pytest.approx(checkout_total)
 
 
 def test_nomenclature_builder_rejects_unknown_or_inconsistent_lines():

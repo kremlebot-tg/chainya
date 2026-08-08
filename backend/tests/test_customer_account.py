@@ -210,10 +210,13 @@ def test_account_page_is_no_store_not_indexed_and_uses_real_photo(tmp_path, monk
         head = client.head("/account/")
     assert page.status_code == 200
     assert "Личный кабинет" in page.text
-    assert '/img/hall-room.webp' in page.text
+    for image in ('hall-room.webp', 'master-pour.webp', 'hall-table.webp'):
+        assert f'/img/{image}' in page.text
     assert 'alt="Интерьер Чайни на улице Острякова"' in page.text
+    assert 'alt="Чайный мастер заваривает чай"' in page.text
+    assert 'alt="Стол для чайной церемонии в Чайне"' in page.text
     assert 'loading="lazy"' in page.text
-    assert page.text.index('class="auth-card"') < page.text.index('class="auth-photo"')
+    assert page.text.index('class="auth-card"') < page.text.index('class="auth-gallery"')
     assert page.headers["cache-control"] == "no-store"
     assert page.headers["x-robots-tag"] == "noindex, nofollow"
     assert head.status_code == 200

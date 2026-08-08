@@ -28,10 +28,12 @@ def test_checkout_has_one_clear_payment_method_and_visible_status():
     assert 'id="payment-secure"' in SOURCE
 
 
-def test_pickup_point_map_and_booking_total_are_rendered():
+def test_pickup_point_map_link_and_booking_total_are_rendered():
     assert 'id="c-pvz-map" hidden' in SOURCE
-    assert 'id="c-pvz-map-frame"' in SOURCE
+    assert 'id="c-pvz-map-address"' in SOURCE
     assert 'id="c-pvz-map-link"' in SOURCE
+    assert 'id="c-pvz-map-frame"' not in SOURCE
+    assert "$('#c-pvz-map-frame').src" not in SOURCE
     assert 'id="s-total"' in SOURCE
     assert "fmtPriceValue() * Number(B.guests)" in SOURCE
 

@@ -515,8 +515,11 @@ h1, h2, h3, p{ text-wrap:pretty; }
   background:var(--bg-3); color:var(--text-2); font-size:12.5px; line-height:1.45;
 }
 .pvz-map{ margin-top:10px; border-top:1px solid var(--line-soft); padding-top:10px; }
-.pvz-map iframe{ width:100%; height:220px; display:block; border:0; background:var(--bg-2); }
-.pvz-map a{ display:inline-flex; align-items:center; min-height:42px; margin-top:5px; color:var(--text-2); font-size:12.5px; border-bottom:1px solid var(--line); }
+.pvz-map__selected{ display:flex; gap:10px; align-items:flex-start; color:var(--text-2); font-size:12.5px; line-height:1.45; }
+.pvz-map__pin{ flex:0 0 auto; color:var(--accent); font-size:18px; line-height:1.1; }
+.pvz-map__copy strong{ display:block; color:var(--text); font-size:13px; font-weight:600; }
+.pvz-map__copy span{ display:block; margin-top:2px; }
+.pvz-map a{ display:inline-flex; align-items:center; min-height:44px; margin-top:6px; color:var(--text-2); font-size:12.5px; border-bottom:1px solid var(--line); }
 .pvz-map a:hover{ color:var(--accent); border-color:var(--accent); }
 .delivery-quote{
   min-height:20px; margin:-8px 0 18px; color:var(--text-3);
@@ -1490,8 +1493,11 @@ select.input{
         </div>
         <div class="delivery-selected" id="c-pvz-selected" hidden></div>
         <div class="pvz-map" id="c-pvz-map" hidden>
-          <iframe id="c-pvz-map-frame" title="Выбранный пункт СДЭК на карте" data-i18n-title="cart_pvz_map_title" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe>
-          <a id="c-pvz-map-link" target="_blank" rel="noopener" data-i18n="cart_pvz_map_open">Открыть пункт в Яндекс Картах</a>
+          <div class="pvz-map__selected">
+            <span class="pvz-map__pin" aria-hidden="true">⌖</span>
+            <span class="pvz-map__copy"><strong data-i18n="cart_pvz_map_selected">Пункт выбран</strong><span id="c-pvz-map-address"></span></span>
+          </div>
+          <a id="c-pvz-map-link" target="_blank" rel="noopener" data-i18n="cart_pvz_map_open">Показать на карте</a>
         </div>
       </div>
       <div class="field" id="c-addr-field">
@@ -1705,7 +1711,7 @@ select.input{
     cart_pvz:'Пункт выдачи СДЭК', cart_pvz_ph:'Улица, метро или код пункта',
     cart_addr:'Адрес', cart_addr_ph:'Улица, дом, квартира', cart_payment:'Оплата',
     pay_card:'Оплата картой', pay_sbp:'СБП', payment_secure:'После оформления откроется защищённая страница Т‑Банка. Подойдёт карта любого российского банка.',
-    payment_terms_link:'Условия оплаты и возврата', cart_pvz_map_title:'Выбранный пункт СДЭК на карте', cart_pvz_map_open:'Открыть пункт в Яндекс Картах',
+    payment_terms_link:'Условия оплаты и возврата', cart_pvz_map_selected:'Пункт выбран', cart_pvz_map_open:'Показать на карте',
     cart_note_ph:'Комментарий к заказу', cart_submit:'Оформить заказ', cart_submit_total:a=>`Оформить заказ · ${a}`, cart_submit_unavailable:'Онлайн-оплата пока недоступна',
     cart_decrease:n=>`Уменьшить количество «${n}»`, cart_increase:n=>`Увеличить количество «${n}»`,
     cart_pay:'Стоимость и срок доставки рассчитывает СДЭК перед оплатой.',
@@ -1884,7 +1890,7 @@ select.input{
     cart_pvz:'CDEK pickup point', cart_pvz_ph:'Street, metro or point code',
     cart_addr:'Address', cart_addr_ph:'Street, building, flat', cart_payment:'Payment',
     pay_card:'Card payment', pay_sbp:'SBP', payment_secure:'After checkout, T‑Bank’s secure payment page will open. Cards issued by Russian banks are accepted.',
-    payment_terms_link:'Payment and return terms', cart_pvz_map_title:'Selected CDEK pickup point on the map', cart_pvz_map_open:'Open pickup point in Yandex Maps',
+    payment_terms_link:'Payment and return terms', cart_pvz_map_selected:'Pickup point selected', cart_pvz_map_open:'Show on map',
     cart_note_ph:'Order comment', cart_submit:'Place order', cart_submit_total:a=>`Place order · ${a}`, cart_submit_unavailable:'Online payment is unavailable',
     cart_decrease:n=>`Decrease quantity of ${n}`, cart_increase:n=>`Increase quantity of ${n}`,
     cart_pay:'CDEK calculates the delivery price and time before payment.',
@@ -2063,7 +2069,7 @@ select.input{
     cart_pvz:'CDEK自提点', cart_pvz_ph:'街道、地铁站或网点代码',
     cart_addr:'地址', cart_addr_ph:'街道、门牌号、公寓', cart_payment:'支付',
     pay_card:'银行卡支付', pay_sbp:'快速支付系统（SBP）', payment_secure:'提交订单后将打开T‑Bank的安全支付页面，支持俄罗斯银行发行的银行卡。',
-    payment_terms_link:'支付与退款条款', cart_pvz_map_title:'地图上的所选CDEK自提点', cart_pvz_map_open:'在Yandex地图中打开自提点',
+    payment_terms_link:'支付与退款条款', cart_pvz_map_selected:'已选择自提点', cart_pvz_map_open:'在地图上查看',
     cart_note_ph:'订单备注', cart_submit:'提交订单', cart_submit_total:a=>`提交订单 · ${a}`, cart_submit_unavailable:'在线支付暂不可用',
     cart_decrease:n=>`减少${n}的数量`, cart_increase:n=>`增加${n}的数量`,
     cart_pay:'付款前由CDEK计算运费和时效。',
@@ -3119,9 +3125,9 @@ select.input{
     results.replaceChildren(message);
   }
   function clearPointMap(){
-    const map = $('#c-pvz-map'), frame = $('#c-pvz-map-frame'), link = $('#c-pvz-map-link');
+    const map = $('#c-pvz-map'), address = $('#c-pvz-map-address'), link = $('#c-pvz-map-link');
     map.hidden = true;
-    frame.removeAttribute('src');
+    address.textContent = '';
     link.removeAttribute('href');
   }
   function resetPoint(){
@@ -3201,7 +3207,7 @@ select.input{
     const longitude = Number(point.longitude), latitude = Number(point.latitude);
     if (Number.isFinite(longitude) && Number.isFinite(latitude)){
       const params = new URLSearchParams({ll:`${longitude},${latitude}`,z:'16',pt:`${longitude},${latitude},pm2rdm`});
-      $('#c-pvz-map-frame').src = `https://yandex.ru/map-widget/v1/?${params}`;
+      $('#c-pvz-map-address').textContent = point.address || point.code;
       $('#c-pvz-map-link').href = `https://yandex.ru/maps/?${params}`;
       $('#c-pvz-map').hidden = false;
     } else {

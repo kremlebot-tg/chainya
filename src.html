@@ -707,7 +707,7 @@ select.input{
 .foot h3{ font-size:13px; font-weight:550; letter-spacing:.015em; text-transform:none; color:var(--text-3); margin:0 0 14px; }
 .foot ul{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:9px; }
 .foot li, .foot p{ font-size:14px; color:var(--text-2); margin:0; }
-.foot a{ transition:color .2s var(--ease); }
+.foot a{ min-height:24px; display:inline-flex; align-items:center; transition:color .2s var(--ease); }
 .foot a:hover{ color:var(--accent); }
 .foot__logo{ margin-bottom:18px; }
 .foot__logo img{ height:86px; width:auto; display:block; border-radius:2px; }
@@ -967,7 +967,7 @@ select.input{
     <div class="hero__in">
       <div class="hero__copy">
         <p class="label" data-i18n="hero_label">Китайский чай · доставка по России</p>
-        <h1 class="display" data-i18n="hero_h">Чай,<br>к которому<br><em>возвращаются</em></h1>
+        <h1 class="display" data-i18n="hero_h">Чай, <br>к которому <br><em>возвращаются</em></h1>
         <p class="lead hero__lead" data-i18n="hero_lead"></p>
         <div class="hero__cta">
           <button class="btn btn--solid" data-go="shop" data-i18n="cta_menu">Купить чай</button>
@@ -1169,7 +1169,7 @@ select.input{
       <div class="sec__head">
         <div>
           <p class="label" data-i18n="b2b_label">Для бизнеса</p>
-          <h1 class="display" data-i18n="b2b_h">Оптовые поставки и мероприятия<br>для вашего бизнеса</h1>
+          <h1 class="display" data-i18n="b2b_h">Оптовые поставки и мероприятия <br>для вашего бизнеса</h1>
         </div>
         <p class="lead" data-i18n="b2b_lead"></p>
       </div>
@@ -1657,7 +1657,7 @@ select.input{
     brand:'Чайня', brand_sup:'МСК',
     nav_home:'Главная', nav_shop:'Купить чай', nav_b2b:'Для бизнеса', nav_book:'Бронь',
     hero_label:'Китайский чай · доставка по России',
-    hero_h:'Чай,<br>к которому<br><em>возвращаются</em>',
+    hero_h:'Чай, <br>к которому <br><em>возвращаются</em>',
     hero_lead:'Отбираем китайский чай, который сами пьём и завариваем в Чайне. Можно взять небольшой пакет на пробу, собрать заказ домой или сначала познакомиться с чаем за нашим столом.',
     cta_book:'Забронировать стол', cta_menu:'Купить чай',
     fact1_k:'Ассортимент', fact1_v:TEA_META.length+' позиции', fact1_s:'От белого чая до выдержанного хэй ча',
@@ -1727,7 +1727,7 @@ select.input{
     dlv:{ pickup:'Самовывоз · Острякова, 3', cdek_pvz:'СДЭК · пункт выдачи', cdek_courier:'СДЭК · курьер' },
     order_head:'🛒 Заказ чая — Чайня', order_done:'Спасибо! Завершите заказ в нашем боте @chainyabot или позвоните +7 905 590-88-01 — подтвердим и посчитаем доставку.',
     ts_note:'За столом этот чай можно выпить бесплатно: два на выбор входят в стоимость стола.',
-    b2b_label:'Для бизнеса и событий', b2b_h:'Оптовые поставки и мероприятия<br>для вашего бизнеса',
+    b2b_label:'Для бизнеса и событий', b2b_h:'Оптовые поставки и мероприятия <br>для вашего бизнеса',
     b2b_lead:'Поставим листовой чай в заведение или офис, соберём чайную карту и проведём выездную церемонию на вашей площадке.',
     b2b_offer1_h:'Чай для заведений и офисов', b2b_offer1_p:'Подбираем сорта под кухню, формат и бюджет, считаем себестоимость и возим партии по графику.',
     b2b_offer1_cta:'Обсудить поставку', b2b_supply_prefill:'Интересует поставка чая для заведения или офиса.',
@@ -1836,7 +1836,7 @@ select.input{
     brand:'Chaynya', brand_sup:'MSK',
     nav_home:'Home', nav_shop:'Buy tea', nav_b2b:'For business', nav_book:'Booking',
     hero_label:'Chinese tea · delivery across Russia',
-    hero_h:'Tea<br>you will want<br><em>to return to</em>',
+    hero_h:'Tea <br>you will want <br><em>to return to</em>',
     hero_lead:'We select the Chinese teas we drink and brew at Chaynya ourselves. Start with a small bag, build an order for home, or get to know the tea at our table first.',
     cta_book:'Book a table', cta_menu:'Buy tea',
     fact1_k:'Selection', fact1_v:TEA_META.length+' teas', fact1_s:'from white tea to aged hei cha',
@@ -1906,7 +1906,7 @@ select.input{
     dlv:{ pickup:'Pickup · Ostryakova 3', cdek_pvz:'CDEK · pickup point', cdek_courier:'CDEK · courier' },
     order_head:'🛒 Tea order — Chaynya', order_done:'Thanks! Finish your order in our bot @chainyabot or call +7 905 590-88-01 — we’ll confirm and calculate shipping.',
     ts_note:'Two teas of your choice are included with every table booking.',
-    b2b_label:'For business and events', b2b_h:'Tea for teams,<br>guests and events',
+    b2b_label:'For business and events', b2b_h:'Tea for teams, <br>guests and events',
     b2b_lead:'We supply loose-leaf tea to venues and offices, build tea menus, and hold off-site ceremonies at your location.',
     b2b_offer1_h:'Tea for venues and offices', b2b_offer1_p:'We match teas to your menu, format and budget, calculate cost per serving, and deliver on a schedule.',
     b2b_offer1_cta:'Discuss supply', b2b_supply_prefill:'I am interested in tea supply for a venue or office.',

@@ -221,3 +221,11 @@ def test_account_page_is_no_store_not_indexed_and_uses_real_photo(tmp_path, monk
     assert page.headers["x-robots-tag"] == "noindex, nofollow"
     assert head.status_code == 200
     assert head.content == b""
+
+
+def test_account_header_links_keep_full_touch_targets(tmp_path, monkeypatch):
+    client, _ = app_client(tmp_path, monkeypatch)
+    with client:
+        page = client.get("/account")
+    assert ".brand{min-height:44px" in page.text
+    assert ".back{min-height:44px" in page.text

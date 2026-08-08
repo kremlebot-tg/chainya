@@ -65,6 +65,18 @@ def test_catalog_keeps_a_semantic_heading_without_restoring_visual_clutter():
     assert "teaCard(m, 'h2', true, index < 8)" in SOURCE
 
 
+def test_display_headings_keep_word_boundaries_across_visual_line_breaks():
+    """Visual line breaks must not merge words for crawlers or assistive tech."""
+
+    assert "Чай, <br>к которому <br><em>возвращаются</em>" in SOURCE
+    assert "Оптовые поставки и мероприятия <br>для вашего бизнеса" in SOURCE
+    assert "Tea <br>you will want <br><em>to return to</em>" in SOURCE
+
+
+def test_footer_links_keep_minimum_touch_targets():
+    assert ".foot a{ min-height:24px; display:inline-flex; align-items:center;" in SOURCE
+
+
 def test_booking_controls_have_accessible_names_and_heading_order():
     assert '<h2 class="summary__title" data-i18n="sum_h">' in SOURCE
     assert '<span class="sr-only">, ${fullDate}</span>' in SOURCE

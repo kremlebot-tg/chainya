@@ -25,6 +25,10 @@ jobs:
         run: python -m pip install -r backend/requirements-dev.txt
       - name: Run backend tests
         run: python -m pytest -q
+      - name: Audit Python dependencies
+        run: python -m pip_audit -r backend/requirements.txt
+      - name: Check blocking Python errors
+        run: python -m ruff check backend scripts build.py --select E9,F
       - name: Build production site
         run: python build.py --web
       - name: Verify release bundle

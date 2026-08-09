@@ -2217,24 +2217,32 @@ def process_paid_order_effects(order_id: str) -> None:
             _mark_paid_effect(order_id, "telegram", "sent")
 
     if _saby_auto_sync_enabled() and _claim_paid_effect(order_id, "saby"):
-        sync_paid_order_to_saby(order_id)
-        saby_state = order_row(order_id)["saby_state"]
-        if saby_state == "synced":
-            _mark_paid_effect(order_id, "saby", "sent")
-        elif saby_state == "ambiguous":
+        if not _saby_order_is_after_rollout_cutoff(row):
             _mark_paid_effect(
                 order_id,
                 "saby",
-                "ambiguous",
-                error="Нужна ручная проверка результата отправки в Saby",
+                "skipped",
+                error="Заказ создан до включения автоматической передачи в Saby",
             )
         else:
-            _mark_paid_effect(
-                order_id,
-                "saby",
-                "failed",
-                error="Заказ пока не передан в Saby",
-            )
+            sync_paid_order_to_saby(order_id)
+            saby_state = order_row(order_id)["saby_state"]
+            if saby_state == "synced":
+                _mark_paid_effect(order_id, "saby", "sent")
+            elif saby_state == "ambiguous":
+                _mark_paid_effect(
+                    order_id,
+                    "saby",
+                    "ambiguous",
+                    error="Нужна ручная проверка результата отправки в Saby",
+                )
+            else:
+                _mark_paid_effect(
+                    order_id,
+                    "saby",
+                    "failed",
+                    error="Заказ пока не передан в Saby",
+                )
 
 
 def recover_paid_order_effects() -> None:
@@ -2849,6 +2857,39 @@ def audit_catalog(action: str, item_id: str, revision: int) -> None:
 def admin_catalog(authorization: str = Header(default="")):
     require_admin(authorization)
     return admin_catalog_response(get_catalog_store().get())
+
+
+@app.get("/api/admin/catalog/history")
+def admin_catalog_history(
+    limit: int = Query(default=30, ge=1, le=100),
+    authorization: str = Header(default=""),
+):
+    """Return a secret-free owner audit trail for catalog changes."""
+    require_admin(authorization)
+    document = get_catalog_store().get()
+    names = {item["id"]: item["name"] for item in document["teas"]}
+    with db() as con:
+        rows = con.execute(
+            """
+            SELECT created_at, action, item_id, revision
+            FROM catalog_audit
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+    return {
+        "history": [
+            {
+                "created_at": row["created_at"],
+                "action": row["action"],
+                "item_id": row["item_id"],
+                "item_name": names.get(row["item_id"], ""),
+                "revision": row["revision"],
+            }
+            for row in rows
+        ]
+    }
 
 
 @app.post("/api/admin/catalog/items", status_code=201)
@@ -4563,6 +4604,41 @@ async def tbank_notification(
         # outbox entries may have committed immediately before a process died.
         background_tasks.add_task(process_paid_order_effects, order_id)
     return "OK"
+
+
+@app.get("/api/admin/orders/{order_id}/tbank/status")
+def admin_tbank_payment_status(
+    order_id: str,
+    response: Response,
+    authorization: str = Header(default=""),
+):
+    """Read the live provider status without changing the local order."""
+    require_admin(authorization)
+    row = order_row(order_id)
+    if row["payment_provider"] not in {"tbank_demo", "tbank"} or not row["provider_payment_id"]:
+        raise HTTPException(409, "У заказа нет платежа Т-Банка")
+    try:
+        result = tbank_client.get_state(row["provider_payment_id"])
+    except TBankError as exc:
+        raise HTTPException(502, "Не удалось прочитать статус платежа в Т-Банке") from exc
+    try:
+        provider_amount = int(result.get("Amount"))
+    except (TypeError, ValueError):
+        provider_amount = -1
+    expected_amount = int(row["total"]) * 100
+    provider_status = str(result.get("Status", ""))[:80]
+    success = result.get("Success") is True
+    response.headers["Cache-Control"] = "no-store"
+    return {
+        "success": success,
+        "provider_status": provider_status,
+        "confirmed": success and provider_status == "CONFIRMED" and provider_amount == expected_amount,
+        "amount_matches": provider_amount == expected_amount,
+        "amount_kopeks": provider_amount if provider_amount >= 0 else None,
+        "expected_amount_kopeks": expected_amount,
+        "local_payment_state": row["payment_state"],
+        "local_provider_status": row["payment_provider_status"],
+    }
 
 
 @app.post("/api/admin/orders/{order_id}/tbank/refund")

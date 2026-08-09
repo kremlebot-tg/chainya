@@ -77,6 +77,10 @@ def test_catalog_admin_create_update_reorder_and_conflict(tmp_path, monkeypatch)
             headers=AUTH,
             json={"revision": hidden["revision"], "ids": ids},
         )
+        anonymous_history = client.get("/api/admin/catalog/history")
+        history = client.get(
+            "/api/admin/catalog/history", params={"limit": 3}, headers=AUTH
+        )
 
     assert initial_response.status_code == 200
     assert missing_csrf.status_code == 403
@@ -91,6 +95,15 @@ def test_catalog_admin_create_update_reorder_and_conflict(tmp_path, monkeypatch)
     assert reordered.status_code == 200
     assert reordered.json()["teas"][0]["id"] == "new-safe-tea"
     assert all(tea["id"] != "new-safe-tea" for tea in client.get("/api/catalog").json()["teas"])
+    assert anonymous_history.status_code == 401
+    assert history.status_code == 200
+    assert [row["action"] for row in history.json()["history"]] == [
+        "reorder",
+        "update",
+        "create",
+    ]
+    assert history.json()["history"][1]["item_name"] == "Новый чай"
+    assert all("token" not in row for row in history.json()["history"])
 
 
 def test_catalog_image_is_reencoded_and_served_immutably(tmp_path, monkeypatch):

@@ -1041,6 +1041,36 @@ def test_saby_rollout_cutoff_never_backfills_older_paid_order(tmp_path, monkeypa
     assert current["integrations"]["saby"]["attempts"] == 0
 
 
+def test_saby_rollout_cutoff_marks_paid_effect_skipped_once(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    monkeypatch.setenv("SABY_ORDER_SYNC_MODE", "auto")
+    monkeypatch.setenv("SABY_ORDER_SYNC_STARTED_AT", "2999-01-01T00:00:00+00:00")
+    monkeypatch.setattr(module, "_saby_auto_sync_enabled", lambda: True)
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        paid_at = module.now_iso()
+        with module.db() as con:
+            con.execute(
+                """UPDATE orders SET status = 'paid', payment_state = 'paid',
+                       paid_at = ?, updated_at = ? WHERE id = ?""",
+                (paid_at, paid_at, order["id"]),
+            )
+            module.enqueue_paid_order_effects(con, order["id"], paid_at)
+
+        module.process_paid_order_effects(order["id"])
+        module.recover_paid_order_effects()
+        with module.db() as con:
+            effect = con.execute(
+                """SELECT state, attempts, last_error FROM paid_order_effects
+                   WHERE order_id = ? AND effect = 'saby'""",
+                (order["id"],),
+            ).fetchone()
+
+    assert effect["state"] == "skipped"
+    assert effect["attempts"] == 1
+    assert "до включения" in effect["last_error"]
+
+
 def test_anonymous_analytics_feed_dashboard(tmp_path, monkeypatch):
     client, module = app_client(tmp_path, monkeypatch)
     auth = {"Authorization": "Bearer test-admin-token"}

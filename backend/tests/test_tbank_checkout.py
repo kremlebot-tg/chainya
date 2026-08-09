@@ -645,6 +645,41 @@ def test_callback_rejects_bad_signature_amount_and_nonfinal_status(tmp_path, mon
             ).fetchone()[0] is None
 
 
+def test_admin_reads_live_tbank_status_without_mutating_order(tmp_path, monkeypatch):
+    client, module = demo_app(tmp_path, monkeypatch)
+    monkeypatch.setattr(module.tbank_client, "create_payment", lambda *_a, **_k: bank_response())
+    monkeypatch.setattr(module.tbank_client, "get_state", lambda _payment_id: {
+        "Success": True,
+        "Status": "CONFIRMED",
+        "Amount": 88_000,
+        "ErrorCode": "0",
+    })
+    auth = {"Authorization": "Bearer test-admin-token"}
+    with client:
+        created = client.post("/api/orders", json=order_payload()).json()["order"]
+        anonymous = client.get(f"/api/admin/orders/{created['id']}/tbank/status")
+        status = client.get(
+            f"/api/admin/orders/{created['id']}/tbank/status", headers=auth
+        )
+        current = module.admin_order(module.order_row(created["id"]))
+
+    assert anonymous.status_code == 401
+    assert status.status_code == 200
+    assert status.headers["cache-control"] == "no-store"
+    assert status.json() == {
+        "success": True,
+        "provider_status": "CONFIRMED",
+        "confirmed": True,
+        "amount_matches": True,
+        "amount_kopeks": 88_000,
+        "expected_amount_kopeks": 88_000,
+        "local_payment_state": "awaiting",
+        "local_provider_status": "NEW",
+    }
+    assert current["status"] == "pending_payment"
+    assert current["integrations"]["payment"]["state"] == "awaiting"
+
+
 def test_admin_full_refund_calls_cancel_once(tmp_path, monkeypatch):
     client, module = demo_app(tmp_path, monkeypatch)
     calls = []

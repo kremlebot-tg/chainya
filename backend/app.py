@@ -4593,11 +4593,21 @@ async def tbank_notification(
                     (provider_status, updated, updated, order_id),
                 )
         else:
-            con.execute(
-                """UPDATE orders SET payment_provider_status = ?, payment_updated_at = ?,
-                       updated_at = ? WHERE id = ?""",
-                (provider_status, updated, updated, order_id),
-            )
+            # Provider notifications can arrive out of order. An intermediate
+            # status such as AUTHORIZED must not replace the terminal status
+            # recorded for an already paid or refunded order.
+            if row["payment_state"] not in {
+                "paid",
+                "refunding",
+                "refund_ambiguous",
+                "partially_refunded",
+                "refunded",
+            }:
+                con.execute(
+                    """UPDATE orders SET payment_provider_status = ?, payment_updated_at = ?,
+                           updated_at = ? WHERE id = ?""",
+                    (provider_status, updated, updated, order_id),
+                )
 
     if process_effects:
         # A replay is also a recovery signal: the paid transition and its

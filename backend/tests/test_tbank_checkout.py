@@ -395,6 +395,40 @@ def test_signed_confirmed_callback_is_idempotent_and_redirect_is_not_proof(tmp_p
     assert sent == [order_id]
 
 
+def test_late_authorized_callback_does_not_replace_confirmed_status(
+    tmp_path, monkeypatch
+):
+    client, module = demo_app(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        module.tbank_client, "create_payment", lambda *_a, **_k: bank_response()
+    )
+    monkeypatch.setattr(module, "notify_owners", lambda _row: True)
+    with client:
+        created = client.post("/api/orders", json=order_payload()).json()["order"]
+        confirmed = signed_notification(
+            module, created["id"], "123456", 88_000, "CONFIRMED"
+        )
+        authorized = signed_notification(
+            module, created["id"], "123456", 88_000, "AUTHORIZED"
+        )
+
+        assert client.post(
+            "/api/payments/tbank/notification", json=confirmed
+        ).text == "OK"
+        assert client.post(
+            "/api/payments/tbank/notification", json=authorized
+        ).text == "OK"
+
+        with module.db() as con:
+            row = con.execute(
+                """SELECT status, payment_state, payment_provider_status
+                   FROM orders WHERE id = ?""",
+                (created["id"],),
+            ).fetchone()
+
+    assert tuple(row) == ("paid", "paid", "CONFIRMED")
+
+
 def test_paid_callback_replay_retries_durable_telegram_effect(tmp_path, monkeypatch):
     client, module = demo_app(tmp_path, monkeypatch)
     deliveries = []

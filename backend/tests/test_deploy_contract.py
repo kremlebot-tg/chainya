@@ -128,6 +128,24 @@ def test_static_deploy_contract() -> None:
     assert "return 1" in remote
 
 
+def test_bot_deploy_uses_versioned_repository_sources() -> None:
+    deploy = (ROOT / "deploy-bot.sh").read_text(encoding="utf-8")
+    assert 'BOT_ROOT="$ROOT/telegram-bot"' in deploy
+    assert "../telegram-bot" not in deploy
+    assert 'git -C "$ROOT" ls-files --error-unmatch "telegram-bot/$file"' in deploy
+    for required in (
+        "bot.py",
+        "requirements.txt",
+        "teas.json",
+        "test_bot_booking.py",
+        "media/start.jpg",
+    ):
+        assert (ROOT / "telegram-bot" / required).is_file(), required
+    catalog_builder = (ROOT / "scripts/build-catalog-seed.py").read_text(encoding="utf-8")
+    assert 'BOT_CATALOG = ROOT / "telegram-bot" / "teas.json"' in catalog_builder
+    assert 'ROOT.parent / "telegram-bot"' not in catalog_builder
+
+
 def test_maintenance_is_chainya_only_and_returns_503() -> None:
     internal = (ROOT / "ops/timeweb/Caddyfile.internal").read_text(encoding="utf-8")
     public = (ROOT / "ops/timeweb/Caddyfile.public-snippet").read_text(encoding="utf-8")

@@ -17,6 +17,7 @@ backend/data/
 mobile-test.html
 .env
 .env.*
+!telegram-bot/.env.example
 *.env
 *.bak
 *.backup

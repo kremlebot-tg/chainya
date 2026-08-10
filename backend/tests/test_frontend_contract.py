@@ -6,6 +6,7 @@ import pytest
 SOURCE_PATH = Path(__file__).resolve().parents[2] / "src.html"
 BUILD_PATH = Path(__file__).resolve().parents[2] / "build.py"
 ADMIN_CATALOG_PATH = Path(__file__).resolve().parents[1] / "admin-catalog.html"
+ACCOUNT_PATH = Path(__file__).resolve().parents[1] / "account.html"
 LEGAL_CSS_PATH = Path(__file__).resolve().parents[2] / "legal.css"
 pytestmark = pytest.mark.skipif(
     not SOURCE_PATH.exists(),
@@ -14,6 +15,7 @@ pytestmark = pytest.mark.skipif(
 SOURCE = SOURCE_PATH.read_text(encoding="utf-8") if SOURCE_PATH.exists() else ""
 BUILD_SOURCE = BUILD_PATH.read_text(encoding="utf-8") if BUILD_PATH.exists() else ""
 ADMIN_CATALOG = ADMIN_CATALOG_PATH.read_text(encoding="utf-8")
+ACCOUNT_SOURCE = ACCOUNT_PATH.read_text(encoding="utf-8")
 LEGAL_CSS = LEGAL_CSS_PATH.read_text(encoding="utf-8") if LEGAL_CSS_PATH.exists() else ""
 
 
@@ -77,6 +79,11 @@ def test_display_headings_keep_word_boundaries_across_visual_line_breaks():
 
 def test_footer_links_keep_minimum_touch_targets():
     assert ".foot a{ min-height:24px; display:inline-flex; align-items:center;" in SOURCE
+
+
+def test_consent_checkboxes_meet_minimum_touch_target_size():
+    assert ".consent input{width:24px;height:24px;" in SOURCE
+    assert ".check input{width:24px;height:24px;" in ACCOUNT_SOURCE
 
 
 def test_booking_controls_have_accessible_names_and_heading_order():

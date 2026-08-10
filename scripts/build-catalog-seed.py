@@ -11,7 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "src.html"
-BOT_CATALOG = ROOT.parent / "telegram-bot" / "teas.json"
+BOT_CATALOG = ROOT / "telegram-bot" / "teas.json"
 OUTPUT = ROOT / "backend" / "catalog.seed.json"
 
 

@@ -1,15 +1,23 @@
 #!/usr/bin/env bash
-# Атомарный деплой Telegram-бота из соседней канонической папки.
+# Атомарный деплой Telegram-бота из этого Git-репозитория.
 set -Eeuo pipefail
 
 HOST="liable-copper"
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-BOT_ROOT="$ROOT/../telegram-bot"
+BOT_ROOT="$ROOT/telegram-bot"
 TMP="$(mktemp -d)"
 trap 'rm -rf -- "$TMP"' EXIT
 
+case "$BOT_ROOT" in
+  "$ROOT/telegram-bot") ;;
+  *) echo "бот должен публиковаться только из Git-репозитория" >&2; exit 1 ;;
+esac
 for file in bot.py teas.json requirements.txt test_bot_booking.py; do
   test -s "$BOT_ROOT/$file" || { echo "нет $BOT_ROOT/$file" >&2; exit 1; }
+  git -C "$ROOT" ls-files --error-unmatch "telegram-bot/$file" >/dev/null || {
+    echo "telegram-bot/$file не отслеживается Git" >&2
+    exit 1
+  }
 done
 test -s "$ROOT/ops/chainya-bot.service"
 test -z "$(git -C "$ROOT" status --porcelain)" || {

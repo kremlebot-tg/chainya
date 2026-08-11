@@ -52,6 +52,7 @@ from .catalog_store import (
     CatalogConflict,
     CatalogError,
     CatalogStore,
+    normalize_item,
 )
 from .catalog_store import (
     image_url as catalog_image_url,
@@ -76,10 +77,12 @@ from .integration_guard import ExternalWriteBlocked
 from .integration_writes import IntegrationWriter
 from .saby import SabyClient, SabyError
 from .saby_shadow import SabyShadowSettings, compare_catalogs
+from .saby_catalog_review import build_catalog_review
 from .saby_sync import (
     SABY_NOMENCLATURE_BY_SITE_ID,
     SabySyncError,
     build_saby_order,
+    mapping_for_catalog,
     sync_mode_from_env,
     validate_mapping_file,
 )
@@ -1060,6 +1063,7 @@ def price_order(payload: CreateOrder) -> tuple[list[dict], int]:
             "qty": requested.qty,
             "unit_price": unit_price,
             "total": line_total,
+            **({"saby": tea["saby"]} if isinstance(tea.get("saby"), dict) else {}),
         })
     return lines, subtotal
 
@@ -2468,7 +2472,13 @@ def run_saby_shadow_check(trigger: str) -> dict:
                 document = get_catalog_store().get()
                 site_catalog = {item["id"]: item for item in document["teas"]}
                 saby_catalog = saby_client.catalog_all(with_balance=True)
-                report = compare_catalogs(site_catalog, saby_catalog)
+                saby_base_catalog = saby_client.base_catalog_all(with_balance=True)
+                report = compare_catalogs(
+                    site_catalog,
+                    saby_catalog,
+                    mapping=mapping_for_catalog(document),
+                    saby_base_catalog=saby_base_catalog,
+                )
                 configuration = saby_client.configuration()
                 catalog_bytes = json.dumps(
                     document, ensure_ascii=False, sort_keys=True, separators=(",", ":")
@@ -2853,6 +2863,46 @@ def audit_catalog(action: str, item_id: str, revision: int) -> None:
         )
 
 
+def validate_catalog_saby_candidate(raw: dict, *, existing_id: str | None = None) -> None:
+    """Reject unsafe publication and duplicate Saby links before persistence."""
+    candidate = normalize_item(raw, existing_id=existing_id)
+    current = get_catalog_store().get()
+    existing = next(
+        (item for item in current["teas"] if item["id"] == candidate["id"]), None
+    )
+    is_new_publication = candidate["published"] and (
+        existing is None or not existing.get("published", True)
+    )
+    if is_new_publication:
+        required = {
+            "orig": "происхождение",
+            "desc": "описание",
+            "composition": "состав",
+            "manufacturer": "изготовитель",
+            "shelf_life": "срок годности",
+            "storage": "условия хранения",
+        }
+        language_names = {"ru": "РУ", "en": "EN", "zh": "中文"}
+        missing = [
+            f"{language_names[language]}: {label}"
+            for language, translation in candidate["translations"].items()
+            for field, label in required.items()
+            if not translation[field].strip()
+        ]
+        if missing:
+            preview = ", ".join(missing[:6])
+            suffix = f" и ещё {len(missing) - 6}" if len(missing) > 6 else ""
+            raise CatalogError(
+                "Перед публикацией заполните карточку: " + preview + suffix
+            )
+    teas = [item for item in current["teas"] if item["id"] != candidate["id"]]
+    teas.append(candidate)
+    try:
+        mapping_for_catalog(teas)
+    except SabySyncError as exc:
+        raise CatalogError(str(exc)) from exc
+
+
 @app.get("/api/admin/catalog")
 def admin_catalog(authorization: str = Header(default="")):
     require_admin(authorization)
@@ -2901,6 +2951,7 @@ def admin_create_catalog_item(
     require_admin(authorization)
     require_catalog_write_request(request)
     try:
+        validate_catalog_saby_candidate(payload.item)
         document = get_catalog_store().create_item(payload.item, payload.revision)
     except (CatalogError, KeyError) as exc:
         raise catalog_error_response(exc) from exc
@@ -2919,6 +2970,7 @@ def admin_update_catalog_item(
     require_admin(authorization)
     require_catalog_write_request(request)
     try:
+        validate_catalog_saby_candidate(payload.item, existing_id=item_id)
         document = get_catalog_store().update_item(item_id, payload.item, payload.revision)
     except (CatalogError, KeyError) as exc:
         raise catalog_error_response(exc) from exc
@@ -3852,6 +3904,18 @@ def admin_saby_catalog_preview(authorization: str = Header(default="")):
         ],
         "total": len(products),
     }
+
+
+@app.get("/api/admin/saby/catalog-review")
+def admin_saby_catalog_review(authorization: str = Header(default="")):
+    """Prepare owner-reviewable suggestions without changing either catalog."""
+    require_admin(authorization)
+    try:
+        items = saby_client.catalog_all(with_balance=True)
+        base_items = saby_client.base_catalog_all(with_balance=True)
+    except SabyError as exc:
+        raise HTTPException(502, str(exc)) from exc
+    return build_catalog_review(get_catalog_store().get(), items, base_items)
 
 
 @app.get("/api/delivery/cities")

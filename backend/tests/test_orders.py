@@ -703,6 +703,10 @@ def test_admin_saby_shadow_is_read_only_persistent_and_protected(tmp_path, monke
             lambda with_balance=False: matching_saby_catalog(module),
         )
         monkeypatch.setattr(
+            module.saby_client, "base_catalog_all",
+            lambda with_balance=False: matching_saby_catalog(module),
+        )
+        monkeypatch.setattr(
             module.saby_client, "configuration",
             lambda: {"configured": True, "point_id": 274, "price_list_id": 7},
         )
@@ -749,6 +753,11 @@ def test_admin_can_acknowledge_only_the_current_exact_saby_difference(tmp_path, 
     catalog[0]["cost"] = float(catalog[0]["cost"]) + 10
     monkeypatch.setattr(
         module.saby_client, "catalog_all", lambda with_balance=False: catalog
+    )
+    monkeypatch.setattr(
+        module.saby_client,
+        "base_catalog_all",
+        lambda with_balance=False: matching_saby_catalog(module),
     )
     monkeypatch.setattr(
         module.saby_client,
@@ -819,6 +828,8 @@ def test_admin_shadow_ui_states_read_only_guarantee_without_apply_action(tmp_pat
     assert 'id="saby-attention"' in html
     assert "Каталог требует проверки" in html
     assert "сайт и СБИС по-разному оценивают одно и то же количество товара" in html
+    assert "Сверка подтвердила одинаковую цену" in html
+    assert "saby_sale_quantum_inferred:'Фасовка'" in html
     assert "проверьте цену вместе с единицей продажи: грамм или упаковка" in html
     assert "Сверьте фактический остаток в СБИС" in html
     assert "Информационные отличия" in html
@@ -887,6 +898,10 @@ def test_saby_shadow_persists_safe_errors_recovers_stale_run_and_limits_history(
         monkeypatch.setattr(module, "SABY_SHADOW_RETENTION_RUNS", 3)
         monkeypatch.setattr(
             module.saby_client, "catalog_all",
+            lambda with_balance=False: matching_saby_catalog(module),
+        )
+        monkeypatch.setattr(
+            module.saby_client, "base_catalog_all",
             lambda with_balance=False: matching_saby_catalog(module),
         )
         for _ in range(4):

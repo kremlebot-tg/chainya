@@ -88,16 +88,22 @@ def compare_catalogs(
     site_catalog: Mapping[str, Mapping[str, Any]],
     saby_catalog: Sequence[Mapping[str, Any]],
     mapping: Mapping[str, SabyNomenclatureRef] = SABY_NOMENCLATURE_BY_SITE_ID,
+    *,
+    saby_base_catalog: Sequence[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Return a deterministic, read-only price and availability comparison.
 
-    Chainya stores loose-tea prices per 10 grams, while Saby returns the price
-    per gram.  Piece products are compared one-to-one.  Unknown units are
+    Chainya stores loose-tea prices per 10 grams.  Saby normally returns a
+    price per gram, but a selected price list may expose a 10-gram sale portion
+    while still labelling it ``г``.  When the optional base catalog confirms
+    both the price and balance ratio, that sale quantum is normalised before
+    comparison.  Piece products are compared one-to-one.  Unknown units are
     reported instead of guessed.
     """
 
     products = [item for item in saby_catalog if isinstance(item, Mapping) and not item.get("isParent")]
     by_external: dict[str, Mapping[str, Any]] = {}
+    base_by_external: dict[str, Mapping[str, Any]] = {}
     duplicate_external_ids: set[str] = set()
     missing_external_id_items: list[Mapping[str, Any]] = []
     for item in products:
@@ -109,6 +115,12 @@ def compare_catalogs(
             duplicate_external_ids.add(external_id)
         else:
             by_external[external_id] = item
+    for item in saby_base_catalog or ():
+        if not isinstance(item, Mapping) or item.get("isParent"):
+            continue
+        external_id = str(item.get("externalId") or "").strip()
+        if external_id and external_id not in base_by_external:
+            base_by_external[external_id] = item
 
     differences: list[dict[str, Any]] = []
     compared = price_matches = stock_matches = 0
@@ -179,9 +191,55 @@ def compare_catalogs(
         saby_unit = _normalised_unit(saby_item.get("unit"))
         site_price = _decimal(site_item.get("price"))
         saby_cost = _decimal(saby_item.get("cost"))
+        balance = _decimal(saby_item.get("balance"))
+        sale_quantum = Decimal(1)
+        base_item = base_by_external.get(ref.external_id)
+        if (
+            site_unit == "g"
+            and saby_unit in {"г", "g", "грамм", "gram"}
+            and base_item is not None
+            and _normalised_unit(base_item.get("unit")) in {"г", "g", "грамм", "gram"}
+        ):
+            base_cost = _decimal(base_item.get("cost"))
+            base_balance = _decimal(base_item.get("balance"))
+            if base_cost and base_cost > 0 and saby_cost and saby_cost > 0:
+                candidate = saby_cost / base_cost
+                rounded = candidate.to_integral_value()
+                balances_agree = (
+                    balance is not None
+                    and base_balance is not None
+                    and abs(balance * rounded - base_balance) <= Decimal("0.005")
+                )
+                supported_quantum = rounded in {Decimal(1), Decimal(10)}
+                if (
+                    supported_quantum
+                    and abs(candidate - rounded) <= Decimal("0.005")
+                    and balances_agree
+                ):
+                    sale_quantum = rounded
+                    if sale_quantum > 1:
+                        differences.append(_difference(
+                            "saby_sale_quantum_inferred", "info", site_id=site_id,
+                            name=name,
+                            message=(
+                                "Базовый каталог Saby подтверждает цену за грамм, "
+                                "а прайс-лист сайта возвращает продажную порцию 10 г."
+                            ),
+                            site_value={
+                                "price": _number(site_price), "unit": "10 г",
+                            },
+                            saby_value={
+                                "base_cost": _number(base_cost),
+                                "price_list_cost": _number(saby_cost),
+                                "sale_quantum_g": _number(sale_quantum),
+                            },
+                        ))
         expected_cost: Decimal | None = None
         if site_unit == "g" and saby_unit in {"г", "g", "грамм", "gram"}:
-            expected_cost = site_price / Decimal(10) if site_price is not None else None
+            expected_cost = (
+                site_price / Decimal(10) * sale_quantum
+                if site_price is not None else None
+            )
         elif site_unit == "pc" and saby_unit in {"шт", "pc", "штука", "piece"}:
             expected_cost = site_price
 
@@ -206,11 +264,10 @@ def compare_catalogs(
                 saby_value={"cost": _number(saby_cost), "unit": saby_item.get("unit")},
             ))
 
-        balance = _decimal(saby_item.get("balance"))
         site_in_stock = site_item.get("stock") is True
         minimum_balance: Decimal | None = None
         if site_unit == "g" and saby_unit in {"г", "g", "грамм", "gram"}:
-            minimum_balance = Decimal(10)
+            minimum_balance = Decimal(10) / sale_quantum
         elif site_unit == "pc" and saby_unit in {"шт", "pc", "штука", "piece"}:
             minimum_balance = Decimal(1)
         if balance is None or minimum_balance is None:
@@ -225,16 +282,19 @@ def compare_catalogs(
             if site_in_stock == saby_in_stock:
                 stock_matches += 1
             else:
+                saby_stock_value = {
+                    "in_stock": saby_in_stock,
+                    "balance": _number(balance),
+                    "minimum_to_sell": _number(minimum_balance),
+                    "unit": saby_item.get("unit"),
+                }
+                if sale_quantum > 1:
+                    saby_stock_value["sale_quantum_g"] = _number(sale_quantum)
                 differences.append(_difference(
                     "stock_mismatch", "warning", site_id=site_id, name=name,
                     message="Доступность на сайте не совпадает с остатком Saby.",
                     site_value={"in_stock": site_in_stock},
-                    saby_value={
-                        "in_stock": saby_in_stock,
-                        "balance": _number(balance),
-                        "minimum_to_sell": _number(minimum_balance),
-                        "unit": saby_item.get("unit"),
-                    },
+                    saby_value=saby_stock_value,
                 ))
 
     for external_id in sorted(duplicate_external_ids):

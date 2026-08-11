@@ -8,6 +8,7 @@ import pytest
 from backend.saby import SabySettings
 from backend.saby_sync import (
     SABY_NOMENCLATURE_BY_SITE_ID,
+    SabyNomenclatureRef,
     SabySyncError,
     SabySyncMode,
     SabySyncPolicyError,
@@ -17,8 +18,45 @@ from backend.saby_sync import (
     sync_mode_from_env,
     validate_mapping_against_catalog,
     validate_mapping_file,
+    mapping_for_catalog,
     write_allowed,
 )
+
+
+def test_reviewed_catalog_link_extends_order_mapping():
+    external_id = "11111111-1111-4111-8111-111111111111"
+    catalog = {"teas": [{
+        "id": "owner-added", "stock": True,
+        "saby": {"id": 777, "external_id": external_id, "image_pending": False},
+    }]}
+    mapping = mapping_for_catalog(catalog, {})
+    assert mapping["owner-added"] == SabyNomenclatureRef(777, external_id)
+
+    rows = build_nomenclatures([{
+        "id": "owner-added", "name": "Owner tea", "pack": 10, "qty": 1,
+        "unit_price": 175, "total": 175,
+        "saby": {"id": 777, "external_id": external_id},
+    }])
+    assert rows[0]["id"] == 777
+    assert rows[0]["externalId"] == external_id
+
+
+def test_reviewed_catalog_link_cannot_duplicate_or_replace_a_verified_link():
+    verified = {"legacy": SabyNomenclatureRef(
+        5, "55555555-5555-4555-8555-555555555555"
+    )}
+    with pytest.raises(SabySyncError, match="несколькими товарами"):
+        mapping_for_catalog({"teas": [{
+            "id": "new", "saby": {
+                "id": 5, "external_id": "66666666-6666-4666-8666-666666666666",
+            },
+        }]}, verified)
+    with pytest.raises(SabySyncError, match="менять нельзя"):
+        mapping_for_catalog({"teas": [{
+            "id": "legacy", "saby": {
+                "id": 6, "external_id": "66666666-6666-4666-8666-666666666666",
+            },
+        }]}, verified)
 
 
 ROOT = Path(__file__).resolve().parents[2]

@@ -143,3 +143,165 @@ def test_catalog_image_is_reencoded_and_served_immutably(tmp_path, monkeypatch):
         assert stored.format == "WEBP"
         assert stored.size == (320, 240)
     assert (module.CATALOG_MEDIA_DIR / image_url.rsplit("/", 1)[1]).is_file()
+
+
+def test_saby_import_stays_hidden_until_real_photo_is_uploaded(tmp_path, monkeypatch):
+    client, _ = app_client(tmp_path, monkeypatch)
+    external_id = "11111111-1111-4111-8111-111111111111"
+    with client:
+        initial = client.get("/api/admin/catalog", headers=AUTH).json()
+        item = dict(initial["teas"][0])
+        item.update({
+            "id": "saby-owner-draft",
+            "published": False,
+            "saby": {"id": 777, "external_id": external_id, "image_pending": True},
+        })
+        created = client.post(
+            "/api/admin/catalog/items", headers=AUTH,
+            json={"revision": initial["revision"], "item": item},
+        )
+        document = created.json()
+        draft = next(row for row in document["teas"] if row["id"] == "saby-owner-draft")
+        draft["published"] = True
+        blocked = client.put(
+            "/api/admin/catalog/items/saby-owner-draft", headers=AUTH,
+            json={"revision": document["revision"], "item": draft},
+        )
+
+        source = BytesIO()
+        Image.new("RGB", (160, 120), (80, 100, 60)).save(source, "PNG")
+        uploaded = client.post(
+            f"/api/admin/catalog/items/saby-owner-draft/image?revision={document['revision']}",
+            headers={**AUTH, "Content-Type": "image/png"}, content=source.getvalue(),
+        )
+        uploaded_document = uploaded.json()
+        ready = next(row for row in uploaded_document["teas"] if row["id"] == "saby-owner-draft")
+        ready["translations"] = {
+            language: {
+                **translation,
+                "orig": translation["orig"] or "Китай",
+                "desc": translation["desc"] or "Описание чая",
+                "composition": "Чайный лист",
+                "manufacturer": "Изготовитель указан владельцем",
+                "shelf_life": "24 месяца",
+                "storage": "Хранить в сухом месте",
+            }
+            for language, translation in ready["translations"].items()
+        }
+        ready["published"] = True
+        published = client.put(
+            "/api/admin/catalog/items/saby-owner-draft", headers=AUTH,
+            json={"revision": uploaded_document["revision"], "item": ready},
+        )
+
+    assert created.status_code == 201
+    assert blocked.status_code == 422
+    assert "фотограф" in blocked.json()["detail"]
+    assert uploaded.status_code == 200
+    assert ready["saby"] == {
+        "id": 777, "external_id": external_id, "image_pending": False,
+    }
+    assert published.status_code == 200
+
+
+def test_catalog_blocks_zero_price_and_incomplete_first_publication(tmp_path, monkeypatch):
+    client, _ = app_client(tmp_path, monkeypatch)
+    with client:
+        initial = client.get("/api/admin/catalog", headers=AUTH).json()
+        source = dict(initial["teas"][0])
+
+        zero_price = dict(source)
+        zero_price["id"] = "zero-price-tea"
+        zero_price["price"] = 0
+        zero_response = client.post(
+            "/api/admin/catalog/items",
+            headers=AUTH,
+            json={"revision": initial["revision"], "item": zero_price},
+        )
+
+        hidden = dict(source)
+        hidden["id"] = "incomplete-hidden-tea"
+        hidden["published"] = False
+        hidden["price"] = 0
+        hidden["translations"] = {
+            language: {
+                **translation,
+                "orig": "",
+                "desc": "",
+                "composition": "",
+                "manufacturer": "",
+                "shelf_life": "",
+                "storage": "",
+            }
+            for language, translation in source["translations"].items()
+        }
+        hidden_response = client.post(
+            "/api/admin/catalog/items",
+            headers=AUTH,
+            json={"revision": initial["revision"], "item": hidden},
+        )
+        hidden_document = hidden_response.json()
+        hidden_item = next(
+            row for row in hidden_document["teas"] if row["id"] == hidden["id"]
+        )
+        hidden_item["price"] = 100
+        hidden_item["published"] = True
+        publish_response = client.put(
+            f"/api/admin/catalog/items/{hidden['id']}",
+            headers=AUTH,
+            json={"revision": hidden_document["revision"], "item": hidden_item},
+        )
+
+    assert zero_response.status_code == 422
+    assert "больше нуля" in zero_response.json()["detail"]
+    assert hidden_response.status_code == 201
+    assert publish_response.status_code == 422
+    assert "Перед публикацией заполните карточку" in publish_response.json()["detail"]
+
+
+def test_legacy_published_item_can_be_edited_before_labels_are_completed(tmp_path, monkeypatch):
+    client, _ = app_client(tmp_path, monkeypatch)
+    with client:
+        initial = client.get("/api/admin/catalog", headers=AUTH).json()
+        item = dict(initial["teas"][0])
+        item["stock"] = not item["stock"]
+        response = client.put(
+            f"/api/admin/catalog/items/{item['id']}",
+            headers=AUTH,
+            json={"revision": initial["revision"], "item": item},
+        )
+
+    assert response.status_code == 200
+
+
+def test_saby_catalog_review_is_read_only_and_owner_only(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    external_id = "22222222-2222-4222-8222-222222222222"
+    selected = [{
+        "id": 778, "externalId": external_id, "name": "Новый чай из СБИС",
+        "unit": "г", "cost": 175, "balance": 9,
+    }]
+    base = [{
+        "id": 778, "externalId": external_id, "name": "Новый чай из СБИС",
+        "unit": "г", "cost": 17.5, "balance": 90,
+    }]
+    monkeypatch.setattr(module.saby_client, "catalog_all", lambda with_balance=False: selected)
+    monkeypatch.setattr(module.saby_client, "base_catalog_all", lambda with_balance=False: base)
+
+    with client:
+        before = client.get("/api/admin/catalog", headers=AUTH).json()
+        anonymous = client.get("/api/admin/saby/catalog-review")
+        response = client.get("/api/admin/saby/catalog-review", headers=AUTH)
+        after = client.get("/api/admin/catalog", headers=AUTH).json()
+
+    assert anonymous.status_code == 401
+    assert response.status_code == 200
+    assert response.json()["read_only_source"] is True
+    assert response.json()["catalog_changed"] is False
+    assert response.json()["items"][0] == {
+        "status": "new", "site_id": "", "saby_id": 778,
+        "external_id": external_id, "name": "Новый чай из СБИС",
+        "unit": "g", "suggested_price": 175, "suggested_stock": True,
+        "note": "Прайс-лист Saby: порция 10 г", "can_create_draft": True,
+    }
+    assert after["revision"] == before["revision"]

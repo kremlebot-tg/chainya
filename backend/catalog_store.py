@@ -11,6 +11,7 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 ITEM_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,79}$")
 TYPE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
@@ -64,6 +65,9 @@ def normalize_item(raw: dict[str, Any], *, existing_id: str | None = None) -> di
         raise CatalogError("Цена должна быть целым числом") from None
     if not 0 <= price <= 10_000_000:
         raise CatalogError("Цена вне допустимого диапазона")
+    published = bool(raw.get("published", True))
+    if published and price == 0:
+        raise CatalogError("Для публикации укажите цену больше нуля")
     unit = raw.get("unit")
     if unit not in {"g", "pc"}:
         raise CatalogError("Единица должна быть g или pc")
@@ -124,8 +128,37 @@ def normalize_item(raw: dict[str, Any], *, existing_id: str | None = None) -> di
     else:
         raise CatalogError("Неизвестный тип изображения")
 
+    saby: dict[str, Any] | None = None
+    saby_raw = raw.get("saby")
+    if saby_raw is not None:
+        if not isinstance(saby_raw, dict):
+            raise CatalogError("Связь с Saby должна быть объектом")
+        saby_id = saby_raw.get("id")
+        if isinstance(saby_id, bool):
+            raise CatalogError("Некорректный id номенклатуры Saby")
+        try:
+            saby_id = int(saby_id)
+        except (TypeError, ValueError):
+            raise CatalogError("Некорректный id номенклатуры Saby") from None
+        if saby_id <= 0:
+            raise CatalogError("Некорректный id номенклатуры Saby")
+        external_id = _text(
+            saby_raw.get("external_id", ""), "saby.external_id", 64, required=True
+        )
+        try:
+            UUID(external_id)
+        except (ValueError, AttributeError) as exc:
+            raise CatalogError("Некорректный externalId номенклатуры Saby") from exc
+        saby = {
+            "id": saby_id,
+            "external_id": external_id,
+            "image_pending": bool(saby_raw.get("image_pending", False)),
+        }
+        if published and saby["image_pending"]:
+            raise CatalogError("Перед публикацией товара из Saby загрузите его фотографию")
+
     ru = translations["ru"]
-    return {
+    item = {
         "id": item_id,
         "type": type_id,
         "name": ru["name"],
@@ -134,12 +167,15 @@ def normalize_item(raw: dict[str, Any], *, existing_id: str | None = None) -> di
         "price": price,
         "unit": unit,
         "stock": bool(raw.get("stock", True)),
-        "published": bool(raw.get("published", True)),
+        "published": published,
         "img": name if kind == "seed" else item_id,
         "image": {"kind": kind, "name": name},
         "taste": taste,
         "translations": translations,
     }
+    if saby is not None:
+        item["saby"] = saby
+    return item
 
 
 def normalize_document(raw: dict[str, Any]) -> dict[str, Any]:
@@ -149,6 +185,11 @@ def normalize_document(raw: dict[str, Any]) -> dict[str, Any]:
     ids = [item["id"] for item in teas]
     if len(ids) != len(set(ids)):
         raise CatalogError("ID товаров не должны повторяться")
+    saby_links = [item["saby"] for item in teas if isinstance(item.get("saby"), dict)]
+    if len({link["id"] for link in saby_links}) != len(saby_links):
+        raise CatalogError("Одна позиция Saby не может быть связана с несколькими товарами")
+    if len({link["external_id"] for link in saby_links}) != len(saby_links):
+        raise CatalogError("Одна позиция Saby не может быть связана с несколькими товарами")
     types = raw.get("types", [])
     if not isinstance(types, list):
         raise CatalogError("Некорректный список категорий")
@@ -275,6 +316,8 @@ class CatalogStore:
                 if current["id"] == item_id:
                     current["image"] = {"kind": "uploaded", "name": filename}
                     current["img"] = item_id
+                    if isinstance(current.get("saby"), dict):
+                        current["saby"]["image_pending"] = False
                     return self._finish(document)
             raise KeyError(item_id)
 

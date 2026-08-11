@@ -78,6 +78,55 @@ def test_shadow_compares_price_units_and_stock_without_mutating_inputs():
     assert saby == original_saby
 
 
+def test_shadow_normalises_verified_ten_gram_saby_sale_portion():
+    site, price_list = site_catalog(), saby_catalog()
+    price_list[0].update(cost=175, balance=89.8)
+    base = [dict(item) for item in price_list]
+    base[0].update(cost=17.5, balance=898)
+
+    result = compare_catalogs(
+        site,
+        price_list,
+        MAPPING,
+        saby_base_catalog=base,
+    )
+
+    assert result["state"] == "ok"
+    assert result["counts"]["price_matches"] == 2
+    assert result["counts"]["stock_matches"] == 2
+    assert result["counts"]["warnings"] == 0
+    inferred = next(
+        item for item in result["differences"]
+        if item["kind"] == "saby_sale_quantum_inferred"
+    )
+    assert inferred["severity"] == "info"
+    assert inferred["saby_value"] == {
+        "base_cost": 17.5,
+        "price_list_cost": 175,
+        "sale_quantum_g": 10,
+    }
+
+
+def test_shadow_does_not_infer_package_from_price_ratio_without_balance_proof():
+    site, price_list = site_catalog(), saby_catalog()
+    price_list[0].update(cost=175, balance=89.8)
+    base = [dict(item) for item in price_list]
+    base[0].update(cost=17.5, balance=500)
+
+    result = compare_catalogs(
+        site,
+        price_list,
+        MAPPING,
+        saby_base_catalog=base,
+    )
+
+    assert result["state"] == "differences"
+    assert any(
+        item["kind"] == "price_mismatch"
+        for item in result["differences"]
+    )
+
+
 def test_shadow_reports_price_stock_mapping_and_saby_only_differences():
     site, saby = site_catalog(), saby_catalog()
     site["unmapped"] = {

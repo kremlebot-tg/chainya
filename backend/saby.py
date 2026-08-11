@@ -188,6 +188,43 @@ class SabyClient:
                 if isinstance(item, dict):
                     key = item.get("id", item.get("externalId"))
                     items[key if key is not None else (page, len(items))] = item
+            has_more = (
+                bool((result.get("outcome") or {}).get("hasMore"))
+                if isinstance(result, dict) else False
+            )
+            if not has_more:
+                return list(items.values())
+        raise SabyError("Каталог Saby содержит слишком много страниц")
+
+    def base_catalog_all(
+        self, point_id: int | None = None, *, with_balance: bool = False,
+        max_pages: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Return the base catalog without applying a retail price list.
+
+        Saby may expose a sale package through a price list while still naming
+        its unit ``г``.  The base catalog is therefore needed by the read-only
+        shadow check to infer that package safely.  This method only performs
+        GET requests.
+        """
+        point = point_id or self.settings.point_id
+        if not point:
+            raise SabyError("Не выбран идентификатор точки продаж Saby")
+
+        items: dict[Any, dict[str, Any]] = {}
+        for page in range(max_pages):
+            result = self.api("/retail/v2/nomenclature/list", {
+                "pointId": point, "noStopList": "false",
+                "withBalance": str(with_balance).lower(), "page": page,
+                "pageSize": 25,
+            })
+            rows = result.get("nomenclatures", []) if isinstance(result, dict) else []
+            if not isinstance(rows, list):
+                raise SabyError("Saby вернул каталог в неожиданном формате")
+            for item in rows:
+                if isinstance(item, dict):
+                    key = item.get("id", item.get("externalId"))
+                    items[key if key is not None else (page, len(items))] = item
             has_more = bool((result.get("outcome") or {}).get("hasMore")) if isinstance(result, dict) else False
             if not has_more:
                 return list(items.values())

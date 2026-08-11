@@ -75,6 +75,27 @@ def test_saby_catalog_all_reads_every_page_and_deduplicates():
     assert "withBalance=false" in calls[1].full_url
 
 
+def test_saby_base_catalog_omits_price_list_and_remains_read_only():
+    calls = []
+
+    def opener(request, timeout):
+        calls.append(request)
+        if request.full_url.endswith("/oauth/service/"):
+            return Response({"token": "access"})
+        assert request.method == "GET"
+        return Response({
+            "nomenclatures": [{"id": 1, "name": "Чай", "cost": 17.5}],
+            "outcome": {"hasMore": False},
+        })
+
+    client = SabyClient(settings(), opener=opener)
+    assert client.base_catalog_all(with_balance=True)[0]["cost"] == 17.5
+    query = parse_qs(urlparse(calls[1].full_url).query)
+    assert query["pointId"] == ["10"]
+    assert query["withBalance"] == ["true"]
+    assert "priceListId" not in query
+
+
 def test_saby_delivery_calendar_is_read_only_and_uses_selected_point():
     calls = []
 

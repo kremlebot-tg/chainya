@@ -2237,7 +2237,8 @@ select.input{
   // «437,5 ₽» на ценнике не пишут.
   const packPrice = (per10, grams) => Math.round(per10 * grams / 10 / 5) * 5;
   const el  = (h) => { const d = document.createElement('div'); d.innerHTML = h.trim(); return d.firstElementChild; };
-  const escAttr = value => String(value).replace(/[&"<>]/g, ch => ({'&':'&amp;','"':'&quot;','<':'&lt;','>':'&gt;'}[ch]));
+  const escHtml = value => String(value).replace(/[&"<>]/g, ch => ({'&':'&amp;','"':'&quot;','<':'&lt;','>':'&gt;'}[ch]));
+  const escAttr = escHtml;
   const $   = (s, r=document) => r.querySelector(s);
   const $$  = (s, r=document) => [...r.querySelectorAll(s)];
 
@@ -2485,8 +2486,8 @@ select.input{
           </button>
         </div>
         <div class="tea__body">
-          <${headingTag} class="tea__name">${txt.n}</${headingTag}>
-          <p class="tea__orig">${txt.o}</p>
+          <${headingTag} class="tea__name">${escHtml(txt.n)}</${headingTag}>
+          <p class="tea__orig">${escHtml(txt.o)}</p>
           <div class="tea__foot">
             <span class="price num">${priceOf(m)}</span>
             <button class="tea__quick" aria-label="${escAttr(T().quick_add(txt.n))}" title="${escAttr(T().quick_add(txt.n))}"${inStock(m) ? '' : ' disabled'}>+</button>
@@ -3063,15 +3064,15 @@ select.input{
       const row = el(`<div class="citem">
         <img class="citem__img" src="${m.img}" alt="" loading="lazy" width="800" height="800">
         <div class="citem__info">
-          <div class="citem__name">${T().teas[it.id].n}</div>
-          <div class="citem__pack">${packLabel(it)} · ${rub(linePrice(it))}</div>
+          <div class="citem__name">${escHtml(T().teas[it.id].n)}</div>
+          <div class="citem__pack">${escHtml(packLabel(it))} · ${escHtml(rub(linePrice(it)))}</div>
         </div>
         <div class="qty">
-          <button class="qty__b" data-d="-1" aria-label="${T().cart_decrease(T().teas[it.id].n)}">−</button>
+          <button class="qty__b" data-d="-1" aria-label="${escAttr(T().cart_decrease(T().teas[it.id].n))}">−</button>
           <span class="qty__n">${it.qty}</span>
-          <button class="qty__b" data-d="1" aria-label="${T().cart_increase(T().teas[it.id].n)}"${it.qty >= 20 ? ' disabled' : ''}>+</button>
+          <button class="qty__b" data-d="1" aria-label="${escAttr(T().cart_increase(T().teas[it.id].n))}"${it.qty >= 20 ? ' disabled' : ''}>+</button>
         </div>
-        <button class="citem__rm" aria-label="${T().cart_remove}">×</button>
+        <button class="citem__rm" aria-label="${escAttr(T().cart_remove)}">×</button>
       </div>`);
       row.querySelectorAll('.qty__b').forEach(b => b.addEventListener('click', () => cartStep(it.id, it.pack, +b.dataset.d)));
       row.querySelector('.citem__rm').addEventListener('click', () => cartRemove(it.id, it.pack));

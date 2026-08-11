@@ -86,6 +86,11 @@ def test_consent_checkboxes_meet_minimum_touch_target_size():
     assert ".check input{width:24px;height:24px;" in ACCOUNT_SOURCE
 
 
+def test_account_text_inputs_do_not_trigger_ios_focus_zoom():
+    assert "@media(max-width:560px)" in ACCOUNT_SOURCE
+    assert ".input{font-size:16px}" in ACCOUNT_SOURCE
+
+
 def test_booking_controls_have_accessible_names_and_heading_order():
     assert '<h2 class="summary__title" data-i18n="sum_h">' in SOURCE
     assert '<span class="sr-only">, ${fullDate}</span>' in SOURCE
@@ -160,7 +165,22 @@ def test_admin_catalog_surfaces_incomplete_food_labelling():
     assert 'id="catalog-filter"' in ADMIN_CATALOG
     assert "function missingLabelFields(item)" in ADMIN_CATALOG
     assert "Маркировка заполнена не полностью" in ADMIN_CATALOG
-    assert "Всё равно показывать товар на сайте?" in ADMIN_CATALOG
+    assert "function missingPublicationFields(item)" in ADMIN_CATALOG
+    assert "Перед публикацией заполните карточку" in ADMIN_CATALOG
+    assert "Всё равно показывать товар на сайте?" not in ADMIN_CATALOG
+
+
+def test_catalog_escapes_owner_controlled_copy_before_using_inner_html():
+    assert "const escHtml = value =>" in SOURCE
+    assert '<${headingTag} class="tea__name">${escHtml(txt.n)}</${headingTag}>' in SOURCE
+    assert '<p class="tea__orig">${escHtml(txt.o)}</p>' in SOURCE
+    assert '<div class="citem__name">${escHtml(T().teas[it.id].n)}</div>' in SOURCE
+    assert 'aria-label="${escAttr(T().cart_decrease' in SOURCE
+
+
+def test_saby_review_distinguishes_unknown_stock_from_out_of_stock():
+    assert "item.suggested_stock===null?'остаток не определён'" in ADMIN_CATALOG
+    assert "товар безопасно отмечен как недоступный" in ADMIN_CATALOG
 
 
 def test_mobile_legal_header_has_accessible_touch_targets():

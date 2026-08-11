@@ -144,6 +144,32 @@ def _catalog_teas(catalog: Mapping[str, Any] | Sequence[Mapping[str, Any]]) -> S
     return teas
 
 
+def mapping_for_catalog(
+    catalog: Mapping[str, Any] | Sequence[Mapping[str, Any]],
+    mapping: Mapping[str, SabyNomenclatureRef] = SABY_NOMENCLATURE_BY_SITE_ID,
+) -> dict[str, SabyNomenclatureRef]:
+    """Merge the reviewed per-item links from the owner catalog with legacy links."""
+
+    result = dict(mapping)
+    for tea in _catalog_teas(catalog):
+        saby = tea.get("saby")
+        if not isinstance(saby, Mapping):
+            continue
+        site_id = str(tea.get("id", ""))
+        try:
+            ref = SabyNomenclatureRef(int(saby.get("id")), str(saby.get("external_id", "")))
+        except (TypeError, ValueError):
+            raise SabySyncError(f"Некорректная связь Saby для {site_id or '<без id>'}") from None
+        legacy = result.get(site_id)
+        if legacy is not None and legacy != ref:
+            raise SabySyncError(f"Проверенную связь Saby для {site_id} менять нельзя")
+        result[site_id] = ref
+    refs = list(result.values())
+    if len({ref.id for ref in refs}) != len(refs) or len({ref.external_id for ref in refs}) != len(refs):
+        raise SabySyncError("Одна позиция Saby не может быть связана с несколькими товарами")
+    return result
+
+
 def validate_mapping_against_catalog(
     catalog: Mapping[str, Any] | Sequence[Mapping[str, Any]],
     mapping: Mapping[str, SabyNomenclatureRef] = SABY_NOMENCLATURE_BY_SITE_ID,
@@ -151,6 +177,7 @@ def validate_mapping_against_catalog(
     """Require the mapping to equal exactly the set of active catalog IDs."""
 
     teas = _catalog_teas(catalog)
+    mapping = mapping_for_catalog(teas, mapping)
     active_ids = {str(tea.get("id", "")) for tea in teas if tea.get("stock") is True}
     mapped_ids = set(mapping)
     missing = sorted(active_ids - mapped_ids)
@@ -216,6 +243,15 @@ def build_nomenclatures(lines: Sequence[Mapping[str, Any]]) -> list[dict[str, An
     for line in lines:
         site_id = str(line.get("id", ""))
         ref = SABY_NOMENCLATURE_BY_SITE_ID.get(site_id)
+        line_saby = line.get("saby")
+        if isinstance(line_saby, Mapping):
+            try:
+                ref = SabyNomenclatureRef(
+                    int(line_saby.get("id")), str(line_saby.get("external_id", ""))
+                )
+                UUID(ref.external_id)
+            except (TypeError, ValueError, AttributeError) as exc:
+                raise SabySyncError(f"Некорректная связь Saby для позиции {site_id}") from exc
         if ref is None:
             raise SabySyncError(f"Нет соответствия Saby для позиции {site_id or '<без id>'}")
         qty = _positive_int(line.get("qty"), f"qty позиции {site_id}")
@@ -325,6 +361,7 @@ __all__ = [
     "SabySyncPolicyError",
     "build_nomenclatures",
     "build_saby_order",
+    "mapping_for_catalog",
     "require_write_allowed",
     "sync_mode_from_env",
     "validate_mapping_against_catalog",

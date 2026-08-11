@@ -149,7 +149,7 @@ COPYFILE_DISABLE=1 tar --no-xattrs -czf "$TMP/shop.tgz" \
   --exclude='telegram-bot/.venv' --exclude='telegram-bot/.env' \
   --exclude='telegram-bot/.env.*' --exclude='telegram-bot/__pycache__' \
   --exclude='telegram-bot/.pytest_cache' --exclude='telegram-bot/favs.json' \
-  backend ops telegram-bot scripts/check-deploy-contract.py deploy-edge.sh \
+  backend ops scripts telegram-bot deploy-edge.sh \
   deploy-shop.sh deploy-bot.sh privacy.html
 COPYFILE_DISABLE=1 tar --no-xattrs -czf "$TMP/web.tgz" \
   --exclude='._*' --exclude='.DS_Store' -C dist .

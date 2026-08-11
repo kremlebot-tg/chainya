@@ -119,7 +119,7 @@ def test_static_deploy_contract() -> None:
     first_archive = deploy.index("COPYFILE_DISABLE=1 tar")
     second_archive = deploy.index("COPYFILE_DISABLE=1 tar", first_archive + 1)
     archive_command = deploy[first_archive:second_archive]
-    assert "scripts/check-deploy-contract.py" in archive_command
+    assert "backend ops scripts telegram-bot" in archive_command
     assert "deploy-edge.sh" in archive_command
     assert "deploy-shop.sh" in archive_command
     assert "deploy-bot.sh" in archive_command

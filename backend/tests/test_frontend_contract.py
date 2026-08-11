@@ -124,12 +124,26 @@ def test_catalog_admin_distinguishes_saby_price_list_from_base_catalog():
 def test_owner_guides_are_searchable_private_help_without_dangerous_actions():
     assert '<meta name="robots" content="noindex,nofollow">' in ADMIN_GUIDES
     assert 'id="guide-search"' in ADMIN_GUIDES
-    assert "СБИС: два разных списка товаров" in ADMIN_GUIDES
-    assert "Сверка работает только на чтение" in ADMIN_GUIDES
+    assert "СБИС: каталог и передача заказов" in ADMIN_GUIDES
+    assert "Retail и Delivery — разные подключения" in ADMIN_GUIDES
+    assert "Работающий календарь доставки не доказывает" in ADMIN_GUIDES
+    assert "Обе проверки работают только на чтение" in ADMIN_GUIDES
     assert "Создание отправления — отдельная реальная запись" in ADMIN_GUIDES
     assert "method:'DELETE'" in ADMIN_GUIDES
     assert "api/admin/refund" not in ADMIN_GUIDES
     assert "api/admin/cdek" not in ADMIN_GUIDES
+
+
+def test_admin_surfaces_saby_order_readiness_on_every_view():
+    alert = ADMIN_SOURCE.index('id="saby-orders-attention"')
+    overview = ADMIN_SOURCE.index('id="view-overview"')
+    assert alert < overview
+    assert "Saby · Retail" in ADMIN_SOURCE
+    assert "Saby · Delivery" in ADMIN_SOURCE
+    assert "Saby · заказы" in ADMIN_SOURCE
+    assert "Заказы не передаются в Saby" in ADMIN_SOURCE
+    assert "X-Chainya-Admin':'saby-readiness'" in ADMIN_SOURCE
+    assert "loadSabyReadiness(true)" in ADMIN_SOURCE
 
 
 def test_booking_controls_have_accessible_names_and_heading_order():

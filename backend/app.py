@@ -150,6 +150,8 @@ ANALYTICS_RETENTION_DAYS = 360
 SABY_SHADOW_RETENTION_RUNS = 50
 SABY_SHADOW_MANUAL_LIMIT = 3
 SABY_SHADOW_MANUAL_WINDOW_SECONDS = 5 * 60
+SABY_READINESS_LIMIT = 6
+SABY_READINESS_WINDOW_SECONDS = 5 * 60
 DELIVERY_LABELS = {
     "pickup": "Самовывоз · Острякова, 3",
     "cdek_pvz": "СДЭК · пункт выдачи",
@@ -212,6 +214,7 @@ _rate_salt = secrets.token_bytes(16)
 _analytics_cleanup_lock = threading.Lock()
 _analytics_cleanup_after = 0.0
 _saby_shadow_lock = threading.Lock()
+_saby_readiness_lock = threading.Lock()
 _cdek_cache: dict[str, tuple[float, object]] = {}
 _cdek_cache_lock = threading.Lock()
 _cdek_cities_index: tuple[float, list[dict]] | None = None
@@ -3672,6 +3675,17 @@ def require_saby_shadow_run_request(request: Request) -> None:
         raise HTTPException(403, "Недопустимый источник запроса")
 
 
+def require_saby_readiness_request(request: Request) -> None:
+    """Require an intentional same-origin admin action for live Saby reads."""
+
+    if request.headers.get("x-chainya-admin") != "saby-readiness":
+        raise HTTPException(403, "Требуется подтверждение запроса админ-панели")
+    origin = request.headers.get("origin", "").rstrip("/")
+    expected = f"{request.url.scheme}://{request.headers.get('host', '')}"
+    if origin and origin != expected:
+        raise HTTPException(403, "Недопустимый источник запроса")
+
+
 def require_saby_shadow_ack_request(request: Request) -> None:
     """Require an intentional same-origin acknowledgement from the admin UI."""
 
@@ -3754,13 +3768,39 @@ def admin_acknowledge_saby_catalog_difference(
     return {"ok": True, "acknowledged": payload.acknowledged}
 
 
-@app.post("/api/admin/saby/test")
-def admin_saby_test(authorization: str = Header(default="")):
-    require_admin(authorization)
+def saby_readiness_report() -> dict:
+    """Perform the explicit read-only Saby readiness audit."""
+
+    configuration = saby_client.configuration()
+    point_id = configuration.get("point_id")
+    price_list_id = configuration.get("price_list_id")
+    if not configuration.get("configured"):
+        return {
+            "state": "blocked",
+            "checked_at": now_iso(),
+            "connected": False,
+            "auth_ok": False,
+            "point_found": False,
+            "price_list_found": False,
+            "catalog_items": 0,
+            "priced_items": 0,
+            "in_stock_items": 0,
+            "catalog_mapping_valid": False,
+            "zero_balance_items": [],
+            "unknown_balance_items": [],
+            "delivery_configured": False,
+            "delivery_confirmation": "",
+            "ready_for_orders": False,
+            "blockers": ["Не настроены реквизиты подключения Saby"],
+            "warnings": [],
+            "errors": {},
+        }
+
+    errors: dict[str, str] = {}
     try:
         retail_result = saby_client.sales_points("retail")
     except SabyError as exc:
-        raise HTTPException(502, str(exc)) from exc
+        retail_result, errors["retail"] = {}, str(exc)
 
     def rows(result: object, key: str) -> list[dict]:
         if isinstance(result, list):
@@ -3775,10 +3815,7 @@ def admin_saby_test(authorization: str = Header(default="")):
         # both documented response forms.
         return [result] if result.get("id") is not None else []
 
-    configuration = saby_client.configuration()
-    point_id, price_list_id = configuration.get("point_id"), configuration.get("price_list_id")
     points = rows(retail_result, "salesPoints")
-    errors: dict[str, str] = {}
 
     try:
         delivery_points = rows(saby_client.sales_points("delivery"), "salesPoints")
@@ -3796,19 +3833,6 @@ def admin_saby_test(authorization: str = Header(default="")):
     point_found = any(str(point.get("id")) == str(point_id) for point in points)
     delivery_found = any(str(point.get("id")) == str(point_id) for point in delivery_points)
     delivery_confirmation = "point_list" if delivery_found else ""
-    # Saby can temporarily omit an enabled Retail point from point/list while
-    # still returning its live delivery calendar.  The calendar endpoint is
-    # read-only and is also a documented prerequisite for creating an order,
-    # so use it as a conservative secondary readiness signal.
-    if point_id and point_found and not delivery_found:
-        try:
-            delivery_calendar = rows(saby_client.delivery_calendar(point_id), "dates")
-        except SabyError as exc:
-            errors["delivery_calendar"] = str(exc)
-        else:
-            if delivery_calendar:
-                delivery_found = True
-                delivery_confirmation = "calendar"
     price_list_found = any(str(item.get("id")) == str(price_list_id) for item in price_lists)
     products = [item for item in catalog if not item.get("isParent")]
     priced_products = [item for item in products if item.get("cost") is not None]
@@ -3868,13 +3892,17 @@ def admin_saby_test(authorization: str = Header(default="")):
         or isinstance(item.get("balance"), bool)
     ]
     blockers = []
-    if not point_id or not point_found:
+    if not point_id:
         blockers.append("Не выбрана розничная точка Saby")
-    if not price_list_id or not price_list_found:
+    elif "retail" not in errors and not point_found:
+        blockers.append("Выбранная точка не найдена в Saby Retail")
+    if not price_list_id:
         blockers.append("Не найден привязанный прайс-лист Saby")
-    if not products:
+    elif "price_list" not in errors and not price_list_found:
+        blockers.append("Выбранный прайс-лист не найден в Saby")
+    if "catalog" not in errors and not products:
         blockers.append("В прайс-листе нет товаров")
-    if not delivery_found:
+    if "delivery" not in errors and not delivery_found:
         blockers.append("Точка «Чайня» ещё не включена для продукта delivery")
     if products and not catalog_mapping_valid:
         blockers.append("Каталог сайта не совпадает с externalId номенклатуры Saby")
@@ -3887,8 +3915,12 @@ def admin_saby_test(authorization: str = Header(default="")):
         label = "позиции" if count == 1 else "позиций"
         blockers.append(f"Saby не вернул числовой остаток для {count} {label}")
 
+    state = "blocked" if blockers else "unknown" if errors else "ready"
     return {
-        "connected": True,
+        "state": state,
+        "checked_at": now_iso(),
+        "connected": "retail" not in errors,
+        "auth_ok": "retail" not in errors,
         "points": [
             {key: point.get(key) for key in ("id", "name", "address", "locality", "prices")}
             for point in points[:50]
@@ -3913,7 +3945,7 @@ def admin_saby_test(authorization: str = Header(default="")):
         ],
         "delivery_configured": delivery_found,
         "delivery_confirmation": delivery_confirmation,
-        "ready_for_orders": not blockers,
+        "ready_for_orders": state == "ready",
         "blockers": blockers,
         "warnings": (
             (["В Saby нет остатка: " + ", ".join(product_display_name(item) for item in zero_balance_products)]
@@ -3925,6 +3957,33 @@ def admin_saby_test(authorization: str = Header(default="")):
         ),
         "errors": errors,
     }
+
+
+@app.post("/api/admin/saby/test")
+def admin_saby_test(
+    request: Request,
+    response: Response,
+    authorization: str = Header(default=""),
+):
+    require_admin(authorization)
+    require_saby_readiness_request(request)
+    rate_limit(
+        request,
+        "admin-saby-readiness",
+        SABY_READINESS_LIMIT,
+        SABY_READINESS_WINDOW_SECONDS,
+    )
+    response.headers["Cache-Control"] = "no-store"
+    if not _saby_readiness_lock.acquire(blocking=False):
+        raise HTTPException(
+            409,
+            "Проверка Saby уже выполняется",
+            headers={"Cache-Control": "no-store"},
+        )
+    try:
+        return saby_readiness_report()
+    finally:
+        _saby_readiness_lock.release()
 
 
 @app.get("/api/admin/saby/catalog-preview")

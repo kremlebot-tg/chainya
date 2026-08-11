@@ -33,8 +33,9 @@ def test_owner_guides_use_existing_admin_session_and_explain_safe_boundaries(tmp
     assert login.status_code == 204
     assert "Вход владельца" in anonymous.text
     assert "Как управлять заказами" in authenticated.text
-    assert "СБИС: два разных списка товаров" in authenticated.text
-    assert "Сверка работает только на чтение" in authenticated.text
+    assert "СБИС: каталог и передача заказов" in authenticated.text
+    assert "Retail и Delivery — разные подключения" in authenticated.text
+    assert "Обе проверки работают только на чтение" in authenticated.text
     assert "возврат — реальная денежная операция" in authenticated.text
     assert module.ADMIN_TOKEN not in authenticated.text
 

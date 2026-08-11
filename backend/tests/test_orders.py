@@ -559,6 +559,7 @@ def test_saby_preview_rejects_unpaid_order_and_past_ready_time(tmp_path, monkeyp
 def test_admin_saby_test_reports_catalog_and_delivery_blocker(tmp_path, monkeypatch):
     client, module = app_client(tmp_path, monkeypatch)
     auth = {"Authorization": "Bearer test-admin-token"}
+    action = {**auth, "X-Chainya-Admin": "saby-readiness"}
     refs = list(module.SABY_NOMENCLATURE_BY_SITE_ID.values())
     monkeypatch.setattr(module.saby_client, "configuration", lambda: {
         "configured": True, "point_id": 274, "price_list_id": 7, "missing": [],
@@ -579,9 +580,11 @@ def test_admin_saby_test_reports_catalog_and_delivery_blocker(tmp_path, monkeypa
         "externalId": "9003e2a3-bbd8-4353-85f7-b2e901781ec8",
     }])
     with client:
-        response = client.post("/api/admin/saby/test", headers=auth)
+        response = client.post("/api/admin/saby/test", headers=action)
     assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
     result = response.json()
+    assert result["state"] == "blocked"
     assert result["connected"] is True
     assert result["point_found"] is True
     assert result["price_list_found"] is True
@@ -600,6 +603,7 @@ def test_admin_saby_test_reports_catalog_and_delivery_blocker(tmp_path, monkeypa
 def test_saby_readiness_rejects_unknown_balance_and_external_id_mismatch(tmp_path, monkeypatch):
     client, module = app_client(tmp_path, monkeypatch)
     auth = {"Authorization": "Bearer test-admin-token"}
+    action = {**auth, "X-Chainya-Admin": "saby-readiness"}
     refs = list(module.SABY_NOMENCLATURE_BY_SITE_ID.values())
     monkeypatch.setattr(module.saby_client, "configuration", lambda: {
         "configured": True, "point_id": 274, "price_list_id": 7, "missing": [],
@@ -620,13 +624,64 @@ def test_saby_readiness_rejects_unknown_balance_and_external_id_mismatch(tmp_pat
     catalog[1]["balance"] = "100"
     monkeypatch.setattr(module.saby_client, "catalog_all", lambda with_balance=False: catalog)
     with client:
-        result = client.post("/api/admin/saby/test", headers=auth).json()
+        result = client.post("/api/admin/saby/test", headers=action).json()
+    assert result["state"] == "blocked"
     assert result["ready_for_orders"] is False
     assert result["catalog_mapping_valid"] is False
     assert result["in_stock_items"] == 26
     assert result["unknown_balance_items"] == [{"id": 1, "name": "Бай Му Дань"}]
     assert "Каталог сайта не совпадает" in " ".join(result["blockers"])
     assert "не вернул числовой остаток" in " ".join(result["blockers"])
+
+
+def test_admin_saby_readiness_requires_intent_and_is_rate_limited(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    auth = {"Authorization": "Bearer test-admin-token"}
+    action = {**auth, "X-Chainya-Admin": "saby-readiness"}
+    monkeypatch.setattr(
+        module.saby_client,
+        "sales_points",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("missing local configuration must not call Saby")
+        ),
+    )
+
+    with client:
+        assert client.post(
+            "/api/admin/saby/test",
+            headers={"X-Chainya-Admin": "saby-readiness"},
+        ).status_code == 401
+        assert client.post("/api/admin/saby/test", headers=auth).status_code == 403
+        assert client.post(
+            "/api/admin/saby/test",
+            headers={**action, "Origin": "https://attacker.invalid"},
+        ).status_code == 403
+        responses = [
+            client.post("/api/admin/saby/test", headers=action)
+            for _ in range(module.SABY_READINESS_LIMIT)
+        ]
+        limited = client.post("/api/admin/saby/test", headers=action)
+
+    assert all(response.status_code == 200 for response in responses)
+    assert all(response.headers["cache-control"] == "no-store" for response in responses)
+    assert responses[0].json()["state"] == "blocked"
+    assert limited.status_code == 429
+
+
+def test_admin_saby_readiness_rejects_a_concurrent_probe(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    headers = {
+        "Authorization": "Bearer test-admin-token",
+        "X-Chainya-Admin": "saby-readiness",
+    }
+    monkeypatch.setattr(module, "rate_limit", lambda *_args, **_kwargs: None)
+
+    with module._saby_readiness_lock, client:
+        response = client.post("/api/admin/saby/test", headers=headers)
+
+    assert response.status_code == 409
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json()["detail"] == "Проверка Saby уже выполняется"
 
 
 def matching_saby_catalog(module):
@@ -649,18 +704,86 @@ def matching_saby_catalog(module):
     ]
 
 
-def test_saby_readiness_accepts_live_delivery_calendar_fallback(tmp_path, monkeypatch):
+def test_saby_readiness_accepts_delivery_point_list(tmp_path, monkeypatch):
     client, module = app_client(tmp_path, monkeypatch)
     auth = {"Authorization": "Bearer test-admin-token"}
+    action = {**auth, "X-Chainya-Admin": "saby-readiness"}
+    monkeypatch.setattr(module.saby_client, "configuration", lambda: {
+        "configured": True, "point_id": 274, "price_list_id": 7, "missing": [],
+    })
+    monkeypatch.setattr(module.saby_client, "sales_points", lambda product="retail": {
+        "salesPoints": [{"id": 274, "name": "Чайня"}],
+    })
+    monkeypatch.setattr(module.saby_client, "price_lists", lambda: {
+        "priceLists": [{"id": 7, "name": "Сайт chainya.ru"}],
+    })
+    monkeypatch.setattr(
+        module.saby_client,
+        "catalog_all",
+        lambda with_balance=False: matching_saby_catalog(module),
+    )
+
+    with client:
+        result = client.post("/api/admin/saby/test", headers=action).json()
+
+    assert result["state"] == "ready"
+    assert result["delivery_configured"] is True
+    assert result["delivery_confirmation"] == "point_list"
+    assert result["ready_for_orders"] is True
+    assert result["blockers"] == []
+    assert result["errors"] == {}
+
+
+def test_saby_readiness_reports_upstream_failure_as_unknown(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    auth = {"Authorization": "Bearer test-admin-token"}
+    action = {**auth, "X-Chainya-Admin": "saby-readiness"}
+    monkeypatch.setattr(module.saby_client, "configuration", lambda: {
+        "configured": True, "point_id": 274, "price_list_id": 7, "missing": [],
+    })
+
+    def sales_points(product="retail"):
+        if product == "delivery":
+            raise module.SabyError("Saby временно недоступен")
+        return {"salesPoints": [{"id": 274, "name": "Чайня"}]}
+
+    monkeypatch.setattr(module.saby_client, "sales_points", sales_points)
+    monkeypatch.setattr(module.saby_client, "price_lists", lambda: {
+        "priceLists": [{"id": 7, "name": "Сайт chainya.ru"}],
+    })
+    monkeypatch.setattr(
+        module.saby_client,
+        "catalog_all",
+        lambda with_balance=False: matching_saby_catalog(module),
+    )
+
+    with client:
+        result = client.post("/api/admin/saby/test", headers=action).json()
+
+    assert result["state"] == "unknown"
+    assert result["delivery_configured"] is False
+    assert result["ready_for_orders"] is False
+    assert result["blockers"] == []
+    assert result["errors"] == {"delivery": "Saby временно недоступен"}
+
+
+def test_saby_readiness_never_treats_calendar_as_delivery_registration(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    auth = {"Authorization": "Bearer test-admin-token"}
+    action = {**auth, "X-Chainya-Admin": "saby-readiness"}
     monkeypatch.setattr(module.saby_client, "configuration", lambda: {
         "configured": True, "point_id": 274, "price_list_id": 7, "missing": [],
     })
     monkeypatch.setattr(module.saby_client, "sales_points", lambda product="retail": {
         "salesPoints": [{"id": 274, "name": "Чайня"}] if product == "retail" else {},
     })
-    monkeypatch.setattr(module.saby_client, "delivery_calendar", lambda point_id=None: {
-        "dates": [{"date": "2026-08-08", "IntervalInfo": []}],
-    })
+    monkeypatch.setattr(
+        module.saby_client,
+        "delivery_calendar",
+        lambda point_id=None: (_ for _ in ()).throw(
+            AssertionError("calendar is not proof of Delivery registration")
+        ),
+    )
     monkeypatch.setattr(module.saby_client, "price_lists", lambda: {
         "priceLists": [{"id": 7, "name": "Сайт chainya.ru"}],
     })
@@ -670,12 +793,13 @@ def test_saby_readiness_accepts_live_delivery_calendar_fallback(tmp_path, monkey
     )
 
     with client:
-        result = client.post("/api/admin/saby/test", headers=auth).json()
+        result = client.post("/api/admin/saby/test", headers=action).json()
 
-    assert result["delivery_configured"] is True
-    assert result["delivery_confirmation"] == "calendar"
-    assert result["ready_for_orders"] is True
-    assert result["blockers"] == []
+    assert result["state"] == "blocked"
+    assert result["delivery_configured"] is False
+    assert result["delivery_confirmation"] == ""
+    assert result["ready_for_orders"] is False
+    assert result["blockers"] == ["Точка «Чайня» ещё не включена для продукта delivery"]
 
 
 def test_admin_saby_shadow_is_read_only_persistent_and_protected(tmp_path, monkeypatch):

@@ -122,6 +122,10 @@ def test_static_deploy_contract() -> None:
     assert "scripts/check-deploy-contract.py" in archive_command
     assert "deploy-edge.sh" in archive_command
     assert "deploy-shop.sh" in archive_command
+    assert "deploy-bot.sh" in archive_command
+    assert "telegram-bot" in archive_command
+    assert 'BOT_ROOT="$ROOT/telegram-bot"' in deploy
+    assert 'BOT_ROOT="$ROOT/../telegram-bot"' not in deploy
     remote = REMOTE.read_text(encoding="utf-8")
     assert "for _attempt in {1..30}" in remote
     assert "payload=$(curl" in remote

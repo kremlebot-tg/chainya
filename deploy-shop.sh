@@ -6,7 +6,7 @@ set -Eeuo pipefail
 
 HOST="${CHAINYA_ORIGIN_HOST:-liable-copper}"
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-BOT_ROOT="$ROOT/../telegram-bot"
+BOT_ROOT="$ROOT/telegram-bot"
 EDGE_HOST="${CHAINYA_EDGE_HOST:-$(awk -F'"' '/^EDGE_HOST=/{print $2; exit}' "$ROOT/deploy-edge.sh")}"
 MAINTENANCE="$ROOT/ops/timeweb/edge-maintenance.sh"
 
@@ -146,8 +146,11 @@ COPYFILE_DISABLE=1 tar --no-xattrs -czf "$TMP/shop.tgz" \
   --exclude='backend/data' --exclude='backend/__pycache__' \
   --exclude='backend/tests/__pycache__' --exclude='backend/.env' \
   --exclude='backend/.env.*' --exclude='backend/*.env' \
-  backend ops scripts/check-deploy-contract.py deploy-edge.sh deploy-shop.sh \
-  privacy.html -C "$BOT_ROOT" teas.json
+  --exclude='telegram-bot/.venv' --exclude='telegram-bot/.env' \
+  --exclude='telegram-bot/.env.*' --exclude='telegram-bot/__pycache__' \
+  --exclude='telegram-bot/.pytest_cache' --exclude='telegram-bot/favs.json' \
+  backend ops telegram-bot scripts/check-deploy-contract.py deploy-edge.sh \
+  deploy-shop.sh deploy-bot.sh privacy.html
 COPYFILE_DISABLE=1 tar --no-xattrs -czf "$TMP/web.tgz" \
   --exclude='._*' --exclude='.DS_Store' -C dist .
 

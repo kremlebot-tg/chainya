@@ -857,7 +857,8 @@ def test_admin_uses_refined_responsive_header(tmp_path, monkeypatch):
     _, module = app_client(tmp_path, monkeypatch)
     html = (module.ROOT / "backend" / "admin.html").read_text(encoding="utf-8")
     assert '<header class="topbar topbar--refined">' in html
-    assert "grid-template-columns:repeat(5,minmax(0,1fr))" in html
+    assert "grid-template-columns:repeat(6,minmax(76px,1fr))" in html
+    assert 'href="/manage/guides">Гайды</a>' in html
     assert ".topbar--refined .nav__count{display:none}" in html
     assert ".topbar--refined .nav__button[aria-selected=true]" in html
 
@@ -1218,7 +1219,7 @@ def test_revenue_uses_payment_time_and_queue_is_not_period_limited(tmp_path, mon
 def test_management_pages_are_served_without_exposing_token(tmp_path, monkeypatch):
     client, _ = app_client(tmp_path, monkeypatch)
     with client:
-        for path in ("/manage", "/manage/", "/manage/catalog", "/admin/orders"):
+        for path in ("/manage", "/manage/", "/manage/catalog", "/manage/guides", "/admin/orders"):
             response = client.get(path)
             assert response.status_code == 200
             assert "Вход владельца" in response.text

@@ -55,3 +55,42 @@ def test_review_does_not_guess_ten_gram_price_when_balance_evidence_is_missing()
     assert result["items"][0]["suggested_stock"] is None
     assert result["items"][0]["can_create_draft"] is False
     assert "нельзя подтвердить" in result["items"][0]["note"]
+
+
+def test_review_surfaces_base_catalog_items_missing_from_selected_price_list():
+    selected_external = "55555555-5555-4555-8555-555555555555"
+    base_only_external = "66666666-6666-4666-8666-666666666666"
+    selected = [{
+        "id": 5,
+        "externalId": selected_external,
+        "name": "Товар прайс-листа",
+        "unit": "г",
+        "cost": 20,
+        "balance": 100,
+    }]
+    base = [
+        selected[0],
+        {
+            "id": 6,
+            "externalId": base_only_external,
+            "name": "Товар только основного каталога",
+            "unit": "г",
+            "cost": 30,
+            "balance": 100,
+        },
+    ]
+
+    result = build_catalog_review({"teas": []}, selected, base)
+
+    assert result["counts"] == {
+        "saby_items": 1,
+        "base_items": 2,
+        "linked": 0,
+        "new": 1,
+        "not_in_price_list": 1,
+        "ready_for_draft": 1,
+    }
+    base_only = next(item for item in result["items"] if item["status"] == "not_in_price_list")
+    assert base_only["name"] == "Товар только основного каталога"
+    assert base_only["can_create_draft"] is False
+    assert "не добавлено в прайс-лист" in base_only["note"]

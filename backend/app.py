@@ -4969,10 +4969,17 @@ def management_catalog_page(request: Request):
     return owner_page(request, "admin-catalog.html")
 
 
+@app.get("/manage/guides")
+def management_guides_page(request: Request):
+    """Owner knowledge base protected by the same server-side session."""
+    return owner_page(request, "admin-guides.html")
+
+
 @app.head("/admin/orders")
 @app.head("/manage/")
 @app.head("/manage")
 @app.head("/manage/catalog")
+@app.head("/manage/guides")
 def management_page_head():
     return Response(
         headers={

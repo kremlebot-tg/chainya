@@ -7,6 +7,7 @@ SOURCE_PATH = Path(__file__).resolve().parents[2] / "src.html"
 BUILD_PATH = Path(__file__).resolve().parents[2] / "build.py"
 ADMIN_CATALOG_PATH = Path(__file__).resolve().parents[1] / "admin-catalog.html"
 ADMIN_PATH = Path(__file__).resolve().parents[1] / "admin.html"
+ADMIN_GUIDES_PATH = Path(__file__).resolve().parents[1] / "admin-guides.html"
 ACCOUNT_PATH = Path(__file__).resolve().parents[1] / "account.html"
 LEGAL_CSS_PATH = Path(__file__).resolve().parents[2] / "legal.css"
 pytestmark = pytest.mark.skipif(
@@ -17,6 +18,7 @@ SOURCE = SOURCE_PATH.read_text(encoding="utf-8") if SOURCE_PATH.exists() else ""
 BUILD_SOURCE = BUILD_PATH.read_text(encoding="utf-8") if BUILD_PATH.exists() else ""
 ADMIN_CATALOG = ADMIN_CATALOG_PATH.read_text(encoding="utf-8")
 ADMIN_SOURCE = ADMIN_PATH.read_text(encoding="utf-8")
+ADMIN_GUIDES = ADMIN_GUIDES_PATH.read_text(encoding="utf-8")
 ACCOUNT_SOURCE = ACCOUNT_PATH.read_text(encoding="utf-8")
 LEGAL_CSS = LEGAL_CSS_PATH.read_text(encoding="utf-8") if LEGAL_CSS_PATH.exists() else ""
 
@@ -91,6 +93,43 @@ def test_consent_checkboxes_meet_minimum_touch_target_size():
 def test_account_text_inputs_do_not_trigger_ios_focus_zoom():
     assert "@media(max-width:560px)" in ACCOUNT_SOURCE
     assert ".input{font-size:16px}" in ACCOUNT_SOURCE
+
+
+def test_account_tabs_support_keyboard_navigation_and_semantic_panels():
+    assert 'id="login-tab" role="tab" aria-selected="true" aria-controls="login-form" tabindex="0"' in ACCOUNT_SOURCE
+    assert 'id="register-tab" role="tab" aria-selected="false" aria-controls="register-form" tabindex="-1"' in ACCOUNT_SOURCE
+    assert 'id="login-form" role="tabpanel" aria-labelledby="login-tab"' in ACCOUNT_SOURCE
+    assert 'id="register-form" role="tabpanel" aria-labelledby="register-tab"' in ACCOUNT_SOURCE
+    assert "event.key==='ArrowRight'" in ACCOUNT_SOURCE
+    assert "event.key==='ArrowLeft'" in ACCOUNT_SOURCE
+    assert "event.key==='Home'" in ACCOUNT_SOURCE
+    assert "event.key==='End'" in ACCOUNT_SOURCE
+
+
+def test_account_respects_reduced_motion_preference():
+    assert "@media(prefers-reduced-motion:reduce)" in ACCOUNT_SOURCE
+    assert "transition-duration:.01ms!important" in ACCOUNT_SOURCE
+
+
+def test_catalog_admin_distinguishes_saby_price_list_from_base_catalog():
+    assert 'id="stat-saby"' in ADMIN_CATALOG
+    assert "В каталоге СБИС" in ADMIN_CATALOG
+    assert "в прайс-листе сайта" in ADMIN_CATALOG
+    assert "В прайс-листе сайта:" in ADMIN_CATALOG
+    assert "в основном каталоге:" in ADMIN_CATALOG
+    assert "not_in_price_list" in ADMIN_CATALOG
+    assert "Сначала добавить в прайс-лист СБИС" in ADMIN_CATALOG
+
+
+def test_owner_guides_are_searchable_private_help_without_dangerous_actions():
+    assert '<meta name="robots" content="noindex,nofollow">' in ADMIN_GUIDES
+    assert 'id="guide-search"' in ADMIN_GUIDES
+    assert "СБИС: два разных списка товаров" in ADMIN_GUIDES
+    assert "Сверка работает только на чтение" in ADMIN_GUIDES
+    assert "Создание отправления — отдельная реальная запись" in ADMIN_GUIDES
+    assert "method:'DELETE'" in ADMIN_GUIDES
+    assert "api/admin/refund" not in ADMIN_GUIDES
+    assert "api/admin/cdek" not in ADMIN_GUIDES
 
 
 def test_booking_controls_have_accessible_names_and_heading_order():

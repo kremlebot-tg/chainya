@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from decimal import Decimal, InvalidOperation
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from .saby_sync import mapping_for_catalog
-
 
 GRAM_UNITS = {"г", "g", "грамм", "gram"}
 PIECE_UNITS = {"шт", "pc", "штука", "piece"}
@@ -94,6 +94,7 @@ def build_catalog_review(
         for item in base_catalog
         if isinstance(item, Mapping) and not item.get("isParent") and item.get("externalId")
     }
+    selected_external: set[str] = set()
     rows: list[dict[str, Any]] = []
     for item in saby_catalog:
         if not isinstance(item, Mapping) or item.get("isParent"):
@@ -106,6 +107,7 @@ def build_catalog_review(
             continue
         if not external_id or not name or saby_id <= 0:
             continue
+        selected_external.add(external_id)
         site_id = linked_external.get(external_id, "")
         unit, price, stock, note = _proposal(item, base_by_external.get(external_id))
         rows.append({
@@ -120,15 +122,42 @@ def build_catalog_review(
             "note": note,
             "can_create_draft": not site_id and unit is not None and price is not None,
         })
-    rows.sort(key=lambda row: (row["status"] != "new", row["name"].casefold()))
+    for external_id, item in base_by_external.items():
+        if external_id in selected_external:
+            continue
+        name = str(item.get("name") or "").strip()
+        try:
+            saby_id = int(item.get("id"))
+        except (TypeError, ValueError):
+            continue
+        if not name or saby_id <= 0:
+            continue
+        unit, price, stock, _ = _proposal(item, None)
+        rows.append({
+            "status": "not_in_price_list",
+            "site_id": "",
+            "saby_id": saby_id,
+            "external_id": external_id,
+            "name": name,
+            "unit": unit,
+            "suggested_price": price,
+            "suggested_stock": stock,
+            "note": "Есть в основном каталоге СБИС, но не добавлено в прайс-лист «Сайт chainya.ru»",
+            "can_create_draft": False,
+        })
+    status_order = {"new": 0, "not_in_price_list": 1, "linked": 2}
+    rows.sort(key=lambda row: (status_order.get(row["status"], 9), row["name"].casefold()))
+    selected_rows = [row for row in rows if row["status"] != "not_in_price_list"]
     return {
         "read_only_source": True,
         "catalog_changed": False,
         "counts": {
-            "saby_items": len(rows),
-            "linked": sum(row["status"] == "linked" for row in rows),
-            "new": sum(row["status"] == "new" for row in rows),
-            "ready_for_draft": sum(row["can_create_draft"] for row in rows),
+            "saby_items": len(selected_rows),
+            "base_items": len(base_by_external),
+            "linked": sum(row["status"] == "linked" for row in selected_rows),
+            "new": sum(row["status"] == "new" for row in selected_rows),
+            "not_in_price_list": sum(row["status"] == "not_in_price_list" for row in rows),
+            "ready_for_draft": sum(row["can_create_draft"] for row in selected_rows),
         },
         "items": rows,
     }

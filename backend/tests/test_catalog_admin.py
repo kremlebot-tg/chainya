@@ -23,6 +23,22 @@ def test_owner_catalog_page_uses_existing_admin_session(tmp_path, monkeypatch):
     assert module.ADMIN_TOKEN not in authenticated.text
 
 
+def test_owner_guides_use_existing_admin_session_and_explain_safe_boundaries(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    with client:
+        anonymous = client.get("/manage/guides")
+        login = client.post("/api/admin/session", json={"token": "test-admin-token"})
+        authenticated = client.get("/manage/guides")
+
+    assert login.status_code == 204
+    assert "Вход владельца" in anonymous.text
+    assert "Как управлять заказами" in authenticated.text
+    assert "СБИС: два разных списка товаров" in authenticated.text
+    assert "Сверка работает только на чтение" in authenticated.text
+    assert "возврат — реальная денежная операция" in authenticated.text
+    assert module.ADMIN_TOKEN not in authenticated.text
+
+
 def test_catalog_admin_create_update_reorder_and_conflict(tmp_path, monkeypatch):
     client, _ = app_client(tmp_path, monkeypatch)
     with client:

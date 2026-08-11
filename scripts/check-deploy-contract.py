@@ -67,6 +67,7 @@ def main() -> None:
     require('respond "Чайня обновляется.' in caddy, "maintenance response is missing")
     require(" 503" in caddy, "maintenance must return HTTP 503")
     require("/__chainya_edge_health" in caddy, "local edge health is missing")
+    require("/manage/*" in caddy, "private owner subroutes must reach the origin")
     require(
         "/__chainya_edge_health" in compose and "/api/health" not in compose,
         "container healthcheck must not call the production origin",

@@ -89,7 +89,7 @@ http://127.0.0.1:8078 {
 		import chainya_origin
 	}
 
-	@private path /payment/* /account /account/ /admin/* /manage /manage/
+	@private path /payment/* /account /account/ /admin/* /manage /manage/ /manage/*
 	handle @private {
 		header {
 			defer

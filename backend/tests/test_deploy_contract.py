@@ -161,6 +161,8 @@ def test_maintenance_is_chainya_only_and_returns_503() -> None:
     assert "__chainya_edge_health" in internal
     assert "__chainya_edge_health" in compose
     assert "/api/health" not in compose
+    assert "/manage/*" in internal
+    assert "location = /manage/guides" in (ROOT / "ops/nginx-chainya.ru").read_text(encoding="utf-8")
 
 
 def test_successful_cutover_and_commit(tmp_path: Path) -> None:

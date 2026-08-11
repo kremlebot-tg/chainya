@@ -6,6 +6,7 @@ import pytest
 SOURCE_PATH = Path(__file__).resolve().parents[2] / "src.html"
 BUILD_PATH = Path(__file__).resolve().parents[2] / "build.py"
 ADMIN_CATALOG_PATH = Path(__file__).resolve().parents[1] / "admin-catalog.html"
+ADMIN_PATH = Path(__file__).resolve().parents[1] / "admin.html"
 ACCOUNT_PATH = Path(__file__).resolve().parents[1] / "account.html"
 LEGAL_CSS_PATH = Path(__file__).resolve().parents[2] / "legal.css"
 pytestmark = pytest.mark.skipif(
@@ -15,6 +16,7 @@ pytestmark = pytest.mark.skipif(
 SOURCE = SOURCE_PATH.read_text(encoding="utf-8") if SOURCE_PATH.exists() else ""
 BUILD_SOURCE = BUILD_PATH.read_text(encoding="utf-8") if BUILD_PATH.exists() else ""
 ADMIN_CATALOG = ADMIN_CATALOG_PATH.read_text(encoding="utf-8")
+ADMIN_SOURCE = ADMIN_PATH.read_text(encoding="utf-8")
 ACCOUNT_SOURCE = ACCOUNT_PATH.read_text(encoding="utf-8")
 LEGAL_CSS = LEGAL_CSS_PATH.read_text(encoding="utf-8") if LEGAL_CSS_PATH.exists() else ""
 
@@ -168,6 +170,20 @@ def test_admin_catalog_surfaces_incomplete_food_labelling():
     assert "function missingPublicationFields(item)" in ADMIN_CATALOG
     assert "Перед публикацией заполните карточку" in ADMIN_CATALOG
     assert "Всё равно показывать товар на сайте?" not in ADMIN_CATALOG
+
+
+def test_admin_button_like_links_share_the_button_alignment_contract():
+    assert "display:inline-flex;align-items:center;justify-content:center;gap:7px;line-height:1.2;text-align:center;text-decoration:none" in ADMIN_CATALOG
+    assert '<a class="btn" href="/manage">Обзор</a>' in ADMIN_CATALOG
+    assert '<a class="btn" href="/shop" target="_blank" rel="noopener">Открыть магазин ↗</a>' in ADMIN_CATALOG
+    assert "display:inline-flex;align-items:center;justify-content:center;line-height:1.2;text-align:center;text-decoration:none" in ADMIN_SOURCE
+
+
+def test_admin_secondary_controls_are_visually_centered():
+    assert ".move{width:30px;height:28px;border:1px solid var(--line);background:transparent;color:var(--muted);display:grid;place-items:center;padding:0;line-height:1}" in ADMIN_CATALOG
+    assert ".dialog-close{width:42px;height:42px;border:1px solid var(--line2);background:transparent;color:var(--text);font-size:22px;display:grid;place-items:center;padding:0;line-height:1}" in ADMIN_CATALOG
+    assert ".period__button{height:35px;min-width:54px;border-right:0;color:var(--muted);font-size:12px;display:inline-flex;align-items:center;justify-content:center;line-height:1.2;text-align:center}" in ADMIN_SOURCE
+    assert ".owner-tools__actions .btn:first-child,.owner-tools__actions .btn:last-child{grid-column:1/-1}" in ADMIN_CATALOG
 
 
 def test_catalog_escapes_owner_controlled_copy_before_using_inner_html():

@@ -157,16 +157,26 @@ COPYFILE_DISABLE=1 tar --no-xattrs -czf "$TMP/web.tgz" \
 echo "→ staging origin без остановки сервисов"
 ssh "$HOST" "umask 077; mkdir '$REMOTE_STAGE'"
 remote_uploaded=1
-rsync -az \
-  "$TMP/shop.tgz" \
-  "$TMP/web.tgz" \
-  "$TMP/RELEASE_COMMIT" \
-  ops/deploy-shop-remote.sh \
-  ops/chainya-shop.service \
-  ops/chainya-backup.service \
-  ops/chainya-backup.timer \
-  ops/nginx-chainya.ru \
-  "$HOST:$REMOTE_STAGE/"
+for upload_attempt in 1 2 3; do
+  if rsync -az --partial \
+    "$TMP/shop.tgz" \
+    "$TMP/web.tgz" \
+    "$TMP/RELEASE_COMMIT" \
+    ops/deploy-shop-remote.sh \
+    ops/chainya-shop.service \
+    ops/chainya-backup.service \
+    ops/chainya-backup.timer \
+    ops/nginx-chainya.ru \
+    "$HOST:$REMOTE_STAGE/"; then
+    break
+  fi
+  if [ "$upload_attempt" = 3 ]; then
+    echo "не удалось передать origin candidate после трёх попыток" >&2
+    false
+  fi
+  echo "повтор передачи origin candidate: попытка $((upload_attempt + 1)) из 3" >&2
+  sleep 2
+done
 remote_transaction stage
 remote_staged=1
 

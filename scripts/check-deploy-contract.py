@@ -51,6 +51,10 @@ def main() -> None:
     maintenance_off = deploy.index('echo "→ снятие Chainya-only maintenance"')
     require(maintenance_on < cutover, "maintenance must precede origin cutover")
     require(cutover < maintenance_off, "maintenance must remain enabled through origin cutover")
+    require(
+        "for upload_attempt in 1 2 3" in deploy and "rsync -az --partial" in deploy,
+        "origin staging upload must retry transient SSH failures",
+    )
     require("systemctl reload nginx" in remote, "graceful Nginx reload is missing")
     require("nginx_test" in remote, "nginx -t wrapper is missing")
     require("if [ \"$nginx_changed\" = 1 ]" in remote, "Nginx diff gate is missing")

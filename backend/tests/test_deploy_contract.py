@@ -205,6 +205,16 @@ def test_maintenance_is_chainya_only_and_returns_503() -> None:
     assert "location = /manage/guides" in (ROOT / "ops/nginx-chainya.ru").read_text(encoding="utf-8")
 
 
+def test_origin_upload_retries_before_any_cutover() -> None:
+    deploy = (ROOT / "deploy-shop.sh").read_text(encoding="utf-8")
+    retry = deploy.index("for upload_attempt in 1 2 3")
+    stage = deploy.index("remote_transaction stage")
+    maintenance = deploy.index('echo "→ Chainya-only maintenance"')
+    cutover = deploy.index("remote_transaction cutover")
+    assert "rsync -az --partial" in deploy
+    assert retry < stage < maintenance < cutover
+
+
 def test_successful_cutover_and_commit(tmp_path: Path) -> None:
     root, stage = make_candidate(tmp_path)
     assert invoke(root, stage, "stage").returncode == 0

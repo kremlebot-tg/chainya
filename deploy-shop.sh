@@ -4,7 +4,7 @@
 # внутри выделенного Chainya edge.
 set -Eeuo pipefail
 
-HOST="liable-copper"
+HOST="${CHAINYA_ORIGIN_HOST:-liable-copper}"
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 BOT_ROOT="$ROOT/../telegram-bot"
 EDGE_HOST="${CHAINYA_EDGE_HOST:-$(awk -F'"' '/^EDGE_HOST=/{print $2; exit}' "$ROOT/deploy-edge.sh")}"

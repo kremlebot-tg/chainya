@@ -188,7 +188,13 @@ def test_full_builder_uses_configured_point_and_price_list():
     assert payload["pointId"] == 274
     assert payload["priceListId"] == 7
     assert payload["datetime"] == "2026-07-24 18:30:00"
-    assert payload["delivery"] == {"isPickup": True, "paymentType": "online"}
+    assert payload["delivery"] == {
+        "isPickup": True,
+        "paymentType": "online",
+        "shopURL": "https://chainya.ru",
+        "successURL": "https://chainya.ru/payment/success",
+        "errorURL": "https://chainya.ru/payment/fail",
+    }
     assert payload["customer"] == {"name": "Даниил", "phone": "+7 900 000-00-00"}
     assert payload["comment"] == "Заказ сайта №ORDER123. Позвонить"
     assert len(payload["nomenclatures"]) == 2
@@ -222,13 +228,28 @@ def test_full_builder_supports_cdek_pvz_and_courier_addresses():
     assert pvz["delivery"] == {
         "isPickup": False,
         "paymentType": "online",
+        "shopURL": "https://chainya.ru",
+        "successURL": "https://chainya.ru/payment/success",
+        "errorURL": "https://chainya.ru/payment/fail",
         "addressFull": "Москва, ул. Примерная, 1",
     }
     assert courier["delivery"] == {
         "isPickup": False,
         "paymentType": "online",
+        "shopURL": "https://chainya.ru",
+        "successURL": "https://chainya.ru/payment/success",
+        "errorURL": "https://chainya.ru/payment/fail",
         "addressFull": "Москва, ул. Чайная, 3",
     }
+
+
+def test_full_builder_rejects_non_https_saby_redirects():
+    with pytest.raises(SabySyncError, match="SABY_SHOP_URL"):
+        build_saby_order(
+            pickup_order(),
+            settings=settings(shop_url="http://chainya.ru"),
+            ready_at="2026-07-24 18:30:00",
+        )
 
 
 def test_full_builder_rejects_unknown_delivery_or_missing_address():

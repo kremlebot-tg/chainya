@@ -113,6 +113,33 @@ def test_saby_delivery_calendar_is_read_only_and_uses_selected_point():
     assert len(calls) == 2
 
 
+def test_saby_checks_whether_point_is_enabled_for_delivery():
+    calls = []
+
+    def opener(request, timeout):
+        calls.append(request)
+        if request.full_url.endswith("/oauth/service/"):
+            return Response({"token": "access"})
+        assert request.method == "GET"
+        query = parse_qs(urlparse(request.full_url).query)
+        assert query["product"] == ["delivery"]
+        return Response({"salesPoints": [{"id": "10"}, {"id": 11}]})
+
+    client = SabyClient(settings(), opener=opener)
+    assert client.sales_point_enabled("delivery") is True
+    assert client.sales_point_enabled("delivery", 99) is False
+
+
+def test_saby_accepts_empty_delivery_point_mapping_as_disabled():
+    def opener(request, timeout):
+        if request.full_url.endswith("/oauth/service/"):
+            return Response({"token": "access"})
+        return Response({"salesPoints": {}})
+
+    client = SabyClient(settings(), opener=opener)
+    assert client.sales_point_enabled("delivery") is False
+
+
 def test_saby_reports_missing_configuration_without_network():
     client = SabyClient(SabySettings())
     assert client.configuration()["configured"] is False

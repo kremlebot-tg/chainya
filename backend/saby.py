@@ -33,6 +33,9 @@ class SabySettings:
     secret_key: str = field(default="", repr=False)
     point_id: int | None = None
     price_list_id: int | None = None
+    shop_url: str = "https://chainya.ru"
+    success_url: str = "https://chainya.ru/payment/success"
+    error_url: str = "https://chainya.ru/payment/fail"
 
     @classmethod
     def from_env(cls) -> "SabySettings":
@@ -46,6 +49,13 @@ class SabySettings:
             secret_key=os.getenv("SABY_SECRET_KEY", "").strip(),
             point_id=optional_int("SABY_POINT_ID"),
             price_list_id=optional_int("SABY_PRICE_LIST_ID"),
+            shop_url=os.getenv("SABY_SHOP_URL", "https://chainya.ru").strip(),
+            success_url=os.getenv(
+                "SABY_SUCCESS_URL", "https://chainya.ru/payment/success"
+            ).strip(),
+            error_url=os.getenv(
+                "SABY_ERROR_URL", "https://chainya.ru/payment/fail"
+            ).strip(),
         )
 
     @property
@@ -136,6 +146,24 @@ class SabyClient:
 
     def sales_points(self, product: str = "retail") -> Any:
         return self.api("/retail/point/list", {"product": product, "withPrices": "true", "pageSize": 500})
+
+    def sales_point_enabled(
+        self, product: str, point_id: int | None = None
+    ) -> bool:
+        """Return whether the configured point is enabled for a Saby product."""
+        point = point_id or self.settings.point_id
+        if not point:
+            raise SabyError("Не выбран идентификатор точки продаж Saby")
+        result = self.sales_points(product)
+        rows = result.get("salesPoints", []) if isinstance(result, dict) else []
+        if isinstance(rows, dict):
+            rows = list(rows.values())
+        if not isinstance(rows, list):
+            raise SabyError("Saby вернул список точек в неожиданном формате")
+        return any(
+            isinstance(row, dict) and str(row.get("id")) == str(point)
+            for row in rows
+        )
 
     def delivery_calendar(self, point_id: int | None = None) -> Any:
         """Return delivery availability without creating or changing an order."""

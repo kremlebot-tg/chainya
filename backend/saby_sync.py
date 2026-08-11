@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import urllib.parse
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
@@ -23,6 +24,10 @@ from .saby import SabySettings
 
 class SabySyncError(ValueError):
     """A dry-run payload cannot be built safely."""
+
+
+class SabyConfigurationError(SabySyncError):
+    """A deterministic Saby setup blocker that must not be retried."""
 
 
 class SabySyncPolicyError(PermissionError):
@@ -288,6 +293,20 @@ def _ready_at_value(ready_at: datetime | str) -> str:
     raise SabySyncError("Нужно явно указать ready_at в формате YYYY-MM-DD HH:MM:SS")
 
 
+def _public_https_url(value: str, field: str) -> str:
+    """Fail closed before sending redirect URLs to Saby."""
+    raw = str(value or "").strip()
+    parsed = urllib.parse.urlsplit(raw)
+    if (
+        parsed.scheme != "https"
+        or not parsed.netloc
+        or parsed.username is not None
+        or parsed.password is not None
+    ):
+        raise SabySyncError(f"{field} должен быть публичным HTTPS URL")
+    return raw
+
+
 def build_saby_order(
     order: Mapping[str, Any],
     *,
@@ -321,6 +340,11 @@ def build_saby_order(
     delivery: dict[str, Any] = {
         "isPickup": delivery_method == "pickup",
         "paymentType": "online",
+        "shopURL": _public_https_url(settings.shop_url, "SABY_SHOP_URL"),
+        "successURL": _public_https_url(
+            settings.success_url, "SABY_SUCCESS_URL"
+        ),
+        "errorURL": _public_https_url(settings.error_url, "SABY_ERROR_URL"),
     }
     if delivery_method != "pickup":
         city = str(customer.get("city", "")).strip()
@@ -355,6 +379,7 @@ def build_saby_order(
 
 __all__ = [
     "SABY_NOMENCLATURE_BY_SITE_ID",
+    "SabyConfigurationError",
     "SabyNomenclatureRef",
     "SabySyncError",
     "SabySyncMode",

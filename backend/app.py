@@ -80,6 +80,7 @@ from .saby_shadow import SabyShadowSettings, compare_catalogs
 from .saby_catalog_review import build_catalog_review
 from .saby_sync import (
     SABY_NOMENCLATURE_BY_SITE_ID,
+    SabyConfigurationError,
     SabySyncError,
     build_saby_order,
     mapping_for_catalog,
@@ -1683,6 +1684,26 @@ def sync_paid_order_to_saby(order_id: str) -> None:
             return
 
     try:
+        try:
+            delivery_enabled = saby_client.sales_point_enabled("delivery")
+        except SabyError as exc:
+            failed = now_iso()
+            with db() as con:
+                con.execute(
+                    """UPDATE orders SET saby_state = 'failed', saby_last_error = ?,
+                           updated_at = ? WHERE id = ? AND saby_state = 'sending'""",
+                    (str(exc)[:500], failed, order_id),
+                )
+            logging.warning(
+                "Не удалось проверить продукт Delivery для заказа %s: %s",
+                order_id,
+                exc,
+            )
+            return
+        if not delivery_enabled:
+            raise SabyConfigurationError(
+                "Выбранная точка Saby не подключена к продукту Delivery"
+            )
         order = admin_order(order_row(order_id))
         payload = build_saby_order(
             order,
@@ -1704,6 +1725,16 @@ def sync_paid_order_to_saby(order_id: str) -> None:
         external_id = _saby_external_id(result)
         if not external_id:
             raise SabyError("Saby не вернул идентификатор созданного заказа")
+    except SabyConfigurationError as exc:
+        blocked = now_iso()
+        with db() as con:
+            con.execute(
+                """UPDATE orders SET saby_state = 'blocked', saby_last_error = ?,
+                       updated_at = ? WHERE id = ? AND saby_state = 'sending'""",
+                (str(exc)[:500], blocked, order_id),
+            )
+        logging.warning("Заказ %s заблокирован настройками Saby: %s", order_id, exc)
+        return
     except (SabySyncError, ExternalWriteBlocked) as exc:
         failed = now_iso()
         with db() as con:
@@ -2239,6 +2270,13 @@ def process_paid_order_effects(order_id: str) -> None:
                     "saby",
                     "ambiguous",
                     error="Нужна ручная проверка результата отправки в Saby",
+                )
+            elif saby_state == "blocked":
+                _mark_paid_effect(
+                    order_id,
+                    "saby",
+                    "blocked",
+                    error="Точка продаж не подключена к Saby Delivery",
                 )
             else:
                 _mark_paid_effect(

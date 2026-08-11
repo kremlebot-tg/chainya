@@ -991,6 +991,7 @@ def test_paid_order_is_sent_to_saby_once_in_auto_mode(tmp_path, monkeypatch):
         "create_delivery_order",
         lambda data: sent.append(data) or {"externalId": "saby-order-123"},
     )
+    monkeypatch.setattr(module.saby_client, "sales_point_enabled", lambda product: True)
     with client:
         order = client.post("/api/orders", json=payload()).json()["order"]
         monkeypatch.setattr(module, "TEST_MODE", False)
@@ -1012,10 +1013,120 @@ def test_paid_order_is_sent_to_saby_once_in_auto_mode(tmp_path, monkeypatch):
         current = module.admin_order(module.order_row(order["id"]))
 
     assert len(sent) == 1
-    assert sent[0]["delivery"] == {"isPickup": True, "paymentType": "online"}
+    assert sent[0]["delivery"] == {
+        "isPickup": True,
+        "paymentType": "online",
+        "shopURL": "https://chainya.ru",
+        "successURL": "https://chainya.ru/payment/success",
+        "errorURL": "https://chainya.ru/payment/fail",
+    }
     assert current["integrations"]["saby"]["state"] == "synced"
     assert current["integrations"]["saby"]["external_id"] == "saby-order-123"
     assert current["integrations"]["saby"]["attempts"] == 1
+
+
+def test_paid_order_is_blocked_when_point_has_no_saby_delivery(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    monkeypatch.setenv("SABY_ORDER_SYNC_MODE", "auto")
+    monkeypatch.setattr(module.saby_client, "settings", SabySettings(
+        app_client_id="configured", app_secret="configured", secret_key="configured",
+        point_id=274, price_list_id=7,
+    ))
+    monkeypatch.setattr(module.saby_client, "sales_point_enabled", lambda product: False)
+    sent = []
+    monkeypatch.setattr(
+        module.saby_client,
+        "create_delivery_order",
+        lambda data: sent.append(data) or {"externalId": "must-not-exist"},
+    )
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        monkeypatch.setattr(module, "TEST_MODE", False)
+        monkeypatch.setattr(
+            module,
+            "integration_writer",
+            module.IntegrationWriter(
+                test_mode=False, exposed_providers=frozenset({"tbank", "saby", "cdek"})
+            ),
+        )
+        paid_at = module.now_iso()
+        with module.db() as con:
+            con.execute(
+                """UPDATE orders SET status = 'paid', payment_state = 'paid',
+                       paid_at = ?, updated_at = ? WHERE id = ?""",
+                (paid_at, paid_at, order["id"]),
+            )
+            module.enqueue_paid_order_effects(con, order["id"], paid_at)
+
+        module.process_paid_order_effects(order["id"])
+        module.recover_paid_order_effects()
+        current = module.admin_order(module.order_row(order["id"]))
+        with module.db() as con:
+            effect = con.execute(
+                """SELECT state, attempts FROM paid_order_effects
+                   WHERE order_id = ? AND effect = 'saby'""",
+                (order["id"],),
+            ).fetchone()
+
+    assert sent == []
+    assert current["integrations"]["saby"]["state"] == "blocked"
+    assert "Delivery" in current["integrations"]["saby"]["last_error"]
+    assert effect["state"] == "blocked"
+    assert effect["attempts"] == 1
+
+
+def test_saby_preflight_failure_is_retryable_without_creating_order(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    monkeypatch.setenv("SABY_ORDER_SYNC_MODE", "auto")
+    monkeypatch.setattr(module.saby_client, "settings", SabySettings(
+        app_client_id="configured", app_secret="configured", secret_key="configured",
+        point_id=274, price_list_id=7,
+    ))
+
+    def fail_preflight(product):
+        assert product == "delivery"
+        raise module.SabyError("Saby временно недоступен")
+
+    monkeypatch.setattr(module.saby_client, "sales_point_enabled", fail_preflight)
+    sent = []
+    monkeypatch.setattr(
+        module.saby_client,
+        "create_delivery_order",
+        lambda data: sent.append(data) or {"externalId": "must-not-exist"},
+    )
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        monkeypatch.setattr(module, "TEST_MODE", False)
+        monkeypatch.setattr(
+            module,
+            "integration_writer",
+            module.IntegrationWriter(
+                test_mode=False, exposed_providers=frozenset({"tbank", "saby", "cdek"})
+            ),
+        )
+        paid_at = module.now_iso()
+        with module.db() as con:
+            con.execute(
+                """UPDATE orders SET status = 'paid', payment_state = 'paid',
+                       paid_at = ?, updated_at = ? WHERE id = ?""",
+                (paid_at, paid_at, order["id"]),
+            )
+            module.enqueue_paid_order_effects(con, order["id"], paid_at)
+
+        module.process_paid_order_effects(order["id"])
+        current = module.admin_order(module.order_row(order["id"]))
+        with module.db() as con:
+            effect = con.execute(
+                """SELECT state, attempts FROM paid_order_effects
+                   WHERE order_id = ? AND effect = 'saby'""",
+                (order["id"],),
+            ).fetchone()
+
+    assert sent == []
+    assert current["integrations"]["saby"]["state"] == "failed"
+    assert "временно недоступен" in current["integrations"]["saby"]["last_error"]
+    assert effect["state"] == "failed"
+    assert effect["attempts"] == 1
 
 
 def test_saby_rollout_cutoff_never_backfills_older_paid_order(tmp_path, monkeypatch):

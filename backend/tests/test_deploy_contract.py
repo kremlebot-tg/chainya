@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import importlib.util
 import io
 import os
 import subprocess
 import tarfile
+import urllib.error
 from pathlib import Path
 
 import pytest
@@ -11,6 +13,44 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 REMOTE = ROOT / "ops/deploy-shop-remote.sh"
+
+
+def load_release_verifier():
+    spec = importlib.util.spec_from_file_location(
+        "chainya_release_verifier", ROOT / "scripts/verify-release.py"
+    )
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_release_verifier_retries_one_transient_tls_failure(monkeypatch) -> None:
+    verifier = load_release_verifier()
+    calls = 0
+
+    class Response:
+        status = 200
+        headers = type("Headers", (), {"get_content_type": lambda self: "text/html"})()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+    def open_once_failed(*_args, **_kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise urllib.error.URLError("temporary TLS EOF")
+        return Response()
+
+    monkeypatch.setattr(verifier.urllib.request, "urlopen", open_once_failed)
+    monkeypatch.setattr(verifier.time, "sleep", lambda _seconds: None)
+
+    assert verifier.response_metadata("https://chainya.invalid/")[:2] == (200, "text/html")
+    assert calls == 2
 
 
 def write_tar(path: Path, files: dict[str, bytes]) -> None:

@@ -8,6 +8,7 @@ import json
 import pathlib
 import re
 import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -197,11 +198,17 @@ def response_metadata(url: str) -> tuple[int, str, object]:
         headers={"User-Agent": "ChainyaReleaseVerifier/1.0"},
         method="GET",
     )
-    try:
-        with urllib.request.urlopen(request, timeout=15) as response:
-            return response.status, response.headers.get_content_type(), response.headers
-    except urllib.error.HTTPError as exc:
-        return exc.code, exc.headers.get_content_type(), exc.headers
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(request, timeout=15) as response:
+                return response.status, response.headers.get_content_type(), response.headers
+        except urllib.error.HTTPError as exc:
+            return exc.code, exc.headers.get_content_type(), exc.headers
+        except urllib.error.URLError:
+            if attempt == 2:
+                raise
+            time.sleep(1)
+    raise AssertionError("unreachable")
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -216,11 +223,17 @@ def raw_response_metadata(url: str, method: str = "GET") -> tuple[int, str, obje
         method=method,
     )
     opener = urllib.request.build_opener(NoRedirect)
-    try:
-        with opener.open(request, timeout=15) as response:
-            return response.status, response.headers.get_content_type(), response.headers
-    except urllib.error.HTTPError as exc:
-        return exc.code, exc.headers.get_content_type(), exc.headers
+    for attempt in range(3):
+        try:
+            with opener.open(request, timeout=15) as response:
+                return response.status, response.headers.get_content_type(), response.headers
+        except urllib.error.HTTPError as exc:
+            return exc.code, exc.headers.get_content_type(), exc.headers
+        except urllib.error.URLError:
+            if attempt == 2:
+                raise
+            time.sleep(1)
+    raise AssertionError("unreachable")
 
 
 def json_response(url: str) -> tuple[int, object]:
@@ -228,11 +241,20 @@ def json_response(url: str) -> tuple[int, object]:
         url,
         headers={"User-Agent": "ChainyaReleaseVerifier/1.0"},
     )
-    try:
-        with urllib.request.urlopen(request, timeout=15) as response:
-            return response.status, json.load(response)
-    except (urllib.error.URLError, json.JSONDecodeError, ValueError):
-        return 0, {}
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(request, timeout=15) as response:
+                return response.status, json.load(response)
+        except urllib.error.HTTPError as exc:
+            return exc.code, {}
+        except urllib.error.URLError:
+            if attempt < 2:
+                time.sleep(1)
+                continue
+            return 0, {}
+        except (json.JSONDecodeError, ValueError):
+            return 0, {}
+    return 0, {}
 
 
 def status(url: str) -> tuple[int, str]:

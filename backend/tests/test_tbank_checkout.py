@@ -109,7 +109,7 @@ def test_demo_init_is_once_idempotent_and_uses_server_amount(tmp_path, monkeypat
     assert parse_qs(success.query)["token"]
 
 
-def test_live_stock_guard_uses_two_stage_short_lived_payment(tmp_path, monkeypatch):
+def test_live_stock_guard_uses_one_stage_short_lived_payment(tmp_path, monkeypatch):
     client, module = demo_app(tmp_path, monkeypatch)
     monkeypatch.setattr(module, "TEST_MODE", False)
     monkeypatch.setenv("SABY_STOCK_GUARD_MODE", "auto")
@@ -132,7 +132,7 @@ def test_live_stock_guard_uses_two_stage_short_lived_payment(tmp_path, monkeypat
     with client:
         response = client.post("/api/orders", json=order_payload())
     assert response.status_code == 201
-    assert calls[0]["pay_type"] == "T"
+    assert calls[0]["pay_type"] == "O"
     assert calls[0]["redirect_due_date"]
     with module.db() as con:
         reservation = con.execute(
@@ -170,7 +170,7 @@ def test_live_stock_guard_rejects_concurrent_oversell(tmp_path, monkeypatch):
     assert second.json()["detail"].startswith("Недостаточно товара:")
 
 
-def test_authorized_payment_is_captured_only_after_fresh_stock_check(tmp_path, monkeypatch):
+def test_authorized_callback_does_not_trigger_capture_in_one_stage_mode(tmp_path, monkeypatch):
     client, module = demo_app(tmp_path, monkeypatch)
     monkeypatch.setattr(module, "TEST_MODE", False)
     monkeypatch.setenv("SABY_STOCK_GUARD_MODE", "auto")
@@ -184,13 +184,10 @@ def test_authorized_payment_is_captured_only_after_fresh_stock_check(tmp_path, m
         }],
     )
     monkeypatch.setattr(module.tbank_client, "create_payment", lambda *_a, **_k: bank_response())
-    captures = []
     monkeypatch.setattr(
         module.tbank_client,
         "confirm",
-        lambda payment_id, amount: captures.append((payment_id, amount)) or {
-            "Success": True, "Status": "CONFIRMED"
-        },
+        lambda *_args: pytest.fail("one-stage checkout must not call Confirm"),
     )
     with client:
         created = client.post("/api/orders", json=order_payload()).json()["order"]
@@ -199,44 +196,13 @@ def test_authorized_payment_is_captured_only_after_fresh_stock_check(tmp_path, m
         )
         response = client.post("/api/payments/tbank/notification", json=notice)
     assert response.status_code == 200
-    assert captures == [("123456", 88_000)]
-    assert module.order_row(created["id"])["payment_state"] == "capturing"
-
-
-def test_authorized_payment_is_cancelled_if_stock_disappeared(tmp_path, monkeypatch):
-    client, module = demo_app(tmp_path, monkeypatch)
-    monkeypatch.setattr(module, "TEST_MODE", False)
-    monkeypatch.setenv("SABY_STOCK_GUARD_MODE", "auto")
-    monkeypatch.setattr(module, "tbank_checkout_ready", lambda: True)
-    external_id = module.SABY_NOMENCLATURE_BY_SITE_ID["baihao"].external_id
-    balances = iter((200, 10))
-    monkeypatch.setattr(
-        module.saby_client,
-        "base_catalog_all",
-        lambda with_balance=False: [{
-            "externalId": external_id, "unit": "г", "balance": next(balances),
-        }],
-    )
-    monkeypatch.setattr(module.tbank_client, "create_payment", lambda *_a, **_k: bank_response())
-    cancellations = []
-    monkeypatch.setattr(
-        module.tbank_client,
-        "refund",
-        lambda payment_id: cancellations.append(payment_id) or {
-            "Success": True, "Status": "CANCELED"
-        },
-    )
-    with client:
-        created = client.post("/api/orders", json=order_payload()).json()["order"]
-        response = client.post(
-            "/api/payments/tbank/notification",
-            json=signed_notification(
-                module, created["id"], "123456", 88_000, "AUTHORIZED"
-            ),
-        )
-    assert response.status_code == 200
-    assert cancellations == ["123456"]
-    assert module.order_row(created["id"])["payment_state"] == "failed"
+    assert module.order_row(created["id"])["payment_state"] == "awaiting"
+    with module.db() as con:
+        reservation = con.execute(
+            "SELECT state FROM stock_reservations WHERE order_id = ?",
+            (created["id"],),
+        ).fetchone()
+    assert reservation["state"] == "held"
 
 
 def test_checkout_status_reports_configured_demo_as_available(tmp_path, monkeypatch):

@@ -1309,108 +1309,6 @@ def set_stock_reservation_state(
     )
 
 
-def authorized_stock_is_still_available(
-    con: sqlite3.Connection,
-    order_id: str,
-    requirements,
-    *,
-    checked_at: datetime,
-) -> bool:
-    """Reconcile fresh Saby balances with every other local reservation."""
-    checked_iso = checked_at.isoformat()
-    by_id = {item.site_id: item for item in requirements}
-    own = con.execute(
-        """SELECT site_item_id, quantity FROM stock_reservations
-           WHERE order_id = ? AND state = 'held'""",
-        (order_id,),
-    ).fetchall()
-    if set(by_id) != {str(row["site_item_id"]) for row in own}:
-        return False
-    for row in own:
-        site_id = str(row["site_item_id"])
-        requirement = by_id[site_id]
-        if Decimal(str(row["quantity"])) != requirement.quantity:
-            return False
-        other = pending_reserved_quantity(
-            con,
-            site_id,
-            requirement.available,
-            checked_iso,
-            exclude_order_id=order_id,
-        )
-        if other + requirement.quantity > requirement.available:
-            return False
-    return True
-
-
-def capture_authorized_tbank_payment(order_id: str, payment_id: str) -> None:
-    """Capture only after a second read-only stock check; otherwise release it."""
-    row = order_row(order_id)
-    requirements = verified_stock_requirements(json.loads(row["items_json"]))
-    checked_at = datetime.now(timezone.utc)
-    updated = checked_at.isoformat()
-    with db() as con:
-        con.execute("BEGIN IMMEDIATE")
-        current = con.execute(
-            "SELECT payment_state FROM orders WHERE id = ?", (order_id,)
-        ).fetchone()
-        if not current or current["payment_state"] in {"paid", "capturing"}:
-            return
-        enough = authorized_stock_is_still_available(
-            con, order_id, requirements, checked_at=checked_at
-        )
-        con.execute(
-            """UPDATE orders SET payment_state = ?, payment_provider_status = 'AUTHORIZED',
-                   payment_last_error = '', payment_updated_at = ?, updated_at = ?
-               WHERE id = ?""",
-            ("capturing" if enough else "cancelling_no_stock", updated, updated, order_id),
-        )
-
-    mode, _valid = rollout_mode("TBANK_CHECKOUT_MODE", allow_demo=True)
-    try:
-        if enough:
-            result = integration_writer.confirm_tbank_payment(
-                tbank_client, payment_id, int(row["total"]) * 100, mode=mode
-            )
-            expected = {"CONFIRMED"}
-        else:
-            result = integration_writer.refund_tbank_payment(
-                tbank_client, payment_id, mode=mode
-            )
-            expected = {"CANCELED", "REVERSED"}
-        result_status = str(result.get("Status", ""))
-        if result.get("Success") is not True or result_status not in expected:
-            raise TBankError("Т-Банк не подтвердил изменение авторизации")
-    except (ExternalWriteBlocked, TBankError) as exc:
-        failed = now_iso()
-        with db() as con:
-            con.execute(
-                """UPDATE orders SET payment_state = 'capture_ambiguous',
-                       payment_last_error = ?, payment_updated_at = ?, updated_at = ?
-                   WHERE id = ?""",
-                (str(exc), failed, failed, order_id),
-            )
-        raise HTTPException(
-            503, "Платёж требует ручной проверки владельцем"
-        ) from exc
-    if not enough:
-        finished = now_iso()
-        with db() as con:
-            con.execute(
-                """UPDATE orders SET status = 'cancelled', payment_state = 'failed',
-                       payment_provider_status = ?, payment_last_error = ?,
-                       payment_updated_at = ?, updated_at = ? WHERE id = ?""",
-                (
-                    result_status,
-                    "Оплата отменена: фактического остатка недостаточно",
-                    finished,
-                    finished,
-                    order_id,
-                ),
-            )
-            set_stock_reservation_state(con, order_id, "released", finished)
-
-
 def validate_delivery(payload: CreateOrder) -> None:
     if payload.delivery != "pickup" and (not payload.city.strip() or not payload.city_code):
         raise HTTPException(422, "Выберите город из подсказок CDEK")
@@ -1908,7 +1806,7 @@ def initialize_tbank_payment(
             int(row["total"]) * 100,
             mode=mode,
             description=f"Заказ Чайни {row['id']}",
-            pay_type="T" if stock_guard_enabled() else "O",
+            pay_type="O",
             language=language if language in {"ru", "en"} else "en",
             notification_url=settings.notification_url,
             success_url=order_access_url(settings.success_url, row, language),
@@ -5509,17 +5407,7 @@ async def tbank_notification(
         updated = now_iso()
         success = payload.get("Success") is True or payload.get("Success") == "true"
         provider_status = status[:80]
-        if success and status == "AUTHORIZED" and stock_guard_enabled():
-            # The provider has only blocked the funds. A fresh Saby read and
-            # capture/cancel happen after this transaction.
-            con.execute(
-                """UPDATE orders SET payment_state = 'authorized',
-                       payment_provider_status = ?, payment_last_error = '',
-                       payment_updated_at = ?, updated_at = ? WHERE id = ?
-                       AND payment_state NOT IN ('paid','refunded')""",
-                (provider_status, updated, updated, order_id),
-            )
-        elif success and status == "CONFIRMED":
+        if success and status == "CONFIRMED":
             # A delayed/replayed confirmation must never undo a refund that is
             # already running, ambiguous, partial or complete.
             if row["payment_state"] not in {
@@ -5588,10 +5476,6 @@ async def tbank_notification(
                     (provider_status, updated, updated, order_id),
                 )
 
-    if success and status == "AUTHORIZED" and stock_guard_enabled():
-        background_tasks.add_task(
-            capture_authorized_tbank_payment, order_id, payment_id
-        )
     if process_effects:
         # A replay is also a recovery signal: the paid transition and its
         # outbox entries may have committed immediately before a process died.

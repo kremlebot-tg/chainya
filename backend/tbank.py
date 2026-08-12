@@ -260,6 +260,7 @@ class TBankClient:
         notification_url: str | None = None,
         success_url: str | None = None,
         fail_url: str | None = None,
+        redirect_due_date: str | None = None,
         data: Mapping[str, Any] | None = None,
         receipt: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
@@ -294,6 +295,15 @@ class TBankClient:
             value = configured if explicit is None else explicit
             if value:
                 payload[key] = value
+        if redirect_due_date is not None:
+            value = self._required_id(
+                redirect_due_date, "срок действия платёжной ссылки", 40
+            )
+            if not re.fullmatch(
+                r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}", value
+            ):
+                raise TBankError("Некорректный срок действия платёжной ссылки")
+            payload["RedirectDueDate"] = value
         if data is not None:
             payload["DATA"] = dict(data)
         if receipt is not None:
@@ -333,6 +343,15 @@ class TBankClient:
         if get_phone is not None:
             payload["GetPhone"] = bool(get_phone)
         return self._post("GetState", payload)
+
+    def confirm(self, payment_id: str | int, amount: int) -> dict[str, Any]:
+        """Capture a previously authorized two-stage payment."""
+        return self._post("Confirm", {
+            "PaymentId": self._required_id(
+                payment_id, "идентификатор платежа", 20
+            ),
+            "Amount": self._amount(amount),
+        })
 
     def refund(
         self,

@@ -189,3 +189,24 @@ def test_saby_delivery_order_keeps_payload_and_uses_create_endpoint():
     result = client.create_delivery_order({"pointId": 10, "amount": 1230, "items": [{"id": 7, "quantity": 1}]})
     assert result == {"id": 99, "status": "created"}
     assert len(calls) == 2
+
+
+def test_saby_fiscal_sale_and_receipt_status_use_documented_endpoints():
+    calls = []
+
+    def opener(request, timeout):
+        calls.append(request)
+        if request.full_url.endswith("/oauth/service/"):
+            return Response({"token": "access"})
+        if request.method == "POST":
+            assert request.full_url.endswith("/retail/sale/create")
+            assert json.loads(request.data) == {"externalId": "chainya-order-sale"}
+            return Response({"id": "receipt-safe-id"})
+        query = parse_qs(urlparse(request.full_url).query)
+        assert request.full_url.startswith("https://api.sbis.ru/retail/pay/list?")
+        assert query["ids[]"] == ["receipt-safe-id"]
+        return Response({"payments": [{"id": "receipt-safe-id"}]})
+
+    client = SabyClient(settings(), opener=opener)
+    assert client.create_fiscal_sale({"externalId": "chainya-order-sale"})["id"] == "receipt-safe-id"
+    assert client.fiscal_receipt("receipt-safe-id")["payments"][0]["id"] == "receipt-safe-id"

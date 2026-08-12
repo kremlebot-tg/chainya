@@ -12,6 +12,10 @@ def demo_app(tmp_path, monkeypatch):
         "CDEK_CLIENT_ID", "CDEK_CLIENT_SECRET", "CDEK_INTEGRATION_MODE",
         "SABY_APP_CLIENT_ID", "SABY_APP_SECRET", "SABY_SECRET_KEY",
         "SABY_POINT_ID", "SABY_PRICE_LIST_ID", "SABY_ORDER_SYNC_MODE",
+        "SABY_PURCHASE_ROUTE", "SABY_OFD_COMPANY_ID",
+        "SABY_OFD_KKT_REG_NUMBER", "SABY_OFD_TAX_SYSTEM",
+        "SABY_OFD_PAY_METHOD", "SABY_OFD_ALLOW_NEGATIVE_STOCK",
+        "SABY_STOCK_GUARD_MODE",
         "SABY_CATALOG_SHADOW_MODE", "SABY_CATALOG_SHADOW_INTERVAL_SECONDS",
     ):
         monkeypatch.delenv(key, raising=False)
@@ -103,6 +107,136 @@ def test_demo_init_is_once_idempotent_and_uses_server_amount(tmp_path, monkeypat
     assert success.path == "/payment/success"
     assert parse_qs(success.query)["order_id"] == [first.json()["order"]["id"]]
     assert parse_qs(success.query)["token"]
+
+
+def test_live_stock_guard_uses_two_stage_short_lived_payment(tmp_path, monkeypatch):
+    client, module = demo_app(tmp_path, monkeypatch)
+    monkeypatch.setattr(module, "TEST_MODE", False)
+    monkeypatch.setenv("SABY_STOCK_GUARD_MODE", "auto")
+    monkeypatch.setattr(module, "tbank_checkout_ready", lambda: True)
+    calls = []
+    monkeypatch.setattr(
+        module.saby_client,
+        "base_catalog_all",
+        lambda with_balance=False: [{
+            "externalId": module.SABY_NOMENCLATURE_BY_SITE_ID["baihao"].external_id,
+            "unit": "г",
+            "balance": 200,
+        }],
+    )
+    monkeypatch.setattr(
+        module.tbank_client,
+        "create_payment",
+        lambda *_args, **kwargs: calls.append(kwargs) or bank_response(),
+    )
+    with client:
+        response = client.post("/api/orders", json=order_payload())
+    assert response.status_code == 201
+    assert calls[0]["pay_type"] == "T"
+    assert calls[0]["redirect_due_date"]
+    with module.db() as con:
+        reservation = con.execute(
+            "SELECT quantity, state FROM stock_reservations"
+        ).fetchone()
+    assert tuple(reservation) == ("50", "held")
+
+
+def test_live_stock_guard_rejects_concurrent_oversell(tmp_path, monkeypatch):
+    client, module = demo_app(tmp_path, monkeypatch)
+    monkeypatch.setattr(module, "TEST_MODE", False)
+    monkeypatch.setenv("SABY_STOCK_GUARD_MODE", "auto")
+    monkeypatch.setattr(module, "tbank_checkout_ready", lambda: True)
+    monkeypatch.setattr(
+        module.saby_client,
+        "base_catalog_all",
+        lambda with_balance=False: [{
+            "externalId": module.SABY_NOMENCLATURE_BY_SITE_ID["baihao"].external_id,
+            "unit": "г",
+            "balance": 60,
+        }],
+    )
+    monkeypatch.setattr(module.tbank_client, "create_payment", lambda *_a, **_k: bank_response())
+    with client:
+        first = client.post(
+            "/api/orders", json=order_payload(),
+            headers={"Idempotency-Key": "stock-first"},
+        )
+        second = client.post(
+            "/api/orders", json=order_payload(),
+            headers={"Idempotency-Key": "stock-second"},
+        )
+    assert first.status_code == 201
+    assert second.status_code == 409
+    assert second.json()["detail"].startswith("Недостаточно товара:")
+
+
+def test_authorized_payment_is_captured_only_after_fresh_stock_check(tmp_path, monkeypatch):
+    client, module = demo_app(tmp_path, monkeypatch)
+    monkeypatch.setattr(module, "TEST_MODE", False)
+    monkeypatch.setenv("SABY_STOCK_GUARD_MODE", "auto")
+    monkeypatch.setattr(module, "tbank_checkout_ready", lambda: True)
+    external_id = module.SABY_NOMENCLATURE_BY_SITE_ID["baihao"].external_id
+    monkeypatch.setattr(
+        module.saby_client,
+        "base_catalog_all",
+        lambda with_balance=False: [{
+            "externalId": external_id, "unit": "г", "balance": 200,
+        }],
+    )
+    monkeypatch.setattr(module.tbank_client, "create_payment", lambda *_a, **_k: bank_response())
+    captures = []
+    monkeypatch.setattr(
+        module.tbank_client,
+        "confirm",
+        lambda payment_id, amount: captures.append((payment_id, amount)) or {
+            "Success": True, "Status": "CONFIRMED"
+        },
+    )
+    with client:
+        created = client.post("/api/orders", json=order_payload()).json()["order"]
+        notice = signed_notification(
+            module, created["id"], "123456", 88_000, "AUTHORIZED"
+        )
+        response = client.post("/api/payments/tbank/notification", json=notice)
+    assert response.status_code == 200
+    assert captures == [("123456", 88_000)]
+    assert module.order_row(created["id"])["payment_state"] == "capturing"
+
+
+def test_authorized_payment_is_cancelled_if_stock_disappeared(tmp_path, monkeypatch):
+    client, module = demo_app(tmp_path, monkeypatch)
+    monkeypatch.setattr(module, "TEST_MODE", False)
+    monkeypatch.setenv("SABY_STOCK_GUARD_MODE", "auto")
+    monkeypatch.setattr(module, "tbank_checkout_ready", lambda: True)
+    external_id = module.SABY_NOMENCLATURE_BY_SITE_ID["baihao"].external_id
+    balances = iter((200, 10))
+    monkeypatch.setattr(
+        module.saby_client,
+        "base_catalog_all",
+        lambda with_balance=False: [{
+            "externalId": external_id, "unit": "г", "balance": next(balances),
+        }],
+    )
+    monkeypatch.setattr(module.tbank_client, "create_payment", lambda *_a, **_k: bank_response())
+    cancellations = []
+    monkeypatch.setattr(
+        module.tbank_client,
+        "refund",
+        lambda payment_id: cancellations.append(payment_id) or {
+            "Success": True, "Status": "CANCELED"
+        },
+    )
+    with client:
+        created = client.post("/api/orders", json=order_payload()).json()["order"]
+        response = client.post(
+            "/api/payments/tbank/notification",
+            json=signed_notification(
+                module, created["id"], "123456", 88_000, "AUTHORIZED"
+            ),
+        )
+    assert response.status_code == 200
+    assert cancellations == ["123456"]
+    assert module.order_row(created["id"])["payment_state"] == "failed"
 
 
 def test_checkout_status_reports_configured_demo_as_available(tmp_path, monkeypatch):

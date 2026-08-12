@@ -22,6 +22,9 @@ class FakeClient:
     def create_delivery_order(self, *args, **kwargs):
         self.calls.append(("saby-create", args, kwargs))
 
+    def create_fiscal_sale(self, *args, **kwargs):
+        self.calls.append(("saby-fiscal", args, kwargs))
+
     def create_order(self, *args, **kwargs):
         self.calls.append(("cdek-create", args, kwargs))
 
@@ -33,6 +36,7 @@ def test_test_mode_performs_zero_calls_for_every_provider_write():
         lambda: writer.create_tbank_payment(client, "ORDER", 100, mode="auto"),
         lambda: writer.refund_tbank_payment(client, "PAYMENT", mode="auto"),
         lambda: writer.create_saby_order(client, {"order": 1}, mode="auto"),
+        lambda: writer.create_saby_fiscal_sale(client, {"sale": 1}, mode="auto"),
         lambda: writer.create_cdek_order(client, {"order": 1}, mode="auto"),
     ]
     for operation in operations:
@@ -54,6 +58,13 @@ def test_guarded_writer_calls_provider_only_after_every_gate_passes():
     writer = IntegrationWriter(test_mode=False, workflow_exposed=True)
     writer.create_cdek_order(client, {"number": "ORDER"}, mode="manual", manual_approved=True)
     assert client.calls == [("cdek-create", ({"number": "ORDER"},), {})]
+
+
+def test_guarded_writer_exposes_saby_fiscal_sale_only_after_policy_gate():
+    client = FakeClient()
+    writer = IntegrationWriter(test_mode=False, exposed_providers=frozenset({"saby"}))
+    writer.create_saby_fiscal_sale(client, {"externalId": "safe"}, mode="auto")
+    assert client.calls == [("saby-fiscal", ({"externalId": "safe"},), {})]
 
 
 def test_provider_specific_demo_workflow_calls_only_demo_tbank():

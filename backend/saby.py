@@ -272,3 +272,14 @@ class SabyClient:
     def create_delivery_order(self, payload: dict) -> Any:
         """Низкоуровневый метод; вызывающий код обязан собрать и проверить заказ."""
         return self.api("/retail/order/create", method="POST", payload=payload)
+
+    def create_fiscal_sale(self, payload: dict) -> Any:
+        """Register one fiscal sale/refund; policy is enforced by the caller."""
+        return self.api("/retail/sale/create", method="POST", payload=payload)
+
+    def fiscal_receipt(self, receipt_id: str) -> Any:
+        """Read receipt state returned by ``create_fiscal_sale``."""
+        value = str(receipt_id or "").strip()
+        if not value or len(value) > 120:
+            raise SabyError("Некорректный идентификатор чека Saby")
+        return self.api("/retail/pay/list", {"ids[]": value})

@@ -8,7 +8,7 @@ misconfigured test deployment still performs zero external write calls.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, FrozenSet
+from typing import Any
 
 from .integration_guard import require_external_write
 
@@ -17,7 +17,7 @@ from .integration_guard import require_external_write
 class IntegrationWriter:
     test_mode: bool
     workflow_exposed: bool = False
-    exposed_providers: FrozenSet[str] = frozenset()
+    exposed_providers: frozenset[str] = frozenset()
 
     def provider_exposed(self, provider: str) -> bool:
         return self.workflow_exposed or provider in self.exposed_providers
@@ -63,11 +63,31 @@ class IntegrationWriter:
         )
         return client.refund(payment_id, **kwargs)
 
+    def confirm_tbank_payment(
+        self, client: Any, payment_id: str, amount: int, *, mode: str,
+        manual_approved: bool = False,
+    ) -> Any:
+        self._authorize(
+            "tbank",
+            mode,
+            manual_approved=manual_approved,
+            demo_credentials=bool(
+                getattr(getattr(client, "settings", None), "is_demo", False)
+            ),
+        )
+        return client.confirm(payment_id, amount)
+
     def create_saby_order(
         self, client: Any, payload: dict, *, mode: str, manual_approved: bool = False,
     ) -> Any:
         self._authorize("saby", mode, manual_approved=manual_approved)
         return client.create_delivery_order(payload)
+
+    def create_saby_fiscal_sale(
+        self, client: Any, payload: dict, *, mode: str, manual_approved: bool = False,
+    ) -> Any:
+        self._authorize("saby", mode, manual_approved=manual_approved)
+        return client.create_fiscal_sale(payload)
 
     def create_cdek_order(
         self, client: Any, payload: dict, *, mode: str, manual_approved: bool = False,

@@ -1,0 +1,179 @@
+import pytest
+
+from backend.saby_purchase import (
+    SabyFiscalSettings,
+    SabyPurchaseError,
+    build_fiscal_sale,
+    purchase_route_status,
+)
+
+
+def fiscal_settings(**changes):
+    values = {
+        "company_id": "274",
+        "kkt_reg_number": "0001234567890123",
+        "tax_system": 2,
+        "pay_method": 1,
+    }
+    values.update(changes)
+    return SabyFiscalSettings(**values)
+
+
+def order(**changes):
+    values = {
+        "id": "7E41D55A13E7",
+        "total": 350,
+        "delivery_price": 0,
+        "customer": {"name": "Тест", "phone": "+7 999 000-00-00"},
+        "items": [{
+            "name": "Бай Хао Инь Чжень", "pack": 10, "qty": 2,
+            "unit_price": 175, "total": 350,
+        }],
+    }
+    values.update(changes)
+    return values
+
+
+def test_delivery_route_preserves_existing_implemented_path():
+    status = purchase_route_status({}, tbank_receipt_enabled=True)
+    assert status.route == "delivery"
+    assert status.implemented is True
+    assert status.writes_enabled is True
+
+
+def test_fiscal_sale_is_ready_only_with_one_receipt_source_and_kkt():
+    ready = purchase_route_status(
+        {"SABY_PURCHASE_ROUTE": "fiscal_sale"},
+        tbank_receipt_enabled=False,
+        fiscal_settings=fiscal_settings(),
+    )
+    duplicate = purchase_route_status(
+        {"SABY_PURCHASE_ROUTE": "fiscal_sale"},
+        tbank_receipt_enabled=True,
+        fiscal_settings=fiscal_settings(),
+    )
+    missing = purchase_route_status(
+        {"SABY_PURCHASE_ROUTE": "fiscal_sale"},
+        tbank_receipt_enabled=False,
+        fiscal_settings=SabyFiscalSettings(),
+    )
+    assert ready.implemented is True and ready.writes_enabled is True
+    assert duplicate.writes_enabled is False
+    assert any("второй фискальный чек" in item for item in duplicate.blockers)
+    assert missing.writes_enabled is False
+    assert any("параметры ККТ" in item for item in missing.blockers)
+
+
+def test_external_ofd_and_unknown_route_remain_fail_closed():
+    external = purchase_route_status(
+        {"SABY_PURCHASE_ROUTE": "external_ofd"}, tbank_receipt_enabled=True
+    )
+    unknown = purchase_route_status(
+        {"SABY_PURCHASE_ROUTE": "anything"}, tbank_receipt_enabled=False
+    )
+    assert external.writes_enabled is False
+    assert "настраивается в Saby" in external.blockers[0]
+    assert unknown.route == "invalid" and unknown.valid is False
+
+
+def test_fiscal_sale_converts_grams_to_kg_and_keeps_checkout_total():
+    payload = build_fiscal_sale(order(), settings=fiscal_settings())
+    line = payload["nomenclatures"][0]
+    assert payload["operationType"] == "1"
+    assert payload["internetSum"] == "350.00"
+    assert payload["vatNone"] == "350.00"
+    assert payload["taxSystem"] == "2"
+    assert payload["payMethod"] == "1"
+    assert line["measureNomenclature"] == "кг"
+    assert line["quantityNomenclature"] == "0.02"
+    assert line["priceNomenclature"] == "17500.00"
+    assert line["totalPriceNomenclature"] == "350.00"
+    assert payload["externalId"] == "chainya-7e41d55a13e7-prepayment"
+
+
+def test_fiscal_sale_supports_piece_item_delivery_and_full_return():
+    source = order(
+        total=665,
+        delivery_price=490,
+        items=[{
+            "name": "Пуэр в мандарине", "pack": "pc", "qty": 1,
+            "unit_price": 175, "total": 175,
+        }],
+    )
+    sale = build_fiscal_sale(source, settings=fiscal_settings())
+    refund = build_fiscal_sale(source, settings=fiscal_settings(), refund=True)
+    assert sale["nomenclatures"][0]["measureNomenclature"] == "шт"
+    assert sale["nomenclatures"][1]["kindNomenclature"] == "у"
+    assert refund["operationType"] == "2"
+    assert refund["externalId"].endswith("-refund")
+
+
+def test_final_settlement_uses_prepayment_without_second_charge():
+    payload = build_fiscal_sale(
+        order(), settings=fiscal_settings(), settlement=True
+    )
+    assert payload["payMethod"] == "4"
+    assert payload["internetSum"] == "0.00"
+    assert payload["prepaySum"] == "350.00"
+    assert payload["externalId"] == "chainya-7e41d55a13e7-settlement"
+
+
+def test_fiscal_sale_rejects_invalid_phone_and_sum_mismatch():
+    with pytest.raises(SabyPurchaseError, match="российский номер"):
+        build_fiscal_sale(
+            order(customer={"name": "Тест", "phone": "123"}),
+            settings=fiscal_settings(),
+        )
+    with pytest.raises(SabyPurchaseError, match="не совпадает"):
+        build_fiscal_sale(order(total=351), settings=fiscal_settings())
+
+
+def test_fiscal_settings_report_names_not_secret_values():
+    settings = SabyFiscalSettings.from_env({
+        "SABY_POINT_ID": "",
+        "SABY_OFD_KKT_REG_NUMBER": "bad",
+        "SABY_OFD_TAX_SYSTEM": "typo",
+    })
+    public = settings.public_dict()
+    assert public["configured"] is False
+    assert "SABY_POINT_ID" in public["missing"]
+    assert "bad" not in repr(public)
+
+
+def test_fiscal_settings_reuse_verified_sales_point_id():
+    settings = SabyFiscalSettings.from_env({
+        "SABY_POINT_ID": "274",
+        "SABY_OFD_KKT_REG_NUMBER": "0001234567890123",
+        "SABY_OFD_PAY_METHOD": "1",
+    })
+    assert settings.company_id == "274"
+    assert settings.configured is True
+
+
+def test_explicit_fiscal_company_id_remains_compatible():
+    settings = SabyFiscalSettings.from_env({
+        "SABY_POINT_ID": "274",
+        "SABY_OFD_COMPANY_ID": "275",
+        "SABY_OFD_KKT_REG_NUMBER": "0001234567890123",
+        "SABY_OFD_PAY_METHOD": "1",
+    })
+    assert settings.company_id == "275"
+
+
+def test_fiscal_route_never_assumes_payment_method():
+    settings = SabyFiscalSettings.from_env({
+        "SABY_POINT_ID": "274",
+        "SABY_OFD_KKT_REG_NUMBER": "0001234567890123",
+    })
+    assert settings.configured is False
+    assert "SABY_OFD_PAY_METHOD" in settings.missing
+
+
+def test_full_payment_setting_cannot_replace_required_prepayment_flow():
+    settings = SabyFiscalSettings.from_env({
+        "SABY_POINT_ID": "274",
+        "SABY_OFD_KKT_REG_NUMBER": "0001234567890123",
+        "SABY_OFD_PAY_METHOD": "4",
+    })
+    assert settings.configured is False
+    assert "SABY_OFD_PAY_METHOD" in settings.missing

@@ -233,13 +233,50 @@ def test_saby_fiscal_sale_and_receipt_status_use_documented_endpoints():
             return Response({"token": "access"})
         if request.method == "POST":
             assert request.full_url.endswith("/retail/sale/create")
+            assert "Cookie" not in request.headers
             assert json.loads(request.data) == {"externalId": "chainya-order-sale"}
-            return Response({"id": "receipt-safe-id"})
+            return Response({"Result": json.dumps({"payId": "receipt-safe-id"})})
         query = parse_qs(urlparse(request.full_url).query)
         assert request.full_url.startswith("https://api.sbis.ru/retail/pay/list?")
+        assert "Cookie" not in request.headers
         assert query["ids[]"] == ["receipt-safe-id"]
-        return Response({"payments": [{"id": "receipt-safe-id"}]})
+        return Response({"Result": json.dumps([
+            {"id": "receipt-safe-id", "fiscalSign": "safe-sign", "state": "готова"}
+        ])})
 
     client = SabyClient(settings(), opener=opener)
-    assert client.create_fiscal_sale({"externalId": "chainya-order-sale"})["id"] == "receipt-safe-id"
-    assert client.fiscal_receipt("receipt-safe-id")["payments"][0]["id"] == "receipt-safe-id"
+    assert client.create_fiscal_sale({"externalId": "chainya-order-sale"})["payId"] == "receipt-safe-id"
+    assert client.fiscal_receipt("receipt-safe-id")[0]["id"] == "receipt-safe-id"
+
+
+def test_saby_fiscal_response_accepts_nested_json_rpc_envelope():
+    def opener(request, timeout):
+        if request.full_url.endswith("/oauth/service/"):
+            return Response({"token": "access"})
+        return Response({
+            "jsonrpc": "2.0",
+            "id": "safe-request",
+            "result": {"Result": json.dumps({"payId": "nested-safe-id"})},
+        })
+
+    client = SabyClient(settings(), opener=opener)
+    result = client.create_fiscal_sale({"externalId": "chainya-order-sale"})
+    assert result == {"payId": "nested-safe-id"}
+
+
+@pytest.mark.parametrize(
+    "vendor_result", ["not-json", "", "null", "42", '"text"', 42, None]
+)
+def test_saby_rejects_malformed_fiscal_result_without_retry(vendor_result):
+    calls = []
+
+    def opener(request, timeout):
+        calls.append(request)
+        if request.full_url.endswith("/oauth/service/"):
+            return Response({"token": "access"})
+        return Response({"Result": vendor_result})
+
+    client = SabyClient(settings(), opener=opener)
+    with pytest.raises(SabyError, match="результат регистрации чека"):
+        client.create_fiscal_sale({"externalId": "chainya-order-sale"})
+    assert len(calls) == 2

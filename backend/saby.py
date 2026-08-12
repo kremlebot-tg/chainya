@@ -19,12 +19,50 @@ from datetime import date
 from typing import Any, Callable
 
 
+# Service OAuth returns an application token for ``X-SBISAccessToken``.  Do
+# not mix it with the separate login/password OFD session API, which returns a
+# ``sid`` and uses another authentication contract.
 AUTH_URL = "https://online.sbis.ru/oauth/service/"
 API_ROOT = "https://api.sbis.ru"
 
 
 class SabyError(RuntimeError):
     """Безопасная ошибка интеграции без вывода ключей в текст или лог."""
+
+
+def unwrap_fiscal_response(result: Any) -> Any:
+    """Normalize the legacy wrapper used by Saby fiscal endpoints.
+
+    The fiscal API can return its actual JSON response as a serialized string
+    in an uppercase ``Result`` field.  A JSON-RPC-style lowercase ``result``
+    wrapper is accepted only when it is the response envelope, so an ordinary
+    business field named ``result`` is not accidentally discarded.
+    """
+    value = result
+    for _depth in range(5):
+        wrapped = False
+        if isinstance(value, dict) and "Result" in value:
+            value = value["Result"]
+            wrapped = True
+        elif (
+            isinstance(value, dict)
+            and "result" in value
+            and set(value).issubset({"jsonrpc", "id", "result"})
+        ):
+            value = value["result"]
+            wrapped = True
+        if not wrapped:
+            return value
+        if isinstance(value, str):
+            try:
+                value = json.loads(value)
+            except json.JSONDecodeError as exc:
+                raise SabyError("Saby вернул некорректный результат регистрации чека") from exc
+            if not isinstance(value, (dict, list)):
+                raise SabyError("Saby вернул результат регистрации чека в неожиданном формате")
+        elif not isinstance(value, (dict, list)):
+            raise SabyError("Saby вернул результат регистрации чека в неожиданном формате")
+    raise SabyError("Saby вернул слишком глубоко вложенный результат регистрации чека")
 
 
 @dataclass(frozen=True)
@@ -323,11 +361,13 @@ class SabyClient:
 
     def create_fiscal_sale(self, payload: dict) -> Any:
         """Register one fiscal sale/refund; policy is enforced by the caller."""
-        return self.api("/retail/sale/create", method="POST", payload=payload)
+        result = self.api("/retail/sale/create", method="POST", payload=payload)
+        return unwrap_fiscal_response(result)
 
     def fiscal_receipt(self, receipt_id: str) -> Any:
         """Read receipt state returned by ``create_fiscal_sale``."""
         value = str(receipt_id or "").strip()
         if not value or len(value) > 120:
             raise SabyError("Некорректный идентификатор чека Saby")
-        return self.api("/retail/pay/list", {"ids[]": value})
+        result = self.api("/retail/pay/list", {"ids[]": value})
+        return unwrap_fiscal_response(result)

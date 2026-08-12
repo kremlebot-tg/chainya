@@ -1927,7 +1927,11 @@ def _payload_sha256(payload: dict) -> str:
 
 
 def _saby_receipt_is_fiscalized(result: object) -> bool:
-    """Recognize a non-empty fiscal sign in documented nested/list responses."""
+    """Recognize a real fiscal sign in documented nested/list responses.
+
+    Saby uses the string ``none`` while a newly accepted receipt is still
+    waiting for the cash register.  It is a sentinel, not a fiscal attribute.
+    """
     if isinstance(result, list):
         return any(_saby_receipt_is_fiscalized(item) for item in result)
     if not isinstance(result, dict):
@@ -1935,7 +1939,11 @@ def _saby_receipt_is_fiscalized(result: object) -> bool:
     for key, value in result.items():
         normalized = re.sub(r"[^a-z]", "", str(key).casefold())
         if normalized in {"fiscalsign", "fiscaldocumentattribute"}:
-            return bool(str(value or "").strip())
+            if value is None or value is False:
+                return False
+            if isinstance(value, str):
+                return value.strip().casefold() not in {"", "none", "null"}
+            return bool(value)
     return any(
         _saby_receipt_is_fiscalized(value)
         for value in result.values()

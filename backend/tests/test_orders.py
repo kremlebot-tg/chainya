@@ -1484,7 +1484,10 @@ def test_accepted_sale_waits_for_ofd_and_polls_without_second_sale(tmp_path, mon
     client, module = app_client(tmp_path, monkeypatch)
     configure_saby_fiscal_flow(module, monkeypatch)
     sent = []
-    checks = iter(({"payments": [{"fiscalSign": ""}]}, {"payments": [{"fiscalSign": "ready"}]}))
+    checks = iter((
+        [{"fiscalSign": "none", "state": "новая"}],
+        [{"fiscalSign": "safe-fiscal-sign", "state": "готова"}],
+    ))
     monkeypatch.setattr(
         module.saby_client, "create_fiscal_sale",
         lambda data: sent.append(data) or {"id": "safe-receipt-pending"},
@@ -1500,6 +1503,17 @@ def test_accepted_sale_waits_for_ofd_and_polls_without_second_sale(tmp_path, mon
 
     assert len(sent) == 1
     assert module.order_row(order["id"])["saby_receipt_state"] == "registered"
+
+
+def test_saby_pending_fiscal_sign_markers_are_not_registered(tmp_path, monkeypatch):
+    _client, module = app_client(tmp_path, monkeypatch)
+    for marker in (None, "", "   ", "none", "NONE", "null", "Null", False, 0):
+        assert not module._saby_receipt_is_fiscalized([
+            {"fiscalSign": marker, "state": "новая"}
+        ])
+    assert module._saby_receipt_is_fiscalized([
+        {"fiscalSign": "safe-fiscal-sign", "state": "готова"}
+    ])
 
 
 def test_confirmed_refund_creates_one_saby_return_after_original_receipt(tmp_path, monkeypatch):

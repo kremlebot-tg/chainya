@@ -2026,9 +2026,9 @@ def sync_paid_order_to_saby_fiscal(
                 f"UPDATE orders SET {state_col} = 'blocked', {error_col} = ?, "
                 f"{updated_col} = ?, updated_at = ? WHERE id = ?",
                 ((
-                    "Нельзя сформировать возвратный чек: чек предоплаты Saby не подтверждён"
+                    "Нельзя сформировать возвратный чек: чек продажи Saby не подтверждён"
                     if refund else
-                    "Нельзя сформировать окончательный чек: чек предоплаты Saby не подтверждён"
+                    "Нельзя сформировать окончательный чек: основной чек Saby не подтверждён"
                 ), started, started, order_id),
             )
             return
@@ -4093,8 +4093,25 @@ def admin_update_order(order_id: str, payload: UpdateOrderStatus, authorization:
 
 @app.post("/api/admin/orders/{order_id}/saby/settle")
 def admin_saby_settle(order_id: str, authorization: str = Header(default="")):
-    """Create the final-settlement receipt after an explicit handover action."""
+    """Reject legacy two-stage settlement in the one-stage checkout flow."""
     require_admin(authorization)
+    order_row(order_id)
+    raise HTTPException(
+        409,
+        "Окончательный чек не нужен: одностадийный полный расчёт создаётся после оплаты",
+    )
+
+
+@app.post("/api/admin/orders/{order_id}/saby/retry-sale")
+def admin_saby_retry_sale(
+    order_id: str,
+    authorization: str = Header(default=""),
+    receipt_absence: str = Header(default="", alias="X-Chainya-Saby-Receipt-Absence"),
+):
+    """Retry one ambiguous sale only after an explicit Saby journal check."""
+    require_admin(authorization)
+    if receipt_absence != "confirmed":
+        raise HTTPException(409, "Сначала подтвердите, что чека нет в журнале продаж Saby")
     row = order_row(order_id)
     route = purchase_route_status(
         tbank_receipt_enabled=tbank_receipt_settings.enabled,
@@ -4104,36 +4121,42 @@ def admin_saby_settle(order_id: str, authorization: str = Header(default="")):
     if route.route != "fiscal_sale" or not route.writes_enabled:
         raise HTTPException(409, route.blockers[0] if route.blockers else "Чеки Saby выключены")
     if row["payment_state"] != "paid":
-        raise HTTPException(409, "Окончательный чек доступен только для оплаченного заказа")
-    if row["status"] not in {"shipped", "completed"}:
-        raise HTTPException(409, "Сначала отметьте заказ выданным или переданным в доставку")
-    if row["saby_receipt_state"] != "registered":
-        raise HTTPException(409, "Сначала дождитесь регистрации чека предоплаты в Saby")
-    if row["saby_settlement_state"] == "registered":
-        return admin_order(row)
-    if row["saby_settlement_state"] in {"sending", "pending_ofd", "ambiguous"}:
-        raise HTTPException(409, "Окончательный чек уже обрабатывается или требует проверки")
-    created = now_iso()
+        raise HTTPException(409, "Повтор доступен только для подтверждённой оплаты")
+    if row["saby_receipt_state"] != "ambiguous" or row["saby_receipt_id"]:
+        raise HTTPException(409, "Этот чек не находится в состоянии ручной сверки")
+    with db() as con:
+        effect = con.execute(
+            "SELECT attempts FROM paid_order_effects WHERE order_id = ? AND effect = 'saby'",
+            (order_id,),
+        ).fetchone()
+    if not effect or int(effect["attempts"] or 0) != 1:
+        raise HTTPException(
+            409,
+            "Контролируемый повтор уже использован или история первой отправки неполна",
+        )
+    updated = now_iso()
     with db() as con:
         con.execute("BEGIN IMMEDIATE")
-        enqueue_saby_settlement_effect(con, order_id, created)
+        claimed = con.execute(
+            """UPDATE orders SET saby_receipt_state = 'failed',
+                      saby_receipt_last_error = '', saby_receipt_updated_at = ?, updated_at = ?
+               WHERE id = ? AND payment_state = 'paid'
+                 AND saby_receipt_state = 'ambiguous' AND saby_receipt_id IS NULL""",
+            (updated, updated, order_id),
+        )
+        if claimed.rowcount != 1:
+            raise HTTPException(409, "Состояние чека уже изменилось; обновите страницу")
         con.execute(
             """UPDATE paid_order_effects
                SET state = 'pending', last_error = '', updated_at = ?
-               WHERE order_id = ? AND effect = 'saby_settlement'
-                 AND state IN ('failed','blocked')""",
-            (created, order_id),
-        )
-        con.execute(
-            """UPDATE orders SET saby_settlement_state = 'not_requested',
-                   saby_settlement_last_error = '', updated_at = ? WHERE id = ?""",
-            (created, order_id),
+               WHERE order_id = ? AND effect = 'saby' AND state = 'ambiguous'""",
+            (updated, order_id),
         )
     process_paid_order_effects(order_id)
     result = admin_order(order_row(order_id))
-    state = result["integrations"]["saby"]["settlement_receipt"]["state"]
+    state = result["integrations"]["saby"]["receipt"]["state"]
     if state in {"failed", "blocked", "ambiguous"}:
-        detail = result["integrations"]["saby"]["settlement_receipt"]["last_error"]
+        detail = result["integrations"]["saby"]["receipt"]["last_error"]
         raise HTTPException(502 if state != "blocked" else 409, detail or "Чек Saby не зарегистрирован")
     return result
 

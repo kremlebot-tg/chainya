@@ -34,8 +34,8 @@ def test_owner_guides_use_existing_admin_session_and_explain_safe_boundaries(tmp
     assert "Вход владельца" in anonymous.text
     assert "Как управлять заказами" in authenticated.text
     assert "СБИС: каталог и чеки покупок" in authenticated.text
-    assert "100% предоплата" in authenticated.text
-    assert "Предоплата, выдача и складской учёт" in authenticated.text
+    assert "полный расчёт" in authenticated.text
+    assert "Один чек, продажа и складской учёт" in authenticated.text
     assert "Сверка каталога работает только на чтение" in authenticated.text
     assert "возврат — реальная денежная операция" in authenticated.text
     assert module.ADMIN_TOKEN not in authenticated.text

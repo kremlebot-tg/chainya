@@ -94,7 +94,7 @@ def test_live_checkout_accepts_exactly_one_ready_fiscal_provider(tmp_path, monke
     monkeypatch.setattr(module, "tbank_receipt_settings", TBankReceiptSettings(enabled=False))
     monkeypatch.setattr(module, "saby_fiscal_settings", SabyFiscalSettings(
         company_id="274", kkt_reg_number="0001234567890123",
-        tax_system=2, pay_method=1,
+        tax_system=2, pay_method=4,
     ))
     assert module.tbank_checkout_ready() is True
 
@@ -1310,7 +1310,7 @@ def configure_saby_fiscal_flow(module, monkeypatch):
     monkeypatch.setattr(module, "tbank_receipt_settings", TBankReceiptSettings(enabled=False))
     monkeypatch.setattr(module, "saby_fiscal_settings", SabyFiscalSettings(
         company_id="274", kkt_reg_number="0001234567890123",
-        tax_system=2, pay_method=1,
+        tax_system=2, pay_method=4,
     ))
     monkeypatch.setattr(
         module.saby_client, "fiscal_receipt",
@@ -1389,6 +1389,97 @@ def test_fiscal_transport_error_is_ambiguous_and_never_blindly_retried(tmp_path,
     assert current["saby_receipt_state"] == "ambiguous"
 
 
+def test_owner_can_retry_ambiguous_sale_only_after_confirmed_absence(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    configure_saby_fiscal_flow(module, monkeypatch)
+    attempts = []
+
+    def send(data):
+        attempts.append(data)
+        if len(attempts) == 1:
+            raise module.SabyError("Saby вернул HTTP 500")
+        return {"id": "safe-receipt-after-manual-check"}
+
+    monkeypatch.setattr(module.saby_client, "create_fiscal_sale", send)
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        expose_live_saby_writer(module, monkeypatch)
+        mark_order_paid_and_enqueue(module, order["id"])
+        module.process_paid_order_effects(order["id"])
+        auth = {"Authorization": f"Bearer {module.ADMIN_TOKEN}"}
+        refused = client.post(
+            f"/api/admin/orders/{order['id']}/saby/retry-sale", headers=auth
+        )
+        assert refused.status_code == 409
+        retried = client.post(
+            f"/api/admin/orders/{order['id']}/saby/retry-sale",
+            headers={**auth, "X-Chainya-Saby-Receipt-Absence": "confirmed"},
+        )
+        assert retried.status_code == 200
+
+    assert len(attempts) == 2
+    assert module.order_row(order["id"])["saby_receipt_state"] == "registered"
+
+
+def test_owner_cannot_retry_registered_or_unpaid_saby_receipt(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    configure_saby_fiscal_flow(module, monkeypatch)
+    auth = {
+        "Authorization": f"Bearer {module.ADMIN_TOKEN}",
+        "X-Chainya-Saby-Receipt-Absence": "confirmed",
+    }
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        expose_live_saby_writer(module, monkeypatch)
+        assert client.post(
+            f"/api/admin/orders/{order['id']}/saby/retry-sale", headers=auth
+        ).status_code == 409
+        mark_order_paid_and_enqueue(module, order["id"])
+        with module.db() as con:
+            con.execute(
+                "UPDATE orders SET saby_receipt_state='registered', saby_receipt_id='existing' WHERE id=?",
+                (order["id"],),
+            )
+        assert client.post(
+            f"/api/admin/orders/{order['id']}/saby/retry-sale", headers=auth
+        ).status_code == 409
+
+
+def test_owner_cannot_repeat_saby_receipt_more_than_once(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    configure_saby_fiscal_flow(module, monkeypatch)
+
+    def fail(_data):
+        raise module.SabyError("Saby вернул HTTP 500")
+
+    monkeypatch.setattr(module.saby_client, "create_fiscal_sale", fail)
+    auth = {
+        "Authorization": f"Bearer {module.ADMIN_TOKEN}",
+        "X-Chainya-Saby-Receipt-Absence": "confirmed",
+    }
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        expose_live_saby_writer(module, monkeypatch)
+        mark_order_paid_and_enqueue(module, order["id"])
+        module.process_paid_order_effects(order["id"])
+        first_retry = client.post(
+            f"/api/admin/orders/{order['id']}/saby/retry-sale", headers=auth
+        )
+        assert first_retry.status_code == 502
+        second_retry = client.post(
+            f"/api/admin/orders/{order['id']}/saby/retry-sale", headers=auth
+        )
+        assert second_retry.status_code == 409
+        assert "повтор уже использован" in second_retry.json()["detail"]
+
+    with module.db() as con:
+        effect = con.execute(
+            "SELECT attempts FROM paid_order_effects WHERE order_id=? AND effect='saby'",
+            (order["id"],),
+        ).fetchone()
+    assert effect["attempts"] == 2
+
+
 def test_accepted_sale_waits_for_ofd_and_polls_without_second_sale(tmp_path, monkeypatch):
     client, module = app_client(tmp_path, monkeypatch)
     configure_saby_fiscal_flow(module, monkeypatch)
@@ -1442,7 +1533,7 @@ def test_confirmed_refund_creates_one_saby_return_after_original_receipt(tmp_pat
     assert current["saby_refund_state"] == "registered"
 
 
-def test_admin_settlement_requires_handover_and_is_idempotent(tmp_path, monkeypatch):
+def test_admin_settlement_is_rejected_for_one_stage_checkout(tmp_path, monkeypatch):
     client, module = app_client(tmp_path, monkeypatch)
     configure_saby_fiscal_flow(module, monkeypatch)
     sent = []
@@ -1467,32 +1558,24 @@ def test_admin_settlement_requires_handover_and_is_idempotent(tmp_path, monkeypa
             headers=auth,
             json={"status": "completed"},
         )
-        first = client.post(
-            f"/api/admin/orders/{order['id']}/saby/settle", headers=auth
-        )
-        second = client.post(
+        rejected = client.post(
             f"/api/admin/orders/{order['id']}/saby/settle", headers=auth
         )
 
-    assert first.status_code == 200
-    assert second.status_code == 200
-    assert [item["payMethod"] for item in sent] == ["1", "4"]
-    settlement = sent[1]
-    assert settlement["internetSum"] == "0.00"
-    assert settlement["prepaySum"] == str(order["total"]) + ".00"
-    assert module.order_row(order["id"])["saby_settlement_state"] == "registered"
+    assert rejected.status_code == 409
+    assert "Окончательный чек не нужен" in rejected.json()["detail"]
+    assert [item["payMethod"] for item in sent] == ["4"]
+    assert module.order_row(order["id"])["saby_settlement_state"] == "not_requested"
 
 
-def test_settlement_transport_error_is_ambiguous_without_retry(tmp_path, monkeypatch):
+def test_legacy_settlement_endpoint_never_calls_saby(tmp_path, monkeypatch):
     client, module = app_client(tmp_path, monkeypatch)
     configure_saby_fiscal_flow(module, monkeypatch)
     calls = []
 
     def register(data):
         calls.append(data)
-        if data["payMethod"] == "4":
-            raise module.SabyError("Saby временно недоступен")
-        return {"id": "safe-prepayment"}
+        return {"id": "safe-sale"}
 
     monkeypatch.setattr(module.saby_client, "create_fiscal_sale", register)
     with client:
@@ -1512,10 +1595,10 @@ def test_settlement_transport_error_is_ambiguous_without_retry(tmp_path, monkeyp
             f"/api/admin/orders/{order['id']}/saby/settle", headers=auth
         )
 
-    assert first.status_code == 502
+    assert first.status_code == 409
     assert second.status_code == 409
-    assert [item["payMethod"] for item in calls].count("4") == 1
-    assert module.order_row(order["id"])["saby_settlement_state"] == "ambiguous"
+    assert len(calls) == 1
+    assert module.order_row(order["id"])["saby_settlement_state"] == "not_requested"
 
 
 def test_saby_preflight_failure_is_retryable_without_creating_order(tmp_path, monkeypatch):

@@ -125,9 +125,9 @@ def test_owner_guides_are_searchable_private_help_without_dangerous_actions():
     assert '<meta name="robots" content="noindex,nofollow">' in ADMIN_GUIDES
     assert 'id="guide-search"' in ADMIN_GUIDES
     assert "СБИС: каталог и чеки покупок" in ADMIN_GUIDES
-    assert "Заказ отправлен/выдан · создать чек" in ADMIN_GUIDES
-    assert "Предоплата, выдача и складской учёт" in ADMIN_GUIDES
-    assert "Простая смена статуса не создаёт окончательный чек" in ADMIN_GUIDES
+    assert "Один чек интернет-заказа" in ADMIN_GUIDES
+    assert "Один чек, продажа и складской учёт" in ADMIN_GUIDES
+    assert "Отдельный чек при выдаче или отправке не нужен" in ADMIN_GUIDES
     assert "Сверка каталога работает только на чтение" in ADMIN_GUIDES
     assert "нельзя включать поверх онлайн-чека Т‑Банка" in ADMIN_GUIDES
     assert "Создание отправления — отдельная реальная запись" in ADMIN_GUIDES

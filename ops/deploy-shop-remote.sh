@@ -29,6 +29,7 @@ shop_unit=$(root_path /etc/systemd/system/chainya-shop.service)
 backup_unit=$(root_path /etc/systemd/system/chainya-backup.service)
 backup_timer_unit=$(root_path /etc/systemd/system/chainya-backup.timer)
 nginx_config=$(root_path /etc/nginx/sites-available/chainya.ru)
+integrations_env=$(root_path /etc/chainya-shop-integrations.env)
 run_dir=$(root_path /run/chainya-deploy.transaction)
 transaction=$stage/transaction
 meta=$transaction/meta.sh
@@ -200,6 +201,8 @@ write_meta() {
     printf 'backup_unit_changed=%q\n' "$backup_unit_changed"
     printf 'backup_timer_changed=%q\n' "$backup_timer_changed"
     printf 'nginx_changed=%q\n' "$nginx_changed"
+    printf 'integrations_env_had=%q\n' "$integrations_env_had"
+    printf 'integrations_env_changed=%q\n' "$integrations_env_changed"
   } > "$meta"
   chmod 0600 "$meta"
 }
@@ -284,10 +287,21 @@ stage_release() {
   backup_unit_had=$(snapshot_file "$backup_unit" chainya-backup.service)
   backup_timer_had=$(snapshot_file "$backup_timer_unit" chainya-backup.timer)
   nginx_had=$(snapshot_file "$nginx_config" nginx-chainya.ru)
+  integrations_env_had=0
+  if [ -z "$test_root" ]; then
+    integrations_env_had=$(snapshot_file "$integrations_env" chainya-shop-integrations.env)
+  fi
   shop_unit_changed=1; cmp -s "$stage/chainya-shop.service" "$shop_unit" && shop_unit_changed=0
   backup_unit_changed=1; cmp -s "$stage/chainya-backup.service" "$backup_unit" && backup_unit_changed=0
   backup_timer_changed=1; cmp -s "$stage/chainya-backup.timer" "$backup_timer_unit" && backup_timer_changed=0
   nginx_changed=1; cmp -s "$stage/nginx-chainya.ru" "$nginx_config" && nginx_changed=0
+  integrations_env_changed=0
+  if [ -z "$test_root" ]; then
+    test "$integrations_env_had" = 1
+    if ! grep -qx 'SABY_OFD_PAY_METHOD=4' "$integrations_env"; then
+      integrations_env_changed=1
+    fi
+  fi
 
   # Candidate validation is deliberately fail-closed and happens before the
   # installed Nginx file is touched.
@@ -334,6 +348,9 @@ rollback_core() {
   restore_file "$shop_unit" chainya-shop.service "$shop_unit_had"
   restore_file "$backup_unit" chainya-backup.service "$backup_unit_had"
   restore_file "$backup_timer_unit" chainya-backup.timer "$backup_timer_had"
+  if [ "$integrations_env_changed" = 1 ]; then
+    restore_file "$integrations_env" chainya-shop-integrations.env "$integrations_env_had"
+  fi
   if [ "$shop_unit_changed" = 1 ] || [ "$backup_unit_changed" = 1 ] || [ "$backup_timer_changed" = 1 ]; then
     daemon_reload
   fi
@@ -366,6 +383,7 @@ cutover_release() {
   same_as_snapshot "$backup_unit" chainya-backup.service "$backup_unit_had"
   same_as_snapshot "$backup_timer_unit" chainya-backup.timer "$backup_timer_had"
   same_as_snapshot "$nginx_config" nginx-chainya.ru "$nginx_had"
+  same_as_snapshot "$integrations_env" chainya-shop-integrations.env "$integrations_env_had"
 
   set_phase cutting
   trap 'code=$?; trap - ERR; echo "cutover failed; restoring previous Chainya release" >&2; set -e; rollback_core; exit "$code"' ERR
@@ -385,6 +403,30 @@ cutover_release() {
   if [ "$backup_unit_changed" = 1 ]; then install_candidate_file "$stage/chainya-backup.service" "$backup_unit" 0644; fi
   if [ "$backup_timer_changed" = 1 ]; then install_candidate_file "$stage/chainya-backup.timer" "$backup_timer_unit" 0644; fi
   if [ "$shop_unit_changed" = 1 ] || [ "$backup_unit_changed" = 1 ] || [ "$backup_timer_changed" = 1 ]; then daemon_reload; fi
+
+  if [ "$integrations_env_changed" = 1 ]; then
+    # Change only the non-secret receipt-method switch while Chainya is in
+    # maintenance and its backend is stopped.  The complete protected file is
+    # already in the transaction snapshot and is restored on rollback.
+    python3 - "$integrations_env" <<'PY'
+import os
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+lines = text.splitlines()
+matches = [index for index, line in enumerate(lines) if line.startswith("SABY_OFD_PAY_METHOD=")]
+if len(matches) != 1:
+    raise SystemExit("SABY_OFD_PAY_METHOD must occur exactly once")
+lines[matches[0]] = "SABY_OFD_PAY_METHOD=4"
+candidate = path.with_name(path.name + ".next")
+candidate.write_text("\n".join(lines) + "\n", encoding="utf-8")
+os.chmod(candidate, path.stat().st_mode & 0o777)
+os.replace(candidate, path)
+PY
+    grep -qx 'SABY_OFD_PAY_METHOD=4' "$integrations_env"
+  fi
 
   if [ "$nginx_changed" = 1 ]; then
     nginx_test

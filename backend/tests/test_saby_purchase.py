@@ -13,7 +13,7 @@ def fiscal_settings(**changes):
         "company_id": "274",
         "kkt_reg_number": "0001234567890123",
         "tax_system": 2,
-        "pay_method": 1,
+        "pay_method": 4,
     }
     values.update(changes)
     return SabyFiscalSettings(**values)
@@ -83,12 +83,12 @@ def test_fiscal_sale_converts_grams_to_kg_and_keeps_checkout_total():
     assert payload["internetSum"] == "350.00"
     assert payload["vatNone"] == "350.00"
     assert payload["taxSystem"] == "2"
-    assert payload["payMethod"] == "1"
+    assert payload["payMethod"] == "4"
     assert line["measureNomenclature"] == "кг"
     assert line["quantityNomenclature"] == "0.02"
     assert line["priceNomenclature"] == "17500.00"
     assert line["totalPriceNomenclature"] == "350.00"
-    assert payload["externalId"] == "chainya-7e41d55a13e7-prepayment"
+    assert payload["externalId"] == "chainya-7e41d55a13e7-sale"
 
 
 def test_fiscal_sale_supports_piece_item_delivery_and_full_return():
@@ -108,14 +108,9 @@ def test_fiscal_sale_supports_piece_item_delivery_and_full_return():
     assert refund["externalId"].endswith("-refund")
 
 
-def test_final_settlement_uses_prepayment_without_second_charge():
-    payload = build_fiscal_sale(
-        order(), settings=fiscal_settings(), settlement=True
-    )
-    assert payload["payMethod"] == "4"
-    assert payload["internetSum"] == "0.00"
-    assert payload["prepaySum"] == "350.00"
-    assert payload["externalId"] == "chainya-7e41d55a13e7-settlement"
+def test_one_stage_sale_rejects_a_second_settlement_receipt():
+    with pytest.raises(SabyPurchaseError, match="полный расчёт уже создаётся"):
+        build_fiscal_sale(order(), settings=fiscal_settings(), settlement=True)
 
 
 def test_fiscal_sale_rejects_invalid_phone_and_sum_mismatch():
@@ -144,7 +139,7 @@ def test_fiscal_settings_reuse_verified_sales_point_id():
     settings = SabyFiscalSettings.from_env({
         "SABY_POINT_ID": "274",
         "SABY_OFD_KKT_REG_NUMBER": "0001234567890123",
-        "SABY_OFD_PAY_METHOD": "1",
+        "SABY_OFD_PAY_METHOD": "4",
     })
     assert settings.company_id == "274"
     assert settings.configured is True
@@ -155,7 +150,7 @@ def test_explicit_fiscal_company_id_remains_compatible():
         "SABY_POINT_ID": "274",
         "SABY_OFD_COMPANY_ID": "275",
         "SABY_OFD_KKT_REG_NUMBER": "0001234567890123",
-        "SABY_OFD_PAY_METHOD": "1",
+        "SABY_OFD_PAY_METHOD": "4",
     })
     assert settings.company_id == "275"
 
@@ -169,11 +164,11 @@ def test_fiscal_route_never_assumes_payment_method():
     assert "SABY_OFD_PAY_METHOD" in settings.missing
 
 
-def test_full_payment_setting_cannot_replace_required_prepayment_flow():
+def test_prepayment_setting_cannot_replace_required_full_payment_flow():
     settings = SabyFiscalSettings.from_env({
         "SABY_POINT_ID": "274",
         "SABY_OFD_KKT_REG_NUMBER": "0001234567890123",
-        "SABY_OFD_PAY_METHOD": "4",
+        "SABY_OFD_PAY_METHOD": "1",
     })
     assert settings.configured is False
     assert "SABY_OFD_PAY_METHOD" in settings.missing

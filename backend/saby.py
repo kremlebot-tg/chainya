@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 import time
 import urllib.error
@@ -102,7 +103,9 @@ class SabyClient:
             with self._opener(request, timeout=15) as response:
                 result = json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
-            raise SabyError(f"Saby вернул HTTP {exc.code}") from exc
+            detail = self._safe_http_error_detail(exc)
+            suffix = f": {detail}" if detail else ""
+            raise SabyError(f"Saby вернул HTTP {exc.code}{suffix}") from exc
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             raise SabyError("Saby временно недоступен") from exc
         except json.JSONDecodeError as exc:
@@ -114,6 +117,51 @@ class SabyClient:
             suffix = f" (код {code})" if code and code.replace("-", "").replace("_", "").isalnum() and len(code) <= 32 else ""
             raise SabyError(f"Saby отклонил запрос{suffix}")
         return result
+
+    def _safe_http_error_detail(self, exc: urllib.error.HTTPError) -> str:
+        """Extract a short vendor explanation without leaking sensitive data."""
+        try:
+            raw = exc.read(16_384).decode("utf-8", errors="replace")
+            payload = json.loads(raw)
+        except (AttributeError, OSError, UnicodeError, ValueError, json.JSONDecodeError):
+            return ""
+
+        candidates: list[str] = []
+        allowed = {"error", "message", "detail", "description", "errormessage", "reason"}
+
+        def collect(value: Any, depth: int = 0) -> None:
+            if depth > 4:
+                return
+            if isinstance(value, dict):
+                for key, nested in value.items():
+                    normalized = re.sub(r"[^a-z]", "", str(key).casefold())
+                    if normalized in allowed and isinstance(nested, str):
+                        candidates.append(nested)
+                    elif isinstance(nested, (dict, list)):
+                        collect(nested, depth + 1)
+            elif isinstance(value, list):
+                for nested in value[:10]:
+                    collect(nested, depth + 1)
+
+        collect(payload)
+        if not candidates:
+            return ""
+        message = " ".join(candidates)
+        for secret in (
+            self.settings.app_client_id,
+            self.settings.app_secret,
+            self.settings.secret_key,
+            self._token,
+        ):
+            if secret:
+                message = message.replace(secret, "[скрыто]")
+        message = re.sub(r"https?://\S+", "[ссылка скрыта]", message)
+        message = re.sub(r"[\w.+-]+@[\w.-]+\.[A-Za-zА-Яа-я]{2,}", "[email скрыт]", message)
+        message = re.sub(r"(?<!\d)(?:\+?7|8)[\d ()-]{9,18}\d", "[телефон скрыт]", message)
+        message = re.sub(r"\b[A-Za-z0-9_=-]{24,}\b", "[значение скрыто]", message)
+        message = re.sub(r"[\x00-\x1f\x7f]+", " ", message)
+        message = re.sub(r"\s+", " ", message).strip(" .:;,-")
+        return message[:360]
 
     def access_token(self, force: bool = False) -> str:
         if not self.settings.configured:

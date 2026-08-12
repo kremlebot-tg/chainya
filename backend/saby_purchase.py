@@ -70,9 +70,10 @@ class SabyFiscalSettings:
             missing.append("SABY_OFD_KKT_REG_NUMBER")
         if self.tax_system not in {1, 2, 4, 16, 32}:
             missing.append("SABY_OFD_TAX_SYSTEM")
-        # Chainya uses the two-receipt flow: 100% prepayment online, then a
-        # final settlement receipt when the goods are handed over.
-        if self.pay_method != 1:
+        # Chainya uses one-stage card/SBP acquisition.  Saby registers the
+        # paid purchase as full settlement and writes stock off after shift
+        # closure; a second handover receipt is neither needed nor allowed.
+        if self.pay_method != 4:
             missing.append("SABY_OFD_PAY_METHOD")
         return tuple(missing)
 
@@ -241,7 +242,7 @@ def build_fiscal_sale(
     order: Mapping[str, Any], *, settings: SabyFiscalSettings,
     refund: bool = False, settlement: bool = False,
 ) -> dict[str, object]:
-    """Build a prepayment, final-settlement, or full-return Saby receipt."""
+    """Build a one-stage full-settlement sale or its full return."""
 
     if not settings.configured:
         raise SabyPurchaseError("Параметры ККТ Saby настроены не полностью")
@@ -260,12 +261,14 @@ def build_fiscal_sale(
         raise SabyPurchaseError("Сумма позиций не совпадает с итогом заказа")
     phone = _phone(customer.get("phone"))
     zero = "0.00"
-    if refund and settlement:
-        raise SabyPurchaseError("Одновременный возврат и окончательный расчёт недопустимы")
-    pay_method = 4 if settlement else settings.pay_method
-    internet_sum = zero if settlement else _decimal_text(total)
-    prepay_sum = _decimal_text(total) if settlement else zero
-    operation_suffix = "refund" if refund else "settlement" if settlement else "prepayment"
+    if settlement:
+        raise SabyPurchaseError(
+            "При одностадийной оплате полный расчёт уже создаётся после оплаты"
+        )
+    pay_method = settings.pay_method
+    internet_sum = _decimal_text(total)
+    prepay_sum = zero
+    operation_suffix = "refund" if refund else "sale"
     return {
         "companyID": settings.company_id,
         "kktRegNumber": int(settings.kkt_reg_number),
@@ -298,9 +301,8 @@ def build_fiscal_sale(
         "propName": "Номер заказа интернет-магазина",
         "propVa": order_id,
         "comment": (
-            f"Возврат предоплаты заказа сайта №{order_id}" if refund
-            else f"Полный расчёт заказа сайта №{order_id}" if settlement
-            else f"Предоплата заказа сайта №{order_id}"
+            f"Возврат полного расчёта заказа сайта №{order_id}" if refund
+            else f"Полный расчёт заказа сайта №{order_id}"
         ),
         "payMethod": str(pay_method),
         "externalId": f"chainya-{order_id.lower()}-{operation_suffix}",

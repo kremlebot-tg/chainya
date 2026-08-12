@@ -1,4 +1,6 @@
+import io
 import json
+import urllib.error
 from urllib.parse import parse_qs, urlparse
 
 import pytest
@@ -171,6 +173,37 @@ def test_saby_settings_repr_and_vendor_errors_never_expose_secrets():
         client.access_token()
     assert str(captured.value) == "Saby отклонил запрос (код AUTH_7)"
     assert "private" not in str(captured.value)
+
+
+def test_saby_http_error_exposes_only_sanitized_vendor_explanation():
+    secret_settings = settings(
+        app_client_id="private-client", app_secret="private-app-secret",
+        secret_key="private-service-secret",
+    )
+    body = json.dumps({
+        "error": {
+            "message": (
+                "ККТ недоступна; private-service-secret; +7 999 123-45-67; "
+                "owner@example.test"
+            )
+        }
+    }).encode()
+
+    def opener(request, timeout):
+        if request.full_url.endswith("/oauth/service/"):
+            return Response({"token": "access-token-value"})
+        raise urllib.error.HTTPError(
+            request.full_url, 500, "Internal Server Error", {}, io.BytesIO(body)
+        )
+
+    client = SabyClient(secret_settings, opener=opener)
+    with pytest.raises(SabyError) as captured:
+        client.create_fiscal_sale({"externalId": "safe-order"})
+    message = str(captured.value)
+    assert message.startswith("Saby вернул HTTP 500: ККТ недоступна")
+    assert "private-service-secret" not in message
+    assert "+7 999 123-45-67" not in message
+    assert "owner@example.test" not in message
 
 
 def test_saby_delivery_order_keeps_payload_and_uses_create_endpoint():

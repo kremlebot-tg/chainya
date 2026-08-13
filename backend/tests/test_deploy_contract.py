@@ -215,6 +215,17 @@ def test_origin_upload_retries_before_any_cutover() -> None:
     assert retry < stage < maintenance < cutover
 
 
+def test_remote_transaction_survives_transient_ssh_disconnect() -> None:
+    deploy = (ROOT / "deploy-shop.sh").read_text(encoding="utf-8")
+    assert "ServerAliveInterval=15" in deploy
+    assert "ServerAliveCountMax=12" in deploy
+    assert "nohup bash -c" in deploy
+    assert 'lock="${stage}.operation-${operation}"' in deploy
+    assert 'printf "%s\\n" "$result" >"$lock/status.next"' in deploy
+    assert 'mv -f -- "$lock/status.next" "$lock/status"' in deploy
+    assert ".operation-${operation}/output.log" in deploy
+
+
 def test_successful_cutover_and_commit(tmp_path: Path) -> None:
     root, stage = make_candidate(tmp_path)
     assert invoke(root, stage, "stage").returncode == 0

@@ -34,8 +34,66 @@ TMP="$(mktemp -d)"
 
 remote_transaction() {
   local operation=$1
-  ssh "$HOST" \
-    "sudo env CHAINYA_STAGE='$REMOTE_STAGE' bash '$REMOTE_STAGE/deploy-shop-remote.sh' '$operation'"
+  local attempt status
+
+  # Stage includes dependency installation and a complete backend test run.  It
+  # must keep running on the origin if the controlling SSH connection briefly
+  # drops; otherwise the local rollback can race the still-running remote
+  # process while both touch the same temporary directory.
+  for attempt in 1 2 3; do
+    if ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=12 "$HOST" \
+      "bash -se" -- "$REMOTE_STAGE" "$operation" <<'REMOTE'
+set -Eeuo pipefail
+stage=$1
+operation=$2
+case "$stage" in (/tmp/chainya-shop-*) ;; (*) exit 64 ;; esac
+case "$operation" in (stage|cutover|rollback|commit) ;; (*) exit 64 ;; esac
+lock="${stage}.operation-${operation}"
+if mkdir "$lock" 2>/dev/null; then
+  nohup bash -c '
+    stage=$1
+    operation=$2
+    lock=$3
+    result=0
+    sudo env CHAINYA_STAGE="$stage" \
+      bash "$stage/deploy-shop-remote.sh" "$operation" \
+      >"$lock/output.log" 2>&1 || result=$?
+    printf "%s\n" "$result" >"$lock/status.next"
+    mv -f -- "$lock/status.next" "$lock/status"
+  ' chainya-remote-operation "$stage" "$operation" "$lock" \
+    </dev/null >/dev/null 2>&1 &
+fi
+test -d "$lock"
+REMOTE
+    then
+      break
+    fi
+    if [ "$attempt" = 3 ]; then
+      echo "не удалось запустить remote operation: $operation" >&2
+      return 255
+    fi
+    echo "повтор запуска remote operation $operation: попытка $((attempt + 1)) из 3" >&2
+    sleep 2
+  done
+
+  for attempt in {1..900}; do
+    status=$(ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=12 "$HOST" \
+      "test -s '${REMOTE_STAGE}.operation-${operation}/status' && cat '${REMOTE_STAGE}.operation-${operation}/status'" \
+      2>/dev/null || true)
+    if [[ "$status" =~ ^[0-9]+$ ]]; then
+      ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=12 "$HOST" \
+        "cat '${REMOTE_STAGE}.operation-${operation}/output.log'" || true
+      ssh "$HOST" "rm -rf -- '${REMOTE_STAGE}.operation-${operation}'" || true
+      return "$status"
+    fi
+    if (( attempt % 15 == 0 )); then
+      echo "remote operation $operation всё ещё выполняется…" >&2
+    fi
+    sleep 2
+  done
+
+  echo "remote operation $operation не завершилась за 30 минут; временные файлы не удаляются" >&2
+  return 124
 }
 
 restore_edge_release() {

@@ -55,6 +55,12 @@ def main() -> None:
         "for upload_attempt in 1 2 3" in deploy and "rsync -az --partial" in deploy,
         "origin staging upload must retry transient SSH failures",
     )
+    require(
+        "nohup bash -c" in deploy
+        and ".operation-${operation}/status" in deploy
+        and "ServerAliveInterval=15" in deploy,
+        "remote operations must survive transient controlling SSH failures",
+    )
     require("systemctl reload nginx" in remote, "graceful Nginx reload is missing")
     require("nginx_test" in remote, "nginx -t wrapper is missing")
     require("if [ \"$nginx_changed\" = 1 ]" in remote, "Nginx diff gate is missing")

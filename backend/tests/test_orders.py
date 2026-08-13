@@ -1470,6 +1470,31 @@ def test_fiscal_transport_error_is_ambiguous_and_never_blindly_retried(tmp_path,
     assert current["saby_receipt_state"] == "ambiguous"
 
 
+def test_fiscal_http_401_after_post_is_ambiguous_and_never_retried(
+    tmp_path, monkeypatch
+):
+    client, module = app_client(tmp_path, monkeypatch)
+    configure_saby_fiscal_flow(module, monkeypatch)
+    attempts = []
+
+    def unauthorized_after_post(data):
+        attempts.append(data)
+        raise module.SabyError("Saby вернул HTTP 401")
+
+    monkeypatch.setattr(
+        module.saby_client, "create_fiscal_sale", unauthorized_after_post
+    )
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        expose_live_saby_writer(module, monkeypatch)
+        mark_order_paid_and_enqueue(module, order["id"])
+        module.process_paid_order_effects(order["id"])
+        module.process_paid_order_effects(order["id"])
+
+    assert len(attempts) == 1
+    assert module.order_row(order["id"])["saby_receipt_state"] == "ambiguous"
+
+
 def test_fiscal_oauth_error_is_retryable_without_marking_sale_ambiguous(
     tmp_path, monkeypatch
 ):

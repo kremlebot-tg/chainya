@@ -330,7 +330,12 @@ class SabyClient:
                 transform=transform,
             )
         except SabyError as exc:
-            if "HTTP 401" not in str(exc):
+            # A write may already have reached Saby before its 401 response.
+            # Retrying it with a refreshed token could create a duplicate sale,
+            # receipt, order or refund.  Automatic re-authentication is safe
+            # only for read-only requests; callers classify a failed write as
+            # ambiguous and require reconciliation instead.
+            if method.upper() != "GET" or "HTTP 401" not in str(exc):
                 raise
             headers["X-SBISAccessToken"] = self.access_token(force=True)
             return self._json_request(

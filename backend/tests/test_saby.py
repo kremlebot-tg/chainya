@@ -185,6 +185,48 @@ def test_missing_service_token_is_a_prewrite_authentication_failure():
         client.access_token()
 
 
+def test_read_only_request_refreshes_token_once_after_http_401():
+    calls = []
+    tokens = iter(("stale-token", "fresh-token"))
+
+    def opener(request, timeout):
+        calls.append(request)
+        if request.full_url.endswith("/oauth/service/"):
+            return Response({"token": next(tokens)})
+        if request.headers["X-sbisaccesstoken"] == "stale-token":
+            raise urllib.error.HTTPError(
+                request.full_url, 401, "Unauthorized", {}, io.BytesIO(b"{}")
+            )
+        return Response({"salesPoints": [{"id": 10}]})
+
+    client = SabyClient(settings(), opener=opener)
+    assert client.sales_points()["salesPoints"] == [{"id": 10}]
+    assert [request.method for request in calls] == ["POST", "GET", "POST", "GET"]
+
+
+def test_fiscal_post_is_never_retried_after_http_401():
+    calls = []
+
+    def opener(request, timeout):
+        calls.append(request)
+        if request.full_url.endswith("/oauth/service/"):
+            return Response({"token": "stale-token"})
+        raise urllib.error.HTTPError(
+            request.full_url, 401, "Unauthorized", {}, io.BytesIO(b"{}")
+        )
+
+    client = SabyClient(settings(), opener=opener)
+    with pytest.raises(SabyError, match="HTTP 401"):
+        client.create_fiscal_sale({"externalId": "safe-order"})
+
+    retail_calls = [
+        request for request in calls
+        if request.full_url.endswith("/retail/sale/create")
+    ]
+    assert len(retail_calls) == 1
+    assert len(calls) == 2
+
+
 def test_saby_http_error_exposes_only_sanitized_vendor_explanation():
     secret_settings = settings(
         app_client_id="private-client", app_secret="private-app-secret",

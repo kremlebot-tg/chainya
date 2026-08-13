@@ -595,7 +595,7 @@ def test_saby_preview_rejects_unpaid_order_and_past_ready_time(tmp_path, monkeyp
     assert "payload" not in unpaid["saby"]
 
 
-def test_admin_saby_test_reports_catalog_and_delivery_blocker(tmp_path, monkeypatch):
+def test_admin_saby_test_does_not_require_delivery_for_cdek_flow(tmp_path, monkeypatch):
     client, module = app_client(tmp_path, monkeypatch)
     auth = {"Authorization": "Bearer test-admin-token"}
     action = {**auth, "X-Chainya-Admin": "saby-readiness"}
@@ -621,7 +621,7 @@ def test_admin_saby_test_reports_catalog_and_delivery_blocker(tmp_path, monkeypa
     assert response.status_code == 200
     assert response.headers["cache-control"] == "no-store"
     result = response.json()
-    assert result["state"] == "blocked"
+    assert result["state"] == "ready"
     assert result["connected"] is True
     assert result["point_found"] is True
     assert result["price_list_found"] is True
@@ -632,9 +632,9 @@ def test_admin_saby_test_reports_catalog_and_delivery_blocker(tmp_path, monkeypa
     assert result["zero_balance_items"] == []
     assert result["warnings"] == ["В Saby есть скрытые на сайте позиции: 1"]
     assert result["delivery_configured"] is False
-    assert result["delivery_confirmation"] == ""
-    assert result["ready_for_orders"] is False
-    assert result["blockers"] == ["Точка «Чайня» ещё не включена для продукта delivery"]
+    assert result["delivery_confirmation"] == "not_required_cdek"
+    assert result["ready_for_orders"] is True
+    assert result["blockers"] == []
 
 
 def test_saby_readiness_rejects_unknown_balance_and_external_id_mismatch(tmp_path, monkeypatch):
@@ -741,7 +741,7 @@ def matching_saby_catalog(module):
     ]
 
 
-def test_saby_readiness_accepts_delivery_point_list(tmp_path, monkeypatch):
+def test_saby_readiness_ignores_delivery_product_for_fiscal_sale(tmp_path, monkeypatch):
     client, module = app_client(tmp_path, monkeypatch)
     auth = {"Authorization": "Bearer test-admin-token"}
     action = {**auth, "X-Chainya-Admin": "saby-readiness"}
@@ -764,14 +764,14 @@ def test_saby_readiness_accepts_delivery_point_list(tmp_path, monkeypatch):
         result = client.post("/api/admin/saby/test", headers=action).json()
 
     assert result["state"] == "ready"
-    assert result["delivery_configured"] is True
-    assert result["delivery_confirmation"] == "point_list"
+    assert result["delivery_configured"] is False
+    assert result["delivery_confirmation"] == "not_required_cdek"
     assert result["ready_for_orders"] is True
     assert result["blockers"] == []
     assert result["errors"] == {}
 
 
-def test_saby_readiness_reports_upstream_failure_as_unknown(tmp_path, monkeypatch):
+def test_saby_readiness_does_not_call_irrelevant_delivery_api(tmp_path, monkeypatch):
     client, module = app_client(tmp_path, monkeypatch)
     auth = {"Authorization": "Bearer test-admin-token"}
     action = {**auth, "X-Chainya-Admin": "saby-readiness"}
@@ -780,8 +780,7 @@ def test_saby_readiness_reports_upstream_failure_as_unknown(tmp_path, monkeypatc
     })
 
     def sales_points(product="retail"):
-        if product == "delivery":
-            raise module.SabyError("Saby временно недоступен")
+        assert product == "retail"
         return {"salesPoints": [{"id": 274, "name": "Чайня"}]}
 
     monkeypatch.setattr(module.saby_client, "sales_points", sales_points)
@@ -797,14 +796,14 @@ def test_saby_readiness_reports_upstream_failure_as_unknown(tmp_path, monkeypatc
     with client:
         result = client.post("/api/admin/saby/test", headers=action).json()
 
-    assert result["state"] == "unknown"
+    assert result["state"] == "ready"
     assert result["delivery_configured"] is False
-    assert result["ready_for_orders"] is False
+    assert result["ready_for_orders"] is True
     assert result["blockers"] == []
-    assert result["errors"] == {"delivery": "Saby временно недоступен"}
+    assert result["errors"] == {}
 
 
-def test_saby_readiness_never_treats_calendar_as_delivery_registration(tmp_path, monkeypatch):
+def test_saby_readiness_never_calls_delivery_calendar(tmp_path, monkeypatch):
     client, module = app_client(tmp_path, monkeypatch)
     auth = {"Authorization": "Bearer test-admin-token"}
     action = {**auth, "X-Chainya-Admin": "saby-readiness"}
@@ -832,11 +831,11 @@ def test_saby_readiness_never_treats_calendar_as_delivery_registration(tmp_path,
     with client:
         result = client.post("/api/admin/saby/test", headers=action).json()
 
-    assert result["state"] == "blocked"
+    assert result["state"] == "ready"
     assert result["delivery_configured"] is False
-    assert result["delivery_confirmation"] == ""
-    assert result["ready_for_orders"] is False
-    assert result["blockers"] == ["Точка «Чайня» ещё не включена для продукта delivery"]
+    assert result["delivery_confirmation"] == "not_required_cdek"
+    assert result["ready_for_orders"] is True
+    assert result["blockers"] == []
 
 
 def test_admin_saby_shadow_is_read_only_persistent_and_protected(tmp_path, monkeypatch):
@@ -1391,7 +1390,7 @@ def test_fiscal_transport_error_is_ambiguous_and_never_blindly_retried(tmp_path,
     assert current["saby_receipt_state"] == "ambiguous"
 
 
-def test_fiscal_sale_blocks_before_post_when_saby_name_differs(tmp_path, monkeypatch):
+def test_fiscal_sale_uses_canonical_saby_name_when_public_name_differs(tmp_path, monkeypatch):
     client, module = app_client(tmp_path, monkeypatch)
     configure_saby_fiscal_flow(module, monkeypatch)
     catalog = matching_saby_catalog(module)
@@ -1412,10 +1411,10 @@ def test_fiscal_sale_blocks_before_post_when_saby_name_differs(tmp_path, monkeyp
         mark_order_paid_and_enqueue(module, order["id"])
         module.process_paid_order_effects(order["id"])
 
-    assert sent == []
+    assert len(sent) == 1
+    assert sent[0]["nomenclatures"][0]["nameNomenclature"] == "Несовпадающее название"
     current = module.order_row(order["id"])
-    assert current["saby_receipt_state"] == "failed"
-    assert "Название товара не совпадает" in current["saby_receipt_last_error"]
+    assert current["saby_receipt_state"] == "registered"
 
 
 def test_paid_delivery_blocks_before_post_without_unique_saby_service(

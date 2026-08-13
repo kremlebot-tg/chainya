@@ -99,8 +99,8 @@ from .saby_sync import (
 )
 from .stock_guard import (
     StockGuardError,
+    canonicalize_line_names,
     requirements_for_lines,
-    verify_line_names,
     verify_unique_catalog_name,
 )
 from .tbank import (
@@ -2118,7 +2118,7 @@ def sync_paid_order_to_saby_fiscal(
     try:
         order = admin_order(order_row(order_id))
         base_catalog = saby_client.base_catalog_all(with_balance=False)
-        verify_line_names(order["items"], base_catalog)
+        order["items"] = canonicalize_line_names(order["items"], base_catalog)
         if int(order.get("delivery_price") or 0) > 0:
             verify_unique_catalog_name("Доставка", base_catalog)
     except (SabyError, StockGuardError) as exc:
@@ -4583,10 +4583,6 @@ def saby_readiness_report() -> dict:
     points = rows(retail_result, "salesPoints")
 
     try:
-        delivery_points = rows(saby_client.sales_points("delivery"), "salesPoints")
-    except SabyError as exc:
-        delivery_points, errors["delivery"] = [], str(exc)
-    try:
         price_lists = rows(saby_client.price_lists(), "priceLists") if point_id else []
     except SabyError as exc:
         price_lists, errors["price_list"] = [], str(exc)
@@ -4596,8 +4592,6 @@ def saby_readiness_report() -> dict:
         catalog, errors["catalog"] = [], str(exc)
 
     point_found = any(str(point.get("id")) == str(point_id) for point in points)
-    delivery_found = any(str(point.get("id")) == str(point_id) for point in delivery_points)
-    delivery_confirmation = "point_list" if delivery_found else ""
     price_list_found = any(str(item.get("id")) == str(price_list_id) for item in price_lists)
     products = [item for item in catalog if not item.get("isParent")]
     priced_products = [item for item in products if item.get("cost") is not None]
@@ -4677,14 +4671,8 @@ def saby_readiness_report() -> dict:
         blockers.append("Выбранный прайс-лист не найден в Saby")
     if "catalog" not in errors and not products:
         blockers.append("В прайс-листе нет товаров")
-    if "delivery" not in errors and not delivery_found:
-        blockers.append("Точка «Чайня» ещё не включена для продукта delivery")
     if products and not catalog_mapping_valid:
         blockers.append("Каталог сайта не совпадает с externalId номенклатуры Saby")
-    if name_mismatch_products:
-        count = len(name_mismatch_products)
-        label = "позиции" if count == 1 else "позиций"
-        blockers.append(f"Названия сайта и Saby различаются у {count} {label}")
     if zero_balance_products:
         count = len(zero_balance_products)
         label = "активной позиции" if count == 1 else "активных позиций"
@@ -4713,6 +4701,7 @@ def saby_readiness_report() -> dict:
         "in_stock_items": len(in_stock_products),
         "catalog_mapping_valid": catalog_mapping_valid,
         "catalog_names_valid": not name_mismatch_products,
+        "fiscal_names_canonicalized": True,
         "name_mismatch_items": name_mismatch_products[:20],
         "missing_external_ids": missing_external_ids,
         "unexpected_external_ids": unexpected_external_ids,
@@ -4724,8 +4713,8 @@ def saby_readiness_report() -> dict:
             {"id": item.get("id"), "name": product_display_name(item)}
             for item in unknown_balance_products[:20]
         ],
-        "delivery_configured": delivery_found,
-        "delivery_confirmation": delivery_confirmation,
+        "delivery_configured": False,
+        "delivery_confirmation": "not_required_cdek",
         "ready_for_orders": state == "ready",
         "blockers": blockers,
         "warnings": (
@@ -4735,6 +4724,8 @@ def saby_readiness_report() -> dict:
                if unknown_balance_products else [])
             + ([f"В Saby есть скрытые на сайте позиции: {len(unexpected_external_ids)}"]
                if unexpected_external_ids else [])
+            + ([f"Для чека используются названия Saby: {len(name_mismatch_products)}"]
+               if name_mismatch_products else [])
         ),
         "errors": errors,
     }

@@ -5,7 +5,7 @@ import pytest
 from backend.stock_guard import (
     StockGuardError,
     requirements_for_lines,
-    verify_line_names,
+    canonicalize_line_names,
     verify_unique_catalog_name,
 )
 
@@ -65,27 +65,27 @@ def test_duplicate_external_id_fails_closed():
         )
 
 
-def test_name_mismatch_fails_closed_before_checkout():
-    with pytest.raises(StockGuardError, match="Название товара не совпадает"):
-        requirements_for_lines(
-            [line(name="Чай сайта")],
-            [{
-                "externalId": "ext", "name": "Чай кассы",
-                "unit": "г", "balance": 50,
-            }],
-        )
+def test_public_name_mismatch_does_not_block_stock_check():
+    result = requirements_for_lines(
+        [line(name="Чай сайта")],
+        [{
+            "externalId": "ext", "name": "Чай кассы",
+            "unit": "г", "balance": 50,
+        }],
+    )
+    assert result[0].available == 50
 
 
-def test_name_preflight_does_not_require_balance_but_requires_exact_name():
+def test_fiscal_preflight_uses_canonical_saby_name_without_requiring_balance():
     lines = [line()]
 
-    verify_line_names(lines, [{
+    result = canonicalize_line_names(lines, [{
         "externalId": "ext", "name": "Чай", "unit": "г",
     }])
-    with pytest.raises(StockGuardError, match="Название товара не совпадает"):
-        verify_line_names(lines, [{
-            "externalId": "ext", "name": "Другой чай", "unit": "г",
-        }])
+    assert result[0]["name"] == "Чай"
+    assert canonicalize_line_names(lines, [{
+        "externalId": "ext", "name": "Другой чай", "unit": "г",
+    }])[0]["name"] == "Другой чай"
 
 
 def test_generated_fiscal_line_requires_one_exact_catalog_name():

@@ -53,18 +53,20 @@ def _catalog_by_external_id(
     return by_external
 
 
-def verify_line_names(
+def canonicalize_line_names(
     lines: Sequence[Mapping[str, Any]],
     base_catalog: Sequence[Mapping[str, Any]],
-) -> None:
-    """Require exact Saby names for every mapped checkout line.
+) -> list[dict[str, Any]]:
+    """Return checkout lines with canonical Saby names.
 
     Saby creates a new nomenclature item when an external sale contains a
-    different name. This preflight is mandatory even when the optional
-    balance guard is disabled.
+    different name.  Public product wording may legitimately differ, so the
+    already verified ``externalId`` is used to select the existing Saby item
+    and only the outbound fiscal copy is renamed.
     """
 
     by_external = _catalog_by_external_id(base_catalog)
+    canonical: list[dict[str, Any]] = []
     for line in lines:
         site_id = str(line.get("id") or "").strip()
         name = str(line.get("name") or site_id or "Товар")
@@ -77,8 +79,11 @@ def verify_line_names(
         item = by_external.get(external_id)
         if not site_id or not external_id or item is None:
             raise StockGuardError(f"Не удалось проверить товар в Saby: {name}")
-        if name != str(item.get("name") or "").strip():
-            raise StockGuardError(f"Название товара не совпадает с Saby: {name}")
+        saby_name = str(item.get("name") or "").strip()
+        if not saby_name:
+            raise StockGuardError(f"Saby не вернул название товара: {name}")
+        canonical.append({**line, "name": saby_name})
+    return canonical
 
 
 def verify_unique_catalog_name(
@@ -126,9 +131,6 @@ def requirements_for_lines(
         item = by_external.get(external_id)
         if not site_id or not external_id or item is None:
             raise StockGuardError(f"Не удалось проверить остаток: {name}")
-        saby_name = str(item.get("name") or "").strip()
-        if name != saby_name:
-            raise StockGuardError(f"Название товара не совпадает с Saby: {name}")
         balance = _decimal(item.get("balance"))
         if balance is None or balance < 0:
             raise StockGuardError(f"Saby не подтвердил остаток: {name}")
@@ -167,5 +169,5 @@ def requirements_for_lines(
 
 __all__ = [
     "StockGuardError", "StockRequirement", "requirements_for_lines",
-    "verify_line_names", "verify_unique_catalog_name",
+    "canonicalize_line_names", "verify_unique_catalog_name",
 ]

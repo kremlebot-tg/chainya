@@ -161,7 +161,7 @@ function renderSystems(s){
   else if(sabyReadinessError){sabyRetail=['Не удалось проверить','off'];sabyDelivery=['Не удалось проверить','off'];sabyOrders=['Готовность неизвестна','off']}
   else if(sabyReadiness){
     if(sabyReadiness.errors?.retail)sabyRetail=['Не удалось проверить','off'];else sabyRetail=sabyReadiness.point_found?['Точка подключена','ok']:['Точка не подключена','off'];
-    if(sabyReadiness.errors?.delivery)sabyDelivery=['Не удалось проверить','off'];else sabyDelivery=sabyReadiness.delivery_configured?['Подключён','ok']:['Не подключён','off'];
+    sabyDelivery=sabyReadiness.delivery_confirmation==='not_required_cdek'?['Не используется · доставляет СДЭК','ok']:sabyReadiness.delivery_configured?['Подключён','ok']:['Не требуется для чеков','ok'];
     if(s.saby_order_mode==='off')sabyOrders=['Отправка выключена','warn'];else if(s.saby_order_mode==='auto')sabyOrders=sabyReadiness.state==='ready'?['Автоматически после оплаты','ok']:sabyReadiness.state==='blocked'?['Заблокированы до настройки','off']:['Проверка не завершена','off'];else sabyOrders=[`Режим ${s.saby_order_mode}`,'warn'];
   }else if(s.saby_order_mode==='off')sabyOrders=['Отправка выключена','warn'];
   if(purchase.route==='fiscal_sale'&&purchase.writes_enabled)sabyOrders=['Чек и списание после оплаты','ok'];

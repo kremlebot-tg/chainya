@@ -246,11 +246,11 @@ server {
 
     # Индексируемые карточки товаров и sitemap строятся из живого каталога.
     # Поэтому изменения владельца в админ-панели видны поисковику без релиза.
-    location ~ ^/tea/([a-z0-9][a-z0-9-]{0,79})/$ {
+    location ~ "^/tea/([a-z0-9][a-z0-9-]{0,79})/$" {
         return 308 /tea/$1;
     }
 
-    location ~ ^/tea/[a-z0-9][a-z0-9-]{0,79}$ {
+    location ~ "^/tea/[a-z0-9][a-z0-9-]{0,79}$" {
         proxy_pass http://127.0.0.1:8077;
         proxy_http_version 1.1;
         proxy_set_header Host $host;

@@ -491,6 +491,7 @@ h1, h2, h3, p{ text-wrap:pretty; }
 .cart-co__h{ font-family:'Prata',Georgia,serif; font-weight:400; font-size:1.15rem; margin:0 0 14px; }
 .cart-note{ margin:10px 0 0; font-size:11.5px; color:var(--text-3); line-height:1.5; text-align:center; }
 .cart-note--error{ color:#c66f62; }
+.cart-receipt-note{ margin:12px 0 0; font-size:12px; color:var(--text-2); line-height:1.45; text-align:left; }
 .input[aria-invalid="true"]{ border-color:#b9574b; box-shadow:0 0 0 1px #b9574b; }
 .consent{display:flex;align-items:flex-start;gap:10px;margin:14px 0;color:var(--text-3);font-size:13px;line-height:1.45}.consent input{width:24px;height:24px;margin:0;flex:none;accent-color:var(--accent)}.consent a{color:var(--text-2);border-bottom:1px solid var(--line)}
 .delivery-combobox{ position:relative; }
@@ -1523,6 +1524,7 @@ select.input{
   <div class="sheet__foot">
     <div class="sheet__sum"><span data-i18n="cart_total">Итого</span><b class="num" id="cart-total">—</b></div>
     <p class="cart-note" id="cart-status" aria-live="polite"></p>
+    <p class="cart-receipt-note" data-i18n="payment_receipt_notice">При полной предоплате кассовый чек полного расчёта формируется в момент оплаты. Отдельный чек при выдаче или отправке заказа не формируется.</p>
     <button class="btn btn--solid btn--wide" id="cart-submit" data-i18n="cart_submit">Оформить заказ</button>
     <p class="cart-note" id="cart-pay-note"></p>
   </div>
@@ -1711,6 +1713,7 @@ select.input{
     cart_pvz:'Пункт выдачи СДЭК', cart_pvz_ph:'Улица, метро или код пункта',
     cart_addr:'Адрес', cart_addr_ph:'Улица, дом, квартира', cart_payment:'Оплата',
     pay_card:'Оплата картой', pay_sbp:'СБП', payment_secure:'После оформления откроется защищённая страница Т‑Банка. Подойдёт карта любого российского банка.',
+    payment_receipt_notice:'При полной предоплате кассовый чек полного расчёта формируется в момент оплаты. Отдельный чек при выдаче или отправке заказа не формируется.',
     payment_terms_link:'Условия оплаты и возврата', cart_pvz_map_selected:'Пункт выбран', cart_pvz_map_open:'Показать на карте',
     cart_note_ph:'Комментарий к заказу', cart_submit:'Оформить заказ', cart_submit_total:a=>`Оформить заказ · ${a}`, cart_submit_unavailable:'Онлайн-оплата пока недоступна',
     cart_decrease:n=>`Уменьшить количество «${n}»`, cart_increase:n=>`Увеличить количество «${n}»`,
@@ -1890,6 +1893,7 @@ select.input{
     cart_pvz:'CDEK pickup point', cart_pvz_ph:'Street, metro or point code',
     cart_addr:'Address', cart_addr_ph:'Street, building, flat', cart_payment:'Payment',
     pay_card:'Card payment', pay_sbp:'SBP', payment_secure:'After checkout, T‑Bank’s secure payment page will open. Cards issued by Russian banks are accepted.',
+    payment_receipt_notice:'With full prepayment, one full-settlement receipt is issued at payment. No separate receipt is issued when the order is handed over or shipped.',
     payment_terms_link:'Payment and return terms', cart_pvz_map_selected:'Pickup point selected', cart_pvz_map_open:'Show on map',
     cart_note_ph:'Order comment', cart_submit:'Place order', cart_submit_total:a=>`Place order · ${a}`, cart_submit_unavailable:'Online payment is unavailable',
     cart_decrease:n=>`Decrease quantity of ${n}`, cart_increase:n=>`Increase quantity of ${n}`,
@@ -2069,6 +2073,7 @@ select.input{
     cart_pvz:'CDEK自提点', cart_pvz_ph:'街道、地铁站或网点代码',
     cart_addr:'地址', cart_addr_ph:'街道、门牌号、公寓', cart_payment:'支付',
     pay_card:'银行卡支付', pay_sbp:'快速支付系统（SBP）', payment_secure:'提交订单后将打开T‑Bank的安全支付页面，支持俄罗斯银行发行的银行卡。',
+    payment_receipt_notice:'全额预付时，付款时开具一张全额结算收据；取货或发货时不再另行开具收据。',
     payment_terms_link:'支付与退款条款', cart_pvz_map_selected:'已选择自提点', cart_pvz_map_open:'在地图上查看',
     cart_note_ph:'订单备注', cart_submit:'提交订单', cart_submit_total:a=>`提交订单 · ${a}`, cart_submit_unavailable:'在线支付暂不可用',
     cart_decrease:n=>`减少${n}的数量`, cart_increase:n=>`增加${n}的数量`,

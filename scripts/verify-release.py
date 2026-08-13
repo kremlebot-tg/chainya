@@ -84,6 +84,9 @@ PRIVATE_BANK_PATTERNS = (
     re.compile(r"корреспондентск\w*\s+сч[её]т\w*\s*[:№]?\s*\d", re.I),
     re.compile(r"расч[её]тн\w*\s+сч[её]т\w*\s*[:№]?\s*\d", re.I),
 )
+FULL_SETTLEMENT_NOTICE = (
+    "При полной предоплате кассовый чек полного расчёта формируется в момент оплаты"
+)
 
 
 def check_dist(root: pathlib.Path) -> list[str]:
@@ -146,6 +149,11 @@ def check_dist(root: pathlib.Path) -> list[str]:
                 errors.append(f"{name}: найдена юридическая заглушка {placeholder.pattern!r}")
         if any(pattern.search(text) for pattern in PRIVATE_BANK_PATTERNS):
             errors.append(f"{name}: обнаружены лишние банковские реквизиты")
+        if name in {"index.html", "shop/index.html", "legal.html"}:
+            if FULL_SETTLEMENT_NOTICE not in text:
+                errors.append(
+                    f"{name}: отсутствует предупреждение об одном чеке полного расчёта"
+                )
     route_canonicals = {
         "shop/index.html": "https://chainya.ru/shop",
         "business/index.html": "https://chainya.ru/business",

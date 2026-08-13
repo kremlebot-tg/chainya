@@ -321,6 +321,23 @@ def tbank_checkout_ready() -> bool:
     )
     if not valid or not settings.configured or not urls_ready:
         return False
+    # A lost Saby response may already have created a fiscal sale.  Until the
+    # ambiguity is reconciled, accepting another payment would enlarge an
+    # unresolved fiscal incident.  This check is intentionally local and
+    # fail-closed; it never calls Saby from the public status endpoint.
+    try:
+        with db() as con:
+            unresolved_saby = con.execute(
+                """SELECT 1 FROM orders
+                   WHERE saby_receipt_state = 'ambiguous'
+                      OR saby_refund_state = 'ambiguous'
+                      OR saby_settlement_state = 'ambiguous'
+                   LIMIT 1"""
+            ).fetchone()
+    except (OSError, sqlite3.Error):
+        return False
+    if unresolved_saby:
+        return False
     if TEST_MODE:
         receipt_safe = (
             not tbank_receipt_settings.enabled
@@ -1948,8 +1965,10 @@ def _saby_receipt_is_fiscalized(result: object) -> bool:
             if value is None or value is False:
                 return False
             if isinstance(value, str):
-                return value.strip().casefold() not in {"", "none", "null"}
-            return bool(value)
+                # A real fiscal document attribute is numeric.  Do not promote
+                # arbitrary vendor text such as "undefined" to registered.
+                return bool(re.fullmatch(r"[1-9]\d{5,19}", value.strip()))
+            return isinstance(value, int) and not isinstance(value, bool) and value > 0
     return any(
         _saby_receipt_is_fiscalized(value)
         for value in result.values()
@@ -4164,57 +4183,14 @@ def admin_saby_retry_sale(
     authorization: str = Header(default=""),
     receipt_absence: str = Header(default="", alias="X-Chainya-Saby-Receipt-Absence"),
 ):
-    """Retry one ambiguous sale only after an explicit Saby journal check."""
+    """Never repeat an ambiguous fiscal POST without vendor-side resolution."""
     require_admin(authorization)
-    if receipt_absence != "confirmed":
-        raise HTTPException(409, "Сначала подтвердите, что чека нет в журнале продаж Saby")
-    row = order_row(order_id)
-    route = purchase_route_status(
-        tbank_receipt_enabled=tbank_receipt_settings.enabled,
-        saby_configured=saby_client.settings.configured,
-        fiscal_settings=saby_fiscal_settings,
+    order_row(order_id)
+    raise HTTPException(
+        409,
+        "Повторная отправка неопределённого чека запрещена. "
+        "Сначала Saby должен письменно подтвердить результат исходного запроса.",
     )
-    if route.route != "fiscal_sale" or not route.writes_enabled:
-        raise HTTPException(409, route.blockers[0] if route.blockers else "Чеки Saby выключены")
-    if row["payment_state"] != "paid":
-        raise HTTPException(409, "Повтор доступен только для подтверждённой оплаты")
-    if row["saby_receipt_state"] != "ambiguous" or row["saby_receipt_id"]:
-        raise HTTPException(409, "Этот чек не находится в состоянии ручной сверки")
-    with db() as con:
-        effect = con.execute(
-            "SELECT attempts FROM paid_order_effects WHERE order_id = ? AND effect = 'saby'",
-            (order_id,),
-        ).fetchone()
-    if not effect or int(effect["attempts"] or 0) != 1:
-        raise HTTPException(
-            409,
-            "Контролируемый повтор уже использован или история первой отправки неполна",
-        )
-    updated = now_iso()
-    with db() as con:
-        con.execute("BEGIN IMMEDIATE")
-        claimed = con.execute(
-            """UPDATE orders SET saby_receipt_state = 'failed',
-                      saby_receipt_last_error = '', saby_receipt_updated_at = ?, updated_at = ?
-               WHERE id = ? AND payment_state = 'paid'
-                 AND saby_receipt_state = 'ambiguous' AND saby_receipt_id IS NULL""",
-            (updated, updated, order_id),
-        )
-        if claimed.rowcount != 1:
-            raise HTTPException(409, "Состояние чека уже изменилось; обновите страницу")
-        con.execute(
-            """UPDATE paid_order_effects
-               SET state = 'pending', last_error = '', updated_at = ?
-               WHERE order_id = ? AND effect = 'saby' AND state = 'ambiguous'""",
-            (updated, order_id),
-        )
-    process_paid_order_effects(order_id)
-    result = admin_order(order_row(order_id))
-    state = result["integrations"]["saby"]["receipt"]["state"]
-    if state in {"failed", "blocked", "ambiguous"}:
-        detail = result["integrations"]["saby"]["receipt"]["last_error"]
-        raise HTTPException(502 if state != "blocked" else 409, detail or "Чек Saby не зарегистрирован")
-    return result
 
 
 @app.get("/api/admin/business-leads")

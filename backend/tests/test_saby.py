@@ -256,7 +256,7 @@ def test_saby_plain_text_document_not_found_is_safely_classified():
     with pytest.raises(SabyError) as captured:
         client.create_fiscal_sale({"externalId": "safe-order"})
     message = str(captured.value)
-    assert "Saby не нашёл связанную точку или ККТ" in message
+    assert "Saby сообщает, что связанный документ не найден" in message
     assert "001234567890" not in message
 
 
@@ -349,7 +349,7 @@ def test_saby_fiscal_sale_and_receipt_status_use_documented_endpoints():
         assert "Cookie" not in request.headers
         assert query["ids[]"] == ["receipt-safe-id"]
         return Response({"Result": json.dumps([
-            {"id": "receipt-safe-id", "fiscalSign": "safe-sign", "state": "готова"}
+            {"id": "receipt-safe-id", "fiscalSign": "1234567890", "state": "готова"}
         ])})
 
     client = SabyClient(settings(), opener=opener)

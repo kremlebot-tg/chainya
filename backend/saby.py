@@ -269,7 +269,10 @@ class SabyClient:
         message = re.sub(r"\s+", " ", message).strip(" .:;,-")
         normalized = message.casefold()
         categories = (
-            (("не найден документ", "document not found"), "Saby не нашёл связанную точку или ККТ"),
+            (
+                ("не найден документ", "document not found"),
+                "Saby сообщает, что связанный документ не найден",
+            ),
             (("ккт", "касс"), "ККТ недоступна или отклонила операцию"),
             (("смен",), "Смена ККТ не готова к операции"),
             (("прав", "доступ", "forbidden", "permission"), "Недостаточно прав приложения Saby"),

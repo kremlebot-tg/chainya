@@ -79,6 +79,7 @@ def test_checkout_status_fails_closed_without_live_payment_mode(tmp_path, monkey
 
 def test_live_checkout_accepts_exactly_one_ready_fiscal_provider(tmp_path, monkeypatch):
     _, module = app_client(tmp_path, monkeypatch, test_mode="0")
+    module.init_db()
     monkeypatch.setenv("TBANK_CHECKOUT_MODE", "auto")
     monkeypatch.setenv("SABY_PURCHASE_ROUTE", "fiscal_sale")
     monkeypatch.setenv("SABY_STOCK_GUARD_MODE", "auto")
@@ -102,6 +103,38 @@ def test_live_checkout_accepts_exactly_one_ready_fiscal_provider(tmp_path, monke
         enabled=True, taxation="usn_income", item_tax="none",
         delivery_tax="none", ffd_version="1.05",
     ))
+    assert module.tbank_checkout_ready() is False
+
+
+def test_live_checkout_closes_while_saby_fiscal_result_is_ambiguous(
+    tmp_path, monkeypatch
+):
+    client, module = app_client(tmp_path, monkeypatch)
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+    module.TEST_MODE = False
+    monkeypatch.setenv("TBANK_CHECKOUT_MODE", "auto")
+    monkeypatch.setenv("SABY_PURCHASE_ROUTE", "fiscal_sale")
+    monkeypatch.setenv("SABY_STOCK_GUARD_MODE", "auto")
+    monkeypatch.setattr(module.tbank_client, "settings", TBankSettings(
+        terminal_key="live-terminal", password="safe-password",
+        notification_url="https://chainya.ru/api/payments/tbank/callback",
+        success_url="https://chainya.ru/payment/success",
+        fail_url="https://chainya.ru/payment/fail",
+    ))
+    monkeypatch.setattr(module.saby_client, "settings", SabySettings(
+        app_client_id="configured", app_secret="configured", secret_key="configured",
+    ))
+    monkeypatch.setattr(module, "tbank_receipt_settings", TBankReceiptSettings(enabled=False))
+    monkeypatch.setattr(module, "saby_fiscal_settings", SabyFiscalSettings(
+        company_id="274", kkt_reg_number="0001234567890123",
+        tax_system=2, pay_method=4,
+    ))
+    with module.db() as con:
+        con.execute(
+            "UPDATE orders SET saby_receipt_state='ambiguous' WHERE id=?",
+            (order["id"],),
+        )
     assert module.tbank_checkout_ready() is False
 
 
@@ -1311,7 +1344,7 @@ def configure_saby_fiscal_flow(module, monkeypatch):
     ))
     monkeypatch.setattr(
         module.saby_client, "fiscal_receipt",
-        lambda _receipt_id: {"payments": [{"fiscalSign": "safe-sign"}]},
+        lambda _receipt_id: {"payments": [{"fiscalSign": "1234567890"}]},
     )
     monkeypatch.setattr(
         module.saby_client, "base_catalog_all",
@@ -1446,16 +1479,14 @@ def test_paid_delivery_blocks_before_post_without_unique_saby_service(
     assert "Доставка" in current["saby_receipt_last_error"]
 
 
-def test_owner_can_retry_ambiguous_sale_only_after_confirmed_absence(tmp_path, monkeypatch):
+def test_owner_cannot_retry_ambiguous_sale_even_after_claimed_absence(tmp_path, monkeypatch):
     client, module = app_client(tmp_path, monkeypatch)
     configure_saby_fiscal_flow(module, monkeypatch)
     attempts = []
 
     def send(data):
         attempts.append(data)
-        if len(attempts) == 1:
-            raise module.SabyError("Saby вернул HTTP 500")
-        return {"id": "safe-receipt-after-manual-check"}
+        raise module.SabyError("Saby вернул HTTP 500")
 
     monkeypatch.setattr(module.saby_client, "create_fiscal_sale", send)
     with client:
@@ -1472,10 +1503,11 @@ def test_owner_can_retry_ambiguous_sale_only_after_confirmed_absence(tmp_path, m
             f"/api/admin/orders/{order['id']}/saby/retry-sale",
             headers={**auth, "X-Chainya-Saby-Receipt-Absence": "confirmed"},
         )
-        assert retried.status_code == 200
+        assert retried.status_code == 409
+        assert "Повторная отправка" in retried.json()["detail"]
 
-    assert len(attempts) == 2
-    assert module.order_row(order["id"])["saby_receipt_state"] == "registered"
+    assert len(attempts) == 1
+    assert module.order_row(order["id"])["saby_receipt_state"] == "ambiguous"
 
 
 def test_owner_cannot_retry_registered_or_unpaid_saby_receipt(tmp_path, monkeypatch):
@@ -1502,7 +1534,7 @@ def test_owner_cannot_retry_registered_or_unpaid_saby_receipt(tmp_path, monkeypa
         ).status_code == 409
 
 
-def test_owner_cannot_repeat_saby_receipt_more_than_once(tmp_path, monkeypatch):
+def test_owner_cannot_repeat_saby_receipt_at_all(tmp_path, monkeypatch):
     client, module = app_client(tmp_path, monkeypatch)
     configure_saby_fiscal_flow(module, monkeypatch)
 
@@ -1522,19 +1554,19 @@ def test_owner_cannot_repeat_saby_receipt_more_than_once(tmp_path, monkeypatch):
         first_retry = client.post(
             f"/api/admin/orders/{order['id']}/saby/retry-sale", headers=auth
         )
-        assert first_retry.status_code == 502
+        assert first_retry.status_code == 409
         second_retry = client.post(
             f"/api/admin/orders/{order['id']}/saby/retry-sale", headers=auth
         )
         assert second_retry.status_code == 409
-        assert "повтор уже использован" in second_retry.json()["detail"]
+        assert "Повторная отправка" in second_retry.json()["detail"]
 
     with module.db() as con:
         effect = con.execute(
             "SELECT attempts FROM paid_order_effects WHERE order_id=? AND effect='saby'",
             (order["id"],),
         ).fetchone()
-    assert effect["attempts"] == 2
+    assert effect["attempts"] == 1
 
 
 def test_accepted_sale_waits_for_ofd_and_polls_without_second_sale(tmp_path, monkeypatch):
@@ -1543,7 +1575,7 @@ def test_accepted_sale_waits_for_ofd_and_polls_without_second_sale(tmp_path, mon
     sent = []
     checks = iter((
         [{"fiscalSign": "none", "state": "новая"}],
-        [{"fiscalSign": "safe-fiscal-sign", "state": "готова"}],
+        [{"fiscalSign": "1234567890", "state": "готова"}],
     ))
     monkeypatch.setattr(
         module.saby_client, "create_fiscal_sale",
@@ -1599,7 +1631,7 @@ def test_saby_pending_fiscal_sign_markers_are_not_registered(tmp_path, monkeypat
             {"fiscalSign": marker, "state": "новая"}
         ])
     assert module._saby_receipt_is_fiscalized([
-        {"fiscalSign": "safe-fiscal-sign", "state": "готова"}
+        {"fiscalSign": "1234567890", "state": "готова"}
     ])
 
 

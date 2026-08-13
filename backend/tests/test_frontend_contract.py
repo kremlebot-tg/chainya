@@ -76,6 +76,15 @@ def test_catalog_keeps_a_semantic_heading_without_restoring_visual_clutter():
     assert "teaCard(m, 'h2', true, index < 8)" in SOURCE
 
 
+def test_catalog_cards_expose_indexable_product_links_and_keep_modal_navigation():
+    assert 'href="/tea/${m.id}"' in SOURCE
+    assert "event.preventDefault(); lastCard = hit; openTea(m);" in SOURCE
+    assert "location.pathname.match(/^\\/tea\\/" in SOURCE
+    assert "history.pushState({ tea:m.id }, '', '/tea/' + m.id)" in SOURCE
+    assert "syncProductMetadata(m, txt)" in SOURCE
+    assert "setMeta('meta[property=\"og:type\"]', 'website')" in SOURCE
+
+
 def test_display_headings_keep_word_boundaries_across_visual_line_breaks():
     """Visual line breaks must not merge words for crawlers or assistive tech."""
 

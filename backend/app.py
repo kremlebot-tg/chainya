@@ -11,6 +11,7 @@ from __future__ import annotations
 import fcntl
 import hashlib
 import hmac
+import html
 import io
 import json
 import logging
@@ -43,7 +44,7 @@ from fastapi import (
     Request,
     Response,
 )
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image, ImageOps, UnidentifiedImageError
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -3598,6 +3599,271 @@ def public_catalog():
             if item.get("published", True)
         ]
     }
+
+
+PUBLIC_SITE = "https://chainya.ru"
+PRODUCT_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,79}$")
+
+
+def _script_json(value: object) -> str:
+    """Serialize JSON-LD without allowing catalog text to close the script tag."""
+    return (
+        json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+        .replace("&", "\\u0026")
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+    )
+
+
+def _public_product(item_id: str) -> tuple[dict, dict] | None:
+    if not PRODUCT_ID_RE.fullmatch(item_id):
+        return None
+    document = get_catalog_store().get()
+    item = next(
+        (
+            current
+            for current in document["teas"]
+            if current["id"] == item_id and current.get("published", True)
+        ),
+        None,
+    )
+    return (document, item) if item else None
+
+
+def _product_page_html(document: dict, item: dict) -> str:
+    ru = item["translations"]["ru"]
+    name = ru["name"]
+    origin = ru.get("orig", "")
+    description = ru.get("desc", "") or f"Китайский чай {name} в каталоге Чайни."
+    canonical = f"{PUBLIC_SITE}/tea/{item['id']}"
+    image_path = catalog_image_url(item)
+    image_url = PUBLIC_SITE + image_path
+    unit_label = "за штуку" if item["unit"] == "pc" else "за 10 г"
+    availability = (
+        "https://schema.org/InStock"
+        if item.get("stock", True)
+        else "https://schema.org/OutOfStock"
+    )
+    type_name = next(
+        (
+            category["name"]
+            for category in document.get("types", [])
+            if category.get("id") == item.get("type")
+        ),
+        "Китайский чай",
+    )
+    reference_quantity = {
+        "@type": "QuantitativeValue",
+        "value": 1 if item["unit"] == "pc" else 10,
+        "unitCode": "C62" if item["unit"] == "pc" else "GRM",
+    }
+    graph = {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "Organization",
+                "@id": PUBLIC_SITE + "/#seller",
+                "name": "Чайня",
+                "url": PUBLIC_SITE + "/",
+                "logo": PUBLIC_SITE + "/img/logo-mark.webp",
+            },
+            {
+                "@type": "WebSite",
+                "@id": PUBLIC_SITE + "/#website",
+                "url": PUBLIC_SITE + "/",
+                "name": "Чайня",
+                "publisher": {"@id": PUBLIC_SITE + "/#seller"},
+                "inLanguage": "ru-RU",
+            },
+            {
+                "@type": "WebPage",
+                "@id": canonical + "#webpage",
+                "url": canonical,
+                "name": f"{name} — купить в Чайне",
+                "description": description,
+                "inLanguage": "ru-RU",
+                "isPartOf": {"@id": PUBLIC_SITE + "/#website"},
+                "mainEntity": {"@id": canonical + "#product"},
+            },
+            {
+                "@type": "Product",
+                "@id": canonical + "#product",
+                "name": name,
+                "description": description,
+                "image": [image_url],
+                "category": type_name,
+                "sku": item["id"],
+                "url": canonical,
+                "offers": {
+                    "@type": "Offer",
+                    "url": canonical,
+                    "priceCurrency": "RUB",
+                    "price": item["price"],
+                    "priceSpecification": {
+                        "@type": "UnitPriceSpecification",
+                        "price": item["price"],
+                        "priceCurrency": "RUB",
+                        "referenceQuantity": reference_quantity,
+                    },
+                    "availability": availability,
+                    "itemCondition": "https://schema.org/NewCondition",
+                    "seller": {"@id": PUBLIC_SITE + "/#seller"},
+                },
+            },
+            {
+                "@type": "BreadcrumbList",
+                "itemListElement": [
+                    {
+                        "@type": "ListItem",
+                        "position": 1,
+                        "name": "Главная",
+                        "item": PUBLIC_SITE + "/",
+                    },
+                    {
+                        "@type": "ListItem",
+                        "position": 2,
+                        "name": "Купить чай",
+                        "item": PUBLIC_SITE + "/shop",
+                    },
+                    {
+                        "@type": "ListItem",
+                        "position": 3,
+                        "name": name,
+                        "item": canonical,
+                    },
+                ],
+            },
+        ],
+    }
+    safe_name = html.escape(name, quote=True)
+    safe_origin = html.escape(origin)
+    safe_description = html.escape(description)
+    safe_type = html.escape(type_name)
+    safe_image = html.escape(image_path, quote=True)
+    safe_image_url = html.escape(image_url, quote=True)
+    safe_canonical = html.escape(canonical, quote=True)
+    safe_meta_description = html.escape(description[:300], quote=True)
+    stock_label = "В наличии" if item.get("stock", True) else "Нет в наличии"
+    stock_class = "" if item.get("stock", True) else " product__stock--out"
+    return f"""<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{safe_name} — купить китайский чай · Чайня</title>
+<meta name="description" content="{safe_meta_description}">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#141110">
+<link rel="canonical" href="{safe_canonical}">
+<link rel="icon" href="/favicon.png" type="image/png">
+<meta property="og:type" content="product">
+<meta property="og:site_name" content="Чайня">
+<meta property="og:title" content="{safe_name} — Чайня">
+<meta property="og:description" content="{safe_meta_description}">
+<meta property="og:url" content="{safe_canonical}">
+<meta property="og:image" content="{safe_image_url}">
+<meta property="og:image:alt" content="{safe_name}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{safe_name} — Чайня">
+<meta name="twitter:description" content="{safe_meta_description}">
+<meta name="twitter:image" content="{safe_image_url}">
+<script type="application/ld+json">{_script_json(graph)}</script>
+<style>
+@font-face{{font-family:Prata;src:url('/fonts/prata-cyr.woff2') format('woff2');font-display:swap}}
+@font-face{{font-family:Golos;src:url('/fonts/golos-cyr.woff2') format('woff2');font-display:swap}}
+:root{{color-scheme:dark;--paper:#141110;--panel:#1c1816;--ink:#f1ece4;--muted:#b9afa4;--line:#453b35;--accent:#df6b66}}
+*{{box-sizing:border-box}}html{{background:var(--paper)}}body{{margin:0;background:var(--paper);color:var(--ink);font-family:Golos,Arial,sans-serif}}
+.shell{{min-height:100svh;display:grid;grid-template-rows:auto 1fr}}.nav{{display:flex;align-items:center;justify-content:space-between;padding:20px clamp(20px,5vw,72px);border-bottom:1px solid var(--line)}}
+.brand{{display:flex;align-items:center;gap:14px;color:var(--ink);text-decoration:none;letter-spacing:.15em}}.brand img{{width:30px;height:42px;object-fit:contain}}.back{{color:var(--muted);text-underline-offset:7px}}
+.product{{width:min(1180px,100%);margin:auto;padding:clamp(32px,6vw,88px) clamp(20px,5vw,72px);display:grid;grid-template-columns:minmax(280px,1fr) minmax(300px,.82fr);gap:clamp(30px,6vw,84px);align-items:center}}
+.product__image{{width:100%;aspect-ratio:1;object-fit:cover;border:1px solid var(--line);background:var(--panel)}}.product__type{{margin:0 0 15px;color:var(--accent);font-size:12px;font-weight:700;letter-spacing:.17em;text-transform:uppercase}}
+h1{{margin:0;font:clamp(42px,6vw,78px)/1.06 Prata,Georgia,serif;letter-spacing:-.035em}}.product__origin{{margin:18px 0 0;color:var(--muted);font-size:17px}}.product__description{{margin:30px 0 0;font-size:18px;line-height:1.65}}
+.product__buy{{margin-top:34px;padding-top:26px;border-top:1px solid var(--line);display:flex;align-items:end;justify-content:space-between;gap:20px;flex-wrap:wrap}}.product__price{{font:36px/1 Prata,Georgia,serif}}.product__unit{{display:block;margin-top:7px;color:var(--muted);font-size:14px}}.product__stock{{display:inline-flex;margin-top:20px;padding:8px 12px;border:1px solid #788a67;color:#b9cba8;font-size:12px;letter-spacing:.08em;text-transform:uppercase}}.product__stock--out{{border-color:#865a55;color:#e78a82}}
+.button{{display:inline-flex;min-height:52px;align-items:center;justify-content:center;padding:0 24px;background:var(--accent);color:#171210;text-decoration:none;font-weight:700}}.button:hover{{background:#ef7a74}}
+@media(max-width:760px){{.nav{{padding:15px 20px}}.back{{font-size:14px}}.product{{grid-template-columns:1fr;align-content:start;padding-top:28px}}h1{{font-size:clamp(38px,12vw,58px)}}.product__description{{font-size:16px}}.button{{width:100%}}}}
+</style>
+</head>
+<body><div class="shell">
+<header class="nav"><a class="brand" href="/"><img src="/img/logo-mark.webp" alt=""><span>ЧАЙНЯ</span></a><a class="back" href="/shop">Все чаи</a></header>
+<main class="product">
+  <img class="product__image" src="{safe_image}" alt="{safe_name}" width="900" height="900">
+  <article>
+    <p class="product__type">{safe_type}</p>
+    <h1>{safe_name}</h1>
+    <p class="product__origin">{safe_origin}</p>
+    <p class="product__description">{safe_description}</p>
+    <span class="product__stock{stock_class}">{stock_label}</span>
+    <div class="product__buy">
+      <div><span class="product__price">{item['price']} ₽</span><span class="product__unit">{unit_label}</span></div>
+      <a class="button" href="/shop#tea-{item['id']}">Открыть в магазине</a>
+    </div>
+  </article>
+</main></div></body></html>"""
+
+
+def _missing_product_html() -> str:
+    return """<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>Чай не найден · Чайня</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#141110;color:#f1ece4;font:18px Arial,sans-serif}.box{max-width:560px;padding:40px}h1{font:52px Georgia,serif}p{color:#b9afa4;line-height:1.6}a{color:#df6b66}</style></head>
+<body><main class="box"><h1>Этот чай уже выпит</h1><p>Карточка могла быть скрыта или адрес изменился.</p><a href="/shop">Вернуться в каталог</a></main></body></html>"""
+
+
+@app.get("/tea/{item_id}", response_class=HTMLResponse)
+def product_page(item_id: str):
+    found = _public_product(item_id)
+    if not found:
+        return HTMLResponse(
+            _missing_product_html(),
+            status_code=404,
+            headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow"},
+        )
+    document, item = found
+    return HTMLResponse(
+        _product_page_html(document, item),
+        headers={"Cache-Control": "public, max-age=60, stale-while-revalidate=300"},
+    )
+
+
+@app.head("/tea/{item_id}")
+def product_page_head(item_id: str):
+    if not _public_product(item_id):
+        return Response(
+            status_code=404,
+            headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow"},
+        )
+    return Response(headers={"Cache-Control": "public, max-age=60, stale-while-revalidate=300"})
+
+
+@app.get("/sitemap.xml", response_class=PlainTextResponse)
+def dynamic_sitemap():
+    document = get_catalog_store().get()
+    updated = str(document.get("updated_at", ""))[:10]
+    lastmod = f"<lastmod>{html.escape(updated)}</lastmod>" if re.fullmatch(r"\d{4}-\d{2}-\d{2}", updated) else ""
+    base_urls = (
+        ("/", "weekly", "1.0"),
+        ("/shop", "weekly", "0.9"),
+        ("/business", "monthly", "0.7"),
+        ("/booking", "monthly", "0.7"),
+        ("/legal.html", "monthly", "0.4"),
+        ("/privacy.html", "monthly", "0.4"),
+    )
+    rows = [
+        f"  <url><loc>{PUBLIC_SITE}{path}</loc><changefreq>{frequency}</changefreq><priority>{priority}</priority></url>"
+        for path, frequency, priority in base_urls
+    ]
+    rows.extend(
+        f"  <url><loc>{PUBLIC_SITE}/tea/{item['id']}</loc>{lastmod}<changefreq>weekly</changefreq><priority>0.8</priority></url>"
+        for item in document["teas"]
+        if item.get("published", True)
+    )
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        + "\n".join(rows)
+        + "\n</urlset>\n"
+    )
+    return PlainTextResponse(xml, media_type="application/xml")
 
 
 def admin_catalog_response(document: dict) -> dict:

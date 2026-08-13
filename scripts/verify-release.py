@@ -49,6 +49,7 @@ PUBLIC_PATHS = (
     ("/privacy.html", "text/html"),
     ("/legal.html", "text/html"),
     ("/api/catalog", "application/json"),
+    ("/sitemap.xml", "application/xml"),
 )
 SECRET_PATTERNS = (
     re.compile(rb"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
@@ -307,6 +308,25 @@ def json_response(url: str) -> tuple[int, object]:
     return 0, {}
 
 
+def text_response(url: str) -> tuple[int, str, object]:
+    request = urllib.request.Request(
+        url,
+        headers={"User-Agent": "ChainyaReleaseVerifier/1.0"},
+    )
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(request, timeout=15) as response:
+                return response.status, response.read().decode("utf-8"), response.headers
+        except urllib.error.HTTPError as exc:
+            return exc.code, "", exc.headers
+        except (urllib.error.URLError, UnicodeDecodeError):
+            if attempt < 2:
+                time.sleep(1)
+                continue
+            return 0, "", {}
+    return 0, "", {}
+
+
 def status(url: str) -> tuple[int, str]:
     code, content_type, _headers = response_metadata(url)
     return code, content_type
@@ -361,6 +381,37 @@ def check_live(base_url: str) -> list[str]:
         for item in catalog_items
     ):
         errors.append("/api/catalog: товар не соответствует публичной схеме")
+    else:
+        first_id = catalog_items[0]["id"]
+        product_path = f"/tea/{first_id}"
+        product_code, product_html, product_headers = text_response(base + product_path)
+        if product_code != 200:
+            errors.append(f"{product_path}: ожидался 200, получен {product_code}")
+        else:
+            canonical = f"{base}{product_path}"
+            for marker in (
+                f'<link rel="canonical" href="{canonical}">',
+                '<meta property="og:type" content="product">',
+                '"@type":"Product"',
+            ):
+                if marker not in product_html:
+                    errors.append(f"{product_path}: отсутствует SEO-маркер {marker!r}")
+            if "public" not in combined_header(product_headers, "cache-control").lower():
+                errors.append(f"{product_path}: отсутствует публичная cache policy")
+        product_head, _type, product_head_headers = raw_response_metadata(
+            base + product_path,
+            method="HEAD",
+        )
+        if product_head != 200:
+            errors.append(f"{product_path}: HEAD ожидался 200, получен {product_head}")
+        elif "frame-ancestors 'none'" not in combined_header(
+            product_head_headers,
+            "content-security-policy",
+        ):
+            errors.append(f"{product_path}: публичная карточка допускает встраивание")
+        sitemap_code, sitemap_xml, _headers = text_response(base + "/sitemap.xml")
+        if sitemap_code != 200 or canonical not in sitemap_xml:
+            errors.append(f"/sitemap.xml: нет опубликованной карточки {product_path}")
     for path in SENSITIVE_PATHS:
         code, _content_type = status(base + path)
         if code not in {403, 404}:

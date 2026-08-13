@@ -2365,10 +2365,32 @@ select.input{
     setMeta('meta[name="description"]', description);
     setMeta('meta[property="og:title"]', title);
     setMeta('meta[property="og:description"]', description);
+    setMeta('meta[property="og:type"]', 'website');
     setMeta('meta[property="og:locale"]', T().og_locale);
     setMeta('meta[property="og:url"]', routeUrl);
     setMeta('meta[name="twitter:title"]', title);
     setMeta('meta[name="twitter:description"]', description);
+    const canonical = document.querySelector('link[rel="canonical"]');
+    if (canonical) canonical.href = routeUrl;
+  }
+  function syncProductMetadata(m, txt){
+    const title = `${txt.n} — купить китайский чай · Чайня`;
+    const description = txt.d || `${txt.n} в каталоге китайского чая Чайни.`;
+    const routeUrl = new URL('/tea/' + m.id, location.origin).href;
+    document.title = title;
+    const values = {
+      'meta[name="description"]': description,
+      'meta[property="og:title"]': `${txt.n} — Чайня`,
+      'meta[property="og:description"]': description,
+      'meta[property="og:type"]': 'product',
+      'meta[property="og:url"]': routeUrl,
+      'meta[name="twitter:title"]': `${txt.n} — Чайня`,
+      'meta[name="twitter:description"]': description,
+    };
+    Object.entries(values).forEach(([selector,value]) => {
+      const node = document.querySelector(selector);
+      if (node) node.content = value;
+    });
     const canonical = document.querySelector('link[rel="canonical"]');
     if (canonical) canonical.href = routeUrl;
   }
@@ -2405,16 +2427,21 @@ select.input{
     go(t.dataset.go);
   });
 
-  // Читаемые URL — /shop, /business, /booking. Старые #shop / #book / #b2b
-  // продолжают работать для ссылок из переписок; #tea-<id> открывает товар.
-  // открывает паспорт конкретного чая. Нужно для кнопок телеграм-бота («Заказать
-  // на сайте» ведёт прямо на чай в браузере) и для шаринга на конкретную позицию.
+  // Читаемые URL — /shop, /business, /booking и /tea/<id>. Старые #shop,
+  // #book, #b2b и #tea-<id> продолжают работать для ссылок из переписок.
   const HASH_VIEWS = ['home', 'shop', 'b2b', 'book'];
   function goFromLocation(){
     const h = location.hash.replace('#', '');
     if (HASH_VIEWS.includes(h)){ go(h, false); return; }
     if (h.startsWith('tea-')){
       const m = TEA_META.find(x => x.id === h.slice(4));
+      if (m){ go('shop', false); openTea(m, false); }
+      else go('shop', false);
+      return;
+    }
+    const productPath = location.pathname.match(/^\/tea\/([a-z0-9][a-z0-9-]{0,79})\/?$/);
+    if (productPath){
+      const m = TEA_META.find(x => x.id === productPath[1]);
       if (m){ go('shop', false); openTea(m, false); }
       else go('shop', false);
       return;
@@ -2498,10 +2525,10 @@ select.input{
             <button class="tea__quick" aria-label="${escAttr(T().quick_add(txt.n))}" title="${escAttr(T().quick_add(txt.n))}"${inStock(m) ? '' : ' disabled'}>+</button>
           </div>
         </div>
-        <button class="tea__hit" aria-label="${escAttr(T().tea_open(txt.n))}"></button>
+        <a class="tea__hit" href="/tea/${m.id}" aria-label="${escAttr(T().tea_open(txt.n))}"></a>
       </article>`);
     const hit = $('.tea__hit', node);
-    hit.addEventListener('click', () => { lastCard = hit; openTea(m); });
+    hit.addEventListener('click', event => { event.preventDefault(); lastCard = hit; openTea(m); });
     const fav = $('.tea__fav', node);
     fav.addEventListener('click', () => toggleFav(m.id));
     const quick = $('.tea__quick', node);
@@ -2878,8 +2905,9 @@ select.input{
     if (!wasOpen) lockScroll();
     bgInert(true);
     if (!wasOpen) focusPanel(sheet, $('#ts-close'));
-    if (updateHistory && location.hash !== '#tea-' + m.id)
-      history.pushState({ tea:m.id }, '', '#tea-' + m.id);
+    if (updateHistory && location.pathname !== '/tea/' + m.id)
+      history.pushState({ tea:m.id }, '', '/tea/' + m.id);
+    syncProductMetadata(m, txt);
     tgSyncBack();
   }
   function closeTea(updateHistory=true){
@@ -2889,9 +2917,12 @@ select.input{
     unlockScroll();
     bgInert(false);
     if (lastCard){ lastCard.focus({ preventScroll:true }); lastCard = null; }
-    if (updateHistory && location.hash.startsWith('#tea-')){
+    if (updateHistory && (location.hash.startsWith('#tea-') || location.pathname.startsWith('/tea/'))){
       if (history.state && history.state.tea) history.back();
-      else history.replaceState({ view:'shop' }, '', VIEW_PATHS.shop);
+      else {
+        history.replaceState({ view:'shop' }, '', VIEW_PATHS.shop);
+        syncDocumentMetadata('shop');
+      }
     }
     tgSyncBack();
   }

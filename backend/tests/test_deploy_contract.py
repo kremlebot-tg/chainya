@@ -202,7 +202,11 @@ def test_maintenance_is_chainya_only_and_returns_503() -> None:
     assert "__chainya_edge_health" in compose
     assert "/api/health" not in compose
     assert "/manage/*" in internal
-    assert "location = /manage/guides" in (ROOT / "ops/nginx-chainya.ru").read_text(encoding="utf-8")
+    nginx = (ROOT / "ops/nginx-chainya.ru").read_text(encoding="utf-8")
+    assert "location = /manage/guides" in nginx
+    assert "location ~ ^/tea/" in nginx
+    assert "return 308 /tea/$1;" in nginx
+    assert "location = /sitemap.xml" in nginx
 
 
 def test_origin_upload_retries_before_any_cutover() -> None:

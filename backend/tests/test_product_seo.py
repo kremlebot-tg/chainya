@@ -44,6 +44,7 @@ def test_product_page_is_indexable_and_uses_live_catalog(tmp_path, monkeypatch):
         "unitCode": "GRM",
     }
     assert product["offers"]["availability"] == "https://schema.org/InStock"
+    assert ".product{width:100%;max-width:1180px" in response.text
 
 
 def test_product_page_escapes_catalog_text_and_json_ld(tmp_path, monkeypatch):

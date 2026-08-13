@@ -599,7 +599,6 @@ def test_admin_saby_test_reports_catalog_and_delivery_blocker(tmp_path, monkeypa
     client, module = app_client(tmp_path, monkeypatch)
     auth = {"Authorization": "Bearer test-admin-token"}
     action = {**auth, "X-Chainya-Admin": "saby-readiness"}
-    refs = list(module.SABY_NOMENCLATURE_BY_SITE_ID.values())
     monkeypatch.setattr(module.saby_client, "configuration", lambda: {
         "configured": True, "point_id": 274, "price_list_id": 7, "missing": [],
     })
@@ -611,9 +610,8 @@ def test_admin_saby_test_reports_catalog_and_delivery_blocker(tmp_path, monkeypa
         {"id": 7, "name": "Сайт chainya.ru"},
     ])
     monkeypatch.setattr(module.saby_client, "catalog_all", lambda with_balance=False: [
-        {"id": index, "name": f"Чай {index}", "cost": 10 + index,
-         "balance": 100, "externalId": ref.external_id}
-        for index, ref in enumerate(refs)
+        {**item, "balance": 100}
+        for item in matching_saby_catalog(module)
     ] + [{
         "id": 59, "name": "Чон Ши Ча", "cost": 350, "balance": 0,
         "externalId": "9003e2a3-bbd8-4353-85f7-b2e901781ec8",
@@ -1316,6 +1314,10 @@ def configure_saby_fiscal_flow(module, monkeypatch):
         module.saby_client, "fiscal_receipt",
         lambda _receipt_id: {"payments": [{"fiscalSign": "safe-sign"}]},
     )
+    monkeypatch.setattr(
+        module.saby_client, "base_catalog_all",
+        lambda *, with_balance: matching_saby_catalog(module),
+    )
 
 
 def expose_live_saby_writer(module, monkeypatch):
@@ -1387,6 +1389,62 @@ def test_fiscal_transport_error_is_ambiguous_and_never_blindly_retried(tmp_path,
     assert len(attempts) == 1
     current = module.order_row(order["id"])
     assert current["saby_receipt_state"] == "ambiguous"
+
+
+def test_fiscal_sale_blocks_before_post_when_saby_name_differs(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    configure_saby_fiscal_flow(module, monkeypatch)
+    catalog = matching_saby_catalog(module)
+    catalog[0] = {**catalog[0], "name": "Несовпадающее название"}
+    monkeypatch.setattr(
+        module.saby_client, "base_catalog_all",
+        lambda *, with_balance: catalog,
+    )
+    sent = []
+    monkeypatch.setattr(
+        module.saby_client, "create_fiscal_sale",
+        lambda data: sent.append(data) or {"id": "must-not-be-created"},
+    )
+
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        expose_live_saby_writer(module, monkeypatch)
+        mark_order_paid_and_enqueue(module, order["id"])
+        module.process_paid_order_effects(order["id"])
+
+    assert sent == []
+    current = module.order_row(order["id"])
+    assert current["saby_receipt_state"] == "failed"
+    assert "Название товара не совпадает" in current["saby_receipt_last_error"]
+
+
+def test_paid_delivery_blocks_before_post_without_unique_saby_service(
+    tmp_path, monkeypatch
+):
+    client, module = app_client(tmp_path, monkeypatch)
+    configure_saby_fiscal_flow(module, monkeypatch)
+    sent = []
+    monkeypatch.setattr(
+        module.saby_client, "create_fiscal_sale",
+        lambda data: sent.append(data) or {"id": "must-not-be-created"},
+    )
+
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        expose_live_saby_writer(module, monkeypatch)
+        with module.db() as con:
+            con.execute(
+                "UPDATE orders SET delivery_price = 100, total = total + 100 "
+                "WHERE id = ?",
+                (order["id"],),
+            )
+        mark_order_paid_and_enqueue(module, order["id"])
+        module.process_paid_order_effects(order["id"])
+
+    assert sent == []
+    current = module.order_row(order["id"])
+    assert current["saby_receipt_state"] == "failed"
+    assert "Доставка" in current["saby_receipt_last_error"]
 
 
 def test_owner_can_retry_ambiguous_sale_only_after_confirmed_absence(tmp_path, monkeypatch):
@@ -1503,6 +1561,36 @@ def test_accepted_sale_waits_for_ofd_and_polls_without_second_sale(tmp_path, mon
 
     assert len(sent) == 1
     assert module.order_row(order["id"])["saby_receipt_state"] == "registered"
+
+
+def test_pending_ofd_stops_after_finite_deadline_without_second_sale(
+    tmp_path, monkeypatch
+):
+    client, module = app_client(tmp_path, monkeypatch)
+    configure_saby_fiscal_flow(module, monkeypatch)
+    monkeypatch.setattr(module, "SABY_OFD_PENDING_MAX_SECONDS", 0)
+    sent = []
+    monkeypatch.setattr(
+        module.saby_client, "create_fiscal_sale",
+        lambda data: sent.append(data) or {"id": "safe-receipt-timeout"},
+    )
+    monkeypatch.setattr(
+        module.saby_client, "fiscal_receipt",
+        lambda _id: [{"fiscalSign": "none", "state": "новая"}],
+    )
+
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        expose_live_saby_writer(module, monkeypatch)
+        mark_order_paid_and_enqueue(module, order["id"])
+        module.process_paid_order_effects(order["id"])
+        assert module.order_row(order["id"])["saby_receipt_state"] == "pending_ofd"
+        module.process_paid_order_effects(order["id"])
+
+    current = module.order_row(order["id"])
+    assert len(sent) == 1
+    assert current["saby_receipt_state"] == "blocked"
+    assert "без повторной продажи" in current["saby_receipt_last_error"]
 
 
 def test_saby_pending_fiscal_sign_markers_are_not_registered(tmp_path, monkeypatch):

@@ -176,21 +176,22 @@ def test_fiscal_settings_report_names_not_secret_values():
     })
     public = settings.public_dict()
     assert public["configured"] is False
-    assert "SABY_POINT_ID" in public["missing"]
+    assert "SABY_OFD_COMPANY_ID" in public["missing"]
     assert "bad" not in repr(public)
 
 
-def test_fiscal_settings_reuse_verified_sales_point_id():
+def test_fiscal_settings_never_infer_company_id_from_sales_point():
     settings = SabyFiscalSettings.from_env({
         "SABY_POINT_ID": "274",
         "SABY_OFD_KKT_REG_NUMBER": "0001234567890123",
         "SABY_OFD_PAY_METHOD": "4",
     })
-    assert settings.company_id == "274"
-    assert settings.configured is True
+    assert settings.company_id == ""
+    assert settings.configured is False
+    assert "SABY_OFD_COMPANY_ID" in settings.missing
 
 
-def test_explicit_fiscal_company_id_remains_compatible():
+def test_explicit_fiscal_company_id_is_required():
     settings = SabyFiscalSettings.from_env({
         "SABY_POINT_ID": "274",
         "SABY_OFD_COMPANY_ID": "275",
@@ -203,6 +204,7 @@ def test_explicit_fiscal_company_id_remains_compatible():
 def test_fiscal_route_never_assumes_payment_method():
     settings = SabyFiscalSettings.from_env({
         "SABY_POINT_ID": "274",
+        "SABY_OFD_COMPANY_ID": "275",
         "SABY_OFD_KKT_REG_NUMBER": "0001234567890123",
     })
     assert settings.configured is False
@@ -212,6 +214,7 @@ def test_fiscal_route_never_assumes_payment_method():
 def test_prepayment_setting_cannot_replace_required_full_payment_flow():
     settings = SabyFiscalSettings.from_env({
         "SABY_POINT_ID": "274",
+        "SABY_OFD_COMPANY_ID": "275",
         "SABY_OFD_KKT_REG_NUMBER": "0001234567890123",
         "SABY_OFD_PAY_METHOD": "1",
     })

@@ -120,6 +120,7 @@ def test_live_stock_guard_uses_one_stage_short_lived_payment(tmp_path, monkeypat
         "base_catalog_all",
         lambda with_balance=False: [{
             "externalId": module.SABY_NOMENCLATURE_BY_SITE_ID["baihao"].external_id,
+            "name": "Бай Хао Инь Чжень",
             "unit": "г",
             "balance": 200,
         }],
@@ -151,6 +152,7 @@ def test_live_stock_guard_rejects_concurrent_oversell(tmp_path, monkeypatch):
         "base_catalog_all",
         lambda with_balance=False: [{
             "externalId": module.SABY_NOMENCLATURE_BY_SITE_ID["baihao"].external_id,
+            "name": "Бай Хао Инь Чжень",
             "unit": "г",
             "balance": 60,
         }],
@@ -180,7 +182,8 @@ def test_authorized_callback_does_not_trigger_capture_in_one_stage_mode(tmp_path
         module.saby_client,
         "base_catalog_all",
         lambda with_balance=False: [{
-            "externalId": external_id, "unit": "г", "balance": 200,
+            "externalId": external_id, "name": "Бай Хао Инь Чжень",
+            "unit": "г", "balance": 200,
         }],
     )
     monkeypatch.setattr(module.tbank_client, "create_payment", lambda *_a, **_k: bank_response())

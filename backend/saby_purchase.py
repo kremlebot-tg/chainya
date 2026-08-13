@@ -47,12 +47,9 @@ class SabyFiscalSettings:
                 return -1
 
         return cls(
-            # The fiscal endpoint calls this ``companyID``, while Saby's
-            # current Retail docs define it as the sales point identifier.
-            company_id=str(
-                source.get("SABY_OFD_COMPANY_ID")
-                or source.get("SABY_POINT_ID", "")
-            ).strip(),
+            # Never infer this write-contract identifier from a read-only
+            # sales-point response. It must be confirmed and set explicitly.
+            company_id=str(source.get("SABY_OFD_COMPANY_ID", "")).strip(),
             kkt_reg_number=str(source.get("SABY_OFD_KKT_REG_NUMBER", "")).strip(),
             tax_system=integer("SABY_OFD_TAX_SYSTEM", 2),
             pay_method=integer("SABY_OFD_PAY_METHOD", -1),
@@ -65,14 +62,14 @@ class SabyFiscalSettings:
     def missing(self) -> tuple[str, ...]:
         missing: list[str] = []
         if not re.fullmatch(r"\d+", self.company_id):
-            missing.append("SABY_POINT_ID")
+            missing.append("SABY_OFD_COMPANY_ID")
         if not re.fullmatch(r"\d{8,32}", self.kkt_reg_number):
             missing.append("SABY_OFD_KKT_REG_NUMBER")
         if self.tax_system not in {1, 2, 4, 16, 32}:
             missing.append("SABY_OFD_TAX_SYSTEM")
-        # Chainya uses one-stage card/SBP acquisition.  Saby registers the
-        # paid purchase as full settlement and writes stock off after shift
-        # closure; a second handover receipt is neither needed nor allowed.
+        # Only the explicitly approved full-settlement fiscal flow is
+        # implemented. One-stage acquiring alone does not prove that this is
+        # the correct fiscal method for deferred pickup or CDEK delivery.
         if self.pay_method != 4:
             missing.append("SABY_OFD_PAY_METHOD")
         return tuple(missing)

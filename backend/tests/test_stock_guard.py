@@ -2,7 +2,12 @@ from decimal import Decimal
 
 import pytest
 
-from backend.stock_guard import StockGuardError, requirements_for_lines
+from backend.stock_guard import (
+    StockGuardError,
+    requirements_for_lines,
+    verify_line_names,
+    verify_unique_catalog_name,
+)
 
 
 def line(*, site_id="tea", external_id="ext", pack=25, qty=2, name="Чай"):
@@ -18,7 +23,7 @@ def line(*, site_id="tea", external_id="ext", pack=25, qty=2, name="Чай"):
 def test_gram_requirements_use_physical_base_balance():
     result = requirements_for_lines(
         [line(pack=25, qty=2), line(pack=100, qty=1)],
-        [{"externalId": "ext", "unit": "г", "balance": 175}],
+        [{"externalId": "ext", "name": "Чай", "unit": "г", "balance": 175}],
     )
     assert result[0].quantity == Decimal(150)
     assert result[0].available == Decimal(175)
@@ -28,7 +33,7 @@ def test_gram_requirements_use_physical_base_balance():
 def test_piece_requirements_use_pieces():
     result = requirements_for_lines(
         [line(pack="pc", qty=3)],
-        [{"externalId": "ext", "unit": "шт.", "balance": 4}],
+        [{"externalId": "ext", "name": "Чай", "unit": "шт.", "balance": 4}],
     )
     assert result[0].quantity == Decimal(3)
     assert result[0].available == Decimal(4)
@@ -39,9 +44,9 @@ def test_piece_requirements_use_pieces():
     "catalog",
     [
         [],
-        [{"externalId": "ext", "unit": "г", "balance": None}],
-        [{"externalId": "ext", "unit": "г", "balance": -1}],
-        [{"externalId": "ext", "unit": "шт", "balance": 10}],
+        [{"externalId": "ext", "name": "Чай", "unit": "г", "balance": None}],
+        [{"externalId": "ext", "name": "Чай", "unit": "г", "balance": -1}],
+        [{"externalId": "ext", "name": "Чай", "unit": "шт", "balance": 10}],
     ],
 )
 def test_unknown_or_unsafe_stock_fails_closed(catalog):
@@ -54,7 +59,40 @@ def test_duplicate_external_id_fails_closed():
         requirements_for_lines(
             [line()],
             [
-                {"externalId": "ext", "unit": "г", "balance": 50},
-                {"externalId": "ext", "unit": "г", "balance": 50},
+                {"externalId": "ext", "name": "Чай", "unit": "г", "balance": 50},
+                {"externalId": "ext", "name": "Чай", "unit": "г", "balance": 50},
             ],
         )
+
+
+def test_name_mismatch_fails_closed_before_checkout():
+    with pytest.raises(StockGuardError, match="Название товара не совпадает"):
+        requirements_for_lines(
+            [line(name="Чай сайта")],
+            [{
+                "externalId": "ext", "name": "Чай кассы",
+                "unit": "г", "balance": 50,
+            }],
+        )
+
+
+def test_name_preflight_does_not_require_balance_but_requires_exact_name():
+    lines = [line()]
+
+    verify_line_names(lines, [{
+        "externalId": "ext", "name": "Чай", "unit": "г",
+    }])
+    with pytest.raises(StockGuardError, match="Название товара не совпадает"):
+        verify_line_names(lines, [{
+            "externalId": "ext", "name": "Другой чай", "unit": "г",
+        }])
+
+
+def test_generated_fiscal_line_requires_one_exact_catalog_name():
+    catalog = [{"externalId": "delivery", "name": "Доставка"}]
+    verify_unique_catalog_name("Доставка", catalog)
+
+    with pytest.raises(StockGuardError, match="ровно одна позиция"):
+        verify_unique_catalog_name("Доставка", [])
+    with pytest.raises(StockGuardError, match="ровно одна позиция"):
+        verify_unique_catalog_name("Доставка", catalog * 2)

@@ -1,6 +1,8 @@
 import io
 import json
 import re
+import threading
+import time
 import urllib.error
 from urllib.parse import parse_qs, urlparse
 
@@ -203,12 +205,38 @@ def test_saby_http_error_exposes_only_sanitized_vendor_explanation():
     with pytest.raises(SabyError) as captured:
         client.create_fiscal_sale({"externalId": "safe-order"})
     message = str(captured.value)
-    assert message.startswith("Saby вернул HTTP 500: ККТ недоступна")
+    assert message.startswith(
+        "Saby вернул HTTP 500: ККТ недоступна или отклонила операцию"
+    )
     assert "наш ID" in message
     assert message.endswith("ID Saby vendor-safe-42")
     assert "private-service-secret" not in message
     assert "+7 999 123-45-67" not in message
     assert "owner@example.test" not in message
+
+
+def test_saby_http_error_never_echoes_arbitrary_customer_or_kkt_data():
+    body = json.dumps({
+        "error": {
+            "message": "Ошибка для Иван Иванов; касса 001234567890; заказ short-42"
+        }
+    }).encode()
+
+    def opener(request, timeout):
+        if request.full_url.endswith("/oauth/service/"):
+            return Response({"token": "access-token-value"})
+        raise urllib.error.HTTPError(
+            request.full_url, 500, "Internal Server Error", {}, io.BytesIO(body)
+        )
+
+    client = SabyClient(settings(), opener=opener)
+    with pytest.raises(SabyError) as captured:
+        client.create_fiscal_sale({"externalId": "safe-order"})
+    message = str(captured.value)
+    assert "Иван" not in message
+    assert "001234567890" not in message
+    assert "short-42" not in message
+    assert "ККТ недоступна" in message
 
 
 def test_saby_request_carries_safe_local_correlation_id():
@@ -336,6 +364,44 @@ def test_saby_rejects_malformed_fiscal_result_without_retry(vendor_result):
         return Response({"Result": vendor_result})
 
     client = SabyClient(settings(), opener=opener)
-    with pytest.raises(SabyError, match="результат регистрации чека"):
+    with pytest.raises(SabyError, match="результат регистрации чека") as captured:
         client.create_fiscal_sale({"externalId": "chainya-order-sale"})
+    assert captured.value.request_id
+    assert "наш ID" in str(captured.value)
     assert len(calls) == 2
+
+
+def test_saby_globally_limits_parallel_http_requests_to_two():
+    active = 0
+    maximum = 0
+    state_lock = threading.Lock()
+    release = threading.Event()
+
+    def opener(request, timeout):
+        nonlocal active, maximum
+        with state_lock:
+            active += 1
+            maximum = max(maximum, active)
+        release.wait(timeout=2)
+        with state_lock:
+            active -= 1
+        return Response({"ok": True})
+
+    clients = [SabyClient(settings(), opener=opener) for _ in range(5)]
+    threads = [
+        threading.Thread(
+            target=client._json_request,
+            args=("https://api.sbis.ru/retail/test",),
+        )
+        for client in clients
+    ]
+    for thread in threads:
+        thread.start()
+    deadline = time.monotonic() + 1
+    while maximum < 2 and time.monotonic() < deadline:
+        time.sleep(0.01)
+    release.set()
+    for thread in threads:
+        thread.join(timeout=2)
+    assert maximum == 2
+    assert all(not thread.is_alive() for thread in threads)

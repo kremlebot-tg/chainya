@@ -178,6 +178,17 @@ def compare_catalogs(
                 site_value=ref.external_id,
             ))
             continue
+        saby_name = str(saby_item.get("name") or "").strip()
+        if name != saby_name:
+            differences.append(_difference(
+                "name_mismatch", "error", site_id=site_id, name=name,
+                message=(
+                    "Название товара на сайте не совпадает с Saby; "
+                    "регистрация чека заблокирована до исправления."
+                ),
+                site_value={"name": name},
+                saby_value={"name": saby_name},
+            ))
         compared += 1
         if str(saby_item.get("id")) != str(ref.id):
             differences.append(_difference(

@@ -15,16 +15,17 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Any, Callable
-
+from typing import Any
 
 # Service OAuth returns an application token for ``X-SBISAccessToken``.  Do
 # not mix it with the separate login/password OFD session API, which returns a
 # ``sid`` and uses another authentication contract.
 AUTH_URL = "https://online.sbis.ru/oauth/service/"
 API_ROOT = "https://api.sbis.ru"
+_SABY_REQUEST_SLOTS = threading.BoundedSemaphore(2)
 
 
 class SabyError(RuntimeError):
@@ -33,6 +34,7 @@ class SabyError(RuntimeError):
     def __init__(
         self, message: str, *, request_id: str = "", vendor_request_id: str = ""
     ) -> None:
+        self.message = message
         self.request_id = request_id
         self.vendor_request_id = vendor_request_id
         ids = []
@@ -145,6 +147,7 @@ class SabyClient:
     def _json_request(
         self, url: str, *, method: str = "GET", payload: dict | None = None,
         headers: dict[str, str] | None = None,
+        transform: Callable[[Any], Any] | None = None,
     ) -> Any:
         request_id = str(uuid.uuid4())
         data = None if payload is None else json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -162,7 +165,9 @@ class SabyClient:
             },
         )
         try:
-            with self._opener(request, timeout=15) as response:
+            with _SABY_REQUEST_SLOTS, self._opener(
+                request, timeout=15
+            ) as response:
                 result = json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             detail = self._safe_http_error_detail(exc)
@@ -183,6 +188,13 @@ class SabyClient:
             code = str(raw_code).strip() if raw_code is not None else ""
             suffix = f" (код {code})" if code and code.replace("-", "").replace("_", "").isalnum() and len(code) <= 32 else ""
             raise SabyError(f"Saby отклонил запрос{suffix}", request_id=request_id)
+        if transform is not None:
+            try:
+                return transform(result)
+            except SabyError as exc:
+                if exc.request_id:
+                    raise
+                raise SabyError(exc.message, request_id=request_id) from exc
         return result
 
     @staticmethod
@@ -245,7 +257,19 @@ class SabyClient:
         message = re.sub(r"\b[A-Za-z0-9_=-]{24,}\b", "[значение скрыто]", message)
         message = re.sub(r"[\x00-\x1f\x7f]+", " ", message)
         message = re.sub(r"\s+", " ", message).strip(" .:;,-")
-        return message[:360]
+        normalized = message.casefold()
+        categories = (
+            (("ккт", "касс"), "ККТ недоступна или отклонила операцию"),
+            (("смен",), "Смена ККТ не готова к операции"),
+            (("прав", "доступ", "forbidden", "permission"), "Недостаточно прав приложения Saby"),
+            (("companyid", "точк"), "Saby не принял идентификатор точки продаж"),
+            (("лиценз", "тариф"), "Лицензия Saby не разрешает операцию"),
+            (("номенклат", "товар"), "Saby не принял товарную позицию"),
+        )
+        for markers, safe_message in categories:
+            if any(marker in normalized for marker in markers):
+                return safe_message
+        return ""
 
     def access_token(self, force: bool = False) -> str:
         if not self.settings.configured:
@@ -264,17 +288,27 @@ class SabyClient:
             self._token, self._token_at = str(token), time.monotonic()
             return self._token
 
-    def api(self, path: str, params: dict | None = None, *, method: str = "GET", payload: dict | None = None) -> Any:
+    def api(
+        self, path: str, params: dict | None = None, *, method: str = "GET",
+        payload: dict | None = None,
+        transform: Callable[[Any], Any] | None = None,
+    ) -> Any:
         query = urllib.parse.urlencode(params or {}, doseq=True)
         url = f"{API_ROOT}{path}" + (f"?{query}" if query else "")
         headers = {"X-SBISAccessToken": self.access_token()}
         try:
-            return self._json_request(url, method=method, payload=payload, headers=headers)
+            return self._json_request(
+                url, method=method, payload=payload, headers=headers,
+                transform=transform,
+            )
         except SabyError as exc:
             if "HTTP 401" not in str(exc):
                 raise
             headers["X-SBISAccessToken"] = self.access_token(force=True)
-            return self._json_request(url, method=method, payload=payload, headers=headers)
+            return self._json_request(
+                url, method=method, payload=payload, headers=headers,
+                transform=transform,
+            )
 
     def sales_points(self, product: str = "retail") -> Any:
         return self.api("/retail/point/list", {"product": product, "withPrices": "true", "pageSize": 500})
@@ -407,13 +441,17 @@ class SabyClient:
 
     def create_fiscal_sale(self, payload: dict) -> Any:
         """Register one fiscal sale/refund; policy is enforced by the caller."""
-        result = self.api("/retail/sale/create", method="POST", payload=payload)
-        return unwrap_fiscal_response(result)
+        return self.api(
+            "/retail/sale/create", method="POST", payload=payload,
+            transform=unwrap_fiscal_response,
+        )
 
     def fiscal_receipt(self, receipt_id: str) -> Any:
         """Read receipt state returned by ``create_fiscal_sale``."""
         value = str(receipt_id or "").strip()
         if not value or len(value) > 120:
             raise SabyError("Некорректный идентификатор чека Saby")
-        result = self.api("/retail/pay/list", {"ids[]": value})
-        return unwrap_fiscal_response(result)
+        return self.api(
+            "/retail/pay/list", {"ids[]": value},
+            transform=unwrap_fiscal_response,
+        )

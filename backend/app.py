@@ -77,7 +77,6 @@ from .cdek_delivery import (
 from .integration_guard import ExternalWriteBlocked
 from .integration_writes import IntegrationWriter
 from .saby import SabyClient, SabyError
-from .saby_shadow import SabyShadowSettings, compare_catalogs
 from .saby_catalog_review import build_catalog_review
 from .saby_purchase import (
     SabyFiscalSettings,
@@ -85,6 +84,7 @@ from .saby_purchase import (
     build_fiscal_sale,
     purchase_route_status,
 )
+from .saby_shadow import SabyShadowSettings, compare_catalogs
 from .saby_sync import (
     SABY_NOMENCLATURE_BY_SITE_ID,
     SabyConfigurationError,
@@ -97,6 +97,12 @@ from .saby_sync import (
 from .saby_sync import (
     write_allowed as saby_write_allowed,
 )
+from .stock_guard import (
+    StockGuardError,
+    requirements_for_lines,
+    verify_line_names,
+    verify_unique_catalog_name,
+)
 from .tbank import (
     TBankClient,
     TBankError,
@@ -104,7 +110,6 @@ from .tbank import (
     verify_notification_token,
 )
 from .tbank_receipt import TBankReceiptError, TBankReceiptSettings, build_receipt
-from .stock_guard import StockGuardError, requirements_for_lines
 
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT = ROOT.parent
@@ -150,6 +155,7 @@ TBANK_INIT_LEASE_SECONDS = 45
 STOCK_RESERVATION_MINUTES = 15
 PAID_EFFECT_LEASE_SECONDS = 90
 PAID_EFFECT_RETRY_SECONDS = 30
+SABY_OFD_PENDING_MAX_SECONDS = 24 * 60 * 60
 OWNER_CHAT_IDS = [
     value for value in re.split(r"[\s,]+", os.getenv("OWNER_CHAT_ID", "").strip()) if value
 ]
@@ -2070,12 +2076,35 @@ def sync_paid_order_to_saby_fiscal(
         except SabyError as exc:
             with db() as con:
                 con.execute(
-                    f"UPDATE orders SET {error_col} = ?, {updated_col} = ?, "
-                    "updated_at = ? WHERE id = ? AND " + state_col + " = 'pending_ofd'",
-                    (str(exc)[:500], started, started, order_id),
+                    f"UPDATE orders SET {error_col} = ?, updated_at = ? "
+                    "WHERE id = ? AND " + state_col + " = 'pending_ofd'",
+                    (str(exc)[:500], started, order_id),
                 )
             return
         if not _saby_receipt_is_fiscalized(receipt):
+            try:
+                pending_since = datetime.fromisoformat(
+                    str(row[updated_col] or "").replace("Z", "+00:00")
+                )
+                pending_expired = (
+                    pending_since.tzinfo is not None
+                    and datetime.now(timezone.utc) - pending_since
+                    >= timedelta(seconds=SABY_OFD_PENDING_MAX_SECONDS)
+                )
+            except (TypeError, ValueError):
+                pending_expired = True
+            if pending_expired:
+                error = (
+                    "Saby принял операцию, но ОФД не подтвердил чек за 24 часа; "
+                    "нужна ручная проверка без повторной продажи"
+                )
+                with db() as con:
+                    con.execute(
+                        f"UPDATE orders SET {state_col} = 'blocked', "
+                        f"{error_col} = ?, {updated_col} = ?, updated_at = ? "
+                        f"WHERE id = ? AND {state_col} = 'pending_ofd'",
+                        (error, started, started, order_id),
+                    )
             return
         with db() as con:
             con.execute(
@@ -2087,8 +2116,27 @@ def sync_paid_order_to_saby_fiscal(
         return
 
     try:
+        order = admin_order(order_row(order_id))
+        base_catalog = saby_client.base_catalog_all(with_balance=False)
+        verify_line_names(order["items"], base_catalog)
+        if int(order.get("delivery_price") or 0) > 0:
+            verify_unique_catalog_name("Доставка", base_catalog)
+    except (SabyError, StockGuardError) as exc:
+        # This preflight is read-only, so no fiscal POST could have been
+        # accepted and retry remains safe.
+        failed = now_iso()
+        with db() as con:
+            con.execute(
+                f"UPDATE orders SET {state_col} = 'failed', {error_col} = ?, "
+                f"{updated_col} = ?, updated_at = ? WHERE id = ? AND "
+                f"{state_col} = 'sending'",
+                (str(exc)[:500], failed, failed, order_id),
+            )
+        return
+
+    try:
         payload = build_fiscal_sale(
-            admin_order(order_row(order_id)), settings=saby_fiscal_settings,
+            order, settings=saby_fiscal_settings,
             refund=refund, settlement=settlement,
         )
         payload_hash = _payload_sha256(payload)
@@ -4581,6 +4629,16 @@ def saby_readiness_report() -> dict:
         item for item in products
         if str(item.get("externalId") or "") in expected_external_ids
     ]
+    name_mismatch_products = []
+    for item in mapped_products:
+        site_id = site_id_by_external_id.get(str(item.get("externalId") or ""))
+        site_name = str(site_catalog.get(site_id or "", {}).get("name") or "").strip()
+        saby_name = str(item.get("name") or "").strip()
+        if not site_name or site_name != saby_name:
+            name_mismatch_products.append({
+                "id": item.get("id"),
+                "name": site_name or saby_name or "Позиция",
+            })
     sellable_external_ids = {
         ref.external_id
         for site_id, ref in SABY_NOMENCLATURE_BY_SITE_ID.items()
@@ -4623,6 +4681,10 @@ def saby_readiness_report() -> dict:
         blockers.append("Точка «Чайня» ещё не включена для продукта delivery")
     if products and not catalog_mapping_valid:
         blockers.append("Каталог сайта не совпадает с externalId номенклатуры Saby")
+    if name_mismatch_products:
+        count = len(name_mismatch_products)
+        label = "позиции" if count == 1 else "позиций"
+        blockers.append(f"Названия сайта и Saby различаются у {count} {label}")
     if zero_balance_products:
         count = len(zero_balance_products)
         label = "активной позиции" if count == 1 else "активных позиций"
@@ -4650,6 +4712,8 @@ def saby_readiness_report() -> dict:
         "priced_items": len(priced_products),
         "in_stock_items": len(in_stock_products),
         "catalog_mapping_valid": catalog_mapping_valid,
+        "catalog_names_valid": not name_mismatch_products,
+        "name_mismatch_items": name_mismatch_products[:20],
         "missing_external_ids": missing_external_ids,
         "unexpected_external_ids": unexpected_external_ids,
         "zero_balance_items": [

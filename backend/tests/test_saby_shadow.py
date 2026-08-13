@@ -159,6 +159,21 @@ def test_shadow_reports_price_stock_mapping_and_saby_only_differences():
     assert price["saby_value"] == {"cost": 175, "unit": "г"}
 
 
+def test_shadow_blocks_exact_name_mismatch_to_prevent_saby_duplicates():
+    saby = saby_catalog()
+    saby[0]["name"] = "Рассыпной чай (касса)"
+
+    result = compare_catalogs(site_catalog(), saby, MAPPING)
+
+    mismatch = next(
+        item for item in result["differences"]
+        if item["kind"] == "name_mismatch"
+    )
+    assert mismatch["severity"] == "error"
+    assert mismatch["site_value"] == {"name": "Рассыпной чай"}
+    assert mismatch["saby_value"] == {"name": "Рассыпной чай (касса)"}
+
+
 def test_shadow_reports_unknown_units_and_missing_saby_items_instead_of_guessing():
     site, saby = site_catalog(), saby_catalog()
     site["piece"]["unit"] = "box"

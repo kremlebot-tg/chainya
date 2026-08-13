@@ -321,10 +321,16 @@ def tbank_checkout_ready() -> bool:
     )
     if not valid or not settings.configured or not urls_ready:
         return False
-    # A lost Saby response may already have created a fiscal sale.  Until the
-    # ambiguity is reconciled, accepting another payment would enlarge an
-    # unresolved fiscal incident.  This check is intentionally local and
-    # fail-closed; it never calls Saby from the public status endpoint.
+    # A lost Saby response may already have created a fiscal sale.  The default
+    # policy therefore closes checkout until the incident is reconciled.  A
+    # business may explicitly opt into manual reconciliation while continuing
+    # to accept payments; ambiguous operations remain durable and visible in
+    # the owner panel and are never retried automatically.
+    ambiguous_policy = os.getenv(
+        "SABY_AMBIGUOUS_CHECKOUT_POLICY", "block"
+    ).strip().lower()
+    if ambiguous_policy not in {"block", "manual"}:
+        return False
     try:
         with db() as con:
             unresolved_saby = con.execute(
@@ -336,7 +342,7 @@ def tbank_checkout_ready() -> bool:
             ).fetchone()
     except (OSError, sqlite3.Error):
         return False
-    if unresolved_saby:
+    if unresolved_saby and ambiguous_policy != "manual":
         return False
     if TEST_MODE:
         receipt_safe = (
@@ -392,6 +398,9 @@ def integrations_status() -> dict:
         saby_configured=bool(saby.get("configured")),
         fiscal_settings=saby_fiscal_settings,
     )
+    ambiguous_checkout_policy = os.getenv(
+        "SABY_AMBIGUOUS_CHECKOUT_POLICY", "block"
+    ).strip().lower()
     return {
         "guard": {
             "test_mode": TEST_MODE,
@@ -436,6 +445,7 @@ def integrations_status() -> dict:
                 and not mapping_error
             ),
             "purchase_route": saby_purchase.public_dict(),
+            "ambiguous_checkout_policy": ambiguous_checkout_policy,
             "fiscal": saby_fiscal_settings.public_dict(),
             "stock_guard": {
                 "mode": os.getenv("SABY_STOCK_GUARD_MODE", "off").strip().lower(),

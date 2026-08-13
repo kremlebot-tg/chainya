@@ -138,6 +138,46 @@ def test_live_checkout_closes_while_saby_fiscal_result_is_ambiguous(
     assert module.tbank_checkout_ready() is False
 
 
+def test_live_checkout_can_continue_with_explicit_manual_saby_reconciliation(
+    tmp_path, monkeypatch
+):
+    client, module = app_client(tmp_path, monkeypatch)
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+    module.TEST_MODE = False
+    monkeypatch.setenv("TBANK_CHECKOUT_MODE", "auto")
+    monkeypatch.setenv("SABY_PURCHASE_ROUTE", "fiscal_sale")
+    monkeypatch.setenv("SABY_STOCK_GUARD_MODE", "auto")
+    monkeypatch.setenv("SABY_AMBIGUOUS_CHECKOUT_POLICY", "manual")
+    monkeypatch.setattr(module.tbank_client, "settings", TBankSettings(
+        terminal_key="live-terminal", password="safe-password",
+        notification_url="https://chainya.ru/api/payments/tbank/callback",
+        success_url="https://chainya.ru/payment/success",
+        fail_url="https://chainya.ru/payment/fail",
+    ))
+    monkeypatch.setattr(module.saby_client, "settings", SabySettings(
+        app_client_id="configured", app_secret="configured", secret_key="configured",
+    ))
+    monkeypatch.setattr(module, "tbank_receipt_settings", TBankReceiptSettings(enabled=False))
+    monkeypatch.setattr(module, "saby_fiscal_settings", SabyFiscalSettings(
+        company_id="274", kkt_reg_number="0001234567890123",
+        tax_system=2, pay_method=4,
+    ))
+    with module.db() as con:
+        con.execute(
+            "UPDATE orders SET saby_receipt_state='ambiguous' WHERE id=?",
+            (order["id"],),
+        )
+    assert module.tbank_checkout_ready() is True
+
+
+def test_invalid_ambiguous_checkout_policy_fails_closed(tmp_path, monkeypatch):
+    _, module = app_client(tmp_path, monkeypatch, test_mode="0")
+    monkeypatch.setenv("TBANK_CHECKOUT_MODE", "auto")
+    monkeypatch.setenv("SABY_AMBIGUOUS_CHECKOUT_POLICY", "unexpected")
+    assert module.tbank_checkout_ready() is False
+
+
 def test_service_pages_support_head_without_exposing_content(tmp_path, monkeypatch):
     client, _ = app_client(tmp_path, monkeypatch)
     with client:

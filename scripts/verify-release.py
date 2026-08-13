@@ -155,6 +155,7 @@ def check_dist(root: pathlib.Path) -> list[str]:
                     f"{name}: отсутствует предупреждение об одном чеке полного расчёта"
                 )
     route_canonicals = {
+        "index.html": "https://chainya.ru/",
         "shop/index.html": "https://chainya.ru/shop",
         "business/index.html": "https://chainya.ru/business",
         "booking/index.html": "https://chainya.ru/booking",
@@ -170,9 +171,50 @@ def check_dist(root: pathlib.Path) -> list[str]:
             errors.append(f"{name}: неверный canonical")
         if f'<meta property="og:url" content="{canonical}">' not in text:
             errors.append(f"{name}: неверный og:url")
-        view = route_views[name]
-        if f'<section class="view is-active" id="view-{view}">' not in text:
-            errors.append(f"{name}: неверный исходный активный раздел")
+        for marker in (
+            '<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">',
+            '<meta property="og:site_name" content="Чайня">',
+            '<meta property="og:image:alt"',
+            '<meta name="twitter:image"',
+            '<meta name="twitter:image:alt"',
+        ):
+            if marker not in text:
+                errors.append(f"{name}: отсутствует SEO-маркер {marker!r}")
+        ld_scripts = re.findall(
+            r'<script type="application/ld\+json">(.*?)</script>',
+            text,
+            flags=re.DOTALL,
+        )
+        if len(ld_scripts) != 1:
+            errors.append(f"{name}: ожидается один JSON-LD блок")
+        else:
+            try:
+                graph = json.loads(ld_scripts[0]).get("@graph", [])
+            except (json.JSONDecodeError, AttributeError):
+                errors.append(f"{name}: JSON-LD не разбирается")
+            else:
+                types = {
+                    item_type
+                    for item in graph
+                    for item_type in (
+                        item.get("@type")
+                        if isinstance(item.get("@type"), list)
+                        else [item.get("@type")]
+                    )
+                }
+                for expected_type in ("Organization", "Store", "WebSite", "WebPage"):
+                    if expected_type not in types:
+                        errors.append(f"{name}: в JSON-LD нет {expected_type}")
+                pages = [item for item in graph if item.get("@type") == "WebPage"]
+                if len(pages) != 1 or pages[0].get("url") != canonical:
+                    errors.append(f"{name}: JSON-LD WebPage указывает не на canonical")
+                has_breadcrumbs = "BreadcrumbList" in types
+                if (name != "index.html") != has_breadcrumbs:
+                    errors.append(f"{name}: неверное наличие BreadcrumbList")
+        if name in route_views:
+            view = route_views[name]
+            if f'<section class="view is-active" id="view-{view}">' not in text:
+                errors.append(f"{name}: неверный исходный активный раздел")
         relative_assets = re.findall(
             r'(?:src|href)=["\'](?:img/|fonts/|favicon\.(?:png|ico))',
             text,

@@ -61,31 +61,27 @@ HERO_PRELOAD = (
     'fetchpriority="high">'
 )
 
-HEAD_EXTRA = f"""<meta name="description" content="{DESC}">
-<meta name="theme-color" content="#141110">
-<meta property="og:type" content="website">
-<meta property="og:title" content="{TITLE}">
-<meta property="og:description" content="{DESC}">
-<meta property="og:locale" content="ru_RU">
-<meta property="og:url" content="{SITE}">
-<meta property="og:image" content="{SITE}{OG_NAME}">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="{TITLE}">
-<meta name="twitter:description" content="{DESC}">
-<link rel="canonical" href="{SITE}">
-<link rel="icon" href="{asset_root}favicon.png" type="image/png">
-<link rel="apple-touch-icon" href="{asset_root}favicon.png">
-{HERO_PRELOAD}
-{json.dumps({
-    "@context": "https://schema.org",
-    "@graph": [
+def seo_head(
+    *,
+    page_title: str = TITLE,
+    page_desc: str = DESC,
+    page_url: str = SITE,
+    page_label: str = "Главная",
+    preload_hero: bool = True,
+) -> str:
+    """Статическое SEO для конкретного публичного URL.
+
+    Контент переключается в браузере, но поисковому роботу сразу отдаём
+    самостоятельную страницу с собственными метаданными и JSON-LD.
+    """
+    graph = [
         {
             "@type": "Organization",
             "@id": SITE + "#seller",
             "name": SELLER_NAME,
             "alternateName": "Чайня",
+            "url": SITE,
+            "logo": SITE + "img/logo-mark.webp",
             "taxID": SELLER_INN,
             "identifier": {
                 "@type": "PropertyValue",
@@ -111,6 +107,7 @@ HEAD_EXTRA = f"""<meta name="description" content="{DESC}">
             "description": DESC,
             "url": SITE,
             "image": SITE + OG_NAME,
+            "logo": SITE + "img/logo-mark.webp",
             "email": SELLER_EMAIL,
             "telephone": "+7 905 590-88-01",
             "priceRange": "₽₽",
@@ -120,7 +117,13 @@ HEAD_EXTRA = f"""<meta name="description" content="{DESC}">
                 "@type": "PostalAddress",
                 "streetAddress": "улица Острякова, 3, помещение 114",
                 "addressLocality": "Москва",
+                "postalCode": "125057",
                 "addressCountry": "RU",
+            },
+            "geo": {
+                "@type": "GeoCoordinates",
+                "latitude": 55.799473,
+                "longitude": 37.526791,
             },
             "openingHoursSpecification": {
                 "@type": "OpeningHoursSpecification",
@@ -131,8 +134,83 @@ HEAD_EXTRA = f"""<meta name="description" content="{DESC}">
             "hasMap": "https://yandex.ru/maps/org/chaynya/49488428011/",
             "sameAs": ["https://t.me/chainyamsk", "https://yandex.ru/maps/org/chaynya/49488428011/"],
         },
-    ],
-}, ensure_ascii=False).join(('<script type="application/ld+json">', '</script>'))}"""
+        {
+            "@type": "WebSite",
+            "@id": SITE + "#website",
+            "url": SITE,
+            "name": "Чайня",
+            "alternateName": "Chainya",
+            "inLanguage": "ru-RU",
+            "publisher": {"@id": SITE + "#seller"},
+        },
+        {
+            "@type": "WebPage",
+            "@id": page_url + "#webpage",
+            "url": page_url,
+            "name": page_title,
+            "description": page_desc,
+            "inLanguage": "ru-RU",
+            "isPartOf": {"@id": SITE + "#website"},
+            "about": {"@id": SITE + "#store"},
+            "primaryImageOfPage": {
+                "@type": "ImageObject",
+                "url": SITE + OG_NAME,
+                "width": 1200,
+                "height": 630,
+            },
+        },
+    ]
+    if page_url != SITE:
+        graph.append({
+            "@type": "BreadcrumbList",
+            "@id": page_url + "#breadcrumb",
+            "itemListElement": [
+                {
+                    "@type": "ListItem",
+                    "position": 1,
+                    "name": "Главная",
+                    "item": SITE,
+                },
+                {
+                    "@type": "ListItem",
+                    "position": 2,
+                    "name": page_label,
+                    "item": page_url,
+                },
+            ],
+        })
+    structured_data = json.dumps(
+        {"@context": "https://schema.org", "@graph": graph},
+        ensure_ascii=False,
+    ).join(('<script type="application/ld+json">', '</script>'))
+    preload = HERO_PRELOAD if preload_hero else ""
+    image_alt = "Китайский чай и чайная «Чайня» в Москве"
+    return f"""<meta name="description" content="{page_desc}">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
+<meta name="theme-color" content="#141110">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Чайня">
+<meta property="og:title" content="{page_title}">
+<meta property="og:description" content="{page_desc}">
+<meta property="og:locale" content="ru_RU">
+<meta property="og:url" content="{page_url}">
+<meta property="og:image" content="{SITE}{OG_NAME}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="{image_alt}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{page_title}">
+<meta name="twitter:description" content="{page_desc}">
+<meta name="twitter:image" content="{SITE}{OG_NAME}">
+<meta name="twitter:image:alt" content="{image_alt}">
+<link rel="canonical" href="{page_url}">
+<link rel="icon" href="{asset_root}favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="{asset_root}favicon.png">
+{preload}
+{structured_data}"""
+
+
+HEAD_EXTRA = seo_head()
 
 
 def font_css(inline: bool) -> str:
@@ -373,29 +451,28 @@ if web:
         "shop": (
             "Купить китайский чай · Чайня",
             "Китайский чай в пакетах 10, 25, 50 и 100 г с доставкой СДЭК по Москве и России.",
+            "Купить чай",
         ),
         "business": (
             "Чай для бизнеса и мероприятий · Чайня",
             "Поставки китайского чая для бизнеса и выездные чайные церемонии в Москве.",
+            "Для бизнеса",
         ),
         "booking": (
             "Бронь чайной церемонии · Чайня",
             "Забронируйте чайную церемонию с мастером или самостоятельное чаепитие на Острякова, 3.",
+            "Бронь",
         ),
     }
     route_views = {"shop": "shop", "business": "b2b", "booking": "book"}
-    for route, (route_title, route_desc) in route_meta.items():
+    for route, (route_title, route_desc, route_label) in route_meta.items():
         route_url = f"{SITE}{route}"
-        route_head = (
-            HEAD_EXTRA
-            .replace(HERO_PRELOAD, "")
-            .replace(f'<meta name="description" content="{DESC}">', f'<meta name="description" content="{route_desc}">')
-            .replace(f'<meta property="og:title" content="{TITLE}">', f'<meta property="og:title" content="{route_title}">')
-            .replace(f'<meta property="og:description" content="{DESC}">', f'<meta property="og:description" content="{route_desc}">')
-            .replace(f'<meta name="twitter:title" content="{TITLE}">', f'<meta name="twitter:title" content="{route_title}">')
-            .replace(f'<meta name="twitter:description" content="{DESC}">', f'<meta name="twitter:description" content="{route_desc}">')
-            .replace(f'<meta property="og:url" content="{SITE}">', f'<meta property="og:url" content="{route_url}">')
-            .replace(f'<link rel="canonical" href="{SITE}">', f'<link rel="canonical" href="{route_url}">')
+        route_head = seo_head(
+            page_title=route_title,
+            page_desc=route_desc,
+            page_url=route_url,
+            page_label=route_label,
+            preload_hero=False,
         )
         route_dir = dist / route
         route_dir.mkdir()

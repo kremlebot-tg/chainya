@@ -66,7 +66,8 @@ def test_public_pages_use_quiet_account_probe_and_eager_hero_image():
     assert "fetch('/api/account',{cache:'no-store'})" not in SOURCE
     assert 'asset_root = "/" if web else ""' in BUILD_SOURCE
     assert 'href="{asset_root}img/tea-baihao.webp"' in BUILD_SOURCE
-    assert '.replace(HERO_PRELOAD, "")' in BUILD_SOURCE
+    assert "preload_hero: bool = True" in BUILD_SOURCE
+    assert "preload_hero=False" in BUILD_SOURCE
 
 
 def test_catalog_keeps_a_semantic_heading_without_restoring_visual_clutter():

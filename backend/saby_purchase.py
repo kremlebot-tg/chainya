@@ -289,7 +289,12 @@ def build_fiscal_sale(
     operation_suffix = "refund" if refund else "sale"
     return {
         "companyID": settings.company_id,
-        "kktRegNumber": int(settings.kkt_reg_number),
+        # A KKT registration number is an identifier, not a quantity.  Saby's
+        # OFD API returns it as a string and real numbers may start with zero.
+        # Converting it to int is lossy and can make Saby resolve a different
+        # or nonexistent KKT even though the older register-receipt table labels
+        # the field as ``number``.
+        "kktRegNumber": settings.kkt_reg_number,
         "cashierFIO": "Автоматический режим",
         "operationType": "2" if refund else "1",
         "cashSum": zero,

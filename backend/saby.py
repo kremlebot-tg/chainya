@@ -218,9 +218,17 @@ class SabyClient:
         """Extract a short vendor explanation without leaking sensitive data."""
         try:
             raw = exc.read(16_384).decode("utf-8", errors="replace")
-            payload = json.loads(raw)
-        except (AttributeError, OSError, UnicodeError, ValueError, json.JSONDecodeError):
+        except (AttributeError, OSError, UnicodeError, ValueError):
             return ""
+
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError:
+            # Some Saby gateways return the useful explanation as plain text
+            # (or a tiny HTML error page) instead of JSON.  Keep only text and
+            # pass it through the same strict category mapping below; the raw
+            # vendor body is never exposed or logged.
+            payload = re.sub(r"<[^>]+>", " ", raw)
 
         candidates: list[str] = []
         allowed = {"error", "message", "detail", "description", "errormessage", "reason"}
@@ -238,6 +246,8 @@ class SabyClient:
             elif isinstance(value, list):
                 for nested in value[:10]:
                     collect(nested, depth + 1)
+            elif isinstance(value, str):
+                candidates.append(value)
 
         collect(payload)
         if not candidates:
@@ -259,6 +269,7 @@ class SabyClient:
         message = re.sub(r"\s+", " ", message).strip(" .:;,-")
         normalized = message.casefold()
         categories = (
+            (("не найден документ", "document not found"), "Saby не нашёл связанную точку или ККТ"),
             (("ккт", "касс"), "ККТ недоступна или отклонила операцию"),
             (("смен",), "Смена ККТ не готова к операции"),
             (("прав", "доступ", "forbidden", "permission"), "Недостаточно прав приложения Saby"),

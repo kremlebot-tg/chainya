@@ -239,6 +239,27 @@ def test_saby_http_error_never_echoes_arbitrary_customer_or_kkt_data():
     assert "ККТ недоступна" in message
 
 
+def test_saby_plain_text_document_not_found_is_safely_classified():
+    body = (
+        "Internal Server Error: Не найден документ с идентификатором "
+        "001234567890"
+    ).encode()
+
+    def opener(request, timeout):
+        if request.full_url.endswith("/oauth/service/"):
+            return Response({"token": "access-token-value"})
+        raise urllib.error.HTTPError(
+            request.full_url, 500, "Internal Server Error", {}, io.BytesIO(body)
+        )
+
+    client = SabyClient(settings(), opener=opener)
+    with pytest.raises(SabyError) as captured:
+        client.create_fiscal_sale({"externalId": "safe-order"})
+    message = str(captured.value)
+    assert "Saby не нашёл связанную точку или ККТ" in message
+    assert "001234567890" not in message
+
+
 def test_saby_request_carries_safe_local_correlation_id():
     calls = []
 

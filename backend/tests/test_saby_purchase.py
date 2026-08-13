@@ -82,6 +82,7 @@ def test_external_ofd_and_unknown_route_remain_fail_closed():
 def test_fiscal_sale_converts_grams_to_kg_and_keeps_checkout_total():
     payload = build_fiscal_sale(order(), settings=fiscal_settings())
     line = payload["nomenclatures"][0]
+    assert payload["kktRegNumber"] == "0001234567890123"
     assert payload["operationType"] == "1"
     assert payload["internetSum"] == "350.00"
     assert payload["vatNone"] == "350.00"

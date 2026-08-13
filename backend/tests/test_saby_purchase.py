@@ -1,8 +1,11 @@
+from decimal import Decimal
+
 import pytest
 
 from backend.saby_purchase import (
     SabyFiscalSettings,
     SabyPurchaseError,
+    build_fiscal_nomenclatures,
     build_fiscal_sale,
     purchase_route_status,
 )
@@ -85,10 +88,50 @@ def test_fiscal_sale_converts_grams_to_kg_and_keeps_checkout_total():
     assert payload["taxSystem"] == "2"
     assert payload["payMethod"] == "4"
     assert line["measureNomenclature"] == "кг"
-    assert line["quantityNomenclature"] == "0.02"
+    assert line["quantityNomenclature"] == "0.020"
     assert line["priceNomenclature"] == "17500.00"
     assert line["totalPriceNomenclature"] == "350.00"
     assert payload["externalId"] == "chainya-7e41d55a13e7-sale"
+
+
+@pytest.mark.parametrize(
+    ("pack", "qty", "unit_price", "expected_quantity"),
+    [
+        (10, 1, 175, "0.010"),
+        (25, 1, 440, "0.025"),
+        (50, 1, 880, "0.050"),
+        (100, 1, 1760, "0.100"),
+        (25, 3, 440, "0.075"),
+    ],
+)
+def test_fiscal_nomenclatures_preserve_gram_precision_after_serialization(
+    pack, qty, unit_price, expected_quantity
+):
+    total = unit_price * qty
+    line = build_fiscal_nomenclatures([{
+        "name": "Тестовый чай",
+        "pack": pack,
+        "qty": qty,
+        "unit_price": unit_price,
+        "total": total,
+    }])[0]
+    assert line["quantityNomenclature"] == expected_quantity
+    serialized_total = (
+        Decimal(line["priceNomenclature"])
+        * Decimal(line["quantityNomenclature"])
+    ).quantize(Decimal("0.01"))
+    assert serialized_total == Decimal(total).quantize(Decimal("0.01"))
+
+
+def test_fiscal_nomenclatures_fail_closed_on_serialized_rounding_mismatch():
+    with pytest.raises(SabyPurchaseError, match="расходятся после округления"):
+        build_fiscal_nomenclatures([{
+            "name": "Некорректная дробная позиция",
+            "pack": 25,
+            "qty": 43,
+            "unit_price": 1,
+            "total": 21,
+        }])
 
 
 def test_fiscal_sale_supports_piece_item_delivery_and_full_return():
@@ -103,7 +146,9 @@ def test_fiscal_sale_supports_piece_item_delivery_and_full_return():
     sale = build_fiscal_sale(source, settings=fiscal_settings())
     refund = build_fiscal_sale(source, settings=fiscal_settings(), refund=True)
     assert sale["nomenclatures"][0]["measureNomenclature"] == "шт"
+    assert sale["nomenclatures"][0]["quantityNomenclature"] == "1.00"
     assert sale["nomenclatures"][1]["kindNomenclature"] == "у"
+    assert sale["nomenclatures"][1]["quantityNomenclature"] == "1.00"
     assert refund["operationType"] == "2"
     assert refund["externalId"].endswith("-refund")
 

@@ -2528,15 +2528,14 @@ select.input{
     pick.forEach(m => strip.append(el(`<img src="${m.img}" alt="" loading="lazy" width="800" height="800">`)));
   }
 
-  const HERO_PICS = [
-    { src:'{{img:tea-dancong}}', alt:'alt_product', pos:'50% 50%' },
-    { src:'{{img:tea-gaba-honey}}', alt:'alt_product', pos:'50% 50%' },
-    { src:'{{img:tea-baihao}}', alt:'alt_product', pos:'50% 50%' },
-  ];
+  const HERO_TEA_ID = 'baihao';
+  const HERO_FALLBACK = '{{img:tea-baihao}}';
   function selectHeroImage(){
-    const pic = HERO_PICS[Math.floor(Date.now() / 86400000) % HERO_PICS.length];
+    const tea = TEA_META.find(item => item.id === HERO_TEA_ID);
     const img = $('#hero-img');
-    img.src = pic.src; img.alt = T()[pic.alt] || ''; img.style.objectPosition = pic.pos;
+    img.src = tea?.img || HERO_FALLBACK;
+    img.alt = T().alt_product || '';
+    img.style.objectPosition = '50% 50%';
   }
 
   let lastCard = null, lastCartTrigger = null;   // куда вернуть фокус после закрытия панели
@@ -2677,6 +2676,7 @@ select.input{
           for (const id of Object.keys(I18N[language].teas)) if (!seen.has(id)) delete I18N[language].teas[id];
         }
         syncCatalogCounters();
+        selectHeroImage();
         buildRange();
         buildTeaGrids();
         syncCart();

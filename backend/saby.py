@@ -14,6 +14,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any, Callable
@@ -28,6 +29,19 @@ API_ROOT = "https://api.sbis.ru"
 
 class SabyError(RuntimeError):
     """Безопасная ошибка интеграции без вывода ключей в текст или лог."""
+
+    def __init__(
+        self, message: str, *, request_id: str = "", vendor_request_id: str = ""
+    ) -> None:
+        self.request_id = request_id
+        self.vendor_request_id = vendor_request_id
+        ids = []
+        if request_id:
+            ids.append(f"наш ID {request_id}")
+        if vendor_request_id and vendor_request_id != request_id:
+            ids.append(f"ID Saby {vendor_request_id}")
+        suffix = f" · {' · '.join(ids)}" if ids else ""
+        super().__init__(f"{message}{suffix}")
 
 
 def unwrap_fiscal_response(result: Any) -> Any:
@@ -132,10 +146,20 @@ class SabyClient:
         self, url: str, *, method: str = "GET", payload: dict | None = None,
         headers: dict[str, str] | None = None,
     ) -> Any:
+        request_id = str(uuid.uuid4())
         data = None if payload is None else json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        request_headers = {
+            key: value for key, value in (headers or {}).items()
+            if key.lower() != "x-request-id"
+        }
         request = urllib.request.Request(
             url, data=data, method=method,
-            headers={"Accept": "application/json", "Content-Type": "application/json", **(headers or {})},
+            headers={
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                **request_headers,
+                "X-Request-ID": request_id,
+            },
         )
         try:
             with self._opener(request, timeout=15) as response:
@@ -143,18 +167,40 @@ class SabyClient:
         except urllib.error.HTTPError as exc:
             detail = self._safe_http_error_detail(exc)
             suffix = f": {detail}" if detail else ""
-            raise SabyError(f"Saby вернул HTTP {exc.code}{suffix}") from exc
+            vendor_request_id = self._safe_request_id(exc.headers)
+            raise SabyError(
+                f"Saby вернул HTTP {exc.code}{suffix}",
+                request_id=request_id,
+                vendor_request_id=vendor_request_id,
+            ) from exc
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
-            raise SabyError("Saby временно недоступен") from exc
+            raise SabyError("Saby временно недоступен", request_id=request_id) from exc
         except json.JSONDecodeError as exc:
-            raise SabyError("Saby вернул некорректный ответ") from exc
+            raise SabyError("Saby вернул некорректный ответ", request_id=request_id) from exc
         if isinstance(result, dict) and result.get("error"):
             error = result["error"]
             raw_code = error.get("code") if isinstance(error, dict) else None
             code = str(raw_code).strip() if raw_code is not None else ""
             suffix = f" (код {code})" if code and code.replace("-", "").replace("_", "").isalnum() and len(code) <= 32 else ""
-            raise SabyError(f"Saby отклонил запрос{suffix}")
+            raise SabyError(f"Saby отклонил запрос{suffix}", request_id=request_id)
         return result
+
+    @staticmethod
+    def _safe_request_id(headers: Any) -> str:
+        """Return only an opaque, printable vendor correlation identifier."""
+        if headers is None:
+            return ""
+        for name in (
+            "X-Request-ID", "Request-ID", "X-Correlation-ID",
+            "X-Trace-ID", "Trace-ID", "X-SBIS-Request-ID",
+        ):
+            try:
+                value = str(headers.get(name, "")).strip()
+            except (AttributeError, TypeError, ValueError):
+                continue
+            if value and len(value) <= 120 and re.fullmatch(r"[A-Za-z0-9._:-]+", value):
+                return value
+        return ""
 
     def _safe_http_error_detail(self, exc: urllib.error.HTTPError) -> str:
         """Extract a short vendor explanation without leaking sensitive data."""

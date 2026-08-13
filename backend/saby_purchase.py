@@ -173,8 +173,25 @@ def _money(value: Any, field: str) -> Decimal:
     return result
 
 
-def _decimal_text(value: Decimal) -> str:
+def _money_text(value: Decimal) -> str:
     return format(value.quantize(Decimal("0.01")), "f")
+
+
+def _quantity_text(value: Decimal, *, measure: str) -> str:
+    precision = Decimal("0.001") if measure == "кг" else Decimal("0.01")
+    return format(value.quantize(precision), "f")
+
+
+def _validate_serialized_line(line: Mapping[str, object], *, name: str) -> None:
+    """Fail closed if the values sent to Saby no longer add up to the line total."""
+
+    price = Decimal(str(line["priceNomenclature"]))
+    quantity = Decimal(str(line["quantityNomenclature"]))
+    total = Decimal(str(line["totalPriceNomenclature"]))
+    if (price * quantity).quantize(Decimal("0.01")) != total:
+        raise SabyPurchaseError(
+            f"Цена, количество и сумма позиции {name} расходятся после округления"
+        )
 
 
 def _phone(value: object) -> str:
@@ -213,28 +230,32 @@ def build_fiscal_nomenclatures(
             measure = "кг"
         if (price * quantity).quantize(Decimal("0.01")) != total.quantize(Decimal("0.01")):
             raise SabyPurchaseError(f"Цена и сумма позиции {name} не совпадают")
-        result.append({
+        fiscal_line = {
             "nameNomenclature": name,
-            "priceNomenclature": _decimal_text(price),
-            "quantityNomenclature": _decimal_text(quantity),
+            "priceNomenclature": _money_text(price),
+            "quantityNomenclature": _quantity_text(quantity, measure=measure),
             "measureNomenclature": measure,
             "kindNomenclature": "т",
-            "totalPriceNomenclature": _decimal_text(total),
+            "totalPriceNomenclature": _money_text(total),
             "taxRateNomenclature": None,
             "totalVat": "0.00",
-        })
+        }
+        _validate_serialized_line(fiscal_line, name=name)
+        result.append(fiscal_line)
     if delivery_price:
         delivery = _money(delivery_price, "стоимости доставки")
-        result.append({
+        delivery_line = {
             "nameNomenclature": "Доставка",
-            "priceNomenclature": _decimal_text(delivery),
+            "priceNomenclature": _money_text(delivery),
             "quantityNomenclature": "1.00",
             "measureNomenclature": "шт",
             "kindNomenclature": "у",
-            "totalPriceNomenclature": _decimal_text(delivery),
+            "totalPriceNomenclature": _money_text(delivery),
             "taxRateNomenclature": None,
             "totalVat": "0.00",
-        })
+        }
+        _validate_serialized_line(delivery_line, name="Доставка")
+        result.append(delivery_line)
     return result
 
 
@@ -266,7 +287,7 @@ def build_fiscal_sale(
             "При одностадийной оплате полный расчёт уже создаётся после оплаты"
         )
     pay_method = settings.pay_method
-    internet_sum = _decimal_text(total)
+    internet_sum = _money_text(total)
     prepay_sum = zero
     operation_suffix = "refund" if refund else "sale"
     return {
@@ -280,7 +301,7 @@ def build_fiscal_sale(
         "accountSum": zero,
         "postpaySum": zero,
         "prepaySum": prepay_sum,
-        "vatNone": _decimal_text(total),
+        "vatNone": _money_text(total),
         "vatSum0": zero,
         "vatSum5": zero,
         "vatSum7": zero,

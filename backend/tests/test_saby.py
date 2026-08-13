@@ -1,5 +1,6 @@
 import io
 import json
+import re
 import urllib.error
 from urllib.parse import parse_qs, urlparse
 
@@ -171,7 +172,8 @@ def test_saby_settings_repr_and_vendor_errors_never_expose_secrets():
     )
     with pytest.raises(SabyError) as captured:
         client.access_token()
-    assert str(captured.value) == "Saby отклонил запрос (код AUTH_7)"
+    assert str(captured.value).startswith("Saby отклонил запрос (код AUTH_7)")
+    assert "наш ID" in str(captured.value)
     assert "private" not in str(captured.value)
 
 
@@ -193,7 +195,8 @@ def test_saby_http_error_exposes_only_sanitized_vendor_explanation():
         if request.full_url.endswith("/oauth/service/"):
             return Response({"token": "access-token-value"})
         raise urllib.error.HTTPError(
-            request.full_url, 500, "Internal Server Error", {}, io.BytesIO(body)
+            request.full_url, 500, "Internal Server Error",
+            {"X-Request-ID": "vendor-safe-42"}, io.BytesIO(body)
         )
 
     client = SabyClient(secret_settings, opener=opener)
@@ -201,9 +204,65 @@ def test_saby_http_error_exposes_only_sanitized_vendor_explanation():
         client.create_fiscal_sale({"externalId": "safe-order"})
     message = str(captured.value)
     assert message.startswith("Saby вернул HTTP 500: ККТ недоступна")
+    assert "наш ID" in message
+    assert message.endswith("ID Saby vendor-safe-42")
     assert "private-service-secret" not in message
     assert "+7 999 123-45-67" not in message
     assert "owner@example.test" not in message
+
+
+def test_saby_request_carries_safe_local_correlation_id():
+    calls = []
+
+    def opener(request, timeout):
+        calls.append(request)
+        return Response({"token": "access-token-value"})
+
+    client = SabyClient(settings(), opener=opener)
+    assert client.access_token() == "access-token-value"
+    request_id = calls[0].get_header("X-request-id")
+    assert request_id
+    assert re.fullmatch(
+        r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}",
+        request_id,
+    )
+
+
+def test_saby_caller_cannot_override_local_correlation_id():
+    calls = []
+
+    def opener(request, timeout):
+        calls.append(request)
+        return Response({"ok": True})
+
+    client = SabyClient(settings(), opener=opener)
+    client._json_request(
+        "https://api.sbis.ru/retail/test",
+        headers={"x-request-id": "caller-controlled", "X-Safe-Test": "kept"},
+    )
+    request_id = calls[0].get_header("X-request-id")
+    assert request_id != "caller-controlled"
+    assert re.fullmatch(
+        r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}",
+        request_id,
+    )
+    assert calls[0].get_header("X-safe-test") == "kept"
+
+
+def test_saby_ignores_unsafe_vendor_request_id():
+    def opener(request, timeout):
+        raise urllib.error.HTTPError(
+            request.full_url, 500, "Internal Server Error",
+            {"X-Request-ID": "unsafe value with spaces"}, io.BytesIO(b"{}")
+        )
+
+    client = SabyClient(settings(), opener=opener)
+    with pytest.raises(SabyError) as captured:
+        client.access_token()
+    message = str(captured.value)
+    assert "unsafe value" not in message
+    assert "наш ID" in message
+    assert "ID Saby" not in message
 
 
 def test_saby_delivery_order_keeps_payload_and_uses_create_endpoint():

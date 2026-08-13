@@ -202,11 +202,25 @@ def test_maintenance_is_chainya_only_and_returns_503() -> None:
     assert "__chainya_edge_health" in compose
     assert "/api/health" not in compose
     assert "/manage/*" in internal
+    assert "@productPage path_regexp" in internal
+    assert "@sitemap path /sitemap.xml" in internal
+    assert "redir @productSlash /tea/{re.productSlash.1} 308" in internal
     nginx = (ROOT / "ops/nginx-chainya.ru").read_text(encoding="utf-8")
     assert "location = /manage/guides" in nginx
     assert 'location ~ "^/tea/' in nginx
     assert "return 308 /tea/$1;" in nginx
     assert "location = /sitemap.xml" in nginx
+
+
+def test_edge_config_change_is_validated_and_rolls_back_only_chainya_edge() -> None:
+    deploy = (ROOT / "deploy-edge.sh").read_text(encoding="utf-8")
+    assert 'cp ops/timeweb/Caddyfile.internal "$TMP/Caddyfile.internal"' in deploy
+    assert "caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile" in deploy
+    assert 'test "$maintenance" = 1' in deploy
+    assert 'cp -p "$edge_config" "$stage/Caddyfile.previous"' in deploy
+    assert 'mv -Tf "${edge_config}.rollback" "$edge_config"' in deploy
+    assert "docker compose -f \"$edge_compose\" up -d --no-deps --force-recreate edge" in deploy
+    assert "systemctl" not in deploy
 
 
 def test_origin_upload_retries_before_any_cutover() -> None:

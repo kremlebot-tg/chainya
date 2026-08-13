@@ -69,6 +69,18 @@ def main() -> None:
     require("previous=$(readlink -f \"$active\")" in edge_deploy, "edge rollback target is missing")
     require("trap rollback ERR" in edge_deploy, "edge automatic rollback is missing")
     require(
+        "caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile" in edge_deploy,
+        "changed Chainya edge config must be validated",
+    )
+    require(
+        'mv -Tf "${edge_config}.rollback" "$edge_config"' in edge_deploy,
+        "Chainya edge config rollback is missing",
+    )
+    require(
+        'test "$maintenance" = 1' in edge_deploy,
+        "Chainya edge config changes must require maintenance",
+    )
+    require(
         'CHAINYA_EDGE_MAINTENANCE' in edge_deploy and ')" = 503' in edge_deploy,
         "edge maintenance verification is missing",
     )
@@ -78,6 +90,8 @@ def main() -> None:
     require(" 503" in caddy, "maintenance must return HTTP 503")
     require("/__chainya_edge_health" in caddy, "local edge health is missing")
     require("/manage/*" in caddy, "private owner subroutes must reach the origin")
+    require("@productPage path_regexp" in caddy, "product pages must reach the origin")
+    require("@sitemap path /sitemap.xml" in caddy, "dynamic sitemap must reach the origin")
     require(
         "/__chainya_edge_health" in compose and "/api/health" not in compose,
         "container healthcheck must not call the production origin",

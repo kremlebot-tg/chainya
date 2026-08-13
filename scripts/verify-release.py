@@ -384,11 +384,11 @@ def check_live(base_url: str) -> list[str]:
     else:
         first_id = catalog_items[0]["id"]
         product_path = f"/tea/{first_id}"
+        canonical = f"{base}{product_path}"
         product_code, product_html, product_headers = text_response(base + product_path)
         if product_code != 200:
             errors.append(f"{product_path}: ожидался 200, получен {product_code}")
         else:
-            canonical = f"{base}{product_path}"
             for marker in (
                 f'<link rel="canonical" href="{canonical}">',
                 '<meta property="og:type" content="product">',

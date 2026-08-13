@@ -36,6 +36,7 @@ python3 scripts/verify-release.py --dist dist
 COPYFILE_DISABLE=1 tar --no-xattrs -czf "$TMP/web.tgz" \
   --exclude='._*' --exclude='.DS_Store' -C dist .
 cp scripts/verify-release.py "$TMP/verify-release.py"
+cp ops/timeweb/Caddyfile.internal "$TMP/Caddyfile.internal"
 printf '%s\n' "$RELEASE_COMMIT" > "$TMP/RELEASE_COMMIT"
 
 echo "→ загрузка edge release"
@@ -43,6 +44,7 @@ ssh "$EDGE_HOST" "umask 077; mkdir '$REMOTE_STAGE'"
 rsync -az \
   "$TMP/web.tgz" \
   "$TMP/verify-release.py" \
+  "$TMP/Caddyfile.internal" \
   "$TMP/RELEASE_COMMIT" \
   "$EDGE_HOST:$REMOTE_STAGE/"
 
@@ -54,6 +56,9 @@ stage=${CHAINYA_EDGE_STAGE:?}
 maintenance=${CHAINYA_EDGE_MAINTENANCE:?}
 releases=/var/www/chainya-releases
 active=/var/www/chainya
+edge_dir=/opt/chainya-edge
+edge_config="$edge_dir/Caddyfile.internal"
+edge_compose="$edge_dir/docker-compose.edge.yml"
 commit=$(cat "$stage/RELEASE_COMMIT")
 case "$commit" in
   (*[!0-9a-f]*|'') echo "✗ некорректный commit" >&2; exit 1 ;;
@@ -62,6 +67,20 @@ esac
 previous=$(readlink -f "$active")
 release="$releases/${commit}-edge-$(date -u +%Y%m%dT%H%M%SZ)"
 switched=0
+config_changed=0
+config_installed=0
+
+wait_for_edge() {
+  local attempt
+  for attempt in $(seq 1 30); do
+    if test "$(docker inspect chainya-edge-edge-1 --format '{{.State.Health.Status}}' 2>/dev/null || true)" = healthy && \
+       curl -fsS http://127.0.0.1:8078/__chainya_edge_health >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
 
 rollback() {
   local code=$?
@@ -69,10 +88,35 @@ rollback() {
     ln -sfnT "$previous" "${active}.rollback"
     mv -Tf "${active}.rollback" "$active"
   fi
+  if [ "$config_installed" = 1 ] && [ -s "$stage/Caddyfile.previous" ]; then
+    install -m 0644 "$stage/Caddyfile.previous" "${edge_config}.rollback"
+    mv -Tf "${edge_config}.rollback" "$edge_config"
+    docker compose -f "$edge_compose" up -d --no-deps --force-recreate edge >/dev/null
+    wait_for_edge || true
+  fi
   rm -rf -- "$stage"
   exit "$code"
 }
 trap rollback ERR
+
+test -f "$edge_config"
+test -f "$edge_compose"
+cp -p "$edge_config" "$stage/Caddyfile.previous"
+if ! cmp -s "$stage/Caddyfile.internal" "$edge_config"; then
+  config_changed=1
+  test "$maintenance" = 1 || {
+    echo "✗ изменение Chainya edge разрешено только за maintenance" >&2
+    false
+  }
+  docker run --rm \
+    -v "$stage/Caddyfile.internal:/etc/caddy/Caddyfile:ro" \
+    caddy:2.10-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+  install -m 0644 "$stage/Caddyfile.internal" "${edge_config}.next"
+  mv -Tf "${edge_config}.next" "$edge_config"
+  config_installed=1
+  docker compose -f "$edge_compose" up -d --no-deps --force-recreate edge >/dev/null
+  wait_for_edge
+fi
 
 mkdir "$release"
 tar -xzf "$stage/web.tgz" -C "$release"

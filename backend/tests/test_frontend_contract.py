@@ -32,6 +32,8 @@ def test_checkout_has_one_clear_payment_method_and_visible_status():
     assert "fetch('/api/checkout/status'" in SOURCE
     assert "!checkoutAvailable || !getCart().length" in SOURCE
     assert 'id="payment-secure"' in SOURCE
+    assert 'id="c-name" data-i18n-ph="f_name_ph" autocomplete="given-name" required' in SOURCE
+    assert "requireCartField('#c-name',T().cart_name_required)" in SOURCE
 
 
 def test_pickup_point_map_link_and_booking_total_are_rendered():
@@ -131,6 +133,10 @@ def test_owner_guides_are_searchable_private_help_without_dangerous_actions():
     assert "Сверка каталога работает только на чтение" in ADMIN_GUIDES
     assert "нельзя включать поверх онлайн-чека Т‑Банка" in ADMIN_GUIDES
     assert "Создание отправления — отдельная реальная запись" in ADMIN_GUIDES
+    assert "Оплата одностадийная" in ADMIN_GUIDES
+    assert "число таких заказов система сейчас не ограничивает" in ADMIN_GUIDES
+    assert "Банк сначала блокирует сумму" not in ADMIN_GUIDES
+    assert "автоматически закрывает приём новых платежей" not in ADMIN_GUIDES
     assert "method:'DELETE'" in ADMIN_GUIDES
     assert "api/admin/refund" not in ADMIN_GUIDES
     assert "api/admin/cdek" not in ADMIN_GUIDES

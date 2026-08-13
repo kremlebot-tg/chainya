@@ -24,7 +24,7 @@ def app_client(tmp_path, monkeypatch, *, test_mode="1"):
         "SABY_OFD_COMPANY_ID", "SABY_OFD_KKT_REG_NUMBER",
         "SABY_OFD_TAX_SYSTEM", "SABY_OFD_PAY_METHOD",
         "SABY_OFD_ALLOW_NEGATIVE_STOCK", "TBANK_RECEIPT_ENABLED",
-        "SABY_STOCK_GUARD_MODE",
+        "SABY_STOCK_GUARD_MODE", "SABY_AMBIGUOUS_CHECKOUT_POLICY",
         "SABY_CATALOG_SHADOW_MODE", "SABY_CATALOG_SHADOW_INTERVAL_SECONDS",
         "BOOKING_BOT_SECRET",
     ):
@@ -169,6 +169,13 @@ def test_live_checkout_can_continue_with_explicit_manual_saby_reconciliation(
             (order["id"],),
         )
     assert module.tbank_checkout_ready() is True
+
+
+def test_order_requires_nonempty_customer_name(tmp_path, monkeypatch):
+    client, _ = app_client(tmp_path, monkeypatch)
+    with client:
+        assert client.post("/api/orders", json=payload(name="")).status_code == 422
+        assert client.post("/api/orders", json=payload(name="   ")).status_code == 422
 
 
 def test_invalid_ambiguous_checkout_policy_fails_closed(tmp_path, monkeypatch):
@@ -1461,6 +1468,32 @@ def test_fiscal_transport_error_is_ambiguous_and_never_blindly_retried(tmp_path,
     assert len(attempts) == 1
     current = module.order_row(order["id"])
     assert current["saby_receipt_state"] == "ambiguous"
+
+
+def test_fiscal_oauth_error_is_retryable_without_marking_sale_ambiguous(
+    tmp_path, monkeypatch
+):
+    client, module = app_client(tmp_path, monkeypatch)
+    configure_saby_fiscal_flow(module, monkeypatch)
+    attempts = []
+
+    def reject_before_retail_request(data):
+        attempts.append(data)
+        raise module.SabyAuthenticationError("Saby OAuth временно недоступен")
+
+    monkeypatch.setattr(
+        module.saby_client, "create_fiscal_sale", reject_before_retail_request
+    )
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        expose_live_saby_writer(module, monkeypatch)
+        mark_order_paid_and_enqueue(module, order["id"])
+        module.process_paid_order_effects(order["id"])
+
+    assert len(attempts) == 1
+    current = module.order_row(order["id"])
+    assert current["saby_receipt_state"] == "failed"
+    assert "OAuth" in current["saby_receipt_last_error"]
 
 
 def test_fiscal_sale_uses_canonical_saby_name_when_public_name_differs(tmp_path, monkeypatch):

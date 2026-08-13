@@ -76,7 +76,7 @@ from .cdek_delivery import (
 )
 from .integration_guard import ExternalWriteBlocked
 from .integration_writes import IntegrationWriter
-from .saby import SabyClient, SabyError
+from .saby import SabyAuthenticationError, SabyClient, SabyError
 from .saby_catalog_review import build_catalog_review
 from .saby_purchase import (
     SabyFiscalSettings,
@@ -490,7 +490,7 @@ class CreateOrder(BaseModel):
     items: list[OrderItem] = Field(min_length=1, max_length=50)
     delivery: Literal["pickup", "cdek_pvz", "cdek_courier"]
     payment_method: Literal["bank_card", "sbp"]
-    name: str = Field(default="", max_length=120)
+    name: str = Field(min_length=1, max_length=120)
     phone: str = Field(min_length=7, max_length=40)
     city: str = Field(default="", max_length=160)
     city_code: int | None = Field(default=None, ge=1, le=9_999_999)
@@ -500,6 +500,14 @@ class CreateOrder(BaseModel):
     privacy_accepted: Literal[True]
     language: Literal["ru", "en", "zh"] = "ru"
     analytics_session: str | None = Field(default=None, min_length=16, max_length=80, pattern=r"^[A-Za-z0-9_-]+$")
+
+    @field_validator("name")
+    @classmethod
+    def valid_name(cls, value: str) -> str:
+        value = " ".join(value.split())
+        if not value:
+            raise ValueError("укажите имя")
+        return value
 
     @field_validator("phone")
     @classmethod
@@ -2180,7 +2188,7 @@ def sync_paid_order_to_saby_fiscal(
         receipt_id = _saby_receipt_id(result)
         if not receipt_id:
             raise SabyError("Saby не вернул идентификатор зарегистрированного чека")
-    except (SabyPurchaseError, ExternalWriteBlocked) as exc:
+    except (SabyPurchaseError, ExternalWriteBlocked, SabyAuthenticationError) as exc:
         failed = now_iso()
         with db() as con:
             con.execute(
@@ -4895,6 +4903,7 @@ def delivery_quote(payload: DeliveryQuoteRequest, request: Request):
         items=payload.items,
         delivery=payload.method,
         payment_method="bank_card",
+        name="Расчёт доставки",
         phone="+79990000000",
         city="CDEK",
         city_code=payload.city_code,

@@ -8,7 +8,7 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 
-from backend.saby import SabyClient, SabyError, SabySettings
+from backend.saby import SabyAuthenticationError, SabyClient, SabyError, SabySettings
 
 
 class Response:
@@ -172,11 +172,17 @@ def test_saby_settings_repr_and_vendor_errors_never_expose_secrets():
             }
         }),
     )
-    with pytest.raises(SabyError) as captured:
+    with pytest.raises(SabyAuthenticationError) as captured:
         client.access_token()
     assert str(captured.value).startswith("Saby отклонил запрос (код AUTH_7)")
     assert "наш ID" in str(captured.value)
     assert "private" not in str(captured.value)
+
+
+def test_missing_service_token_is_a_prewrite_authentication_failure():
+    client = SabyClient(settings(), opener=lambda *_args, **_kwargs: Response({}))
+    with pytest.raises(SabyAuthenticationError, match="не вернул токен"):
+        client.access_token()
 
 
 def test_saby_http_error_exposes_only_sanitized_vendor_explanation():

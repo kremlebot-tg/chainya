@@ -1458,7 +1458,7 @@ select.input{
       <div class="row2">
         <div class="field">
           <label class="label" for="c-name" data-i18n="f_name">Имя</label>
-          <input class="input" type="text" id="c-name" data-i18n-ph="f_name_ph" autocomplete="given-name">
+          <input class="input" type="text" id="c-name" data-i18n-ph="f_name_ph" autocomplete="given-name" required>
         </div>
         <div class="field">
           <label class="label" for="c-phone" data-i18n="f_phone">Телефон</label>
@@ -1723,7 +1723,7 @@ select.input{
     cart_quote_ready:(a,min,max)=>`СДЭК · ${a} · ${min===max?min:`${min}–${max}`} дн.`,
     cart_quote_error:'Не удалось рассчитать доставку. Проверьте город или попробуйте ещё раз.',
     privacy_accept:'Согласен на обработку данных согласно', privacy_link:'политике конфиденциальности', privacy_link_footer:'Политика конфиденциальности', legal_link:'Реквизиты и условия', privacy_required:'Подтвердите согласие на обработку данных',
-    cart_phone_required:'Укажите полный номер телефона, чтобы мы могли подтвердить заказ.', cart_city_required:'Укажите город доставки.',
+    cart_name_required:'Укажите имя, чтобы мы могли оформить чек.', cart_phone_required:'Укажите полный номер телефона, чтобы мы могли подтвердить заказ.', cart_city_required:'Укажите город доставки.',
     cart_pvz_required:'Выберите пункт из подсказок СДЭК.', cart_addr_required:'Укажите адрес доставки.',
     cart_catalog_checking:'Проверяем цены и наличие…',
     cart_catalog_unavailable:'Не удалось обновить каталог. Проверьте интернет и попробуйте ещё раз.',
@@ -1902,7 +1902,7 @@ select.input{
     cart_quote_ready:(a,min,max)=>`CDEK · ${a} · ${min===max?min:`${min}–${max}`} days`,
     cart_quote_error:'Could not calculate delivery. Check the city or try again.',
     privacy_accept:'I consent to data processing under the', privacy_link:'privacy policy', privacy_link_footer:'Privacy policy', legal_link:'Seller details and terms', privacy_required:'Please accept the data processing terms',
-    cart_phone_required:'Enter a complete phone number so we can confirm the order.', cart_city_required:'Enter the delivery city.',
+    cart_name_required:'Enter your name so we can issue the receipt.', cart_phone_required:'Enter a complete phone number so we can confirm the order.', cart_city_required:'Enter the delivery city.',
     cart_pvz_required:'Choose a CDEK point from the suggestions.', cart_addr_required:'Enter the delivery address.',
     cart_catalog_checking:'Checking prices and availability…',
     cart_catalog_unavailable:'Could not refresh the catalogue. Check your connection and try again.',
@@ -2081,7 +2081,7 @@ select.input{
     cart_quote_ready:(a,min,max)=>`CDEK · ${a} · ${min===max?min:`${min}–${max}`}天`,
     cart_quote_error:'无法计算运费，请检查城市或重试。',
     privacy_accept:'我同意按照以下条款处理个人数据：', privacy_link:'隐私政策', privacy_link_footer:'隐私政策', legal_link:'商家信息与条款', privacy_required:'请同意个人数据处理条款',
-    cart_phone_required:'请填写完整的电话号码，以便我们确认订单。', cart_city_required:'请填写配送城市。',
+    cart_name_required:'请填写姓名，以便我们开具收据。', cart_phone_required:'请填写完整的电话号码，以便我们确认订单。', cart_city_required:'请填写配送城市。',
     cart_pvz_required:'请从提示中选择CDEK自提点。', cart_addr_required:'请填写配送地址。',
     cart_catalog_checking:'正在核对价格和库存…',
     cart_catalog_unavailable:'无法更新商品目录，请检查网络后重试。',
@@ -3376,6 +3376,7 @@ select.input{
     const status = $('#cart-status'); status.textContent=''; status.classList.remove('cart-note--error');
     const submit = $('#cart-submit');
     if (!checkoutAvailable){ status.textContent=T().cart_payment_unavailable; status.classList.add('cart-note--error'); return; }
+    if (!requireCartField('#c-name',T().cart_name_required)) return;
     if (!requireCartField('#c-phone',T().cart_phone_required,value=>value.replace(/\D/g,'').length>=10)) return;
     if (!$('#c-privacy').checked){ status.textContent = T().privacy_required; status.classList.add('cart-note--error'); $('#c-privacy').focus(); return; }
     const dlv = $('#c-dlv').value;

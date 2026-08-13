@@ -169,6 +169,30 @@ def test_fiscal_sale_rejects_invalid_phone_and_sum_mismatch():
         build_fiscal_sale(order(total=351), settings=fiscal_settings())
 
 
+def test_fiscal_sale_requires_customer_name_for_receipt():
+    with pytest.raises(SabyPurchaseError, match="имя покупателя"):
+        build_fiscal_sale(
+            order(customer={"name": "   ", "phone": "+7 999 000-00-00"}),
+            settings=fiscal_settings(),
+        )
+
+
+@pytest.mark.parametrize("registration_number", ["12345678", "1" * 15, "1" * 21])
+def test_fiscal_settings_require_16_to_20_digit_registration_number(
+    registration_number,
+):
+    settings = fiscal_settings(kkt_reg_number=registration_number)
+    assert settings.configured is False
+    assert "SABY_OFD_KKT_REG_NUMBER" in settings.missing
+
+
+@pytest.mark.parametrize("registration_number", ["1" * 16, "1" * 20])
+def test_fiscal_settings_accept_fns_registration_number_lengths(
+    registration_number,
+):
+    assert fiscal_settings(kkt_reg_number=registration_number).configured is True
+
+
 def test_fiscal_settings_report_names_not_secret_values():
     settings = SabyFiscalSettings.from_env({
         "SABY_POINT_ID": "",

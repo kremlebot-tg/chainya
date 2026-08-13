@@ -46,6 +46,10 @@ class SabyError(RuntimeError):
         super().__init__(f"{message}{suffix}")
 
 
+class SabyAuthenticationError(SabyError):
+    """The request failed before a Retail API write could be attempted."""
+
+
 def unwrap_fiscal_response(result: Any) -> Any:
     """Normalize the legacy wrapper used by Saby fiscal endpoints.
 
@@ -291,14 +295,24 @@ class SabyClient:
         with self._lock:
             if self._token and not force and time.monotonic() - self._token_at < 3000:
                 return self._token
-            result = self._json_request(AUTH_URL, method="POST", payload={
-                "app_client_id": self.settings.app_client_id,
-                "app_secret": self.settings.app_secret,
-                "secret_key": self.settings.secret_key,
-            })
+            try:
+                result = self._json_request(AUTH_URL, method="POST", payload={
+                    "app_client_id": self.settings.app_client_id,
+                    "app_secret": self.settings.app_secret,
+                    "secret_key": self.settings.secret_key,
+                })
+            except SabyError as exc:
+                # No Retail request has been made yet.  Keep this failure
+                # distinguishable so a paid order can be retried safely after
+                # credentials or Saby OAuth recover.
+                raise SabyAuthenticationError(
+                    exc.message,
+                    request_id=exc.request_id,
+                    vendor_request_id=exc.vendor_request_id,
+                ) from exc
             token = result.get("token") if isinstance(result, dict) else None
             if not token:
-                raise SabyError("Saby не вернул токен доступа")
+                raise SabyAuthenticationError("Saby не вернул токен доступа")
             self._token, self._token_at = str(token), time.monotonic()
             return self._token
 

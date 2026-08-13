@@ -63,7 +63,9 @@ class SabyFiscalSettings:
         missing: list[str] = []
         if not re.fullmatch(r"\d+", self.company_id):
             missing.append("SABY_OFD_COMPANY_ID")
-        if not re.fullmatch(r"\d{8,32}", self.kkt_reg_number):
+        # FNS tag 1037 is a string of 16 to 20 digits. Keep it as text because
+        # leading zeroes identify the registered device and must not be lost.
+        if not re.fullmatch(r"\d{16,20}", self.kkt_reg_number):
             missing.append("SABY_OFD_KKT_REG_NUMBER")
         if self.tax_system not in {1, 2, 4, 16, 32}:
             missing.append("SABY_OFD_TAX_SYSTEM")
@@ -278,6 +280,9 @@ def build_fiscal_sale(
     if lines_total.quantize(Decimal("0.01")) != total.quantize(Decimal("0.01")):
         raise SabyPurchaseError("Сумма позиций не совпадает с итогом заказа")
     phone = _phone(customer.get("phone"))
+    customer_name = " ".join(str(customer.get("name", "")).split())
+    if not customer_name:
+        raise SabyPurchaseError("В заказе не указано имя покупателя")
     zero = "0.00"
     if settlement:
         raise SabyPurchaseError(
@@ -314,7 +319,7 @@ def build_fiscal_sale(
         "vatSum120": zero,
         "allowRetailPayed": 1 if settings.allow_negative_stock else 0,
         "nomenclatures": lines,
-        "customerFIO": str(customer.get("name", "")).strip(),
+        "customerFIO": customer_name,
         "customerEmail": "",
         "customerPhone": phone,
         "customerINN": "",

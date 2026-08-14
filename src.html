@@ -2184,7 +2184,8 @@ select.input{
 
   };
 
-  const requestedLang = new URLSearchParams(location.search).get('lang');
+  const pathLang = location.pathname.match(/^\/(en|zh)(?:\/|$)/)?.[1];
+  const requestedLang = pathLang || new URLSearchParams(location.search).get('lang');
   let LANG = I18N[requestedLang] ? requestedLang : 'ru';
   if (!I18N[requestedLang]){
     try{ const savedLang = localStorage.getItem('chaynya-lang'); if (I18N[savedLang]) LANG = savedLang; }catch(e){}
@@ -2353,6 +2354,10 @@ select.input{
   /* ─────────────  НАВИГАЦИЯ  ───────────── */
   const VIEW_PATHS = { home:'/', shop:'/shop', b2b:'/business', book:'/booking' };
   const PATH_VIEWS = Object.fromEntries(Object.entries(VIEW_PATHS).map(([view,path]) => [path,view]));
+  function productRoute(id, language=LANG){
+    const prefix = language === 'ru' ? '' : `/${language}`;
+    return `${prefix}/tea/${id}`;
+  }
   function syncDocumentMetadata(view){
     const title = T().route_titles?.[view] || T().title;
     const description = T().route_descriptions?.[view] || T().route_descriptions?.home || '';
@@ -2376,7 +2381,7 @@ select.input{
   function syncProductMetadata(m, txt){
     const title = `${txt.n} — купить китайский чай · Чайня`;
     const description = txt.d || `${txt.n} в каталоге китайского чая Чайни.`;
-    const routeUrl = new URL('/tea/' + m.id, location.origin).href;
+    const routeUrl = new URL(productRoute(m.id), location.origin).href;
     document.title = title;
     const values = {
       'meta[name="description"]': description,
@@ -2439,9 +2444,11 @@ select.input{
       else go('shop', false);
       return;
     }
-    const productPath = location.pathname.match(/^\/tea\/([a-z0-9][a-z0-9-]{0,79})\/?$/);
+    const productPath = location.pathname.match(/^\/(?:(en|zh)\/)?tea\/([a-z0-9][a-z0-9-]{0,79})\/?$/);
     if (productPath){
-      const m = TEA_META.find(x => x.id === productPath[1]);
+      const routeLanguage = productPath[1] || 'ru';
+      if (LANG !== routeLanguage) LANG = routeLanguage;
+      const m = TEA_META.find(x => x.id === productPath[2]);
       if (m){ go('shop', false); openTea(m, false); }
       else go('shop', false);
       return;
@@ -2525,7 +2532,7 @@ select.input{
             <button class="tea__quick" aria-label="${escAttr(T().quick_add(txt.n))}" title="${escAttr(T().quick_add(txt.n))}"${inStock(m) ? '' : ' disabled'}>+</button>
           </div>
         </div>
-        <a class="tea__hit" href="/tea/${m.id}" aria-label="${escAttr(T().tea_open(txt.n))}"></a>
+        <a class="tea__hit" href="${productRoute(m.id)}" aria-label="${escAttr(T().tea_open(txt.n))}"></a>
       </article>`);
     const hit = $('.tea__hit', node);
     hit.addEventListener('click', event => { event.preventDefault(); lastCard = hit; openTea(m); });
@@ -2905,8 +2912,8 @@ select.input{
     if (!wasOpen) lockScroll();
     bgInert(true);
     if (!wasOpen) focusPanel(sheet, $('#ts-close'));
-    if (updateHistory && location.pathname !== '/tea/' + m.id)
-      history.pushState({ tea:m.id }, '', '/tea/' + m.id);
+    if (updateHistory && location.pathname !== productRoute(m.id))
+      history.pushState({ tea:m.id }, '', productRoute(m.id));
     syncProductMetadata(m, txt);
     tgSyncBack();
   }
@@ -2917,7 +2924,7 @@ select.input{
     unlockScroll();
     bgInert(false);
     if (lastCard){ lastCard.focus({ preventScroll:true }); lastCard = null; }
-    if (updateHistory && (location.hash.startsWith('#tea-') || location.pathname.startsWith('/tea/'))){
+    if (updateHistory && (location.hash.startsWith('#tea-') || /^\/(?:(?:en|zh)\/)?tea\//.test(location.pathname))){
       if (history.state && history.state.tea) history.back();
       else {
         history.replaceState({ view:'shop' }, '', VIEW_PATHS.shop);

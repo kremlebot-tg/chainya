@@ -77,10 +77,11 @@ def test_catalog_keeps_a_semantic_heading_without_restoring_visual_clutter():
 
 
 def test_catalog_cards_expose_indexable_product_links_and_keep_modal_navigation():
-    assert 'href="/tea/${m.id}"' in SOURCE
+    assert 'href="${productRoute(m.id)}"' in SOURCE
+    assert "function productRoute(id, language=LANG)" in SOURCE
     assert "event.preventDefault(); lastCard = hit; openTea(m);" in SOURCE
-    assert "location.pathname.match(/^\\/tea\\/" in SOURCE
-    assert "history.pushState({ tea:m.id }, '', '/tea/' + m.id)" in SOURCE
+    assert "location.pathname.match(/^\\/(?:(en|zh)\\/)?tea\\/" in SOURCE
+    assert "history.pushState({ tea:m.id }, '', productRoute(m.id))" in SOURCE
     assert "syncProductMetadata(m, txt)" in SOURCE
     assert "setMeta('meta[property=\"og:type\"]', 'website')" in SOURCE
 

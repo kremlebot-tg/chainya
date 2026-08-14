@@ -3603,6 +3603,86 @@ def public_catalog():
 
 PUBLIC_SITE = "https://chainya.ru"
 PRODUCT_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,79}$")
+PRODUCT_LOCALES = {
+    "ru": {
+        "prefix": "",
+        "html_lang": "ru",
+        "schema_lang": "ru-RU",
+        "hreflang": "ru",
+        "og_locale": "ru_RU",
+        "brand": "Чайня",
+        "title": "{name} — купить китайский чай · Чайня",
+        "fallback": "Китайский чай {name} в каталоге Чайни.",
+        "category": "Китайский чай",
+        "home": "Главная",
+        "shop": "Купить чай",
+        "all_teas": "Все чаи",
+        "in_stock": "В наличии",
+        "out_of_stock": "Нет в наличии",
+        "per_piece": "за штуку",
+        "per_10g": "за 10 г",
+        "open_shop": "Открыть в магазине",
+    },
+    "en": {
+        "prefix": "/en",
+        "html_lang": "en",
+        "schema_lang": "en",
+        "hreflang": "en",
+        "og_locale": "en_US",
+        "brand": "Chainya",
+        "title": "{name} — buy Chinese tea · Chainya",
+        "fallback": "{name}, Chinese tea from the Chainya collection.",
+        "category": "Chinese tea",
+        "home": "Home",
+        "shop": "Shop tea",
+        "all_teas": "All teas",
+        "in_stock": "In stock",
+        "out_of_stock": "Out of stock",
+        "per_piece": "per piece",
+        "per_10g": "per 10 g",
+        "open_shop": "Open in the shop",
+    },
+    "zh": {
+        "prefix": "/zh",
+        "html_lang": "zh-CN",
+        "schema_lang": "zh-CN",
+        "hreflang": "zh-CN",
+        "og_locale": "zh_CN",
+        "brand": "茶饮屋",
+        "title": "{name} — 购买中国茶 · 茶饮屋",
+        "fallback": "茶饮屋精选中国茶：{name}。",
+        "category": "中国茶",
+        "home": "首页",
+        "shop": "选购茶叶",
+        "all_teas": "全部茶叶",
+        "in_stock": "有货",
+        "out_of_stock": "缺货",
+        "per_piece": "每块",
+        "per_10g": "每10克",
+        "open_shop": "在商店中打开",
+    },
+}
+PRODUCT_TYPE_NAMES = {
+    "en": {
+        "white": "White tea", "green": "Green tea", "gaba": "GABA tea",
+        "fujian": "Southern Fujian oolong", "dancong": "Guangdong oolong",
+        "wuyi": "Wuyi oolong", "red": "Chinese red tea", "sheng": "Sheng pu-erh",
+        "shu": "Shu pu-erh", "heicha": "Hei cha", "herbs": "Herbs and blends",
+    },
+    "zh": {
+        "white": "白茶", "green": "绿茶", "gaba": "GABA茶", "fujian": "闽南乌龙",
+        "dancong": "广东乌龙", "wuyi": "武夷乌龙", "red": "红茶", "sheng": "生普洱",
+        "shu": "熟普洱", "heicha": "黑茶", "herbs": "草本与拼配茶",
+    },
+}
+
+
+def _product_url(item_id: str, language: str) -> str:
+    return f"{PUBLIC_SITE}{PRODUCT_LOCALES[language]['prefix']}/tea/{item_id}"
+
+
+def _product_alternates(item_id: str) -> dict[str, str]:
+    return {language: _product_url(item_id, language) for language in PRODUCT_LOCALES}
 
 
 def _script_json(value: object) -> str:
@@ -3630,28 +3710,33 @@ def _public_product(item_id: str) -> tuple[dict, dict] | None:
     return (document, item) if item else None
 
 
-def _product_page_html(document: dict, item: dict) -> str:
-    ru = item["translations"]["ru"]
-    name = ru["name"]
-    origin = ru.get("orig", "")
-    description = ru.get("desc", "") or f"Китайский чай {name} в каталоге Чайни."
-    canonical = f"{PUBLIC_SITE}/tea/{item['id']}"
+def _product_page_html(document: dict, item: dict, language: str = "ru") -> str:
+    locale = PRODUCT_LOCALES[language]
+    translated = item["translations"].get(language) or item["translations"]["ru"]
+    name = translated["name"]
+    origin = translated.get("orig", "")
+    description = translated.get("desc", "") or locale["fallback"].format(name=name)
+    canonical = _product_url(item["id"], language)
+    alternates = _product_alternates(item["id"])
     image_path = catalog_image_url(item)
     image_url = PUBLIC_SITE + image_path
-    unit_label = "за штуку" if item["unit"] == "pc" else "за 10 г"
+    unit_label = locale["per_piece"] if item["unit"] == "pc" else locale["per_10g"]
     availability = (
         "https://schema.org/InStock"
         if item.get("stock", True)
         else "https://schema.org/OutOfStock"
     )
-    type_name = next(
-        (
-            category["name"]
-            for category in document.get("types", [])
-            if category.get("id") == item.get("type")
-        ),
-        "Китайский чай",
-    )
+    if language == "ru":
+        type_name = next(
+            (
+                category["name"]
+                for category in document.get("types", [])
+                if category.get("id") == item.get("type")
+            ),
+            locale["category"],
+        )
+    else:
+        type_name = PRODUCT_TYPE_NAMES.get(language, {}).get(item.get("type"), locale["category"])
     reference_quantity = {
         "@type": "QuantitativeValue",
         "value": 1 if item["unit"] == "pc" else 10,
@@ -3673,15 +3758,15 @@ def _product_page_html(document: dict, item: dict) -> str:
                 "url": PUBLIC_SITE + "/",
                 "name": "Чайня",
                 "publisher": {"@id": PUBLIC_SITE + "/#seller"},
-                "inLanguage": "ru-RU",
+                "inLanguage": locale["schema_lang"],
             },
             {
                 "@type": "WebPage",
                 "@id": canonical + "#webpage",
                 "url": canonical,
-                "name": f"{name} — купить в Чайне",
+                "name": locale["title"].format(name=name),
                 "description": description,
-                "inLanguage": "ru-RU",
+                "inLanguage": locale["schema_lang"],
                 "isPartOf": {"@id": PUBLIC_SITE + "/#website"},
                 "mainEntity": {"@id": canonical + "#product"},
             },
@@ -3716,14 +3801,14 @@ def _product_page_html(document: dict, item: dict) -> str:
                     {
                         "@type": "ListItem",
                         "position": 1,
-                        "name": "Главная",
+                        "name": locale["home"],
                         "item": PUBLIC_SITE + "/",
                     },
                     {
                         "@type": "ListItem",
                         "position": 2,
-                        "name": "Купить чай",
-                        "item": PUBLIC_SITE + "/shop",
+                        "name": locale["shop"],
+                        "item": PUBLIC_SITE + f"/shop?lang={language}",
                     },
                     {
                         "@type": "ListItem",
@@ -3743,28 +3828,44 @@ def _product_page_html(document: dict, item: dict) -> str:
     safe_image_url = html.escape(image_url, quote=True)
     safe_canonical = html.escape(canonical, quote=True)
     safe_meta_description = html.escape(description[:300], quote=True)
-    stock_label = "В наличии" if item.get("stock", True) else "Нет в наличии"
+    stock_label = locale["in_stock"] if item.get("stock", True) else locale["out_of_stock"]
     stock_class = "" if item.get("stock", True) else " product__stock--out"
+    alternate_links = "\n".join(
+        f'<link rel="alternate" hreflang="{PRODUCT_LOCALES[code]["hreflang"]}" href="{html.escape(url, quote=True)}">'
+        for code, url in alternates.items()
+    )
+    alternate_links += (
+        f'\n<link rel="alternate" hreflang="x-default" href="{html.escape(alternates["ru"], quote=True)}">'
+    )
+    og_alternates = "\n".join(
+        f'<meta property="og:locale:alternate" content="{details["og_locale"]}">'
+        for code, details in PRODUCT_LOCALES.items()
+        if code != language
+    )
+    shop_href = f"/shop?lang={language}#tea-{item['id']}"
     return f"""<!doctype html>
-<html lang="ru">
+<html lang="{locale['html_lang']}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>{safe_name} — купить китайский чай · Чайня</title>
+<title>{html.escape(locale['title'].format(name=name))}</title>
 <meta name="description" content="{safe_meta_description}">
 <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
 <meta name="theme-color" content="#141110">
 <link rel="canonical" href="{safe_canonical}">
+{alternate_links}
 <link rel="icon" href="/favicon.png" type="image/png">
 <meta property="og:type" content="product">
 <meta property="og:site_name" content="Чайня">
-<meta property="og:title" content="{safe_name} — Чайня">
+<meta property="og:title" content="{safe_name} — {locale['brand']}">
 <meta property="og:description" content="{safe_meta_description}">
 <meta property="og:url" content="{safe_canonical}">
+<meta property="og:locale" content="{locale['og_locale']}">
+{og_alternates}
 <meta property="og:image" content="{safe_image_url}">
 <meta property="og:image:alt" content="{safe_name}">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="{safe_name} — Чайня">
+<meta name="twitter:title" content="{safe_name} — {locale['brand']}">
 <meta name="twitter:description" content="{safe_meta_description}">
 <meta name="twitter:image" content="{safe_image_url}">
 <script type="application/ld+json">{_script_json(graph)}</script>
@@ -3784,7 +3885,7 @@ h1{{margin:0;font:clamp(42px,6vw,78px)/1.06 Prata,Georgia,serif;letter-spacing:-
 </style>
 </head>
 <body><div class="shell">
-<header class="nav"><a class="brand" href="/"><img src="/img/logo-mark.webp" alt=""><span>ЧАЙНЯ</span></a><a class="back" href="/shop">Все чаи</a></header>
+<header class="nav"><a class="brand" href="/"><img src="/img/logo-mark.webp" alt=""><span>ЧАЙНЯ</span></a><a class="back" href="/shop?lang={language}">{locale['all_teas']}</a></header>
 <main class="product">
   <img class="product__image" src="{safe_image}" alt="{safe_name}" width="900" height="900">
   <article>
@@ -3795,7 +3896,7 @@ h1{{margin:0;font:clamp(42px,6vw,78px)/1.06 Prata,Georgia,serif;letter-spacing:-
     <span class="product__stock{stock_class}">{stock_label}</span>
     <div class="product__buy">
       <div><span class="product__price">{item['price']} ₽</span><span class="product__unit">{unit_label}</span></div>
-      <a class="button" href="/shop#tea-{item['id']}">Открыть в магазине</a>
+      <a class="button" href="{shop_href}">{locale['open_shop']}</a>
     </div>
   </article>
 </main></div></body></html>"""
@@ -3809,8 +3910,7 @@ def _missing_product_html() -> str:
 <body><main class="box"><h1>Этот чай уже выпит</h1><p>Карточка могла быть скрыта или адрес изменился.</p><a href="/shop">Вернуться в каталог</a></main></body></html>"""
 
 
-@app.get("/tea/{item_id}", response_class=HTMLResponse)
-def product_page(item_id: str):
+def _product_page_response(item_id: str, language: str = "ru") -> HTMLResponse:
     found = _public_product(item_id)
     if not found:
         return HTMLResponse(
@@ -3820,9 +3920,24 @@ def product_page(item_id: str):
         )
     document, item = found
     return HTMLResponse(
-        _product_page_html(document, item),
+        _product_page_html(document, item, language),
         headers={"Cache-Control": "public, max-age=60, stale-while-revalidate=300"},
     )
+
+
+@app.get("/tea/{item_id}", response_class=HTMLResponse)
+def product_page(item_id: str):
+    return _product_page_response(item_id)
+
+
+@app.get("/en/tea/{item_id}", response_class=HTMLResponse)
+def product_page_en(item_id: str):
+    return _product_page_response(item_id, "en")
+
+
+@app.get("/zh/tea/{item_id}", response_class=HTMLResponse)
+def product_page_zh(item_id: str):
+    return _product_page_response(item_id, "zh")
 
 
 @app.head("/tea/{item_id}")
@@ -3833,6 +3948,12 @@ def product_page_head(item_id: str):
             headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow"},
         )
     return Response(headers={"Cache-Control": "public, max-age=60, stale-while-revalidate=300"})
+
+
+@app.head("/en/tea/{item_id}")
+@app.head("/zh/tea/{item_id}")
+def localized_product_page_head(item_id: str):
+    return product_page_head(item_id)
 
 
 @app.get("/sitemap.xml", response_class=PlainTextResponse)
@@ -3852,14 +3973,22 @@ def dynamic_sitemap():
         f"  <url><loc>{PUBLIC_SITE}{path}</loc><changefreq>{frequency}</changefreq><priority>{priority}</priority></url>"
         for path, frequency, priority in base_urls
     ]
-    rows.extend(
-        f"  <url><loc>{PUBLIC_SITE}/tea/{item['id']}</loc>{lastmod}<changefreq>weekly</changefreq><priority>0.8</priority></url>"
-        for item in document["teas"]
-        if item.get("published", True)
-    )
+    for item in document["teas"]:
+        if not item.get("published", True):
+            continue
+        alternates = _product_alternates(item["id"])
+        alternate_xml = "".join(
+            f'<xhtml:link rel="alternate" hreflang="{PRODUCT_LOCALES[code]["hreflang"]}" href="{url}"/>'
+            for code, url in alternates.items()
+        )
+        alternate_xml += f'<xhtml:link rel="alternate" hreflang="x-default" href="{alternates["ru"]}"/>'
+        for url in alternates.values():
+            rows.append(
+                f"  <url><loc>{url}</loc>{lastmod}{alternate_xml}<changefreq>weekly</changefreq><priority>0.8</priority></url>"
+            )
     xml = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n'
         + "\n".join(rows)
         + "\n</urlset>\n"
     )

@@ -383,14 +383,21 @@ def check_live(base_url: str) -> list[str]:
         errors.append("/api/catalog: товар не соответствует публичной схеме")
     else:
         first_id = catalog_items[0]["id"]
-        product_path = f"/tea/{first_id}"
-        canonical = f"{base}{product_path}"
-        product_code, product_html, product_headers = text_response(base + product_path)
-        if product_code != 200:
-            errors.append(f"{product_path}: ожидался 200, получен {product_code}")
-        else:
+        product_paths = (
+            (f"/tea/{first_id}", "ru"),
+            (f"/en/tea/{first_id}", "en"),
+            (f"/zh/tea/{first_id}", "zh-CN"),
+        )
+        for product_path, page_language in product_paths:
+            canonical = f"{base}{product_path}"
+            product_code, product_html, product_headers = text_response(base + product_path)
+            if product_code != 200:
+                errors.append(f"{product_path}: ожидался 200, получен {product_code}")
+                continue
             for marker in (
+                f'<html lang="{page_language}">',
                 f'<link rel="canonical" href="{canonical}">',
+                f'hreflang="x-default" href="{base}/tea/{first_id}"',
                 '<meta property="og:type" content="product">',
                 '"@type":"Product"',
             ):
@@ -398,20 +405,24 @@ def check_live(base_url: str) -> list[str]:
                     errors.append(f"{product_path}: отсутствует SEO-маркер {marker!r}")
             if "public" not in combined_header(product_headers, "cache-control").lower():
                 errors.append(f"{product_path}: отсутствует публичная cache policy")
-        product_head, _type, product_head_headers = raw_response_metadata(
-            base + product_path,
-            method="HEAD",
-        )
-        if product_head != 200:
-            errors.append(f"{product_path}: HEAD ожидался 200, получен {product_head}")
-        elif "frame-ancestors 'none'" not in combined_header(
-            product_head_headers,
-            "content-security-policy",
-        ):
-            errors.append(f"{product_path}: публичная карточка допускает встраивание")
+            product_head, _type, product_head_headers = raw_response_metadata(
+                base + product_path,
+                method="HEAD",
+            )
+            if product_head != 200:
+                errors.append(f"{product_path}: HEAD ожидался 200, получен {product_head}")
+            elif "frame-ancestors 'none'" not in combined_header(
+                product_head_headers,
+                "content-security-policy",
+            ):
+                errors.append(f"{product_path}: публичная карточка допускает встраивание")
         sitemap_code, sitemap_xml, _headers = text_response(base + "/sitemap.xml")
-        if sitemap_code != 200 or canonical not in sitemap_xml:
-            errors.append(f"/sitemap.xml: нет опубликованной карточки {product_path}")
+        if sitemap_code != 200:
+            errors.append("/sitemap.xml: не удалось прочитать карту сайта")
+        else:
+            for product_path, _language in product_paths:
+                if f"{base}{product_path}" not in sitemap_xml:
+                    errors.append(f"/sitemap.xml: нет опубликованной карточки {product_path}")
     for path in SENSITIVE_PATHS:
         code, _content_type = status(base + path)
         if code not in {403, 404}:

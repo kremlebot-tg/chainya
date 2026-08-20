@@ -1,9 +1,12 @@
 import importlib
 import json
 import sqlite3
+import threading
 from datetime import datetime, timedelta
+from decimal import Decimal
 from urllib.parse import parse_qs, urlparse
 
+import pytest
 from fastapi.testclient import TestClient
 
 from backend.cdek import CdekSettings
@@ -68,6 +71,89 @@ def test_health_exposes_safe_release_version(tmp_path, monkeypatch):
     assert response.json()["version"] in {"development", "unknown"} or len(response.json()["version"]) == 12
 
 
+def test_every_sellable_catalog_option_builds_an_exact_saby_fiscal_line(
+    tmp_path, monkeypatch
+):
+    """Exercise the real checkout pricing rules against the complete live seed.
+
+    This is deliberately an offline contract test: it proves that every product
+    and pack currently offered by the storefront can be serialized without a
+    rounding mismatch, but it never calls Saby or any other external service.
+    """
+
+    _client, module = app_client(tmp_path, monkeypatch)
+    settings = SabyFiscalSettings(
+        point_id="274",
+        company_id="274",
+        kkt_reg_number="0001234567890123",
+        tax_system=2,
+        pay_method=4,
+    )
+    catalog = module.load_catalog()
+    packs = module.get_catalog_store().get()["packs"]
+    expected_options = sum(
+        1 if tea["unit"] == "pc" else len(packs)
+        for tea in catalog.values()
+        if tea.get("published") is not False and tea.get("stock") is not False
+    )
+    checked_options = 0
+
+    for tea in catalog.values():
+        if tea.get("published") is False or tea.get("stock") is False:
+            continue
+        options = ["pc"] if tea["unit"] == "pc" else packs
+        for pack in options:
+            request = module.CreateOrder(
+                items=[{"id": tea["id"], "pack": pack, "qty": 1}],
+                delivery="pickup",
+                payment_method="sbp",
+                name="Тест",
+                phone="+7 999 000-00-00",
+                privacy_accepted=True,
+            )
+            lines, subtotal = module.price_order(request)
+            fiscal = module.build_fiscal_sale(
+                {
+                    "id": f"CATALOG{checked_options:04d}",
+                    "total": subtotal,
+                    "delivery_price": 0,
+                    "customer": {
+                        "name": request.name,
+                        "phone": request.phone,
+                    },
+                    "items": lines,
+                },
+                settings=settings,
+            )
+            fiscal_line = fiscal["nomenclatures"][0]
+            serialized_total = (
+                Decimal(fiscal_line["priceNomenclature"])
+                * Decimal(fiscal_line["quantityNomenclature"])
+            ).quantize(Decimal("0.01"))
+            assert serialized_total == Decimal(subtotal).quantize(Decimal("0.01"))
+            assert Decimal(fiscal["internetSum"]) == Decimal(subtotal)
+            assert Decimal(fiscal["vatNone"]) == Decimal(subtotal)
+            checked_options += 1
+
+    assert checked_options == expected_options
+    assert checked_options > 0
+
+
+def test_database_enforces_durable_effect_foreign_keys(tmp_path, monkeypatch):
+    _client, module = app_client(tmp_path, monkeypatch)
+    module.init_db()
+
+    with module.db() as con:
+        assert con.execute("PRAGMA foreign_keys").fetchone()[0] == 1
+        with pytest.raises(sqlite3.IntegrityError):
+            con.execute(
+                """INSERT INTO paid_order_effects
+                   (order_id, effect, state, attempts, last_error, updated_at)
+                   VALUES ('missing-order', 'telegram', 'pending', 0, '', ?)""",
+                (module.now_iso(),),
+            )
+
+
 def test_checkout_status_fails_closed_without_live_payment_mode(tmp_path, monkeypatch):
     client, _ = app_client(tmp_path, monkeypatch, test_mode="0")
     with client:
@@ -94,7 +180,7 @@ def test_live_checkout_accepts_exactly_one_ready_fiscal_provider(tmp_path, monke
     ))
     monkeypatch.setattr(module, "tbank_receipt_settings", TBankReceiptSettings(enabled=False))
     monkeypatch.setattr(module, "saby_fiscal_settings", SabyFiscalSettings(
-        company_id="274", kkt_reg_number="0001234567890123",
+        point_id="274", company_id="274", kkt_reg_number="0001234567890123",
         tax_system=2, pay_method=4,
     ))
     assert module.tbank_checkout_ready() is True
@@ -127,7 +213,7 @@ def test_live_checkout_closes_while_saby_fiscal_result_is_ambiguous(
     ))
     monkeypatch.setattr(module, "tbank_receipt_settings", TBankReceiptSettings(enabled=False))
     monkeypatch.setattr(module, "saby_fiscal_settings", SabyFiscalSettings(
-        company_id="274", kkt_reg_number="0001234567890123",
+        point_id="274", company_id="274", kkt_reg_number="0001234567890123",
         tax_system=2, pay_method=4,
     ))
     with module.db() as con:
@@ -160,7 +246,7 @@ def test_live_checkout_can_continue_with_explicit_manual_saby_reconciliation(
     ))
     monkeypatch.setattr(module, "tbank_receipt_settings", TBankReceiptSettings(enabled=False))
     monkeypatch.setattr(module, "saby_fiscal_settings", SabyFiscalSettings(
-        company_id="274", kkt_reg_number="0001234567890123",
+        point_id="274", company_id="274", kkt_reg_number="0001234567890123",
         tax_system=2, pay_method=4,
     ))
     with module.db() as con:
@@ -450,12 +536,23 @@ def test_business_lead_is_idempotent_before_rate_limit(tmp_path, monkeypatch):
 
 
 def test_admin_lists_and_updates_orders(tmp_path, monkeypatch):
-    client, _ = app_client(tmp_path, monkeypatch)
+    client, module = app_client(tmp_path, monkeypatch)
     auth = {"Authorization": "Bearer test-admin-token"}
     with client:
         created = client.post("/api/orders", json=payload()).json()["order"]
+        single_reservation_summary = module.admin_stock_reservation
+        monkeypatch.setattr(
+            module,
+            "admin_stock_reservation",
+            lambda *_args, **_kwargs: pytest.fail(
+                "the order list must batch stock-reservation summaries"
+            ),
+        )
         assert client.get("/api/admin/orders").status_code == 401
         listing = client.get("/api/admin/orders", headers=auth)
+        monkeypatch.setattr(
+            module, "admin_stock_reservation", single_reservation_summary
+        )
         assert listing.status_code == 200
         assert listing.json()["orders"][0]["customer"]["phone"] == "+7 999 123-45-67"
         integrations = listing.json()["orders"][0]["integrations"]
@@ -517,13 +614,38 @@ def test_legacy_orders_receive_safe_integration_states(tmp_path, monkeypatch):
             rows = {
                 row["id"]: row
                 for row in con.execute(
-                    "SELECT id, payment_provider, payment_state FROM orders"
+                    """SELECT id, payment_provider, payment_state,
+                              paid_effects_enqueued, saby_state,
+                              saby_receipt_state, saby_settlement_state,
+                              saby_refund_state, cdek_state
+                       FROM orders"""
                 ).fetchall()
+            }
+            effects = con.execute(
+                "SELECT order_id, effect FROM paid_order_effects"
+            ).fetchall()
+            indexes = {
+                row["name"] for row in con.execute("PRAGMA index_list(orders)")
             }
     assert (rows["MOCKPAID"]["payment_provider"], rows["MOCKPAID"]["payment_state"]) == ("test", "paid")
     assert (rows["MANUALPAID"]["payment_provider"], rows["MANUALPAID"]["payment_state"]) == ("manual", "paid")
     assert (rows["PENDING"]["payment_provider"], rows["PENDING"]["payment_state"]) == ("test", "awaiting")
     assert (rows["CANCELLEDPAID"]["payment_provider"], rows["CANCELLEDPAID"]["payment_state"]) == ("test", "paid")
+    assert rows["PENDING"]["paid_effects_enqueued"] == 0
+    assert all(rows[order_id]["paid_effects_enqueued"] == 1 for order_id in (
+        "MOCKPAID", "MANUALPAID", "CANCELLEDPAID",
+    ))
+    assert all(rows[order_id]["saby_state"] == "not_queued" for order_id in rows)
+    assert all(rows[order_id]["saby_receipt_state"] == "not_requested" for order_id in rows)
+    assert all(rows[order_id]["saby_settlement_state"] == "not_requested" for order_id in rows)
+    assert all(rows[order_id]["saby_refund_state"] == "not_requested" for order_id in rows)
+    assert all(rows[order_id]["cdek_state"] == "not_requested" for order_id in rows)
+    assert effects == []
+    assert {
+        "idx_orders_saby_receipt",
+        "idx_orders_saby_settlement_receipt",
+        "idx_orders_saby_refund_receipt",
+    }.issubset(indexes)
 
 
 def test_admin_lists_and_updates_business_leads(tmp_path, monkeypatch):
@@ -710,11 +832,117 @@ def test_admin_saby_test_does_not_require_delivery_for_cdek_flow(tmp_path, monke
     assert result["in_stock_items"] == 28
     assert result["catalog_mapping_valid"] is True
     assert result["zero_balance_items"] == []
-    assert result["warnings"] == ["В Saby есть скрытые на сайте позиции: 1"]
+    assert result["warnings"] == [
+        "В Saby есть скрытые на сайте позиции: 1",
+        "Кассовая регистрация не проверяется этим read-only тестом",
+    ]
     assert result["delivery_configured"] is False
     assert result["delivery_confirmation"] == "not_required_cdek"
-    assert result["ready_for_orders"] is True
+    assert result["retail_catalog_ready"] is True
+    assert result["write_probe_performed"] is False
+    assert result["fiscal_registration_confirmed"] is False
+    assert result["ready_for_orders"] is False
     assert result["blockers"] == []
+
+
+def test_admin_saby_readiness_reports_separate_ofd_auth_without_writing(
+    tmp_path, monkeypatch
+):
+    client, module = app_client(tmp_path, monkeypatch)
+    action = {
+        "Authorization": "Bearer test-admin-token",
+        "X-Chainya-Admin": "saby-readiness",
+    }
+    monkeypatch.setattr(module, "saby_fiscal_settings", SabyFiscalSettings(
+        point_id="274", company_id="274",
+        kkt_reg_number="0001234567890123", pay_method=4,
+    ))
+    monkeypatch.setattr(module.saby_client, "configuration", lambda: {
+        "configured": True, "point_id": 274, "price_list_id": 7, "missing": [],
+    })
+    monkeypatch.setattr(module.saby_client, "sales_points", lambda product="retail": {
+        "salesPoints": [{"id": 274, "name": "Чайня"}],
+    })
+    monkeypatch.setattr(module.saby_client, "price_lists", lambda: {
+        "priceLists": [{"id": 7, "name": "Сайт chainya.ru"}],
+    })
+    monkeypatch.setattr(
+        module.saby_client, "catalog_all",
+        lambda with_balance=False: matching_saby_catalog(module),
+    )
+    monkeypatch.setattr(module.saby_client, "companies", lambda: {
+        "companies": [{"id": 274, "inn": "1234567890"}],
+    })
+
+    with client:
+        response = client.post("/api/admin/saby/test", headers=action)
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["fiscal_probe"] == {
+        "state": "separate_auth_required",
+        "company_found": True,
+        "kkt_found": False,
+        "read_only": True,
+        "detail": (
+            "Retail API видит компанию, но список ККТ требует отдельную "
+            "OFD-авторизацию; эта проверка не подтверждает кассу"
+        ),
+    }
+    assert result["write_probe_performed"] is False
+    assert result["fiscal_registration_confirmed"] is False
+    assert "отдельную OFD-авторизацию" in " ".join(result["warnings"])
+
+
+def test_admin_saby_readiness_does_not_expose_company_identifier(
+    tmp_path, monkeypatch
+):
+    client, module = app_client(tmp_path, monkeypatch)
+    action = {
+        "Authorization": "Bearer test-admin-token",
+        "X-Chainya-Admin": "saby-readiness",
+    }
+    monkeypatch.setattr(module, "saby_fiscal_settings", SabyFiscalSettings(
+        point_id="274", company_id="274",
+        kkt_reg_number="0001234567890123", pay_method=4,
+    ))
+    monkeypatch.setattr(module.saby_client, "configuration", lambda: {
+        "configured": True, "point_id": 274, "price_list_id": 7, "missing": [],
+    })
+    monkeypatch.setattr(module.saby_client, "sales_points", lambda product="retail": {
+        "salesPoints": [{"id": 274, "name": "Чайня"}],
+    })
+    monkeypatch.setattr(module.saby_client, "price_lists", lambda: {
+        "priceLists": [{"id": 7, "name": "Сайт chainya.ru"}],
+    })
+    monkeypatch.setattr(
+        module.saby_client, "catalog_all",
+        lambda with_balance=False: matching_saby_catalog(module),
+    )
+    monkeypatch.setattr(module.saby_client, "companies", lambda: {
+        "companies": [{"id": 274, "inn": "1234567890"}],
+    })
+
+    with client:
+        response = client.post("/api/admin/saby/test", headers=action)
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["fiscal_probe"] == {
+        "state": "separate_auth_required",
+        "company_found": True,
+        "kkt_found": False,
+        "read_only": True,
+        "detail": (
+            "Retail API видит компанию, но список ККТ требует отдельную "
+            "OFD-авторизацию; эта проверка не подтверждает кассу"
+        ),
+    }
+    serialized = json.dumps(result, ensure_ascii=False)
+    assert "1234567890" not in serialized
+    assert "0001234567890123" not in serialized
+    assert result["write_probe_performed"] is False
+    assert result["fiscal_registration_confirmed"] is False
 
 
 def test_saby_readiness_rejects_unknown_balance_and_external_id_mismatch(tmp_path, monkeypatch):
@@ -846,7 +1074,8 @@ def test_saby_readiness_ignores_delivery_product_for_fiscal_sale(tmp_path, monke
     assert result["state"] == "ready"
     assert result["delivery_configured"] is False
     assert result["delivery_confirmation"] == "not_required_cdek"
-    assert result["ready_for_orders"] is True
+    assert result["retail_catalog_ready"] is True
+    assert result["ready_for_orders"] is False
     assert result["blockers"] == []
     assert result["errors"] == {}
 
@@ -878,7 +1107,8 @@ def test_saby_readiness_does_not_call_irrelevant_delivery_api(tmp_path, monkeypa
 
     assert result["state"] == "ready"
     assert result["delivery_configured"] is False
-    assert result["ready_for_orders"] is True
+    assert result["retail_catalog_ready"] is True
+    assert result["ready_for_orders"] is False
     assert result["blockers"] == []
     assert result["errors"] == {}
 
@@ -914,7 +1144,8 @@ def test_saby_readiness_never_calls_delivery_calendar(tmp_path, monkeypatch):
     assert result["state"] == "ready"
     assert result["delivery_configured"] is False
     assert result["delivery_confirmation"] == "not_required_cdek"
-    assert result["ready_for_orders"] is True
+    assert result["retail_catalog_ready"] is True
+    assert result["ready_for_orders"] is False
     assert result["blockers"] == []
 
 
@@ -1089,6 +1320,24 @@ def test_admin_uses_readable_typography_scale(tmp_path, monkeypatch):
     assert '<body class="admin-readable">' in html
     assert ".admin-readable{font-size:16px;line-height:1.55}" in html
     assert ".admin-readable .saby-alert__title{font-size:20px" in html
+
+
+def test_admin_shows_every_saby_fiscal_receipt_and_its_incident(tmp_path, monkeypatch):
+    _, module = app_client(tmp_path, monkeypatch)
+    html = (module.ROOT / "backend" / "admin.html").read_text(encoding="utf-8")
+    assert "fiscalLabel('Чек Saby',saby.receipt)" in html
+    assert "fiscalLabel('Окончательный чек',saby.settlement_receipt)" in html
+    assert "fiscalLabel('Чек возврата',saby.refund_receipt)" in html
+    assert "sabyReceiptWarning('Чек продажи Saby',sabyIntegration.receipt)" in html
+    assert "sabyReceiptWarning('Окончательный чек Saby',sabyIntegration.settlement_receipt)" in html
+    assert "sabyReceiptWarning('Чек возврата Saby',sabyIntegration.refund_receipt)" in html
+    assert "Автоповтор запрещён" in html
+    assert "Запрос в Saby ещё не отправлялся" in html
+    assert "Saby мог принять операцию" in html
+    assert "Saby не вернул идентификатор чека" in html
+    assert "проверить его через API по кнопке нельзя" in html
+    assert "Идентификатор чека Saby сохранён" in html
+    assert "Состояние зафиксировано" in html
     assert ".admin-readable .saby-alert__item{padding:5px 8px;font-size:12px" in html
     assert "@media(max-width:760px){.admin-readable{font-size:16px}" in html
 
@@ -1101,6 +1350,29 @@ def test_admin_uses_refined_responsive_header(tmp_path, monkeypatch):
     assert 'href="/manage/guides">Гайды</a>' in html
     assert ".topbar--refined .nav__count{display:none}" in html
     assert ".topbar--refined .nav__button[aria-selected=true]" in html
+
+
+def test_admin_does_not_claim_saby_fiscal_success_without_confirmation(
+    tmp_path, monkeypatch
+):
+    _, module = app_client(tmp_path, monkeypatch)
+    html = (module.ROOT / "backend" / "admin.html").read_text(encoding="utf-8")
+    guides = (module.ROOT / "backend" / "admin-guides.html").read_text(
+        encoding="utf-8"
+    )
+    assert "saby_fiscal_incidents" in html
+    assert "saby_fiscal_prewrite_blocked" in html
+    assert "saby_fiscal_retrying" in html
+    assert "Оплаты получены, чеки Saby требуют сверки" in html
+    assert "Автоповтор запрещён" in html
+    assert "Остановлено до настройки" in html
+    assert "Безопасный повтор" in html
+    assert "Кассовая продажа · готова" not in html
+    assert "Saby готов принимать заказы" not in html
+    assert "Кассовая продажа · маршрут включён" in html
+    assert "Отправка после оплаты · включена" in html
+    assert "Успех подтверждается только настоящим фискальным признаком" in guides
+    assert "контур нельзя считать полностью проверенным" in guides
 
 
 def test_saby_shadow_persists_safe_errors_recovers_stale_run_and_limits_history(tmp_path, monkeypatch):
@@ -1378,6 +1650,168 @@ def test_paid_effect_preserves_actual_purchase_route_blocker(tmp_path, monkeypat
     assert "Delivery" not in effect["last_error"]
 
 
+def test_worker_resumes_prewrite_fiscal_block_after_configuration_is_fixed(
+    tmp_path, monkeypatch
+):
+    client, module = app_client(tmp_path, monkeypatch)
+    monkeypatch.setenv("SABY_ORDER_SYNC_MODE", "auto")
+    monkeypatch.setenv("SABY_PURCHASE_ROUTE", "fiscal_sale")
+    sent = []
+    monkeypatch.setattr(
+        module.saby_client,
+        "create_fiscal_sale",
+        lambda data: sent.append(data) or {"id": "resumed-safe-receipt"},
+    )
+
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        expose_live_saby_writer(module, monkeypatch)
+        mark_order_paid_and_enqueue(module, order["id"])
+
+        module.process_paid_order_effects(order["id"])
+        blocked = module.order_row(order["id"])
+        assert blocked["saby_receipt_state"] == "blocked"
+        assert blocked["saby_receipt_id"] is None
+        assert blocked["saby_receipt_payload_hash"] is None
+
+        configure_saby_fiscal_flow(module, monkeypatch)
+        module.recover_paid_order_effects()
+
+    current = module.order_row(order["id"])
+    with module.db() as con:
+        effect = con.execute(
+            """SELECT state, attempts FROM paid_order_effects
+               WHERE order_id = ? AND effect = 'saby'""",
+            (order["id"],),
+        ).fetchone()
+    assert len(sent) == 1
+    assert current["saby_receipt_state"] == "registered"
+    assert current["saby_receipt_id"] == "resumed-safe-receipt"
+    assert effect["state"] == "sent"
+    assert effect["attempts"] == 2
+
+
+def test_worker_never_requeues_blocked_fiscal_sale_with_persisted_payload(
+    tmp_path, monkeypatch
+):
+    client, module = app_client(tmp_path, monkeypatch)
+    configure_saby_fiscal_flow(module, monkeypatch)
+    sent = []
+    monkeypatch.setattr(
+        module.saby_client,
+        "create_fiscal_sale",
+        lambda data: sent.append(data) or {"id": "must-not-be-created"},
+    )
+
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        expose_live_saby_writer(module, monkeypatch)
+        mark_order_paid_and_enqueue(module, order["id"])
+        with module.db() as con:
+            con.execute(
+                """UPDATE orders
+                   SET saby_receipt_state = 'blocked',
+                       saby_receipt_payload_hash = 'provider-bound-payload'
+                   WHERE id = ?""",
+                (order["id"],),
+            )
+            con.execute(
+                """UPDATE paid_order_effects SET state = 'blocked'
+                   WHERE order_id = ? AND effect = 'saby'""",
+                (order["id"],),
+            )
+        module.recover_paid_order_effects()
+
+    assert sent == []
+    assert module.order_row(order["id"])["saby_receipt_state"] == "blocked"
+
+
+def test_safe_fiscal_requeue_updates_only_exact_eligible_outbox_row(
+    tmp_path, monkeypatch
+):
+    client, module = app_client(tmp_path, monkeypatch)
+    configure_saby_fiscal_flow(module, monkeypatch)
+
+    with client:
+        eligible = client.post("/api/orders", json=payload()).json()["order"]
+        unrelated = client.post(
+            "/api/orders",
+            json={**payload(), "phone": "+7 999 111-22-34"},
+        ).json()["order"]
+        expose_live_saby_writer(module, monkeypatch)
+        mark_order_paid_and_enqueue(module, eligible["id"])
+        mark_order_paid_and_enqueue(module, unrelated["id"])
+        with module.db() as con:
+            con.execute(
+                """UPDATE orders
+                   SET saby_receipt_state = 'blocked'
+                   WHERE id = ?""",
+                (eligible["id"],),
+            )
+            con.execute(
+                """UPDATE paid_order_effects SET state = 'blocked'
+                   WHERE order_id = ? AND effect = 'saby'""",
+                (eligible["id"],),
+            )
+            con.execute(
+                """UPDATE orders
+                   SET payment_state = 'failed', saby_receipt_state = 'failed'
+                   WHERE id = ?""",
+                (unrelated["id"],),
+            )
+            con.execute(
+                """UPDATE paid_order_effects SET state = 'blocked'
+                   WHERE order_id = ? AND effect = 'saby'""",
+                (unrelated["id"],),
+            )
+            resumed = module.requeue_safe_blocked_saby_sales(con)
+            effects = {
+                row["order_id"]: row["state"]
+                for row in con.execute(
+                    """SELECT order_id, state FROM paid_order_effects
+                       WHERE effect = 'saby' AND order_id IN (?, ?)""",
+                    (eligible["id"], unrelated["id"]),
+                ).fetchall()
+            }
+
+    assert resumed == 1
+    assert effects[eligible["id"]] == "failed"
+    assert effects[unrelated["id"]] == "blocked"
+
+
+def test_bound_fiscal_blocker_survives_later_route_change(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    monkeypatch.setenv("SABY_ORDER_SYNC_MODE", "auto")
+    monkeypatch.setenv("SABY_PURCHASE_ROUTE", "delivery")
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        paid_at = module.now_iso()
+        with module.db() as con:
+            con.execute(
+                """UPDATE orders
+                   SET status = 'paid', payment_state = 'paid', paid_at = ?,
+                       saby_state = 'failed', saby_last_error = 'ошибка Delivery',
+                       saby_receipt_state = 'blocked',
+                       saby_receipt_last_error = 'проверить фискальную кассу',
+                       updated_at = ?
+                   WHERE id = ?""",
+                (paid_at, paid_at, order["id"]),
+            )
+            module.enqueue_paid_order_effects(con, order["id"], paid_at)
+
+        module.process_paid_order_effects(order["id"])
+        with module.db() as con:
+            effect = con.execute(
+                """SELECT state, attempts, last_error FROM paid_order_effects
+                   WHERE order_id = ? AND effect = 'saby'""",
+                (order["id"],),
+            ).fetchone()
+
+    assert effect["state"] == "blocked"
+    assert effect["attempts"] == 1
+    assert effect["last_error"] == "проверить фискальную кассу"
+
+
 def configure_saby_fiscal_flow(module, monkeypatch):
     monkeypatch.setenv("SABY_ORDER_SYNC_MODE", "auto")
     monkeypatch.setenv("SABY_PURCHASE_ROUTE", "fiscal_sale")
@@ -1386,12 +1820,12 @@ def configure_saby_fiscal_flow(module, monkeypatch):
     ))
     monkeypatch.setattr(module, "tbank_receipt_settings", TBankReceiptSettings(enabled=False))
     monkeypatch.setattr(module, "saby_fiscal_settings", SabyFiscalSettings(
-        company_id="274", kkt_reg_number="0001234567890123",
+        point_id="274", company_id="274", kkt_reg_number="0001234567890123",
         tax_system=2, pay_method=4,
     ))
     monkeypatch.setattr(
         module.saby_client, "fiscal_receipt",
-        lambda _receipt_id: {"payments": [{"fiscalSign": "1234567890"}]},
+        lambda receipt_id: [{"id": receipt_id, "fiscalSign": "1234567890"}],
     )
     monkeypatch.setattr(
         module.saby_client, "base_catalog_all",
@@ -1468,6 +1902,54 @@ def test_fiscal_transport_error_is_ambiguous_and_never_blindly_retried(tmp_path,
     assert len(attempts) == 1
     current = module.order_row(order["id"])
     assert current["saby_receipt_state"] == "ambiguous"
+
+
+def test_restart_preserves_provider_bound_ambiguous_sale_without_retry(
+    tmp_path, monkeypatch
+):
+    client, module = app_client(tmp_path, monkeypatch)
+    configure_saby_fiscal_flow(module, monkeypatch)
+    sent = []
+    monkeypatch.setattr(
+        module.saby_client,
+        "create_fiscal_sale",
+        lambda data: sent.append(data) or {"id": "must-not-be-created"},
+    )
+
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        expose_live_saby_writer(module, monkeypatch)
+        mark_order_paid_and_enqueue(module, order["id"])
+        with module.db() as con:
+            con.execute(
+                """UPDATE orders
+                   SET saby_receipt_state = 'ambiguous',
+                       saby_receipt_id = NULL,
+                       saby_receipt_payload_hash = 'provider-bound-payload'
+                   WHERE id = ?""",
+                (order["id"],),
+            )
+            con.execute(
+                """UPDATE paid_order_effects
+                   SET state = 'ambiguous', attempts = 1
+                   WHERE order_id = ? AND effect = 'saby'""",
+                (order["id"],),
+            )
+
+        module.recover_paid_order_effects()
+        module.process_paid_order_effects(order["id"])
+
+    assert sent == []
+    current = module.order_row(order["id"])
+    assert current["saby_receipt_state"] == "ambiguous"
+    assert current["saby_receipt_payload_hash"] == "provider-bound-payload"
+    with module.db() as con:
+        effect = con.execute(
+            """SELECT state, attempts FROM paid_order_effects
+               WHERE order_id = ? AND effect = 'saby'""",
+            (order["id"],),
+        ).fetchone()
+    assert tuple(effect) == ("ambiguous", 1)
 
 
 def test_fiscal_http_401_after_post_is_ambiguous_and_never_retried(
@@ -1672,12 +2154,17 @@ def test_accepted_sale_waits_for_ofd_and_polls_without_second_sale(tmp_path, mon
     configure_saby_fiscal_flow(module, monkeypatch)
     sent = []
     checks = iter((
-        [{"fiscalSign": "none", "state": "новая"}],
-        [{"fiscalSign": "1234567890", "state": "готова"}],
+        [{"id": "safe-receipt-pending", "fiscalSign": "none", "state": "новая"}],
+        [{"id": "safe-receipt-pending", "fiscalSign": "1234567890", "state": "готова"}],
     ))
     monkeypatch.setattr(
         module.saby_client, "create_fiscal_sale",
         lambda data: sent.append(data) or {"id": "safe-receipt-pending"},
+    )
+    delivery_sent = []
+    monkeypatch.setattr(
+        module.saby_client, "create_delivery_order",
+        lambda data: delivery_sent.append(data) or {"externalId": "wrong-route"},
     )
     monkeypatch.setattr(module.saby_client, "fiscal_receipt", lambda _id: next(checks))
     with client:
@@ -1686,8 +2173,104 @@ def test_accepted_sale_waits_for_ofd_and_polls_without_second_sale(tmp_path, mon
         mark_order_paid_and_enqueue(module, order["id"])
         module.process_paid_order_effects(order["id"])
         assert module.order_row(order["id"])["saby_receipt_state"] == "pending_ofd"
+        # A later deploy may change the route for new orders.  This accepted
+        # payId must remain bound to fiscal GET polling and never become a
+        # Delivery write.
+        monkeypatch.setenv("SABY_PURCHASE_ROUTE", "delivery")
         module.process_paid_order_effects(order["id"])
 
+    assert len(sent) == 1
+    assert delivery_sent == []
+    assert module.order_row(order["id"])["saby_receipt_state"] == "registered"
+
+
+def test_accepted_sale_keeps_polling_after_rollout_cutoff_changes(
+    tmp_path, monkeypatch
+):
+    client, module = app_client(tmp_path, monkeypatch)
+    configure_saby_fiscal_flow(module, monkeypatch)
+    sent = []
+    checks = iter((
+        [{"id": "accepted-before-cutoff", "fiscalSign": "none", "state": "новая"}],
+        [{
+            "id": "accepted-before-cutoff",
+            "fiscalSign": "1234567890",
+            "state": "готова",
+        }],
+    ))
+    monkeypatch.setattr(
+        module.saby_client,
+        "create_fiscal_sale",
+        lambda data: sent.append(data) or {"id": "accepted-before-cutoff"},
+    )
+    monkeypatch.setattr(module.saby_client, "fiscal_receipt", lambda _id: next(checks))
+
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        expose_live_saby_writer(module, monkeypatch)
+        mark_order_paid_and_enqueue(module, order["id"])
+        module.process_paid_order_effects(order["id"])
+        assert module.order_row(order["id"])["saby_receipt_state"] == "pending_ofd"
+
+        monkeypatch.setenv(
+            "SABY_ORDER_SYNC_STARTED_AT", "2099-01-01T00:00:00+00:00"
+        )
+        module.process_paid_order_effects(order["id"])
+
+    assert len(sent) == 1
+    assert module.order_row(order["id"])["saby_receipt_state"] == "registered"
+    with module.db() as con:
+        effect = con.execute(
+            """SELECT state, attempts FROM paid_order_effects
+               WHERE order_id = ? AND effect = 'saby'""",
+            (order["id"],),
+        ).fetchone()
+    assert tuple(effect) == ("sent", 2)
+
+
+def test_concurrent_paid_effect_workers_create_only_one_fiscal_sale(
+    tmp_path, monkeypatch
+):
+    client, module = app_client(tmp_path, monkeypatch)
+    configure_saby_fiscal_flow(module, monkeypatch)
+    post_started = threading.Event()
+    release_post = threading.Event()
+    sent = []
+
+    def create_once(data):
+        sent.append(data)
+        post_started.set()
+        assert release_post.wait(timeout=3)
+        return {"id": "safe-concurrent-receipt"}
+
+    monkeypatch.setattr(module.saby_client, "create_fiscal_sale", create_once)
+    monkeypatch.setattr(
+        module.saby_client,
+        "fiscal_receipt",
+        lambda receipt_id: [
+            {"id": receipt_id, "fiscalSign": "1234567890", "state": "готова"}
+        ],
+    )
+
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        expose_live_saby_writer(module, monkeypatch)
+        mark_order_paid_and_enqueue(module, order["id"])
+        first = threading.Thread(
+            target=module.process_paid_order_effects, args=(order["id"],)
+        )
+        second = threading.Thread(
+            target=module.process_paid_order_effects, args=(order["id"],)
+        )
+        first.start()
+        assert post_started.wait(timeout=3)
+        second.start()
+        second.join(timeout=3)
+        release_post.set()
+        first.join(timeout=3)
+
+    assert not first.is_alive()
+    assert not second.is_alive()
     assert len(sent) == 1
     assert module.order_row(order["id"])["saby_receipt_state"] == "registered"
 
@@ -1705,7 +2288,7 @@ def test_pending_ofd_stops_after_finite_deadline_without_second_sale(
     )
     monkeypatch.setattr(
         module.saby_client, "fiscal_receipt",
-        lambda _id: [{"fiscalSign": "none", "state": "новая"}],
+        lambda receipt_id: [{"id": receipt_id, "fiscalSign": "none", "state": "новая"}],
     )
 
     with client:
@@ -1722,6 +2305,166 @@ def test_pending_ofd_stops_after_finite_deadline_without_second_sale(
     assert "без повторной продажи" in current["saby_receipt_last_error"]
 
 
+def test_pending_ofd_get_errors_stop_after_deadline_without_second_sale(
+    tmp_path, monkeypatch
+):
+    client, module = app_client(tmp_path, monkeypatch)
+    configure_saby_fiscal_flow(module, monkeypatch)
+    sent = []
+    monkeypatch.setattr(
+        module.saby_client,
+        "create_fiscal_sale",
+        lambda data: sent.append(data) or {"id": "must-not-be-created"},
+    )
+
+    def unavailable(_receipt_id):
+        raise module.SabyError("временная ошибка чтения")
+
+    monkeypatch.setattr(module.saby_client, "fiscal_receipt", unavailable)
+
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        expose_live_saby_writer(module, monkeypatch)
+        mark_order_paid_and_enqueue(module, order["id"])
+        expired = "2000-01-01T00:00:00+00:00"
+        with module.db() as con:
+            con.execute(
+                """UPDATE orders
+                   SET saby_receipt_state = 'pending_ofd',
+                       saby_receipt_id = 'accepted-before-get-errors',
+                       saby_receipt_updated_at = ?, updated_at = ?
+                   WHERE id = ?""",
+                (expired, expired, order["id"]),
+            )
+
+        module.process_paid_order_effects(order["id"])
+        module.recover_paid_order_effects()
+
+    current = module.order_row(order["id"])
+    with module.db() as con:
+        effect = con.execute(
+            """SELECT state, attempts FROM paid_order_effects
+               WHERE order_id = ? AND effect = 'saby'""",
+            (order["id"],),
+        ).fetchone()
+    assert sent == []
+    assert current["saby_receipt_state"] == "blocked"
+    assert "без повторной продажи" in current["saby_receipt_last_error"]
+    assert effect["state"] == "blocked"
+    assert effect["attempts"] == 1
+
+
+def test_worker_restart_marks_interrupted_fiscal_post_ambiguous_without_retry(
+    tmp_path, monkeypatch
+):
+    client, module = app_client(tmp_path, monkeypatch)
+    configure_saby_fiscal_flow(module, monkeypatch)
+    sent = []
+    monkeypatch.setattr(
+        module.saby_client,
+        "create_fiscal_sale",
+        lambda data: sent.append(data) or {"id": "must-not-be-created"},
+    )
+    delivery_sent = []
+    monkeypatch.setattr(
+        module.saby_client, "create_delivery_order",
+        lambda data: delivery_sent.append(data) or {"externalId": "wrong-route"},
+    )
+
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        expose_live_saby_writer(module, monkeypatch)
+        mark_order_paid_and_enqueue(module, order["id"])
+        stale = "2000-01-01T00:00:00+00:00"
+        with module.db() as con:
+            con.execute(
+                """UPDATE paid_order_effects
+                   SET state = 'sending', attempts = 1, updated_at = ?
+                   WHERE order_id = ? AND effect = 'saby'""",
+                (stale, order["id"]),
+            )
+            con.execute(
+                """UPDATE orders
+                   SET saby_receipt_state = 'sending',
+                       saby_receipt_updated_at = ?, updated_at = ?
+                   WHERE id = ?""",
+                (stale, stale, order["id"]),
+            )
+
+        monkeypatch.setenv("SABY_PURCHASE_ROUTE", "delivery")
+        module.recover_paid_order_effects()
+
+    current = module.order_row(order["id"])
+    with module.db() as con:
+        effect = con.execute(
+            """SELECT state, attempts FROM paid_order_effects
+               WHERE order_id = ? AND effect = 'saby'""",
+            (order["id"],),
+        ).fetchone()
+    assert sent == []
+    assert delivery_sent == []
+    assert current["saby_receipt_state"] == "ambiguous"
+    assert effect["state"] == "ambiguous"
+    assert effect["attempts"] == 1
+
+
+def test_worker_restart_resumes_pending_receipt_by_get_without_second_sale(
+    tmp_path, monkeypatch
+):
+    client, module = app_client(tmp_path, monkeypatch)
+    configure_saby_fiscal_flow(module, monkeypatch)
+    sent = []
+    monkeypatch.setattr(
+        module.saby_client,
+        "create_fiscal_sale",
+        lambda data: sent.append(data) or {"id": "must-not-be-created"},
+    )
+    checked = []
+    monkeypatch.setattr(
+        module.saby_client,
+        "fiscal_receipt",
+        lambda receipt_id: checked.append(receipt_id) or [
+            {"id": receipt_id, "fiscalSign": "1234567890", "state": "готова"}
+        ],
+    )
+
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        expose_live_saby_writer(module, monkeypatch)
+        mark_order_paid_and_enqueue(module, order["id"])
+        stale = "2000-01-01T00:00:00+00:00"
+        with module.db() as con:
+            con.execute(
+                """UPDATE paid_order_effects
+                   SET state = 'sending', attempts = 1, updated_at = ?
+                   WHERE order_id = ? AND effect = 'saby'""",
+                (stale, order["id"]),
+            )
+            con.execute(
+                """UPDATE orders
+                   SET saby_receipt_state = 'pending_ofd',
+                       saby_receipt_id = 'accepted-before-restart',
+                       saby_receipt_updated_at = ?, updated_at = ?
+                   WHERE id = ?""",
+                (stale, stale, order["id"]),
+            )
+
+        module.recover_paid_order_effects()
+
+    current = module.order_row(order["id"])
+    with module.db() as con:
+        effect = con.execute(
+            """SELECT state, attempts FROM paid_order_effects
+               WHERE order_id = ? AND effect = 'saby'""",
+            (order["id"],),
+        ).fetchone()
+    assert sent == []
+    assert checked == ["accepted-before-restart"]
+    assert current["saby_receipt_state"] == "registered"
+    assert effect["state"] == "sent"
+    assert effect["attempts"] == 2
+
+
 def test_saby_pending_fiscal_sign_markers_are_not_registered(tmp_path, monkeypatch):
     _client, module = app_client(tmp_path, monkeypatch)
     for marker in (None, "", "   ", "none", "NONE", "null", "Null", False, 0):
@@ -1731,6 +2474,425 @@ def test_saby_pending_fiscal_sign_markers_are_not_registered(tmp_path, monkeypat
     assert module._saby_receipt_is_fiscalized([
         {"fiscalSign": "1234567890", "state": "готова"}
     ])
+
+
+def test_saby_receipt_status_must_match_requested_id(tmp_path, monkeypatch):
+    _client, module = app_client(tmp_path, monkeypatch)
+    response = [
+        {"id": "other-receipt", "fiscalSign": "1234567890", "state": "готова"},
+        {"id": "expected-receipt", "fiscalSign": "none", "state": "новая"},
+    ]
+
+    assert not module._saby_receipt_is_fiscalized_for_id(
+        response, "expected-receipt"
+    )
+    assert module._saby_receipt_is_fiscalized_for_id(response, "other-receipt")
+
+
+def test_owner_check_reads_known_pending_receipt_without_second_sale(
+    tmp_path, monkeypatch
+):
+    client, module = app_client(tmp_path, monkeypatch)
+    checked = []
+    created = []
+    monkeypatch.setattr(
+        module.saby_client,
+        "fiscal_receipt",
+        lambda receipt_id: checked.append(receipt_id) or [
+            {"id": receipt_id, "fiscalSign": "none", "state": "новая"}
+        ],
+    )
+    monkeypatch.setattr(
+        module.saby_client,
+        "create_fiscal_sale",
+        lambda data: created.append(data) or {"id": "unexpected"},
+    )
+    headers = {
+        "Authorization": "Bearer test-admin-token",
+        "X-Chainya-Admin": "saby-receipt-check",
+    }
+
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        mark_order_paid_and_enqueue(module, order["id"])
+        pending_since = "2026-08-01T10:00:00+00:00"
+        with module.db() as con:
+            con.execute(
+                """UPDATE orders
+                   SET saby_receipt_state = 'pending_ofd',
+                       saby_receipt_id = 'known-pending-receipt',
+                       saby_receipt_updated_at = ?
+                   WHERE id = ?""",
+                (pending_since, order["id"]),
+            )
+            con.execute(
+                """UPDATE paid_order_effects SET state = 'blocked'
+                   WHERE order_id = ? AND effect = 'saby'""",
+                (order["id"],),
+            )
+        response = client.post(
+            f"/api/admin/orders/{order['id']}/saby/receipts/sale/check",
+            headers=headers,
+        )
+
+    assert response.status_code == 200
+    assert response.json()["found"] is True
+    assert response.json()["confirmed"] is False
+    assert response.json()["state"] == "pending_ofd"
+    assert checked == ["known-pending-receipt"]
+    assert created == []
+    current = module.order_row(order["id"])
+    assert current["saby_receipt_updated_at"] == pending_since
+    with module.db() as con:
+        effect = con.execute(
+            """SELECT state FROM paid_order_effects
+               WHERE order_id = ? AND effect = 'saby'""",
+            (order["id"],),
+        ).fetchone()
+    assert effect["state"] == "failed"
+
+
+def test_owner_check_confirms_exact_blocked_receipt_without_second_sale(
+    tmp_path, monkeypatch
+):
+    client, module = app_client(tmp_path, monkeypatch)
+    created = []
+    monkeypatch.setattr(
+        module.saby_client,
+        "fiscal_receipt",
+        lambda receipt_id: [
+            {"id": "other", "fiscalSign": "1234567890", "state": "готова"},
+            {"id": receipt_id, "fiscalSign": "9876543210", "state": "готова"},
+        ],
+    )
+    monkeypatch.setattr(
+        module.saby_client,
+        "create_fiscal_sale",
+        lambda data: created.append(data) or {"id": "unexpected"},
+    )
+    headers = {
+        "Authorization": "Bearer test-admin-token",
+        "X-Chainya-Admin": "saby-receipt-check",
+    }
+
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        mark_order_paid_and_enqueue(module, order["id"])
+        with module.db() as con:
+            con.execute(
+                """UPDATE orders
+                   SET saby_receipt_state = 'blocked',
+                       saby_receipt_id = 'known-blocked-receipt',
+                       saby_receipt_updated_at = '2026-08-01T10:00:00+00:00'
+                   WHERE id = ?""",
+                (order["id"],),
+            )
+            con.execute(
+                """UPDATE paid_order_effects SET state = 'blocked'
+                   WHERE order_id = ? AND effect = 'saby'""",
+                (order["id"],),
+            )
+        response = client.post(
+            f"/api/admin/orders/{order['id']}/saby/receipts/sale/check",
+            headers=headers,
+        )
+
+    assert response.status_code == 200
+    assert response.json()["confirmed"] is True
+    assert response.json()["state"] == "registered"
+    assert created == []
+    with module.db() as con:
+        effect = con.execute(
+            """SELECT state FROM paid_order_effects
+               WHERE order_id = ? AND effect = 'saby'""",
+            (order["id"],),
+        ).fetchone()
+    assert effect["state"] == "sent"
+
+
+def test_owner_check_queues_one_return_when_refunded_sale_is_confirmed(
+    tmp_path, monkeypatch
+):
+    client, module = app_client(tmp_path, monkeypatch)
+    created = []
+    monkeypatch.setattr(
+        module.saby_client,
+        "fiscal_receipt",
+        lambda receipt_id: [
+            {"id": receipt_id, "fiscalSign": "9876543210", "state": "готова"}
+        ],
+    )
+    monkeypatch.setattr(
+        module.saby_client,
+        "create_fiscal_sale",
+        lambda data: created.append(data) or {"id": "unexpected"},
+    )
+    headers = {
+        "Authorization": "Bearer test-admin-token",
+        "X-Chainya-Admin": "saby-receipt-check",
+    }
+
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        mark_order_paid_and_enqueue(module, order["id"])
+        with module.db() as con:
+            con.execute(
+                """UPDATE orders
+                   SET status = 'cancelled', payment_state = 'refunded',
+                       saby_receipt_state = 'blocked',
+                       saby_receipt_id = 'known-refunded-sale'
+                   WHERE id = ?""",
+                (order["id"],),
+            )
+            con.execute(
+                """UPDATE paid_order_effects SET state = 'blocked'
+                   WHERE order_id = ? AND effect = 'saby'""",
+                (order["id"],),
+            )
+
+        first = client.post(
+            f"/api/admin/orders/{order['id']}/saby/receipts/sale/check",
+            headers=headers,
+        )
+        # Simulate a historical deployment that recorded the confirmed sale
+        # but crashed before persisting the matching refund effect.
+        with module.db() as con:
+            con.execute(
+                """DELETE FROM paid_order_effects
+                   WHERE order_id = ? AND effect = 'saby_refund'""",
+                (order["id"],),
+            )
+        second = client.post(
+            f"/api/admin/orders/{order['id']}/saby/receipts/sale/check",
+            headers=headers,
+        )
+
+    assert first.status_code == 200
+    assert first.json()["state"] == "registered"
+    assert second.status_code == 200
+    assert created == []
+    with module.db() as con:
+        effects = con.execute(
+            """SELECT effect, state FROM paid_order_effects
+               WHERE order_id = ? AND effect IN ('saby', 'saby_refund')
+               ORDER BY effect""",
+            (order["id"],),
+        ).fetchall()
+    assert [(row["effect"], row["state"]) for row in effects] == [
+        ("saby", "sent"),
+        ("saby_refund", "pending"),
+    ]
+
+
+def test_owner_check_fails_closed_without_receipt_id_or_action_header(
+    tmp_path, monkeypatch
+):
+    client, module = app_client(tmp_path, monkeypatch)
+    checked = []
+    monkeypatch.setattr(
+        module.saby_client,
+        "fiscal_receipt",
+        lambda receipt_id: checked.append(receipt_id) or [],
+    )
+    auth = {"Authorization": "Bearer test-admin-token"}
+
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        with module.db() as con:
+            con.execute(
+                "UPDATE orders SET saby_receipt_state = 'ambiguous' WHERE id = ?",
+                (order["id"],),
+            )
+        missing_header = client.post(
+            f"/api/admin/orders/{order['id']}/saby/receipts/sale/check",
+            headers=auth,
+        )
+        no_identifier = client.post(
+            f"/api/admin/orders/{order['id']}/saby/receipts/sale/check",
+            headers={**auth, "X-Chainya-Admin": "saby-receipt-check"},
+        )
+
+    assert missing_header.status_code == 403
+    assert no_identifier.status_code == 409
+    assert "Повторная продажа запрещена" in no_identifier.json()["detail"]
+    assert checked == []
+
+
+def test_owner_check_does_not_accept_a_different_receipt(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        module.saby_client,
+        "fiscal_receipt",
+        lambda _receipt_id: [
+            {"id": "different", "fiscalSign": "1234567890", "state": "готова"}
+        ],
+    )
+    headers = {
+        "Authorization": "Bearer test-admin-token",
+        "X-Chainya-Admin": "saby-receipt-check",
+    }
+
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        with module.db() as con:
+            con.execute(
+                """UPDATE orders
+                   SET saby_receipt_state = 'ambiguous',
+                       saby_receipt_id = 'expected'
+                   WHERE id = ?""",
+                (order["id"],),
+            )
+        response = client.post(
+            f"/api/admin/orders/{order['id']}/saby/receipts/sale/check",
+            headers=headers,
+        )
+
+    assert response.status_code == 200
+    assert response.json()["found"] is False
+    assert response.json()["confirmed"] is False
+    assert response.json()["state"] == "ambiguous"
+    assert module.order_row(order["id"])["saby_receipt_state"] == "ambiguous"
+
+
+def test_owner_check_keeps_expired_receipt_blocked_when_sign_is_still_missing(
+    tmp_path, monkeypatch
+):
+    client, module = app_client(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        module.saby_client,
+        "fiscal_receipt",
+        lambda receipt_id: [
+            {"id": receipt_id, "fiscalSign": "none", "state": "новая"}
+        ],
+    )
+    headers = {
+        "Authorization": "Bearer test-admin-token",
+        "X-Chainya-Admin": "saby-receipt-check",
+    }
+
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        blocked_since = "2026-08-01T10:00:00+00:00"
+        with module.db() as con:
+            con.execute(
+                """UPDATE orders
+                   SET saby_receipt_state = 'blocked',
+                       saby_receipt_id = 'expired-receipt',
+                       saby_receipt_updated_at = ?
+                   WHERE id = ?""",
+                (blocked_since, order["id"]),
+            )
+        response = client.post(
+            f"/api/admin/orders/{order['id']}/saby/receipts/sale/check",
+            headers=headers,
+        )
+
+    assert response.status_code == 200
+    assert response.json()["found"] is True
+    assert response.json()["confirmed"] is False
+    assert response.json()["state"] == "blocked"
+    current = module.order_row(order["id"])
+    assert current["saby_receipt_state"] == "blocked"
+    assert current["saby_receipt_updated_at"] == blocked_since
+
+
+def test_owner_check_does_not_downgrade_concurrently_blocked_receipt(
+    tmp_path, monkeypatch
+):
+    client, module = app_client(tmp_path, monkeypatch)
+    headers = {
+        "Authorization": "Bearer test-admin-token",
+        "X-Chainya-Admin": "saby-receipt-check",
+    }
+
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        with module.db() as con:
+            con.execute(
+                """UPDATE orders
+                   SET saby_receipt_state = 'pending_ofd',
+                       saby_receipt_id = 'race-receipt',
+                       saby_receipt_updated_at = '2026-08-01T10:00:00+00:00'
+                   WHERE id = ?""",
+                (order["id"],),
+            )
+            con.execute(
+                """INSERT INTO paid_order_effects
+                   (order_id, effect, state, attempts, last_error,
+                    updated_at, completed_at)
+                   VALUES (?, 'saby', 'blocked', 1, '', ?, NULL)""",
+                (order["id"], module.now_iso()),
+            )
+
+        def block_while_checking(receipt_id):
+            with module.db() as con:
+                con.execute(
+                    """UPDATE orders SET saby_receipt_state = 'blocked'
+                       WHERE id = ?""",
+                    (order["id"],),
+                )
+            return [{"id": receipt_id, "fiscalSign": "none", "state": "новая"}]
+
+        monkeypatch.setattr(module.saby_client, "fiscal_receipt", block_while_checking)
+        response = client.post(
+            f"/api/admin/orders/{order['id']}/saby/receipts/sale/check",
+            headers=headers,
+        )
+
+    assert response.status_code == 200
+    assert response.json()["state"] == "blocked"
+    assert module.order_row(order["id"])["saby_receipt_state"] == "blocked"
+    with module.db() as con:
+        effect = con.execute(
+            """SELECT state FROM paid_order_effects
+               WHERE order_id = ? AND effect = 'saby'""",
+            (order["id"],),
+        ).fetchone()
+    assert effect["state"] == "blocked"
+
+
+@pytest.mark.parametrize(
+    ("kind", "state_col", "id_col"),
+    (
+        ("settlement", "saby_settlement_state", "saby_settlement_receipt_id"),
+        ("refund", "saby_refund_state", "saby_refund_receipt_id"),
+    ),
+)
+def test_owner_check_uses_the_selected_receipt_columns(
+    tmp_path, monkeypatch, kind, state_col, id_col
+):
+    client, module = app_client(tmp_path, monkeypatch)
+    checked = []
+    monkeypatch.setattr(
+        module.saby_client,
+        "fiscal_receipt",
+        lambda receipt_id: checked.append(receipt_id) or [
+            {"id": receipt_id, "fiscalSign": "1234567890", "state": "готова"}
+        ],
+    )
+    headers = {
+        "Authorization": "Bearer test-admin-token",
+        "X-Chainya-Admin": "saby-receipt-check",
+    }
+
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        receipt_id = f"known-{kind}-receipt"
+        with module.db() as con:
+            con.execute(
+                f"""UPDATE orders SET {state_col} = 'pending_ofd',
+                       {id_col} = ? WHERE id = ?""",
+                (receipt_id, order["id"]),
+            )
+        response = client.post(
+            f"/api/admin/orders/{order['id']}/saby/receipts/{kind}/check",
+            headers=headers,
+        )
+
+    assert response.status_code == 200
+    assert response.json()["state"] == "registered"
+    assert checked == [receipt_id]
+    assert module.order_row(order["id"])[state_col] == "registered"
 
 
 def test_confirmed_refund_creates_one_saby_return_after_original_receipt(tmp_path, monkeypatch):
@@ -1762,6 +2924,118 @@ def test_confirmed_refund_creates_one_saby_return_after_original_receipt(tmp_pat
     assert [item["operationType"] for item in sent] == ["1", "2"]
     current = module.order_row(order["id"])
     assert current["saby_refund_state"] == "registered"
+
+
+def test_refund_waits_for_pending_sale_receipt_then_creates_one_return(
+    tmp_path, monkeypatch
+):
+    client, module = app_client(tmp_path, monkeypatch)
+    configure_saby_fiscal_flow(module, monkeypatch)
+    sent = []
+    monkeypatch.setattr(
+        module.saby_client,
+        "create_fiscal_sale",
+        lambda data: sent.append(data) or {"id": "safe-return-after-pending"},
+    )
+    checked = []
+    monkeypatch.setattr(
+        module.saby_client,
+        "fiscal_receipt",
+        lambda receipt_id: checked.append(receipt_id) or [
+            {"id": receipt_id, "fiscalSign": "1234567890", "state": "готова"}
+        ],
+    )
+
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        expose_live_saby_writer(module, monkeypatch)
+        mark_order_paid_and_enqueue(module, order["id"])
+        refunded_at = module.now_iso()
+        with module.db() as con:
+            con.execute(
+                """UPDATE orders
+                   SET status = 'cancelled', payment_state = 'refunded',
+                       saby_receipt_state = 'pending_ofd',
+                       saby_receipt_id = 'accepted-sale-before-refund',
+                       saby_receipt_updated_at = ?, updated_at = ?
+                   WHERE id = ?""",
+                (refunded_at, refunded_at, order["id"]),
+            )
+            con.execute(
+                """UPDATE paid_order_effects
+                   SET state = 'failed', last_error = 'ожидаем ОФД', updated_at = ?
+                   WHERE order_id = ? AND effect = 'saby'""",
+                (refunded_at, order["id"]),
+            )
+
+        module.process_paid_order_effects(order["id"])
+        module.process_paid_order_effects(order["id"])
+
+    current = module.order_row(order["id"])
+    assert checked == ["accepted-sale-before-refund", "safe-return-after-pending"]
+    assert [item["operationType"] for item in sent] == ["2"]
+    assert current["saby_receipt_state"] == "registered"
+    assert current["saby_refund_state"] == "registered"
+    with module.db() as con:
+        effects = {
+            row["effect"]: row["state"]
+            for row in con.execute(
+                """SELECT effect, state FROM paid_order_effects
+                   WHERE order_id = ? AND effect IN ('saby', 'saby_refund')""",
+                (order["id"],),
+            ).fetchall()
+        }
+    assert effects == {"saby": "sent", "saby_refund": "sent"}
+
+
+def test_refund_after_safe_preflight_failure_never_creates_sale_or_return(
+    tmp_path, monkeypatch
+):
+    client, module = app_client(tmp_path, monkeypatch)
+    configure_saby_fiscal_flow(module, monkeypatch)
+    sent = []
+    monkeypatch.setattr(
+        module.saby_client,
+        "create_fiscal_sale",
+        lambda data: sent.append(data) or {"id": "must-not-be-created"},
+    )
+
+    with client:
+        order = client.post("/api/orders", json=payload()).json()["order"]
+        expose_live_saby_writer(module, monkeypatch)
+        mark_order_paid_and_enqueue(module, order["id"])
+        refunded_at = module.now_iso()
+        with module.db() as con:
+            con.execute(
+                """UPDATE orders
+                   SET status = 'cancelled', payment_state = 'refunded',
+                       saby_receipt_state = 'failed', updated_at = ?
+                   WHERE id = ?""",
+                (refunded_at, order["id"]),
+            )
+            con.execute(
+                """UPDATE paid_order_effects
+                   SET state = 'failed', last_error = 'ошибка до POST', updated_at = ?
+                   WHERE order_id = ? AND effect = 'saby'""",
+                (refunded_at, order["id"]),
+            )
+
+        module.process_paid_order_effects(order["id"])
+        module.recover_paid_order_effects()
+
+    assert sent == []
+    current = module.order_row(order["id"])
+    assert current["saby_receipt_state"] == "failed"
+    assert current["saby_refund_state"] == "not_requested"
+    with module.db() as con:
+        effect = con.execute(
+            """SELECT state, attempts, last_error FROM paid_order_effects
+               WHERE order_id = ? AND effect = 'saby'""",
+            (order["id"],),
+        ).fetchone()
+    assert effect["state"] == "skipped"
+    assert effect["attempts"] == 1
+    assert "возвращена" in effect["last_error"]
 
 
 def test_admin_settlement_is_rejected_for_one_stage_checkout(tmp_path, monkeypatch):
@@ -2047,6 +3321,73 @@ def test_production_dashboard_uses_actual_tbank_write_readiness(tmp_path, monkey
     assert dashboard["system"]["tbank_writes_enabled"] is True
     assert dashboard["system"]["tbank_callback_ready"] is True
     assert dashboard["system"]["tbank_receipt_configured"] is True
+
+
+def test_dashboard_counts_unresolved_saby_fiscal_incidents(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    auth = {"Authorization": "Bearer test-admin-token"}
+    with client:
+        first = client.post("/api/orders", json=payload()).json()["order"]
+        second = client.post("/api/orders", json=payload()).json()["order"]
+        third = client.post("/api/orders", json=payload()).json()["order"]
+        fourth = client.post("/api/orders", json=payload()).json()["order"]
+        fifth = client.post("/api/orders", json=payload()).json()["order"]
+        with module.db() as con:
+            con.execute(
+                "UPDATE orders SET saby_receipt_state = 'ambiguous' WHERE id = ?",
+                (first["id"],),
+            )
+            con.execute(
+                "UPDATE orders SET saby_refund_state = 'failed' WHERE id = ?",
+                (second["id"],),
+            )
+            con.execute(
+                "UPDATE orders SET saby_receipt_state = 'pending_ofd' WHERE id = ?",
+                (third["id"],),
+            )
+            con.execute(
+                "UPDATE orders SET saby_receipt_state = 'registered' WHERE id = ?",
+                (fourth["id"],),
+            )
+            con.execute(
+                "UPDATE orders SET saby_receipt_state = 'blocked' WHERE id = ?",
+                (fifth["id"],),
+            )
+        dashboard = client.get("/api/admin/dashboard", headers=auth).json()
+
+    assert dashboard["system"]["saby_fiscal_incidents"] == 1
+    assert dashboard["system"]["saby_fiscal_retrying"] == 1
+    assert dashboard["system"]["saby_fiscal_prewrite_blocked"] == 1
+    assert dashboard["system"]["saby_fiscal_pending"] == 1
+    assert dashboard["system"]["saby_fiscal_registered"] == 1
+
+
+def test_dashboard_counts_payment_states_requiring_reconciliation(
+    tmp_path, monkeypatch
+):
+    client, module = app_client(tmp_path, monkeypatch)
+    auth = {"Authorization": "Bearer test-admin-token"}
+    states = (
+        "init_ambiguous",
+        "capture_ambiguous",
+        "refund_ambiguous",
+        "partially_refunded",
+        "paid",
+    )
+    with client:
+        orders = [
+            client.post("/api/orders", json=payload()).json()["order"]
+            for _ in states
+        ]
+        with module.db() as con:
+            for order, state in zip(orders, states, strict=True):
+                con.execute(
+                    "UPDATE orders SET payment_state = ? WHERE id = ?",
+                    (state, order["id"]),
+                )
+        dashboard = client.get("/api/admin/dashboard", headers=auth).json()
+
+    assert dashboard["system"]["payment_reconciliation_incidents"] == 4
 
 
 def test_analytics_validates_public_payload_and_dashboard_range(tmp_path, monkeypatch):

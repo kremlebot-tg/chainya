@@ -539,9 +539,12 @@ def test_catalog_exposes_complete_public_fields_without_internal_data(tmp_path, 
     assert response.status_code == 200
     data = response.json()
     assert data["revision"] == 4
-    assert data["types"] == [{"id": "white", "name": "Белый чай"}]
+    assert data["types"][0]["id"] == "white"
+    assert data["types"][0]["group"] == "tea"
+    assert any(row["id"] == "teaware-teapots" and row["group"] == "teaware" for row in data["types"])
     assert data["teas"][0]["id"] == "public-tea"
     assert data["teas"][0]["image_url"] == "/img/tea-baihao.webp"
+    assert data["teas"][0]["image_urls"] == ["/img/tea-baihao.webp"]
     assert data["teas"][0]["translations"]["ru"]["name"] == "Публичное название"
     assert data["teas"][0]["taste"]["floral"] == 5
     assert "saby_id" not in data["teas"][0]

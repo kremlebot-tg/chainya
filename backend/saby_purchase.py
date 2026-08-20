@@ -29,6 +29,7 @@ class SabyPurchaseRoute(str, Enum):
 
 @dataclass(frozen=True)
 class SabyFiscalSettings:
+    point_id: str = ""
     company_id: str = ""
     kkt_reg_number: str = ""
     tax_system: int = 2
@@ -47,8 +48,10 @@ class SabyFiscalSettings:
                 return -1
 
         return cls(
-            # Never infer this write-contract identifier from a read-only
-            # sales-point response. It must be confirmed and set explicitly.
+            point_id=str(source.get("SABY_POINT_ID", "")).strip(),
+            # Keep the write-contract value explicit. Saby describes companyID
+            # as a sales-point identifier but asks clients to obtain the exact
+            # value for their organisation; never infer a missing value.
             company_id=str(source.get("SABY_OFD_COMPANY_ID", "")).strip(),
             kkt_reg_number=str(source.get("SABY_OFD_KKT_REG_NUMBER", "")).strip(),
             tax_system=integer("SABY_OFD_TAX_SYSTEM", 2),
@@ -61,11 +64,18 @@ class SabyFiscalSettings:
     @property
     def missing(self) -> tuple[str, ...]:
         missing: list[str] = []
+        if not re.fullmatch(r"\d+", self.point_id):
+            missing.append("SABY_POINT_ID")
         if not re.fullmatch(r"\d+", self.company_id):
             missing.append("SABY_OFD_COMPANY_ID")
-        # FNS tag 1037 is a string of 16 to 20 digits. Keep it as text because
-        # leading zeroes identify the registered device and must not be lost.
-        if not re.fullmatch(r"\d{16,20}", self.kkt_reg_number):
+        # Chainya's conservative binding requires the explicitly configured
+        # companyID to match the selected sales point. A future vendor-approved
+        # exception must be reviewed instead of silently opening checkout.
+        elif re.fullmatch(r"\d+", self.point_id) and self.company_id != self.point_id:
+            missing.append("SABY_OFD_COMPANY_ID_POINT_MISMATCH")
+        # Keep the env value as text so malformed or truncated configuration is
+        # rejected and leading zeroes survive request serialization.
+        if not re.fullmatch(r"(?=.*[1-9])\d{16,20}", self.kkt_reg_number):
             missing.append("SABY_OFD_KKT_REG_NUMBER")
         if self.tax_system not in {1, 2, 4, 16, 32}:
             missing.append("SABY_OFD_TAX_SYSTEM")
@@ -84,6 +94,10 @@ class SabyFiscalSettings:
         return {
             "configured": self.configured,
             "missing": list(self.missing),
+            "point_binding_confirmed": bool(
+                re.fullmatch(r"\d+", self.point_id)
+                and self.company_id == self.point_id
+            ),
             "tax_system": self.tax_system if self.tax_system in {1, 2, 4, 16, 32} else None,
             "pay_method": self.pay_method if self.pay_method in {1, 2, 3, 4, 5, 6, 7} else None,
             "allow_negative_stock": self.allow_negative_stock,
@@ -283,51 +297,59 @@ def build_fiscal_sale(
     customer_name = " ".join(str(customer.get("name", "")).split())
     if not customer_name:
         raise SabyPurchaseError("В заказе не указано имя покупателя")
-    zero = "0.00"
     if settlement:
         raise SabyPurchaseError(
             "При одностадийной оплате полный расчёт уже создаётся после оплаты"
         )
     pay_method = settings.pay_method
     internet_sum = _money_text(total)
-    prepay_sum = zero
     operation_suffix = "refund" if refund else "sale"
     return {
         "companyID": settings.company_id,
-        # A KKT registration number is an identifier, not a quantity.  Saby's
-        # OFD API returns it as a string and real numbers may start with zero.
-        # Converting it to int is lossy and can make Saby resolve a different
-        # or nonexistent KKT even though the older register-receipt table labels
-        # the field as ``number``.
+        # The registration number is an identifier and real KKT values may
+        # start with zero.  Saby's own request example serializes it as a JSON
+        # string, so preserve every configured digit instead of converting it
+        # to a lossy number.
         "kktRegNumber": settings.kkt_reg_number,
         "cashierFIO": "Автоматический режим",
         "operationType": "2" if refund else "1",
-        "cashSum": zero,
-        "bankSum": zero,
+        # Saby's published request example uses JSON null for payment and VAT
+        # buckets that do not participate in the sale.  Empty/zero strings are
+        # not equivalent to an absent bucket for every backend validator, so
+        # follow the documented wire example exactly.
+        "cashSum": None,
+        "bankSum": None,
         "internetSum": internet_sum,
-        "accountSum": zero,
-        "postpaySum": zero,
-        "prepaySum": prepay_sum,
+        "accountSum": None,
+        "postpaySum": None,
+        "prepaySum": None,
         "vatNone": _money_text(total),
-        "vatSum0": zero,
-        "vatSum5": zero,
-        "vatSum7": zero,
-        "vatSum10": zero,
-        "vatSum20": zero,
-        "vatSum22": zero,
-        "vatSum110": zero,
-        "vatSum120": zero,
-        "allowRetailPayed": 1 if settings.allow_negative_stock else 0,
+        "vatSum0": None,
+        "vatSum5": None,
+        "vatSum7": None,
+        "vatSum10": None,
+        "vatSum20": None,
+        "vatSum22": None,
+        "vatSum110": None,
+        "vatSum120": None,
+        # As with most scalar fields in this legacy endpoint, Saby's concrete
+        # JSON example serializes this flag as text even though the parameter
+        # table labels it as ``number``. Follow the wire example so the Retail
+        # validator does not have to coerce a JSON number.
+        "allowRetailPayed": "1" if settings.allow_negative_stock else "0",
         "nomenclatures": lines,
         "customerFIO": customer_name,
-        "customerEmail": "",
+        "customerEmail": None,
         "customerPhone": phone,
-        "customerINN": "",
+        "customerINN": None,
         "customerExtId": phone,
         "taxSystem": str(settings.tax_system),
         "sendPhone": phone,
         "propName": "Номер заказа интернет-магазина",
-        "propVa": order_id,
+        # The parameter table currently truncates this name to ``propVa``,
+        # while Saby's concrete JSON request example uses ``propVal``.  The
+        # serialized example is the authoritative wire shape.
+        "propVal": order_id,
         "comment": (
             f"Возврат полного расчёта заказа сайта №{order_id}" if refund
             else f"Полный расчёт заказа сайта №{order_id}"

@@ -263,6 +263,52 @@ def test_saby_http_error_exposes_only_sanitized_vendor_explanation():
     assert "owner@example.test" not in message
 
 
+def test_saby_http_error_exposes_only_safe_nested_vendor_code():
+    body = json.dumps({
+        "error": {
+            "code": "KKT_NOT_READY_42",
+            "detail": "ККТ недоступна; заказ customer-order-17",
+        }
+    }).encode()
+
+    def opener(request, timeout):
+        if request.full_url.endswith("/oauth/service/"):
+            return Response({"token": "access-token-value"})
+        raise urllib.error.HTTPError(
+            request.full_url, 500, "Internal Server Error", {}, io.BytesIO(body)
+        )
+
+    client = SabyClient(settings(), opener=opener)
+    with pytest.raises(SabyError) as captured:
+        client.create_fiscal_sale({"externalId": "safe-order"})
+    message = str(captured.value)
+    assert "ККТ недоступна или отклонила операцию (код KKT_NOT_READY_42)" in message
+    assert "customer-order-17" not in message
+
+
+def test_saby_http_error_rejects_unsafe_vendor_code():
+    body = json.dumps({
+        "error": {
+            "code": "unsafe code with customer data",
+            "message": "Internal Server Error",
+        }
+    }).encode()
+
+    def opener(request, timeout):
+        if request.full_url.endswith("/oauth/service/"):
+            return Response({"token": "access-token-value"})
+        raise urllib.error.HTTPError(
+            request.full_url, 500, "Internal Server Error", {}, io.BytesIO(body)
+        )
+
+    client = SabyClient(settings(), opener=opener)
+    with pytest.raises(SabyError) as captured:
+        client.create_fiscal_sale({"externalId": "safe-order"})
+    message = str(captured.value)
+    assert "unsafe code" not in message
+    assert "Saby вернул HTTP 500" in message
+
+
 def test_saby_http_error_never_echoes_arbitrary_customer_or_kkt_data():
     body = json.dumps({
         "error": {

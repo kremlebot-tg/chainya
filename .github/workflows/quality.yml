@@ -29,10 +29,10 @@ jobs:
       - name: Run backend tests
         run: python -m pytest -q
       - name: Run Telegram bot tests
-        run: python -m pytest -q telegram-bot/test_bot_booking.py
+        run: PYTHONPATH=telegram-bot python -m pytest -q telegram-bot/test_bot_booking.py
       - name: Validate shell scripts and deploy contract
         run: |
-          bash -n deploy-shop.sh deploy-edge.sh deploy-bot.sh ops/deploy-shop-remote.sh ops/timeweb/edge-maintenance.sh
+          bash -n deploy.sh deploy-shop.sh deploy-edge.sh deploy-bot.sh ops/deploy-shop-remote.sh ops/timeweb/edge-maintenance.sh
           python scripts/check-deploy-contract.py
       - name: Audit Python dependencies
         run: python -m pip_audit -r backend/requirements.txt

@@ -18,6 +18,29 @@ TYPE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
 SEED_IMAGE_RE = re.compile(r"^[A-Za-z0-9_-]{1,120}$")
 MEDIA_FILE_RE = re.compile(r"^[a-f0-9]{32}\.webp$")
 LANGUAGES = ("ru", "en", "zh")
+MAX_PRODUCT_IMAGES = 8
+CATALOG_TYPE_DEFAULTS = (
+    ("white", "tea", "Белый чай", "White tea", "白茶"),
+    ("green", "tea", "Зелёный чай", "Green tea", "绿茶"),
+    ("gaba", "tea", "Габа", "GABA", "佳叶龙茶"),
+    ("fujian", "tea", "Улуны Южной Фуцзяни", "Fujian oolong", "闽南乌龙"),
+    ("dancong", "tea", "Улуны Гуандуна", "Guangdong oolong", "广东乌龙"),
+    ("wuyi", "tea", "Улуны Уишаня", "Wuyi oolong", "武夷岩茶"),
+    ("red", "tea", "Красный чай", "Black tea", "红茶"),
+    ("sheng", "tea", "Шэн Пуэр", "Sheng pu-erh", "生普洱"),
+    ("shu", "tea", "Шу Пуэр", "Shou pu-erh", "熟普洱"),
+    ("heicha", "tea", "Хэй Ча", "Hei cha", "黑茶"),
+    ("herbs", "tea", "Травы и добавки", "Herbs & extras", "花草与配料"),
+    ("tea-sets", "tea", "Чайные наборы", "Tea sets", "茶叶礼盒"),
+    ("teaware-teapots", "teaware", "Чайники", "Teapots", "茶壶"),
+    ("teaware-gaiwans", "teaware", "Гайвани", "Gaiwans", "盖碗"),
+    ("teaware-cups", "teaware", "Пиалы", "Tea cups", "茶杯"),
+    ("teaware-chahai", "teaware", "Чахаи", "Chahai", "公道杯"),
+    ("teaware-chahe", "teaware", "Чахэ", "Chahe", "茶荷"),
+    ("teaware-figurines", "teaware", "Фигурки", "Tea pets", "茶宠"),
+    ("teaware-tools", "teaware", "Инструменты", "Tea tools", "茶道工具"),
+    ("teaware-sets", "teaware", "Наборы посуды", "Teaware sets", "茶具套装"),
+)
 TASTE_AXES = (
     "floral", "fruity", "driedfruit", "honey", "nutty",
     "roasted", "spicy", "woody", "herbal",
@@ -84,15 +107,15 @@ def normalize_item(raw: dict[str, Any], *, existing_id: str | None = None) -> di
     translations: dict[str, dict[str, str]] = {}
     ru_raw = translations_raw.get("ru")
     if not isinstance(ru_raw, dict):
-        raise CatalogError("Русский перевод обязателен")
+        ru_raw = {}
     for lang in LANGUAGES:
         source = translations_raw.get(lang)
         if source is None:
-            source = ru_raw
+            source = {}
         if not isinstance(source, dict):
             raise CatalogError(f"Некорректный перевод {lang}")
         translations[lang] = {
-            "name": _text(source.get("name", ""), f"{lang}.name", 160, required=True),
+            "name": _text(source.get("name", ""), f"{lang}.name", 160),
             "orig": _text(source.get("orig", ""), f"{lang}.orig", 240),
             "desc": _text(source.get("desc", ""), f"{lang}.desc", 5000),
             "composition": _text(source.get("composition", ""), f"{lang}.composition", 2000),
@@ -100,6 +123,8 @@ def normalize_item(raw: dict[str, Any], *, existing_id: str | None = None) -> di
             "shelf_life": _text(source.get("shelf_life", ""), f"{lang}.shelf_life", 500),
             "storage": _text(source.get("storage", ""), f"{lang}.storage", 1000),
         }
+    if not any(translation["name"] for translation in translations.values()):
+        raise CatalogError("Укажите название хотя бы на одном языке")
 
     taste_raw = raw.get("taste", {})
     if not isinstance(taste_raw, dict):
@@ -117,16 +142,34 @@ def normalize_item(raw: dict[str, Any], *, existing_id: str | None = None) -> di
     image_raw = raw.get("image")
     if not isinstance(image_raw, dict):
         image_raw = {"kind": "seed", "name": raw.get("img", item_id)}
-    kind = image_raw.get("kind")
-    name = _text(image_raw.get("name", ""), "image.name", 140, required=True)
-    if kind == "seed":
-        if not SEED_IMAGE_RE.fullmatch(name):
-            raise CatalogError("Некорректное имя встроенного изображения")
-    elif kind == "uploaded":
-        if not MEDIA_FILE_RE.fullmatch(name):
-            raise CatalogError("Некорректное имя загруженного изображения")
-    else:
-        raise CatalogError("Неизвестный тип изображения")
+    images_raw = raw.get("images")
+    if images_raw is None:
+        images_raw = [image_raw]
+    if not isinstance(images_raw, list) or not images_raw:
+        raise CatalogError("Добавьте хотя бы одно изображение")
+    if len(images_raw) > MAX_PRODUCT_IMAGES:
+        raise CatalogError(f"Для одного товара можно добавить не более {MAX_PRODUCT_IMAGES} фото")
+    images: list[dict[str, str]] = []
+    seen_images: set[tuple[str, str]] = set()
+    for index, entry in enumerate(images_raw):
+        if not isinstance(entry, dict):
+            raise CatalogError("Некорректное изображение")
+        kind = entry.get("kind")
+        name = _text(entry.get("name", ""), f"images.{index}.name", 140, required=True)
+        if kind == "seed":
+            if not SEED_IMAGE_RE.fullmatch(name):
+                raise CatalogError("Некорректное имя встроенного изображения")
+        elif kind == "uploaded":
+            if not MEDIA_FILE_RE.fullmatch(name):
+                raise CatalogError("Некорректное имя загруженного изображения")
+        else:
+            raise CatalogError("Неизвестный тип изображения")
+        key = (kind, name)
+        if key not in seen_images:
+            images.append({"kind": kind, "name": name})
+            seen_images.add(key)
+    image = images[0]
+    kind, name = image["kind"], image["name"]
 
     saby: dict[str, Any] | None = None
     saby_raw = raw.get("saby")
@@ -158,18 +201,23 @@ def normalize_item(raw: dict[str, Any], *, existing_id: str | None = None) -> di
             raise CatalogError("Перед публикацией товара из Saby загрузите его фотографию")
 
     ru = translations["ru"]
+    display = next(
+        (translation for translation in translations.values() if translation["name"]),
+        ru,
+    )
     item = {
         "id": item_id,
         "type": type_id,
-        "name": ru["name"],
-        "orig": ru["orig"],
-        "desc": ru["desc"],
+        "name": display["name"],
+        "orig": ru["orig"] or display["orig"],
+        "desc": ru["desc"] or display["desc"],
         "price": price,
         "unit": unit,
         "stock": bool(raw.get("stock", True)),
         "published": published,
         "img": name if kind == "seed" else item_id,
-        "image": {"kind": kind, "name": name},
+        "image": image,
+        "images": images,
         "taste": taste,
         "translations": translations,
     }
@@ -193,6 +241,15 @@ def normalize_document(raw: dict[str, Any]) -> dict[str, Any]:
     types = raw.get("types", [])
     if not isinstance(types, list):
         raise CatalogError("Некорректный список категорий")
+    defaults = {
+        type_id: {
+            "id": type_id,
+            "name": ru,
+            "group": group,
+            "names": {"ru": ru, "en": en, "zh": zh},
+        }
+        for type_id, group, ru, en, zh in CATALOG_TYPE_DEFAULTS
+    }
     clean_types = []
     for entry in types:
         if not isinstance(entry, dict):
@@ -200,7 +257,30 @@ def normalize_document(raw: dict[str, Any]) -> dict[str, Any]:
         type_id = _text(entry.get("id", ""), "type.id", 40, required=True).lower()
         if not TYPE_ID_RE.fullmatch(type_id):
             raise CatalogError("Некорректный ID категории")
-        clean_types.append({"id": type_id, "name": _text(entry.get("name", ""), "type.name", 120, required=True)})
+        default = defaults.get(type_id, {})
+        group = _text(entry.get("group", default.get("group", "tea")), "type.group", 20, required=True)
+        if group not in {"tea", "teaware"}:
+            raise CatalogError("Некорректная группа категории")
+        names_raw = entry.get("names") if isinstance(entry.get("names"), dict) else {}
+        name = _text(entry.get("name", default.get("name", "")), "type.name", 120, required=True)
+        clean_types.append({
+            "id": type_id,
+            "name": name,
+            "group": group,
+            "names": {
+                language: _text(
+                    names_raw.get(language, default.get("names", {}).get(language, name)),
+                    f"type.names.{language}", 120, required=True,
+                )
+                for language in LANGUAGES
+            },
+        })
+    present_types = {entry["id"] for entry in clean_types}
+    clean_types.extend(
+        copy.deepcopy(defaults[type_id])
+        for type_id, *_rest in CATALOG_TYPE_DEFAULTS
+        if type_id not in present_types
+    )
     known_types = {entry["id"] for entry in clean_types}
     missing = sorted({item["type"] for item in teas} - known_types)
     if missing:
@@ -209,7 +289,7 @@ def normalize_document(raw: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(revision, int) or revision < 1:
         revision = 1
     return {
-        "schema_version": 3,
+        "schema_version": 4,
         "revision": revision,
         "updated_at": str(raw.get("updated_at") or utc_now()),
         "types": clean_types,
@@ -314,11 +394,80 @@ class CatalogStore:
             self._require_revision(document, revision)
             for current in document["teas"]:
                 if current["id"] == item_id:
-                    current["image"] = {"kind": "uploaded", "name": filename}
+                    uploaded = {"kind": "uploaded", "name": filename}
+                    current["images"] = [uploaded]
+                    current["image"] = uploaded
                     current["img"] = item_id
                     if isinstance(current.get("saby"), dict):
                         current["saby"]["image_pending"] = False
                     return self._finish(document)
+            raise KeyError(item_id)
+
+    def add_image(
+        self, item_id: str, filename: str, revision: int, *, make_primary: bool = False
+    ) -> dict[str, Any]:
+        with self._lock:
+            document = self.get()
+            self._require_revision(document, revision)
+            uploaded = {"kind": "uploaded", "name": filename}
+            for current in document["teas"]:
+                if current["id"] != item_id:
+                    continue
+                images = [
+                    image for image in current.get("images", [current["image"]])
+                    if image != uploaded
+                ]
+                if make_primary:
+                    images.insert(0, uploaded)
+                else:
+                    images.append(uploaded)
+                if len(images) > MAX_PRODUCT_IMAGES:
+                    raise CatalogError(
+                        f"Для одного товара можно добавить не более {MAX_PRODUCT_IMAGES} фото"
+                    )
+                current["images"] = images
+                current["image"] = images[0]
+                current["img"] = item_id if images[0]["kind"] == "uploaded" else images[0]["name"]
+                if isinstance(current.get("saby"), dict):
+                    current["saby"]["image_pending"] = False
+                return self._finish(document)
+            raise KeyError(item_id)
+
+    def set_primary_image(self, item_id: str, index: int, revision: int) -> dict[str, Any]:
+        with self._lock:
+            document = self.get()
+            self._require_revision(document, revision)
+            for current in document["teas"]:
+                if current["id"] != item_id:
+                    continue
+                images = list(current.get("images", [current["image"]]))
+                if index < 0 or index >= len(images):
+                    raise CatalogError("Фотография не найдена")
+                image = images.pop(index)
+                images.insert(0, image)
+                current["images"] = images
+                current["image"] = image
+                current["img"] = item_id if image["kind"] == "uploaded" else image["name"]
+                return self._finish(document)
+            raise KeyError(item_id)
+
+    def remove_image(self, item_id: str, index: int, revision: int) -> dict[str, Any]:
+        with self._lock:
+            document = self.get()
+            self._require_revision(document, revision)
+            for current in document["teas"]:
+                if current["id"] != item_id:
+                    continue
+                images = list(current.get("images", [current["image"]]))
+                if index < 0 or index >= len(images):
+                    raise CatalogError("Фотография не найдена")
+                if len(images) == 1:
+                    raise CatalogError("У товара должна остаться хотя бы одна фотография")
+                images.pop(index)
+                current["images"] = images
+                current["image"] = images[0]
+                current["img"] = item_id if images[0]["kind"] == "uploaded" else images[0]["name"]
+                return self._finish(document)
             raise KeyError(item_id)
 
     def reorder(self, item_ids: list[str], revision: int) -> dict[str, Any]:
@@ -337,3 +486,7 @@ def image_url(item: dict[str, Any]) -> str:
     if image.get("kind") == "uploaded":
         return f"/catalog-media/{image['name']}"
     return f"/img/{image.get('name', item['id'])}.webp"
+
+
+def image_urls(item: dict[str, Any]) -> list[str]:
+    return [image_url({**item, "image": image}) for image in item.get("images", [item.get("image", {})])]

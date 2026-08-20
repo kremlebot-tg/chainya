@@ -1,50 +1,206 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "revision": 1,
   "types": [
     {
       "id": "white",
-      "name": "Белый чай"
+      "name": "Белый чай",
+      "group": "tea",
+      "names": {
+        "ru": "Белый чай",
+        "en": "White tea",
+        "zh": "白茶"
+      }
     },
     {
       "id": "green",
-      "name": "Зелёный чай"
+      "name": "Зелёный чай",
+      "group": "tea",
+      "names": {
+        "ru": "Зелёный чай",
+        "en": "Green tea",
+        "zh": "绿茶"
+      }
     },
     {
       "id": "gaba",
-      "name": "Габа"
+      "name": "Габа",
+      "group": "tea",
+      "names": {
+        "ru": "Габа",
+        "en": "GABA",
+        "zh": "佳叶龙茶"
+      }
     },
     {
       "id": "fujian",
-      "name": "Улуны Южной Фуцзяни"
+      "name": "Улуны Южной Фуцзяни",
+      "group": "tea",
+      "names": {
+        "ru": "Улуны Южной Фуцзяни",
+        "en": "Fujian oolong",
+        "zh": "闽南乌龙"
+      }
     },
     {
       "id": "dancong",
-      "name": "Улуны Гуандуна"
+      "name": "Улуны Гуандуна",
+      "group": "tea",
+      "names": {
+        "ru": "Улуны Гуандуна",
+        "en": "Guangdong oolong",
+        "zh": "广东乌龙"
+      }
     },
     {
       "id": "wuyi",
-      "name": "Улуны Уишаня"
+      "name": "Улуны Уишаня",
+      "group": "tea",
+      "names": {
+        "ru": "Улуны Уишаня",
+        "en": "Wuyi oolong",
+        "zh": "武夷岩茶"
+      }
     },
     {
       "id": "red",
-      "name": "Красный чай"
+      "name": "Красный чай",
+      "group": "tea",
+      "names": {
+        "ru": "Красный чай",
+        "en": "Black tea",
+        "zh": "红茶"
+      }
     },
     {
       "id": "sheng",
-      "name": "Шэн Пуэр"
+      "name": "Шэн Пуэр",
+      "group": "tea",
+      "names": {
+        "ru": "Шэн Пуэр",
+        "en": "Sheng pu-erh",
+        "zh": "生普洱"
+      }
     },
     {
       "id": "shu",
-      "name": "Шу Пуэр"
+      "name": "Шу Пуэр",
+      "group": "tea",
+      "names": {
+        "ru": "Шу Пуэр",
+        "en": "Shou pu-erh",
+        "zh": "熟普洱"
+      }
     },
     {
       "id": "heicha",
-      "name": "Хэй Ча"
+      "name": "Хэй Ча",
+      "group": "tea",
+      "names": {
+        "ru": "Хэй Ча",
+        "en": "Hei cha",
+        "zh": "黑茶"
+      }
     },
     {
       "id": "herbs",
-      "name": "Травы и добавки"
+      "name": "Травы и добавки",
+      "group": "tea",
+      "names": {
+        "ru": "Травы и добавки",
+        "en": "Herbs & extras",
+        "zh": "花草与配料"
+      }
+    },
+    {
+      "id": "tea-sets",
+      "name": "Чайные наборы",
+      "group": "tea",
+      "names": {
+        "ru": "Чайные наборы",
+        "en": "Tea sets",
+        "zh": "茶叶礼盒"
+      }
+    },
+    {
+      "id": "teaware-teapots",
+      "name": "Чайники",
+      "group": "teaware",
+      "names": {
+        "ru": "Чайники",
+        "en": "Teapots",
+        "zh": "茶壶"
+      }
+    },
+    {
+      "id": "teaware-gaiwans",
+      "name": "Гайвани",
+      "group": "teaware",
+      "names": {
+        "ru": "Гайвани",
+        "en": "Gaiwans",
+        "zh": "盖碗"
+      }
+    },
+    {
+      "id": "teaware-cups",
+      "name": "Пиалы",
+      "group": "teaware",
+      "names": {
+        "ru": "Пиалы",
+        "en": "Tea cups",
+        "zh": "茶杯"
+      }
+    },
+    {
+      "id": "teaware-chahai",
+      "name": "Чахаи",
+      "group": "teaware",
+      "names": {
+        "ru": "Чахаи",
+        "en": "Chahai",
+        "zh": "公道杯"
+      }
+    },
+    {
+      "id": "teaware-chahe",
+      "name": "Чахэ",
+      "group": "teaware",
+      "names": {
+        "ru": "Чахэ",
+        "en": "Chahe",
+        "zh": "茶荷"
+      }
+    },
+    {
+      "id": "teaware-figurines",
+      "name": "Фигурки",
+      "group": "teaware",
+      "names": {
+        "ru": "Фигурки",
+        "en": "Tea pets",
+        "zh": "茶宠"
+      }
+    },
+    {
+      "id": "teaware-tools",
+      "name": "Инструменты",
+      "group": "teaware",
+      "names": {
+        "ru": "Инструменты",
+        "en": "Tea tools",
+        "zh": "茶道工具"
+      }
+    },
+    {
+      "id": "teaware-sets",
+      "name": "Наборы посуды",
+      "group": "teaware",
+      "names": {
+        "ru": "Наборы посуды",
+        "en": "Teaware sets",
+        "zh": "茶具套装"
+      }
     }
   ],
   "axes": [

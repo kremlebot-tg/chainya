@@ -222,7 +222,7 @@ def test_saby_import_stays_hidden_until_real_photo_is_uploaded(tmp_path, monkeyp
     assert published.status_code == 200
 
 
-def test_catalog_blocks_zero_price_and_incomplete_first_publication(tmp_path, monkeypatch):
+def test_catalog_blocks_zero_price_but_allows_incomplete_first_publication(tmp_path, monkeypatch):
     client, _ = app_client(tmp_path, monkeypatch)
     with client:
         initial = client.get("/api/admin/catalog", headers=AUTH).json()
@@ -273,8 +273,77 @@ def test_catalog_blocks_zero_price_and_incomplete_first_publication(tmp_path, mo
     assert zero_response.status_code == 422
     assert "больше нуля" in zero_response.json()["detail"]
     assert hidden_response.status_code == 201
-    assert publish_response.status_code == 422
-    assert "Перед публикацией заполните карточку" in publish_response.json()["detail"]
+    assert publish_response.status_code == 200
+    public = client.get("/api/catalog").json()["teas"]
+    published = next(row for row in public if row["id"] == hidden["id"])
+    assert published["translations"]["en"]["desc"] == ""
+
+
+def test_catalog_allows_missing_secondary_languages_and_falls_back_for_product_page(
+    tmp_path, monkeypatch
+):
+    client, _ = app_client(tmp_path, monkeypatch)
+    with client:
+        initial = client.get("/api/admin/catalog", headers=AUTH).json()
+        item = dict(initial["teas"][0])
+        item["id"] = "russian-only-item"
+        item["published"] = True
+        item["translations"] = {
+            "ru": {**item["translations"]["ru"], "name": "Товар без перевода"},
+            "en": {key: "" for key in item["translations"]["en"]},
+            "zh": {key: "" for key in item["translations"]["zh"]},
+        }
+        created = client.post(
+            "/api/admin/catalog/items", headers=AUTH,
+            json={"revision": initial["revision"], "item": item},
+        )
+        english_page = client.get("/en/tea/russian-only-item")
+
+    assert created.status_code == 201
+    assert english_page.status_code == 200
+    assert "Товар без перевода" in english_page.text
+
+
+def test_catalog_supports_multiple_images_and_primary_selection(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    sources = []
+    for color in ((170, 80, 45), (60, 100, 150)):
+        source = BytesIO()
+        Image.new("RGB", (160, 120), color).save(source, "PNG")
+        sources.append(source.getvalue())
+
+    with client:
+        catalog = client.get("/api/admin/catalog", headers=AUTH).json()
+        item_id = catalog["teas"][0]["id"]
+        first = client.post(
+            f"/api/admin/catalog/items/{item_id}/images?revision={catalog['revision']}",
+            headers={**AUTH, "Content-Type": "image/png"}, content=sources[0],
+        )
+        second = client.post(
+            f"/api/admin/catalog/items/{item_id}/images?revision={first.json()['revision']}",
+            headers={**AUTH, "Content-Type": "image/png"}, content=sources[1],
+        )
+        second_item = next(row for row in second.json()["teas"] if row["id"] == item_id)
+        selected = client.put(
+            f"/api/admin/catalog/items/{item_id}/images/2/primary?revision={second.json()['revision']}",
+            headers=AUTH,
+        )
+        selected_item = next(row for row in selected.json()["teas"] if row["id"] == item_id)
+        public_item = next(row for row in client.get("/api/catalog").json()["teas"] if row["id"] == item_id)
+        removed = client.delete(
+            f"/api/admin/catalog/items/{item_id}/images/2?revision={selected.json()['revision']}",
+            headers=AUTH,
+        )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert len(second_item["image_urls"]) == 3
+    assert selected.status_code == 200
+    assert selected_item["image_urls"][0] == second_item["image_urls"][2]
+    assert public_item["image_urls"] == selected_item["image_urls"]
+    assert removed.status_code == 200
+    assert len(next(row for row in removed.json()["teas"] if row["id"] == item_id)["image_urls"]) == 2
+    assert all((module.CATALOG_MEDIA_DIR / url.rsplit("/", 1)[1]).is_file() for url in second_item["image_urls"][1:])
 
 
 def test_legacy_published_item_can_be_edited_before_labels_are_completed(tmp_path, monkeypatch):

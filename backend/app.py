@@ -59,6 +59,9 @@ from .catalog_store import (
 from .catalog_store import (
     image_url as catalog_image_url,
 )
+from .catalog_store import (
+    image_urls as catalog_image_urls,
+)
 from .cdek import CdekClient, CdekError
 from .cdek_delivery import (
     CdekDeliverySettings,
@@ -781,6 +784,12 @@ def db():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(DB_PATH)
     con.row_factory = sqlite3.Row
+    # SQLite does not enforce declared foreign keys unless every connection
+    # enables them explicitly.  The durable payment outbox and stock holds
+    # must never outlive or point at a missing order after a migration or an
+    # interrupted maintenance operation.
+    con.execute("PRAGMA foreign_keys = ON")
+    con.execute("PRAGMA busy_timeout = 5000")
     try:
         yield con
         con.commit()
@@ -1310,9 +1319,11 @@ def pending_reserved_quantity(
     reflected and is no longer subtracted a second time.
     """
     rows = con.execute(
-        """SELECT order_id, quantity, available_at_check, state, expires_at
-           FROM stock_reservations
-           WHERE site_item_id = ? AND state IN ('held','paid')""",
+        """SELECT r.order_id, r.quantity, r.available_at_check,
+                  r.state, r.expires_at, o.saby_state, o.saby_receipt_state
+           FROM stock_reservations AS r
+           JOIN orders AS o ON o.id = r.order_id
+           WHERE r.site_item_id = ? AND r.state IN ('held','paid')""",
         (site_item_id,),
     ).fetchall()
     total = Decimal(0)
@@ -1325,7 +1336,11 @@ def pending_reserved_quantity(
                 total += quantity
             continue
         baseline = Decimal(str(row["available_at_check"]))
-        if current_available <= baseline - quantity:
+        order_reflected_by_saby = (
+            row["saby_receipt_state"] == "registered"
+            or row["saby_state"] == "synced"
+        )
+        if order_reflected_by_saby and current_available <= baseline - quantity:
             con.execute(
                 """UPDATE stock_reservations SET state = 'reflected',
                        expires_at = NULL, updated_at = ?
@@ -1342,12 +1357,23 @@ def set_stock_reservation_state(
 ) -> None:
     if state not in {"paid", "released"}:
         raise ValueError("Некорректное состояние резерва")
+    if state == "paid":
+        # A customer can complete payment before RedirectDueDate while the
+        # signed callback reaches us only after the short hold expired. Revive
+        # a released row so it is still subtracted until Saby reflects the
+        # sale; never revive one already proven reflected in Saby.
+        con.execute(
+            """UPDATE stock_reservations
+               SET state = 'paid', updated_at = ?
+               WHERE order_id = ? AND state != 'reflected'""",
+            (updated_at, order_id),
+        )
+        return
     con.execute(
         """UPDATE stock_reservations
-           SET state = ?, expires_at = CASE WHEN ? = 'released' THEN NULL ELSE expires_at END,
-               updated_at = ?
+           SET state = 'released', expires_at = NULL, updated_at = ?
            WHERE order_id = ? AND state != 'released'""",
-        (state, state, updated_at, order_id),
+        (updated_at, order_id),
     )
 
 
@@ -1875,8 +1901,11 @@ def initialize_tbank_payment(
                    WHERE id = ? AND provider_payment_id IS NULL""",
                 (str(exc), updated, updated, row["id"]),
             )
-            if stock_guard_enabled():
-                set_stock_reservation_state(con, row["id"], "released", updated)
+            # Init may have reached T-Bank even when its response was lost or
+            # malformed. Keep the short-lived hold aligned with the payment
+            # link while CheckOrder resolves that ambiguity. Expired holds are
+            # released atomically by reserve_verified_stock; releasing here
+            # could expose a recovered live payment without reserved stock.
         form_label = (
             "Тестовая"
             if TEST_MODE and row["payment_provider"] == "tbank_demo"
@@ -1899,12 +1928,11 @@ def initialize_tbank_payment(
                 updated, updated, row["id"],
             ),
         )
-        if stock_guard_enabled():
-            stored = con.execute(
-                "SELECT provider_payment_id FROM orders WHERE id = ?", (row["id"],)
-            ).fetchone()
-            if not stored or str(stored["provider_payment_id"] or "") != payment_id:
-                set_stock_reservation_state(con, row["id"], "released", updated)
+        stored = con.execute(
+            "SELECT provider_payment_id FROM orders WHERE id = ?", (row["id"],)
+        ).fetchone()
+        if not stored or str(stored["provider_payment_id"] or "") != payment_id:
+            set_stock_reservation_state(con, row["id"], "released", updated)
     return order_row(row["id"])
 
 
@@ -1995,6 +2023,48 @@ def _saby_receipt_is_fiscalized(result: object) -> bool:
     )
 
 
+def _saby_receipt_is_fiscalized_for_id(result: object, receipt_id: str) -> bool:
+    """Accept a fiscal sign only for the exact receipt returned by Saby.
+
+    ``retail/pay/list`` is queried by ID, but a fiscal state transition must
+    still fail closed if the vendor ever returns an empty, stale or additional
+    row.  A signed receipt for another payment must not register this order.
+    """
+    row = _saby_receipt_row_for_id(result, receipt_id)
+    return bool(row and _saby_receipt_is_fiscalized(row))
+
+
+def _saby_receipt_row_for_id(result: object, receipt_id: str) -> dict | None:
+    """Return only the exact receipt requested from ``retail/pay/list``."""
+    expected = str(receipt_id or "").strip()
+    if not expected:
+        return None
+    rows = result if isinstance(result, list) else [result]
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        candidates = (row.get("id"), row.get("payId"), row.get("paymentId"))
+        if any(str(candidate or "").strip() == expected for candidate in candidates):
+            return row
+    return None
+
+
+def _saby_pending_expired(value: object) -> bool:
+    """Fail closed when a pending timestamp is absent, invalid or too old."""
+    try:
+        pending_since = datetime.fromisoformat(
+            str(value or "").replace("Z", "+00:00")
+        )
+    except (TypeError, ValueError):
+        return True
+    if pending_since.tzinfo is None:
+        return True
+    return (
+        datetime.now(timezone.utc) - pending_since
+        >= timedelta(seconds=SABY_OFD_PENDING_MAX_SECONDS)
+    )
+
+
 def _saby_fiscal_columns(
     *, refund: bool = False, settlement: bool = False
 ) -> tuple[str, str, str, str, str]:
@@ -2034,43 +2104,71 @@ def sync_paid_order_to_saby_fiscal(
         return
     if mode.value != "auto":
         return
-    route = purchase_route_status(
-        tbank_receipt_enabled=tbank_receipt_settings.enabled,
-        saby_configured=saby_client.settings.configured,
-        fiscal_settings=saby_fiscal_settings,
-    )
-    if route.route != "fiscal_sale" or not route.writes_enabled:
-        reason = route.blockers[0] if route.blockers else "Фискализация через Saby заблокирована"
-        state_col, _id_col, _hash_col, error_col, updated_col = _saby_fiscal_columns(
-            refund=refund, settlement=settlement
-        )
-        with db() as con:
-            con.execute(
-                f"UPDATE orders SET {state_col} = 'blocked', {error_col} = ?, "
-                f"{updated_col} = ?, updated_at = ? WHERE id = ? AND {state_col} IN "
-                "('not_requested','failed')",
-                (reason[:500], now_iso(), now_iso(), order_id),
-            )
-        return
-
     state_col, id_col, hash_col, error_col, updated_col = _saby_fiscal_columns(
         refund=refund, settlement=settlement
     )
+    # A known payId belongs to an already accepted Saby operation.  Polling it
+    # is read-only and must survive a later route/configuration change; routing
+    # it through a newly selected Delivery workflow could create a second write.
+    with db() as con:
+        existing = con.execute(
+            f"SELECT {state_col}, {id_col} FROM orders WHERE id = ?", (order_id,)
+        ).fetchone()
+    known_receipt = bool(
+        existing
+        and existing[state_col] == "pending_ofd"
+        and str(existing[id_col] or "").strip()
+    )
+    if not known_receipt:
+        route = purchase_route_status(
+            tbank_receipt_enabled=tbank_receipt_settings.enabled,
+            saby_configured=saby_client.settings.configured,
+            fiscal_settings=saby_fiscal_settings,
+        )
+        if route.route != "fiscal_sale" or not route.writes_enabled:
+            reason = (
+                route.blockers[0]
+                if route.blockers else "Фискализация через Saby заблокирована"
+            )
+            with db() as con:
+                con.execute(
+                    f"UPDATE orders SET {state_col} = 'blocked', {error_col} = ?, "
+                    f"{updated_col} = ?, updated_at = ? WHERE id = ? AND {state_col} IN "
+                    "('not_requested','failed')",
+                    (reason[:500], now_iso(), now_iso(), order_id),
+                )
+            return
     started = now_iso()
     with db() as con:
         con.execute("BEGIN IMMEDIATE")
         row = con.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
-        required_payment_state = "refunded" if refund else "paid"
-        if (
-            not row or row["payment_state"] != required_payment_state
-            or not _saby_order_is_after_rollout_cutoff(row)
-        ):
+        if not row:
             return
         if row[state_col] == "pending_ofd" and row[id_col]:
             receipt_id = str(row[id_col])
             check_existing = True
         else:
             check_existing = False
+        # The rollout cutoff may prevent a historical order from creating a
+        # new Saby write.  It must never orphan a write that Saby has already
+        # accepted: a known payId is resumed exclusively through read-only GET
+        # polling, even if the cutoff is corrected by a later deployment.
+        if not check_existing and not _saby_order_is_after_rollout_cutoff(row):
+            return
+        required_payment_state = "refunded" if refund else "paid"
+        may_poll_sale_after_refund = (
+            not refund
+            and not settlement
+            and check_existing
+            and row["payment_state"] in {
+                "refunding", "refund_ambiguous", "partially_refunded", "refunded",
+            }
+        )
+        if (
+            row["payment_state"] != required_payment_state
+            and not may_poll_sale_after_refund
+        ):
+            return
         if not check_existing and row[state_col] not in {"not_requested", "failed"}:
             return
         if (refund or settlement) and row["saby_receipt_state"] != "registered":
@@ -2113,25 +2211,26 @@ def sync_paid_order_to_saby_fiscal(
             receipt = saby_client.fiscal_receipt(receipt_id)
         except SabyError as exc:
             with db() as con:
-                con.execute(
-                    f"UPDATE orders SET {error_col} = ?, updated_at = ? "
-                    "WHERE id = ? AND " + state_col + " = 'pending_ofd'",
-                    (str(exc)[:500], started, order_id),
-                )
+                if _saby_pending_expired(row[updated_col]):
+                    error = (
+                        "Не удалось подтвердить чек Saby через ОФД за 24 часа; "
+                        "нужна ручная проверка без повторной продажи"
+                    )
+                    con.execute(
+                        f"UPDATE orders SET {state_col} = 'blocked', "
+                        f"{error_col} = ?, {updated_col} = ?, updated_at = ? "
+                        f"WHERE id = ? AND {state_col} = 'pending_ofd'",
+                        (error, started, started, order_id),
+                    )
+                else:
+                    con.execute(
+                        f"UPDATE orders SET {error_col} = ?, updated_at = ? "
+                        "WHERE id = ? AND " + state_col + " = 'pending_ofd'",
+                        (str(exc)[:500], started, order_id),
+                    )
             return
-        if not _saby_receipt_is_fiscalized(receipt):
-            try:
-                pending_since = datetime.fromisoformat(
-                    str(row[updated_col] or "").replace("Z", "+00:00")
-                )
-                pending_expired = (
-                    pending_since.tzinfo is not None
-                    and datetime.now(timezone.utc) - pending_since
-                    >= timedelta(seconds=SABY_OFD_PENDING_MAX_SECONDS)
-                )
-            except (TypeError, ValueError):
-                pending_expired = True
-            if pending_expired:
+        if not _saby_receipt_is_fiscalized_for_id(receipt, receipt_id):
+            if _saby_pending_expired(row[updated_col]):
                 error = (
                     "Saby принял операцию, но ОФД не подтвердил чек за 24 часа; "
                     "нужна ручная проверка без повторной продажи"
@@ -2212,7 +2311,7 @@ def sync_paid_order_to_saby_fiscal(
     finished = now_iso()
     try:
         receipt = saby_client.fiscal_receipt(receipt_id)
-        fiscalized = _saby_receipt_is_fiscalized(receipt)
+        fiscalized = _saby_receipt_is_fiscalized_for_id(receipt, receipt_id)
     except SabyError:
         fiscalized = False
     final_state = "registered" if fiscalized else "pending_ofd"
@@ -2223,6 +2322,168 @@ def sync_paid_order_to_saby_fiscal(
             f"WHERE id = ? AND {state_col} = 'sending'",
             (final_state, receipt_id, finished, finished, order_id),
         )
+
+
+def refresh_known_saby_fiscal_receipt(order_id: str, kind: str) -> dict:
+    """Read one already-created Saby receipt without creating a new sale.
+
+    This is the owner-facing recovery path for a lost or delayed OFD result.
+    It is deliberately impossible to use when Saby never returned a receipt
+    identifier: in that case another ``retail/sale/create`` could duplicate a
+    fiscal operation and the incident must stay in manual reconciliation.
+    """
+    if kind not in {"sale", "settlement", "refund"}:
+        raise HTTPException(422, "Неизвестный тип чека Saby")
+    state_col, id_col, _hash_col, error_col, updated_col = _saby_fiscal_columns(
+        refund=kind == "refund", settlement=kind == "settlement"
+    )
+    effect = {
+        "sale": "saby",
+        "settlement": "saby_settlement",
+        "refund": "saby_refund",
+    }[kind]
+    row = order_row(order_id)
+    receipt_id = str(row[id_col] or "").strip()
+    if not receipt_id:
+        raise HTTPException(
+            409,
+            "Saby не вернул идентификатор чека. Повторная продажа запрещена; "
+            "нужна ручная сверка по времени и сумме.",
+        )
+    if row[state_col] == "registered":
+        if kind == "sale" and row["payment_state"] == "refunded":
+            # Repair a historical state produced before confirmation of a
+            # refunded sale also persisted its matching return outbox entry.
+            # This is local and idempotent; the worker still applies all
+            # normal route and payment guards before any provider write.
+            with db() as con:
+                enqueue_saby_refund_effect(con, order_id, now_iso())
+        return {
+            "kind": kind,
+            "state": "registered",
+            "found": True,
+            "confirmed": True,
+            "checked_at": row[updated_col],
+        }
+    if row[state_col] not in {"pending_ofd", "blocked", "ambiguous", "failed"}:
+        raise HTTPException(409, "Этот чек Saby ещё нельзя безопасно сверить")
+
+    checked_at = now_iso()
+    try:
+        result = saby_client.fiscal_receipt(receipt_id)
+    except SabyError as exc:
+        with db() as con:
+            con.execute(
+                f"UPDATE orders SET {error_col} = ?, updated_at = ? WHERE id = ? AND "
+                f"{id_col} = ? AND {state_col} IN "
+                "('pending_ofd','blocked','ambiguous','failed')",
+                (str(exc)[:500], checked_at, order_id, receipt_id),
+            )
+        raise HTTPException(
+            502, "Не удалось прочитать состояние уже созданного чека Saby"
+        ) from exc
+
+    receipt = _saby_receipt_row_for_id(result, receipt_id)
+    if receipt is None:
+        error = (
+            "Saby не вернул запрошенный чек. Повторная продажа не создавалась; "
+            "нужна ручная сверка."
+        )
+        with db() as con:
+            con.execute(
+                f"UPDATE orders SET {error_col} = ?, updated_at = ? WHERE id = ? AND "
+                f"{id_col} = ? AND {state_col} IN "
+                "('pending_ofd','blocked','ambiguous','failed')",
+                (error, checked_at, order_id, receipt_id),
+            )
+        return {
+            "kind": kind,
+            "state": str(row[state_col]),
+            "found": False,
+            "confirmed": False,
+            "checked_at": checked_at,
+        }
+
+    confirmed = _saby_receipt_is_fiscalized(receipt)
+    previous_state = str(row[state_col])
+    next_state = (
+        "registered"
+        if confirmed
+        else "blocked"
+        if previous_state == "blocked"
+        else "pending_ofd"
+    )
+    error = "" if confirmed else (
+        "Saby нашёл этот чек, но фискальный признак ОФД ещё не появился. "
+        "Повторная продажа не создавалась."
+    )
+    with db() as con:
+        con.execute("BEGIN IMMEDIATE")
+        state_guard = (
+            "('pending_ofd','blocked','ambiguous','failed')"
+            if confirmed
+            else "(?)"
+        )
+        state_params = () if confirmed else (previous_state,)
+        updated = con.execute(
+            f"UPDATE orders SET {state_col} = ?, {error_col} = ?, "
+            f"{updated_col} = CASE WHEN {state_col} IN ('ambiguous','failed') "
+            f"THEN ? ELSE {updated_col} END, updated_at = ? WHERE id = ? AND "
+            f"{id_col} = ? AND {state_col} IN {state_guard}",
+            (
+                next_state,
+                error,
+                checked_at,
+                checked_at,
+                order_id,
+                receipt_id,
+                *state_params,
+            ),
+        )
+        transition_applied = updated.rowcount == 1
+        if confirmed and transition_applied:
+            con.execute(
+                """UPDATE paid_order_effects
+                   SET state = 'sent', last_error = '', updated_at = ?,
+                       completed_at = COALESCE(completed_at, ?)
+                   WHERE order_id = ? AND effect = ?
+                     AND state IN ('pending','sending','failed','blocked','ambiguous')""",
+                (checked_at, checked_at, order_id, effect),
+            )
+            if kind == "sale":
+                payment = con.execute(
+                    "SELECT payment_state FROM orders WHERE id = ?",
+                    (order_id,),
+                ).fetchone()
+                if payment and payment["payment_state"] == "refunded":
+                    # The money may have been returned while the original
+                    # sale was still ambiguous or waiting for the KKT/OFD.
+                    # Once this exact sale is proven fiscalized, persist its
+                    # matching return. INSERT OR IGNORE keeps this idempotent
+                    # with a concurrent REFUNDED notification from T-Bank.
+                    enqueue_saby_refund_effect(con, order_id, checked_at)
+        elif next_state == "pending_ofd" and transition_applied:
+            # The exact provider row proves that the operation exists. Resume
+            # only safe GET polling; no fiscal POST is made by this transition.
+            con.execute(
+                """UPDATE paid_order_effects
+                   SET state = 'failed', last_error = ?, updated_at = ?
+                   WHERE order_id = ? AND effect = ?
+                     AND state IN ('blocked','ambiguous','failed')""",
+                (error[:300], checked_at, order_id, effect),
+            )
+        current = con.execute(
+            f"SELECT {state_col} AS state FROM orders WHERE id = ?",
+            (order_id,),
+        ).fetchone()
+        current_state = str(current["state"] if current else previous_state)
+    return {
+        "kind": kind,
+        "state": current_state,
+        "found": True,
+        "confirmed": confirmed,
+        "checked_at": checked_at,
+    }
 
 
 def sync_paid_order_to_saby(order_id: str) -> None:
@@ -2543,7 +2804,68 @@ async def admin_session_to_authorization(request: Request, call_next):
     return await call_next(request)
 
 
-def admin_order(row: sqlite3.Row) -> dict:
+def _stock_reservation_summary(rows: list[sqlite3.Row]) -> dict[str, object]:
+    if not rows:
+        return {"state": "not_used", "items": 0, "expires_at": None}
+    current = datetime.now(timezone.utc)
+    states = set()
+    for item in rows:
+        state = str(item["state"])
+        if state == "held" and item["expires_at"]:
+            try:
+                expires_at = datetime.fromisoformat(
+                    str(item["expires_at"]).replace("Z", "+00:00")
+                )
+            except ValueError:
+                expires_at = None
+            if expires_at and expires_at.tzinfo and expires_at <= current:
+                state = "expired"
+        states.add(state)
+    expires = [str(item["expires_at"]) for item in rows if item["expires_at"]]
+    return {
+        "state": next(iter(states)) if len(states) == 1 else "mixed",
+        "items": len(rows),
+        "expires_at": max(expires) if expires else None,
+    }
+
+
+def admin_stock_reservation(
+    con: sqlite3.Connection, order_id: str
+) -> dict[str, object]:
+    rows = con.execute(
+        """SELECT state, expires_at FROM stock_reservations
+           WHERE order_id = ? ORDER BY site_item_id""",
+        (order_id,),
+    ).fetchall()
+    return _stock_reservation_summary(rows)
+
+
+def admin_stock_reservations(
+    con: sqlite3.Connection, order_ids: list[str]
+) -> dict[str, dict[str, object]]:
+    if not order_ids:
+        return {}
+    placeholders = ",".join("?" for _ in order_ids)
+    rows = con.execute(
+        f"""SELECT order_id, state, expires_at FROM stock_reservations
+            WHERE order_id IN ({placeholders}) ORDER BY order_id, site_item_id""",
+        order_ids,
+    ).fetchall()
+    grouped: dict[str, list[sqlite3.Row]] = {order_id: [] for order_id in order_ids}
+    for row in rows:
+        grouped.setdefault(str(row["order_id"]), []).append(row)
+    return {
+        order_id: _stock_reservation_summary(reservations)
+        for order_id, reservations in grouped.items()
+    }
+
+
+def admin_order(
+    row: sqlite3.Row, stock_reservation: dict[str, object] | None = None
+) -> dict:
+    if stock_reservation is None:
+        with db() as con:
+            stock_reservation = admin_stock_reservation(con, str(row["id"]))
     result = public_order(row)
     result["updated_at"] = row["updated_at"]
     result["customer"] = json.loads(row["customer_json"])
@@ -2557,6 +2879,7 @@ def admin_order(row: sqlite3.Row) -> dict:
             "last_error": row["payment_last_error"],
             "updated_at": row["payment_updated_at"],
         },
+        "stock": stock_reservation,
         "saby": {
             "state": row["saby_state"],
             "external_id": row["saby_external_id"],
@@ -2801,13 +3124,18 @@ def _claim_paid_effect(order_id: str, effect: str) -> bool:
             saby_configured=saby_client.settings.configured,
             fiscal_settings=saby_fiscal_settings,
         ).route == "fiscal_sale"
+        # Provider state is stronger evidence than the current environment: a
+        # deploy may change SABY_PURCHASE_ROUTE while a previous POST is still
+        # leased.  Such an interrupted fiscal write must become ambiguous, not
+        # be reclaimed under a different route.
+        fiscal_in_flight = row["saby_receipt_state"] == "sending"
         provider_sending = (
             row["saby_refund_state"] == "sending"
             if effect == "saby_refund"
             else row["saby_settlement_state"] == "sending"
             if effect == "saby_settlement"
-            else row["saby_receipt_state"] == "sending"
-            if effect == "saby" and fiscal_route
+            else fiscal_in_flight
+            if effect == "saby" and fiscal_in_flight
             else row["saby_state"] == "sending"
         )
         if (
@@ -2833,7 +3161,7 @@ def _claim_paid_effect(order_id: str, effect: str) -> bool:
                 _saby_fiscal_columns(settlement=True)
                 if effect == "saby_settlement" else
                 _saby_fiscal_columns(refund=False)
-                if fiscal_route else
+                if fiscal_in_flight or fiscal_route else
                 ("saby_state", "saby_external_id", "saby_payload_hash", "saby_last_error", "updated_at")
             )
             con.execute(
@@ -2885,6 +3213,74 @@ def _saby_order_is_after_rollout_cutoff(row: sqlite3.Row) -> bool:
     return paid_at >= cutoff
 
 
+def requeue_safe_blocked_saby_sales(con: sqlite3.Connection) -> int:
+    """Requeue only sales proven to have been blocked before any provider POST.
+
+    A local configuration/readiness blocker can disappear after an operator
+    fixes Saby.  Keeping that order permanently ``blocked`` would require a
+    direct database edit.  It is safe to resume automatically only when the
+    selected route is now writable and neither a provider identifier nor a
+    serialized payload was ever persisted.  Known receipts and ambiguous
+    writes are deliberately excluded.
+    """
+    if not _saby_auto_sync_enabled():
+        return 0
+    route = purchase_route_status(
+        tbank_receipt_enabled=tbank_receipt_settings.enabled,
+        saby_configured=saby_client.settings.configured,
+        fiscal_settings=saby_fiscal_settings,
+    )
+    # Delivery readiness depends on a remote product check. Re-arming it in the
+    # 30-second worker would hammer that read endpoint while the product stays
+    # disabled. Chainya's selected production route is fiscal_sale, whose
+    # pre-write blockers are completely determined by local configuration.
+    if not route.writes_enabled or route.route != "fiscal_sale":
+        return 0
+
+    updated = now_iso()
+    provider_state = "saby_receipt_state"
+    provider_id = "saby_receipt_id"
+    payload_hash = "saby_receipt_payload_hash"
+    provider_error = "saby_receipt_last_error"
+    provider_updated = "saby_receipt_updated_at"
+
+    eligible = (
+        "payment_state = 'paid' "
+        f"AND {provider_state} = 'blocked' "
+        f"AND {provider_id} IS NULL "
+        f"AND {payload_hash} IS NULL "
+        "AND EXISTS (SELECT 1 FROM paid_order_effects AS effect "
+        "WHERE effect.order_id = orders.id AND effect.effect = 'saby' "
+        "AND effect.state = 'blocked')"
+    )
+    candidate_ids = [
+        str(row["id"])
+        for row in con.execute(
+            f"SELECT id FROM orders WHERE {eligible} ORDER BY id"
+        ).fetchall()
+    ]
+    resumed = 0
+    for order_id in candidate_ids:
+        changed = con.execute(
+            f"UPDATE orders SET {provider_state} = 'failed', {provider_error} = '', "
+            f"{provider_updated} = ?, updated_at = ? WHERE id = ? AND {eligible}",
+            (updated, updated, order_id),
+        ).rowcount
+        if changed != 1:
+            continue
+        # Update exactly the outbox row whose order passed the eligibility
+        # guard above.  A broad state-based UPDATE could accidentally re-arm a
+        # different, internally inconsistent historical row.
+        con.execute(
+            """UPDATE paid_order_effects
+               SET state = 'failed', last_error = '', updated_at = ?
+               WHERE order_id = ? AND effect = 'saby' AND state = 'blocked'""",
+            (updated, order_id),
+        )
+        resumed += 1
+    return resumed
+
+
 def _telegram_notifications_enabled() -> bool:
     return bool(BOT_TOKEN and OWNER_CHAT_IDS)
 
@@ -2895,29 +3291,75 @@ def process_paid_order_effects(order_id: str) -> None:
         row = order_row(order_id)
     except HTTPException:
         return
-    if row["payment_state"] == "refunded" and _claim_paid_effect(
-        order_id, "saby_refund"
-    ):
-        sync_paid_order_to_saby_fiscal(order_id, refund=True)
-        current = order_row(order_id)
-        state = current["saby_refund_state"]
-        if state == "registered":
-            _mark_paid_effect(order_id, "saby_refund", "sent")
-        elif state == "ambiguous":
+    if row["payment_state"] == "refunded":
+        # A refund can be confirmed while the already accepted sale is still
+        # waiting for its fiscal sign. Keep polling that known payId with GET;
+        # never create a second sale after the money has been returned.
+        sale_state = str(row["saby_receipt_state"])
+        if sale_state in {"pending_ofd", "sending"} and _claim_paid_effect(
+            order_id, "saby"
+        ):
+            sync_paid_order_to_saby_fiscal(order_id)
+            current = order_row(order_id)
+            sale_state = str(current["saby_receipt_state"])
+            if sale_state == "registered":
+                _mark_paid_effect(order_id, "saby", "sent")
+            elif sale_state == "pending_ofd":
+                _mark_paid_effect(
+                    order_id, "saby", "failed",
+                    error="Продажа принята Saby; ожидаем фискальные признаки ОФД",
+                )
+            elif sale_state == "ambiguous":
+                _mark_paid_effect(
+                    order_id, "saby", "ambiguous",
+                    error="Нужна ручная проверка результата отправки в Saby",
+                )
+            elif sale_state == "blocked":
+                _mark_paid_effect(
+                    order_id, "saby", "blocked",
+                    error=str(
+                        current["saby_receipt_last_error"]
+                        or "Передача покупки в Saby заблокирована"
+                    ),
+                )
+            row = current
+        elif sale_state in {"not_requested", "failed"} and _claim_paid_effect(
+            order_id, "saby"
+        ):
             _mark_paid_effect(
-                order_id, "saby_refund", "ambiguous",
-                error="Нужна ручная проверка возвратного чека Saby",
+                order_id, "saby", "skipped",
+                error="Оплата возвращена до создания продажи Saby",
             )
-        elif state == "blocked":
-            _mark_paid_effect(
-                order_id, "saby_refund", "blocked",
-                error=str(current["saby_refund_last_error"] or "Возвратный чек Saby заблокирован"),
-            )
-        else:
-            _mark_paid_effect(
-                order_id, "saby_refund", "failed",
-                error="Возвратный чек Saby пока не зарегистрирован",
-            )
+
+        row = order_row(order_id)
+        if row["saby_receipt_state"] == "registered":
+            with db() as con:
+                enqueue_saby_refund_effect(con, order_id, now_iso())
+
+        if _claim_paid_effect(order_id, "saby_refund"):
+            sync_paid_order_to_saby_fiscal(order_id, refund=True)
+            current = order_row(order_id)
+            state = current["saby_refund_state"]
+            if state == "registered":
+                _mark_paid_effect(order_id, "saby_refund", "sent")
+            elif state == "ambiguous":
+                _mark_paid_effect(
+                    order_id, "saby_refund", "ambiguous",
+                    error="Нужна ручная проверка возвратного чека Saby",
+                )
+            elif state == "blocked":
+                _mark_paid_effect(
+                    order_id, "saby_refund", "blocked",
+                    error=str(
+                        current["saby_refund_last_error"]
+                        or "Возвратный чек Saby заблокирован"
+                    ),
+                )
+            else:
+                _mark_paid_effect(
+                    order_id, "saby_refund", "failed",
+                    error="Возвратный чек Saby пока не зарегистрирован",
+                )
         return
     if row["payment_state"] != "paid":
         return
@@ -2964,7 +3406,13 @@ def process_paid_order_effects(order_id: str) -> None:
             _mark_paid_effect(order_id, "telegram", "sent")
 
     if _saby_auto_sync_enabled() and _claim_paid_effect(order_id, "saby"):
-        if not _saby_order_is_after_rollout_cutoff(row):
+        fiscal_effect_bound = row["saby_receipt_state"] in {
+            "sending", "pending_ofd", "registered", "ambiguous", "blocked",
+        }
+        if (
+            not fiscal_effect_bound
+            and not _saby_order_is_after_rollout_cutoff(row)
+        ):
             _mark_paid_effect(
                 order_id,
                 "saby",
@@ -2972,16 +3420,26 @@ def process_paid_order_effects(order_id: str) -> None:
                 error="Заказ создан до включения автоматической передачи в Saby",
             )
         else:
-            sync_paid_order_to_saby(order_id)
+            # Once Saby has returned a payId, this effect is permanently bound
+            # to the fiscal workflow.  A later configuration change may affect
+            # new orders, but it must never redirect this accepted operation.
+            if row["saby_receipt_state"] == "pending_ofd":
+                sync_paid_order_to_saby_fiscal(order_id)
+            elif row["saby_receipt_state"] != "registered":
+                sync_paid_order_to_saby(order_id)
             current = order_row(order_id)
             route = purchase_route_status(
                 tbank_receipt_enabled=tbank_receipt_settings.enabled,
                 saby_configured=saby_client.settings.configured,
                 fiscal_settings=saby_fiscal_settings,
             )
+            fiscal_effect_bound = current["saby_receipt_state"] in {
+                "sending", "pending_ofd", "registered", "ambiguous", "blocked",
+            }
             saby_state = (
                 current["saby_receipt_state"]
-                if route.route == "fiscal_sale" else current["saby_state"]
+                if fiscal_effect_bound or route.route == "fiscal_sale"
+                else current["saby_state"]
             )
             if saby_state in {"synced", "registered"}:
                 _mark_paid_effect(order_id, "saby", "sent")
@@ -3003,7 +3461,8 @@ def process_paid_order_effects(order_id: str) -> None:
                 current = order_row(order_id)
                 saby_error = str(
                     current["saby_receipt_last_error"]
-                    if route.route == "fiscal_sale" else current["saby_last_error"]
+                    if fiscal_effect_bound or route.route == "fiscal_sale"
+                    else current["saby_last_error"]
                 )
                 _mark_paid_effect(
                     order_id,
@@ -3023,6 +3482,7 @@ def process_paid_order_effects(order_id: str) -> None:
 def recover_paid_order_effects() -> None:
     """Enqueue unfinished new paid orders and retry persisted work."""
     with db() as con:
+        requeue_safe_blocked_saby_sales(con)
         pending_orders = con.execute(
             """SELECT id FROM orders
                WHERE paid_effects_enqueued = 0
@@ -3508,6 +3968,61 @@ def dashboard_data(days: int) -> dict:
                 tea["revenue"] += int(item["total"])
 
         first_event = con.execute("SELECT MIN(created_at) FROM analytics_events").fetchone()[0]
+        payment_reconciliation_incidents = con.execute(
+            """
+            SELECT COUNT(*) FROM orders
+            WHERE payment_state IN (
+                'init_ambiguous',
+                'capture_ambiguous',
+                'refund_ambiguous',
+                'partially_refunded'
+            )
+            """
+        ).fetchone()[0]
+        saby_fiscal_incidents = con.execute(
+            """
+            SELECT COUNT(*) FROM orders
+            WHERE saby_receipt_state = 'ambiguous'
+               OR saby_settlement_state = 'ambiguous'
+               OR saby_refund_state = 'ambiguous'
+               OR (saby_receipt_state = 'blocked' AND
+                   (saby_receipt_id IS NOT NULL OR saby_receipt_payload_hash IS NOT NULL))
+               OR (saby_settlement_state = 'blocked' AND
+                   (saby_settlement_receipt_id IS NOT NULL OR saby_settlement_payload_hash IS NOT NULL))
+               OR (saby_refund_state = 'blocked' AND
+                   (saby_refund_receipt_id IS NOT NULL OR saby_refund_payload_hash IS NOT NULL))
+            """
+        ).fetchone()[0]
+        saby_fiscal_prewrite_blocked = con.execute(
+            """
+            SELECT COUNT(*) FROM orders
+            WHERE (saby_receipt_state = 'blocked' AND saby_receipt_id IS NULL
+                   AND saby_receipt_payload_hash IS NULL)
+               OR (saby_settlement_state = 'blocked' AND saby_settlement_receipt_id IS NULL
+                   AND saby_settlement_payload_hash IS NULL)
+               OR (saby_refund_state = 'blocked' AND saby_refund_receipt_id IS NULL
+                   AND saby_refund_payload_hash IS NULL)
+            """
+        ).fetchone()[0]
+        saby_fiscal_retrying = con.execute(
+            """
+            SELECT COUNT(*) FROM orders
+            WHERE saby_receipt_state = 'failed'
+               OR saby_settlement_state = 'failed'
+               OR saby_refund_state = 'failed'
+            """
+        ).fetchone()[0]
+        saby_fiscal_pending = con.execute(
+            """
+            SELECT COUNT(*) FROM orders
+            WHERE saby_receipt_state = 'pending_ofd'
+               OR saby_settlement_state = 'pending_ofd'
+               OR saby_refund_state = 'pending_ofd'
+            """
+        ).fetchone()[0]
+        saby_fiscal_registered = con.execute(
+            "SELECT COUNT(*) FROM orders WHERE saby_receipt_state = 'registered'"
+        ).fetchone()[0]
 
     changes = {
         "visits": percent_change(traffic["visits"], previous_traffic["visits"]),
@@ -3535,6 +4050,16 @@ def dashboard_data(days: int) -> dict:
             "saby_order_mode": integration["saby"]["mode"],
             "saby_purchase_route": integration["saby"]["purchase_route"],
             "saby_mapping_valid": integration["saby"]["mapping_valid"],
+            "payment_reconciliation_incidents": int(
+                payment_reconciliation_incidents or 0
+            ),
+            "saby_fiscal_incidents": int(saby_fiscal_incidents or 0),
+            "saby_fiscal_prewrite_blocked": int(
+                saby_fiscal_prewrite_blocked or 0
+            ),
+            "saby_fiscal_retrying": int(saby_fiscal_retrying or 0),
+            "saby_fiscal_pending": int(saby_fiscal_pending or 0),
+            "saby_fiscal_registered": int(saby_fiscal_registered or 0),
             "tbank_configured": integration["tbank"]["configured"],
             "tbank_mode": integration["tbank"]["mode"],
             "tbank_writes_enabled": integration["tbank"]["writes_enabled"],
@@ -3592,6 +4117,7 @@ def public_catalog():
                 "unit": item["unit"],
                 "stock": item.get("stock", True),
                 "image_url": catalog_image_url(item),
+                "image_urls": catalog_image_urls(item),
                 "taste": item["taste"],
                 "translations": item["translations"],
             }
@@ -3611,12 +4137,13 @@ PRODUCT_LOCALES = {
         "hreflang": "ru",
         "og_locale": "ru_RU",
         "brand": "Чайня",
-        "title": "{name} — купить китайский чай · Чайня",
-        "fallback": "Китайский чай {name} в каталоге Чайни.",
-        "category": "Китайский чай",
+        "title_tea": "{name} — купить китайский чай",
+        "title_teaware": "{name} — купить чайную посуду в Чайне",
+        "fallback": "{name} в каталоге Чайни.",
+        "category": "Товары Чайни",
         "home": "Главная",
         "shop": "Купить чай",
-        "all_teas": "Все чаи",
+        "all_teas": "Все товары",
         "in_stock": "В наличии",
         "out_of_stock": "Нет в наличии",
         "per_piece": "за штуку",
@@ -3630,12 +4157,13 @@ PRODUCT_LOCALES = {
         "hreflang": "en",
         "og_locale": "en_US",
         "brand": "Chainya",
-        "title": "{name} — buy Chinese tea · Chainya",
-        "fallback": "{name}, Chinese tea from the Chainya collection.",
-        "category": "Chinese tea",
+        "title_tea": "{name} — buy Chinese tea at Chainya",
+        "title_teaware": "{name} — buy teaware at Chainya",
+        "fallback": "{name} in the Chainya catalogue.",
+        "category": "Chainya products",
         "home": "Home",
         "shop": "Shop tea",
-        "all_teas": "All teas",
+        "all_teas": "All products",
         "in_stock": "In stock",
         "out_of_stock": "Out of stock",
         "per_piece": "per piece",
@@ -3649,12 +4177,13 @@ PRODUCT_LOCALES = {
         "hreflang": "zh-CN",
         "og_locale": "zh_CN",
         "brand": "茶饮屋",
-        "title": "{name} — 购买中国茶 · 茶饮屋",
-        "fallback": "茶饮屋精选中国茶：{name}。",
-        "category": "中国茶",
+        "title_tea": "{name} — 在茶饮屋购买中国茶",
+        "title_teaware": "{name} — 在茶饮屋购买茶具",
+        "fallback": "茶饮屋商品：{name}。",
+        "category": "茶饮屋商品",
         "home": "首页",
         "shop": "选购茶叶",
-        "all_teas": "全部茶叶",
+        "all_teas": "全部商品",
         "in_stock": "有货",
         "out_of_stock": "缺货",
         "per_piece": "每块",
@@ -3712,7 +4241,23 @@ def _public_product(item_id: str) -> tuple[dict, dict] | None:
 
 def _product_page_html(document: dict, item: dict, language: str = "ru") -> str:
     locale = PRODUCT_LOCALES[language]
-    translated = item["translations"].get(language) or item["translations"]["ru"]
+    translations = item["translations"]
+    requested = translations.get(language) or {}
+    fallbacks = [requested, translations.get("ru") or {}]
+    fallbacks.extend(
+        translation
+        for code, translation in translations.items()
+        if code not in {language, "ru"}
+    )
+    translated = {
+        field: next(
+            (str(source.get(field, "")) for source in fallbacks if str(source.get(field, "")).strip()),
+            "",
+        )
+        for field in (
+            "name", "orig", "desc", "composition", "manufacturer", "shelf_life", "storage",
+        )
+    }
     name = translated["name"]
     origin = translated.get("orig", "")
     description = translated.get("desc", "") or locale["fallback"].format(name=name)
@@ -3726,17 +4271,23 @@ def _product_page_html(document: dict, item: dict, language: str = "ru") -> str:
         if item.get("stock", True)
         else "https://schema.org/OutOfStock"
     )
-    if language == "ru":
-        type_name = next(
-            (
-                category["name"]
-                for category in document.get("types", [])
-                if category.get("id") == item.get("type")
-            ),
-            locale["category"],
-        )
-    else:
-        type_name = PRODUCT_TYPE_NAMES.get(language, {}).get(item.get("type"), locale["category"])
+    category = next(
+        (
+            category
+            for category in document.get("types", [])
+            if category.get("id") == item.get("type")
+        ),
+        {},
+    )
+    type_name = (
+        (category.get("names") or {}).get(language)
+        or category.get("name")
+        or PRODUCT_TYPE_NAMES.get(language, {}).get(item.get("type"))
+        or locale["category"]
+    )
+    title = locale[
+        "title_teaware" if category.get("group") == "teaware" else "title_tea"
+    ].format(name=name)
     reference_quantity = {
         "@type": "QuantitativeValue",
         "value": 1 if item["unit"] == "pc" else 10,
@@ -3764,7 +4315,7 @@ def _product_page_html(document: dict, item: dict, language: str = "ru") -> str:
                 "@type": "WebPage",
                 "@id": canonical + "#webpage",
                 "url": canonical,
-                "name": locale["title"].format(name=name),
+                "name": title,
                 "description": description,
                 "inLanguage": locale["schema_lang"],
                 "isPartOf": {"@id": PUBLIC_SITE + "/#website"},
@@ -3775,7 +4326,7 @@ def _product_page_html(document: dict, item: dict, language: str = "ru") -> str:
                 "@id": canonical + "#product",
                 "name": name,
                 "description": description,
-                "image": [image_url],
+                "image": [PUBLIC_SITE + path for path in catalog_image_urls(item)],
                 "category": type_name,
                 "sku": item["id"],
                 "url": canonical,
@@ -3848,7 +4399,7 @@ def _product_page_html(document: dict, item: dict, language: str = "ru") -> str:
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>{html.escape(locale['title'].format(name=name))}</title>
+<title>{html.escape(title)}</title>
 <meta name="description" content="{safe_meta_description}">
 <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
 <meta name="theme-color" content="#141110">
@@ -3998,7 +4549,12 @@ def dynamic_sitemap():
 def admin_catalog_response(document: dict) -> dict:
     result = dict(document)
     result["teas"] = [
-        {**item, "image_url": catalog_image_url(item)} for item in document["teas"]
+        {
+            **item,
+            "image_url": catalog_image_url(item),
+            "image_urls": catalog_image_urls(item),
+        }
+        for item in document["teas"]
     ]
     return result
 
@@ -4030,37 +4586,9 @@ def audit_catalog(action: str, item_id: str, revision: int) -> None:
 
 
 def validate_catalog_saby_candidate(raw: dict, *, existing_id: str | None = None) -> None:
-    """Reject unsafe publication and duplicate Saby links before persistence."""
+    """Reject duplicate Saby links while allowing incomplete owner drafts."""
     candidate = normalize_item(raw, existing_id=existing_id)
     current = get_catalog_store().get()
-    existing = next(
-        (item for item in current["teas"] if item["id"] == candidate["id"]), None
-    )
-    is_new_publication = candidate["published"] and (
-        existing is None or not existing.get("published", True)
-    )
-    if is_new_publication:
-        required = {
-            "orig": "происхождение",
-            "desc": "описание",
-            "composition": "состав",
-            "manufacturer": "изготовитель",
-            "shelf_life": "срок годности",
-            "storage": "условия хранения",
-        }
-        language_names = {"ru": "РУ", "en": "EN", "zh": "中文"}
-        missing = [
-            f"{language_names[language]}: {label}"
-            for language, translation in candidate["translations"].items()
-            for field, label in required.items()
-            if not translation[field].strip()
-        ]
-        if missing:
-            preview = ", ".join(missing[:6])
-            suffix = f" и ещё {len(missing) - 6}" if len(missing) > 6 else ""
-            raise CatalogError(
-                "Перед публикацией заполните карточку: " + preview + suffix
-            )
     teas = [item for item in current["teas"] if item["id"] != candidate["id"]]
     teas.append(candidate)
     try:
@@ -4244,6 +4772,69 @@ async def admin_upload_catalog_image(
     except (CatalogError, KeyError) as exc:
         raise catalog_error_response(exc) from exc
     audit_catalog("image", item_id, document["revision"])
+    return admin_catalog_response(document)
+
+
+@app.post("/api/admin/catalog/items/{item_id}/images")
+async def admin_add_catalog_image(
+    item_id: str,
+    request: Request,
+    revision: int = Query(ge=1),
+    make_primary: bool = Query(default=False),
+    authorization: str = Header(default=""),
+):
+    require_admin(authorization)
+    require_catalog_write_request(request)
+    current = get_catalog_store().get()
+    if current["revision"] != revision:
+        raise HTTPException(409, "Каталог уже изменён в другой вкладке. Обновите страницу.")
+    if item_id not in {item["id"] for item in current["teas"]}:
+        raise HTTPException(404, "Сначала сохраните новый товар")
+    data = prepare_catalog_image(await bounded_request_body(request, 8 * 1024 * 1024))
+    filename = persist_catalog_image(data)
+    try:
+        document = get_catalog_store().add_image(
+            item_id, filename, revision, make_primary=make_primary
+        )
+    except (CatalogError, KeyError) as exc:
+        raise catalog_error_response(exc) from exc
+    audit_catalog("image_add", item_id, document["revision"])
+    return admin_catalog_response(document)
+
+
+@app.put("/api/admin/catalog/items/{item_id}/images/{index}/primary")
+def admin_set_primary_catalog_image(
+    item_id: str,
+    index: int,
+    request: Request,
+    revision: int = Query(ge=1),
+    authorization: str = Header(default=""),
+):
+    require_admin(authorization)
+    require_catalog_write_request(request)
+    try:
+        document = get_catalog_store().set_primary_image(item_id, index, revision)
+    except (CatalogError, KeyError) as exc:
+        raise catalog_error_response(exc) from exc
+    audit_catalog("image_primary", item_id, document["revision"])
+    return admin_catalog_response(document)
+
+
+@app.delete("/api/admin/catalog/items/{item_id}/images/{index}")
+def admin_remove_catalog_image(
+    item_id: str,
+    index: int,
+    request: Request,
+    revision: int = Query(ge=1),
+    authorization: str = Header(default=""),
+):
+    require_admin(authorization)
+    require_catalog_write_request(request)
+    try:
+        document = get_catalog_store().remove_image(item_id, index, revision)
+    except (CatalogError, KeyError) as exc:
+        raise catalog_error_response(exc) from exc
+    audit_catalog("image_remove", item_id, document["revision"])
     return admin_catalog_response(document)
 
 
@@ -4531,8 +5122,13 @@ def admin_orders(
             f"SELECT * FROM orders{where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
             (*params, limit, offset),
         ).fetchall()
+        stock_reservations = admin_stock_reservations(
+            con, [str(row["id"]) for row in rows]
+        )
     return {
-        "orders": [admin_order(row) for row in rows],
+        "orders": [
+            admin_order(row, stock_reservations[str(row["id"])]) for row in rows
+        ],
         "total": total,
         "limit": limit,
         "offset": offset,
@@ -4572,8 +5168,7 @@ def admin_update_order(order_id: str, payload: UpdateOrderStatus, authorization:
                    WHERE id = ?""",
                 (payload.status, updated, updated, order_id),
             )
-            if stock_guard_enabled():
-                set_stock_reservation_state(con, order_id, "released", updated)
+            set_stock_reservation_state(con, order_id, "released", updated)
         else:
             con.execute("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?", (payload.status, updated, order_id))
     return admin_order(order_row(order_id))
@@ -4604,6 +5199,23 @@ def admin_saby_retry_sale(
         "Повторная отправка неопределённого чека запрещена. "
         "Сначала Saby должен письменно подтвердить результат исходного запроса.",
     )
+
+
+@app.post("/api/admin/orders/{order_id}/saby/receipts/{receipt_kind}/check")
+def admin_saby_check_known_receipt(
+    order_id: str,
+    receipt_kind: Literal["sale", "settlement", "refund"],
+    response: Response,
+    authorization: str = Header(default=""),
+    x_chainya_admin: str = Header(default=""),
+):
+    """Refresh one known Saby payId without repeating a fiscal write."""
+    require_admin(authorization)
+    if not secrets.compare_digest(x_chainya_admin, "saby-receipt-check"):
+        raise HTTPException(403, "Не подтверждена безопасная сверка чека")
+    result = refresh_known_saby_fiscal_receipt(order_id, receipt_kind)
+    response.headers["Cache-Control"] = "no-store"
+    return result
 
 
 @app.get("/api/admin/business-leads")
@@ -4944,6 +5556,16 @@ def saby_readiness_report() -> dict:
             "unknown_balance_items": [],
             "delivery_configured": False,
             "delivery_confirmation": "",
+            "retail_catalog_ready": False,
+            "write_probe_performed": False,
+            "fiscal_registration_confirmed": False,
+            "fiscal_probe": {
+                "state": "not_configured",
+                "company_found": False,
+                "kkt_found": False,
+                "read_only": True,
+                "detail": "Кассовый контур не настроен для read-only проверки",
+            },
             "ready_for_orders": False,
             "blockers": ["Не настроены реквизиты подключения Saby"],
             "warnings": [],
@@ -4979,6 +5601,51 @@ def saby_readiness_report() -> dict:
         catalog = saby_client.catalog_all(with_balance=True) if point_id and price_list_id else []
     except SabyError as exc:
         catalog, errors["catalog"] = [], str(exc)
+
+    fiscal_probe = {
+        "state": "not_configured",
+        "company_found": False,
+        "kkt_found": False,
+        "read_only": True,
+        "detail": "Кассовый контур не настроен для read-only проверки",
+    }
+    if saby_fiscal_settings.configured:
+        fiscal_probe = {
+            "state": "unknown",
+            "company_found": False,
+            "kkt_found": False,
+            "read_only": True,
+            "detail": "Не удалось подтвердить доступ приложения к ККТ/OFD",
+        }
+        try:
+            company_result = saby_client.companies()
+            companies = rows(company_result, "companies")
+            company = next(
+                (
+                    item for item in companies
+                    if str(item.get("id") or item.get("companyId") or "")
+                    == saby_fiscal_settings.company_id
+                ),
+                None,
+            )
+            fiscal_probe["company_found"] = company is not None
+            if not company:
+                fiscal_probe["state"] = "company_not_found"
+                fiscal_probe["detail"] = (
+                    "Настроенный companyID не найден среди доступных компаний Saby"
+                )
+            else:
+                # The documented OFD KKT-list API uses its own login/password
+                # session (sid). A Retail service OAuth token cannot prove KKT
+                # visibility and a 403 from that endpoint must not be reported
+                # as a missing permission of the service application.
+                fiscal_probe["state"] = "separate_auth_required"
+                fiscal_probe["detail"] = (
+                    "Retail API видит компанию, но список ККТ требует отдельную "
+                    "OFD-авторизацию; эта проверка не подтверждает кассу"
+                )
+        except SabyError as exc:
+            errors["fiscal_probe"] = str(exc)
 
     point_found = any(str(point.get("id")) == str(point_id) for point in points)
     price_list_found = any(str(item.get("id")) == str(price_list_id) for item in price_lists)
@@ -5104,7 +5771,13 @@ def saby_readiness_report() -> dict:
         ],
         "delivery_configured": False,
         "delivery_confirmation": "not_required_cdek",
-        "ready_for_orders": state == "ready",
+        "retail_catalog_ready": state == "ready",
+        "write_probe_performed": False,
+        "fiscal_registration_confirmed": False,
+        "fiscal_probe": fiscal_probe,
+        # The probe above is deliberately read-only. Catalog health is not
+        # evidence that the KKT/OFD contour accepted a fiscal sale.
+        "ready_for_orders": False,
         "blockers": blockers,
         "warnings": (
             (["В Saby нет остатка: " + ", ".join(product_display_name(item) for item in zero_balance_products)]
@@ -5115,6 +5788,12 @@ def saby_readiness_report() -> dict:
                if unexpected_external_ids else [])
             + ([f"Для чека используются названия Saby: {len(name_mismatch_products)}"]
                if name_mismatch_products else [])
+            + (["Кассовая регистрация не проверяется этим read-only тестом"]
+               if state == "ready" else [])
+            + ([fiscal_probe["detail"]]
+               if fiscal_probe["state"] in {
+                   "company_not_found", "separate_auth_required",
+               } else [])
         ),
         "errors": errors,
     }
@@ -5842,6 +6521,85 @@ async def tbank_notification_payload(request: Request) -> dict:
     return payload
 
 
+def apply_tbank_provider_state(
+    con: sqlite3.Connection,
+    row: sqlite3.Row,
+    provider_status: str,
+    success: bool,
+    updated: str,
+) -> bool:
+    """Apply one verified T-Bank state without regressing terminal states.
+
+    The caller must first verify the local order, provider payment id and
+    amount.  The same transition table is used by signed notifications and by
+    the explicit admin recovery action for a webhook that never arrived.
+    """
+    order_id = str(row["id"])
+    process_effects = False
+    if success and provider_status == "CONFIRMED":
+        # A delayed/replayed confirmation must never undo a refund that is
+        # already running, ambiguous, partial or complete.
+        if row["payment_state"] not in {
+            "refunding", "refund_ambiguous", "partially_refunded", "refunded",
+        }:
+            next_order_status = "paid" if row["status"] == "pending_payment" else row["status"]
+            con.execute(
+                """UPDATE orders
+                   SET status = ?, paid_at = COALESCE(paid_at, ?), payment_state = 'paid',
+                       payment_provider_status = ?, payment_last_error = '',
+                       payment_updated_at = ?, updated_at = ?
+                   WHERE id = ?""",
+                (next_order_status, updated, provider_status, updated, updated, order_id),
+            )
+            if not row["paid_effects_enqueued"]:
+                enqueue_paid_order_effects(con, order_id, updated)
+            set_stock_reservation_state(con, order_id, "paid", updated)
+            process_effects = True
+    elif success and provider_status == "REFUNDED":
+        con.execute(
+            """UPDATE orders
+               SET status = 'cancelled', payment_state = 'refunded',
+                   payment_provider_status = ?, payment_last_error = '',
+                   payment_updated_at = ?, updated_at = ?
+               WHERE id = ?""",
+            (provider_status, updated, updated, order_id),
+        )
+        if row["saby_receipt_state"] == "registered":
+            enqueue_saby_refund_effect(con, order_id, updated)
+            process_effects = True
+        set_stock_reservation_state(con, order_id, "released", updated)
+    elif success and provider_status == "PARTIAL_REFUNDED":
+        con.execute(
+            """UPDATE orders
+               SET payment_state = 'partially_refunded', payment_provider_status = ?,
+                   payment_updated_at = ?, updated_at = ? WHERE id = ?""",
+            (provider_status, updated, updated, order_id),
+        )
+    elif provider_status in {"REJECTED", "CANCELED", "REVERSED", "DEADLINE_EXPIRED"}:
+        # A late failure must never downgrade a payment already confirmed.
+        if row["paid_at"] is None:
+            con.execute(
+                """UPDATE orders
+                   SET payment_state = 'failed', payment_provider_status = ?,
+                       payment_updated_at = ?, updated_at = ? WHERE id = ?""",
+                (provider_status, updated, updated, order_id),
+            )
+            set_stock_reservation_state(con, order_id, "released", updated)
+    else:
+        # Provider notifications can arrive out of order. An intermediate
+        # status such as AUTHORIZED must not replace the terminal status
+        # recorded for an already paid or refunded order.
+        if row["payment_state"] not in {
+            "paid", "refunding", "refund_ambiguous", "partially_refunded", "refunded",
+        }:
+            con.execute(
+                """UPDATE orders SET payment_provider_status = ?, payment_updated_at = ?,
+                       updated_at = ? WHERE id = ?""",
+                (provider_status, updated, updated, order_id),
+            )
+    return process_effects
+
+
 @app.post("/api/payments/tbank/notification", response_class=PlainTextResponse)
 async def tbank_notification(
     request: Request,
@@ -5883,74 +6641,9 @@ async def tbank_notification(
         updated = now_iso()
         success = payload.get("Success") is True or payload.get("Success") == "true"
         provider_status = status[:80]
-        if success and status == "CONFIRMED":
-            # A delayed/replayed confirmation must never undo a refund that is
-            # already running, ambiguous, partial or complete.
-            if row["payment_state"] not in {
-                "refunding", "refund_ambiguous", "partially_refunded", "refunded",
-            }:
-                next_order_status = "paid" if row["status"] == "pending_payment" else row["status"]
-                con.execute(
-                    """UPDATE orders
-                       SET status = ?, paid_at = COALESCE(paid_at, ?), payment_state = 'paid',
-                           payment_provider_status = ?, payment_last_error = '',
-                           payment_updated_at = ?, updated_at = ?
-                       WHERE id = ?""",
-                    (next_order_status, updated, provider_status, updated, updated, order_id),
-                )
-                if not row["paid_effects_enqueued"]:
-                    enqueue_paid_order_effects(con, order_id, updated)
-                if stock_guard_enabled():
-                    set_stock_reservation_state(con, order_id, "paid", updated)
-                process_effects = True
-        elif success and status == "REFUNDED":
-            con.execute(
-                """UPDATE orders
-                   SET status = 'cancelled', payment_state = 'refunded',
-                       payment_provider_status = ?, payment_last_error = '',
-                       payment_updated_at = ?, updated_at = ?
-                   WHERE id = ?""",
-                (provider_status, updated, updated, order_id),
-            )
-            if row["saby_receipt_state"] == "registered":
-                enqueue_saby_refund_effect(con, order_id, updated)
-                process_effects = True
-            if stock_guard_enabled():
-                set_stock_reservation_state(con, order_id, "released", updated)
-        elif success and status == "PARTIAL_REFUNDED":
-            con.execute(
-                """UPDATE orders
-                   SET payment_state = 'partially_refunded', payment_provider_status = ?,
-                       payment_updated_at = ?, updated_at = ? WHERE id = ?""",
-                (provider_status, updated, updated, order_id),
-            )
-        elif status in {"REJECTED", "CANCELED", "REVERSED", "DEADLINE_EXPIRED"}:
-            # A late failure must never downgrade a payment already confirmed.
-            if row["paid_at"] is None:
-                con.execute(
-                    """UPDATE orders
-                       SET payment_state = 'failed', payment_provider_status = ?,
-                           payment_updated_at = ?, updated_at = ? WHERE id = ?""",
-                    (provider_status, updated, updated, order_id),
-                )
-                if stock_guard_enabled():
-                    set_stock_reservation_state(con, order_id, "released", updated)
-        else:
-            # Provider notifications can arrive out of order. An intermediate
-            # status such as AUTHORIZED must not replace the terminal status
-            # recorded for an already paid or refunded order.
-            if row["payment_state"] not in {
-                "paid",
-                "refunding",
-                "refund_ambiguous",
-                "partially_refunded",
-                "refunded",
-            }:
-                con.execute(
-                    """UPDATE orders SET payment_provider_status = ?, payment_updated_at = ?,
-                           updated_at = ? WHERE id = ?""",
-                    (provider_status, updated, updated, order_id),
-                )
+        process_effects = apply_tbank_provider_state(
+            con, row, provider_status, success, updated
+        )
 
     if process_effects:
         # A replay is also a recovery signal: the paid transition and its
@@ -5981,16 +6674,126 @@ def admin_tbank_payment_status(
     expected_amount = int(row["total"]) * 100
     provider_status = str(result.get("Status", ""))[:80]
     success = result.get("Success") is True
+    returned_payment_id = result.get("PaymentId")
+    returned_order_id = result.get("OrderId")
+    payment_id_matches = returned_payment_id is None or secrets.compare_digest(
+        str(returned_payment_id), str(row["provider_payment_id"])
+    )
+    order_id_matches = returned_order_id is None or secrets.compare_digest(
+        str(returned_order_id), str(row["id"])
+    )
+    identity_matches = payment_id_matches and order_id_matches
+    terminal_states = {
+        "refunding", "refund_ambiguous", "partially_refunded", "refunded",
+    }
+    reconciliation_needed = (
+        success
+        and provider_amount == expected_amount
+        and identity_matches
+        and (
+            (provider_status == "CONFIRMED" and row["payment_state"] not in terminal_states | {"paid"})
+            or (provider_status == "REFUNDED" and row["payment_state"] != "refunded")
+            or (
+                provider_status == "PARTIAL_REFUNDED"
+                and row["payment_state"] != "partially_refunded"
+            )
+            or (
+                provider_status in {"REJECTED", "CANCELED", "REVERSED", "DEADLINE_EXPIRED"}
+                and row["paid_at"] is None
+                and row["payment_state"] != "failed"
+            )
+        )
+    )
     response.headers["Cache-Control"] = "no-store"
     return {
         "success": success,
         "provider_status": provider_status,
-        "confirmed": success and provider_status == "CONFIRMED" and provider_amount == expected_amount,
+        "confirmed": (
+            success
+            and provider_status == "CONFIRMED"
+            and provider_amount == expected_amount
+            and identity_matches
+        ),
         "amount_matches": provider_amount == expected_amount,
+        "identity_matches": identity_matches,
         "amount_kopeks": provider_amount if provider_amount >= 0 else None,
         "expected_amount_kopeks": expected_amount,
         "local_payment_state": row["payment_state"],
         "local_provider_status": row["payment_provider_status"],
+        "reconciliation_needed": reconciliation_needed,
+    }
+
+
+@app.post("/api/admin/orders/{order_id}/tbank/reconcile")
+def admin_tbank_payment_reconcile(
+    order_id: str,
+    background_tasks: BackgroundTasks,
+    authorization: str = Header(default=""),
+    x_chainya_admin: str = Header(default=""),
+):
+    """Recover local state from a live T-Bank read after a missed webhook.
+
+    This endpoint never creates, captures, cancels or refunds a payment.  It
+    performs one GetState request and applies only the same guarded transitions
+    accepted from a signed notification.
+    """
+    require_admin(authorization)
+    if not secrets.compare_digest(x_chainya_admin, "tbank-reconcile"):
+        raise HTTPException(403, "Не подтверждено восстановление статуса платежа")
+    row = order_row(order_id)
+    if row["payment_provider"] not in {"tbank_demo", "tbank"} or not row["provider_payment_id"]:
+        raise HTTPException(409, "У заказа нет платежа Т-Банка")
+    try:
+        result = tbank_client.get_state(row["provider_payment_id"])
+    except TBankError as exc:
+        raise HTTPException(502, "Не удалось прочитать статус платежа в Т-Банке") from exc
+
+    try:
+        provider_amount = int(result.get("Amount"))
+    except (TypeError, ValueError):
+        raise HTTPException(409, "Т-Банк не вернул проверяемую сумму платежа") from None
+    provider_status = str(result.get("Status", ""))[:80]
+    if result.get("Success") is not True or not provider_status:
+        raise HTTPException(409, "Т-Банк не подтвердил актуальный статус платежа")
+    if provider_amount != int(row["total"]) * 100:
+        raise HTTPException(409, "Сумма платежа в Т-Банке не совпадает с заказом")
+    returned_payment_id = result.get("PaymentId")
+    if returned_payment_id is not None and not secrets.compare_digest(
+        str(returned_payment_id), str(row["provider_payment_id"])
+    ):
+        raise HTTPException(409, "Т-Банк вернул другой идентификатор платежа")
+    returned_order_id = result.get("OrderId")
+    if returned_order_id is not None and not secrets.compare_digest(
+        str(returned_order_id), str(row["id"])
+    ):
+        raise HTTPException(409, "Т-Банк вернул другой идентификатор заказа")
+
+    process_effects = False
+    before = (str(row["status"]), str(row["payment_state"]), str(row["payment_provider_status"]))
+    updated = now_iso()
+    with db() as con:
+        locked = con.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+        if not locked:
+            raise HTTPException(404, "Заказ не найден")
+        if locked["payment_provider"] not in {"tbank_demo", "tbank"} or not secrets.compare_digest(
+            str(locked["provider_payment_id"] or ""), str(row["provider_payment_id"])
+        ):
+            raise HTTPException(409, "Платёж заказа изменился во время проверки")
+        process_effects = apply_tbank_provider_state(
+            con, locked, provider_status, True, updated
+        )
+        current = con.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+    if process_effects:
+        background_tasks.add_task(process_paid_order_effects, order_id)
+    after = (
+        str(current["status"]),
+        str(current["payment_state"]),
+        str(current["payment_provider_status"]),
+    )
+    return {
+        "reconciled": after != before,
+        "provider_status": provider_status,
+        "order": admin_order(current),
     }
 
 
@@ -6058,6 +6861,8 @@ def admin_tbank_refund(order_id: str, authorization: str = Header(default="")):
         )
         if refunded and row["saby_receipt_state"] == "registered":
             enqueue_saby_refund_effect(con, order_id, finished)
+        if refunded:
+            set_stock_reservation_state(con, order_id, "released", finished)
     if refunded:
         process_paid_order_effects(order_id)
     return admin_order(order_row(order_id))

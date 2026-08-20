@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DEPLOY_FILES = (
+    ROOT / "deploy.sh",
     ROOT / "deploy-shop.sh",
     ROOT / "ops" / "deploy-shop-remote.sh",
 )

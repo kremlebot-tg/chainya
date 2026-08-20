@@ -13,6 +13,7 @@ from backend.saby_purchase import (
 
 def fiscal_settings(**changes):
     values = {
+        "point_id": "274",
         "company_id": "274",
         "kkt_reg_number": "0001234567890123",
         "tax_system": 2,
@@ -82,17 +83,56 @@ def test_external_ofd_and_unknown_route_remain_fail_closed():
 def test_fiscal_sale_converts_grams_to_kg_and_keeps_checkout_total():
     payload = build_fiscal_sale(order(), settings=fiscal_settings())
     line = payload["nomenclatures"][0]
+    assert payload["companyID"] == "274"
     assert payload["kktRegNumber"] == "0001234567890123"
     assert payload["operationType"] == "1"
     assert payload["internetSum"] == "350.00"
+    assert payload["cashSum"] is None
+    assert payload["bankSum"] is None
+    assert payload["prepaySum"] is None
     assert payload["vatNone"] == "350.00"
+    assert payload["vatSum0"] is None
+    assert payload["vatSum20"] is None
+    assert payload["allowRetailPayed"] == "0"
     assert payload["taxSystem"] == "2"
     assert payload["payMethod"] == "4"
     assert line["measureNomenclature"] == "кг"
     assert line["quantityNomenclature"] == "0.020"
     assert line["priceNomenclature"] == "17500.00"
     assert line["totalPriceNomenclature"] == "350.00"
+    # The concrete official JSON request uses ``propVal`` even though the
+    # parameter table currently truncates the label to ``propVa``.
+    assert payload["propVal"] == "7E41D55A13E7"
+    assert "propVa" not in payload
+    assert payload["customerEmail"] is None
+    assert payload["customerINN"] is None
     assert payload["externalId"] == "chainya-7e41d55a13e7-sale"
+
+
+def test_fiscal_sale_matches_documented_legacy_wire_types():
+    payload = build_fiscal_sale(
+        order(),
+        settings=fiscal_settings(allow_negative_stock=True),
+    )
+    line = payload["nomenclatures"][0]
+
+    # Saby's current concrete request example uses strings for identifiers,
+    # operation flags and monetary scalars, with JSON null for unused buckets.
+    assert isinstance(payload["companyID"], str)
+    assert isinstance(payload["kktRegNumber"], str)
+    assert isinstance(payload["operationType"], str)
+    assert isinstance(payload["allowRetailPayed"], str)
+    assert payload["allowRetailPayed"] == "1"
+    assert isinstance(payload["internetSum"], str)
+    assert payload["cashSum"] is None
+    assert payload["bankSum"] is None
+    assert payload["customerEmail"] is None
+    assert payload["customerINN"] is None
+    assert isinstance(payload["taxSystem"], str)
+    assert isinstance(payload["payMethod"], str)
+    assert isinstance(line["priceNomenclature"], str)
+    assert isinstance(line["quantityNomenclature"], str)
+    assert isinstance(line["totalPriceNomenclature"], str)
 
 
 @pytest.mark.parametrize(
@@ -193,6 +233,12 @@ def test_fiscal_settings_accept_fns_registration_number_lengths(
     assert fiscal_settings(kkt_reg_number=registration_number).configured is True
 
 
+def test_fiscal_settings_reject_all_zero_registration_number():
+    settings = fiscal_settings(kkt_reg_number="0" * 16)
+    assert settings.configured is False
+    assert "SABY_OFD_KKT_REG_NUMBER" in settings.missing
+
+
 def test_fiscal_settings_report_names_not_secret_values():
     settings = SabyFiscalSettings.from_env({
         "SABY_POINT_ID": "",
@@ -201,7 +247,9 @@ def test_fiscal_settings_report_names_not_secret_values():
     })
     public = settings.public_dict()
     assert public["configured"] is False
+    assert "SABY_POINT_ID" in public["missing"]
     assert "SABY_OFD_COMPANY_ID" in public["missing"]
+    assert public["point_binding_confirmed"] is False
     assert "bad" not in repr(public)
 
 
@@ -212,11 +260,12 @@ def test_fiscal_settings_never_infer_company_id_from_sales_point():
         "SABY_OFD_PAY_METHOD": "4",
     })
     assert settings.company_id == ""
+    assert settings.point_id == "274"
     assert settings.configured is False
     assert "SABY_OFD_COMPANY_ID" in settings.missing
 
 
-def test_explicit_fiscal_company_id_is_required():
+def test_fiscal_company_id_must_match_the_selected_sales_point():
     settings = SabyFiscalSettings.from_env({
         "SABY_POINT_ID": "274",
         "SABY_OFD_COMPANY_ID": "275",
@@ -224,12 +273,26 @@ def test_explicit_fiscal_company_id_is_required():
         "SABY_OFD_PAY_METHOD": "4",
     })
     assert settings.company_id == "275"
+    assert settings.configured is False
+    assert "SABY_OFD_COMPANY_ID_POINT_MISMATCH" in settings.missing
+    assert settings.public_dict()["point_binding_confirmed"] is False
+
+
+def test_explicit_matching_fiscal_company_id_confirms_point_binding():
+    settings = SabyFiscalSettings.from_env({
+        "SABY_POINT_ID": "274",
+        "SABY_OFD_COMPANY_ID": "274",
+        "SABY_OFD_KKT_REG_NUMBER": "0001234567890123",
+        "SABY_OFD_PAY_METHOD": "4",
+    })
+    assert settings.configured is True
+    assert settings.public_dict()["point_binding_confirmed"] is True
 
 
 def test_fiscal_route_never_assumes_payment_method():
     settings = SabyFiscalSettings.from_env({
         "SABY_POINT_ID": "274",
-        "SABY_OFD_COMPANY_ID": "275",
+        "SABY_OFD_COMPANY_ID": "274",
         "SABY_OFD_KKT_REG_NUMBER": "0001234567890123",
     })
     assert settings.configured is False
@@ -239,7 +302,7 @@ def test_fiscal_route_never_assumes_payment_method():
 def test_prepayment_setting_cannot_replace_required_full_payment_flow():
     settings = SabyFiscalSettings.from_env({
         "SABY_POINT_ID": "274",
-        "SABY_OFD_COMPANY_ID": "275",
+        "SABY_OFD_COMPANY_ID": "274",
         "SABY_OFD_KKT_REG_NUMBER": "0001234567890123",
         "SABY_OFD_PAY_METHOD": "1",
     })

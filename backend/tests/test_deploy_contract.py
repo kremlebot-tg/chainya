@@ -172,6 +172,21 @@ def test_static_deploy_contract() -> None:
     assert "return 1" in remote
 
 
+def test_legacy_static_deploy_never_controls_shared_nginx() -> None:
+    deploy = (ROOT / "deploy.sh").read_text(encoding="utf-8")
+    for command in (
+        "systemctl stop nginx",
+        "systemctl start nginx",
+        "systemctl restart nginx",
+        "service nginx stop",
+        "service nginx start",
+        "service nginx restart",
+    ):
+        assert command not in deploy
+    assert "legacy-каталогом" in deploy
+    assert "systemctl is-active --quiet nginx" in deploy
+
+
 def test_bot_deploy_uses_versioned_repository_sources() -> None:
     deploy = (ROOT / "deploy-bot.sh").read_text(encoding="utf-8")
     assert 'BOT_ROOT="$ROOT/telegram-bot"' in deploy

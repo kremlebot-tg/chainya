@@ -36,6 +36,35 @@ def test_checkout_has_one_clear_payment_method_and_visible_status():
     assert "requireCartField('#c-name',T().cart_name_required)" in SOURCE
 
 
+def test_checkout_explains_stock_and_ambiguous_bank_failures_without_duplicate_payment():
+    assert "cart_stock_unavailable:'Одного из товаров уже недостаточно" in SOURCE
+    assert "cart_payment_checking:'Ответ банка не получен" in SOURCE
+    assert "response.status === 409" in SOURCE
+    assert "response.status === 502" in SOURCE
+    assert "savedAttempt.recovery === true" in SOURCE
+    assert "saveCheckoutAttempt(" in SOURCE
+    assert "T().cart_payment_checking" in SOURCE
+
+
+def test_admin_orders_explain_local_stock_reservation_state():
+    assert "Товар зарезервирован" in ADMIN_SOURCE
+    assert "Резерв истёк" in ADMIN_SOURCE
+    assert "Резерв до списания Saby" in ADMIN_SOURCE
+    assert "Остаток Saby обновлён" in ADMIN_SOURCE
+    assert "Резерв освобождён" in ADMIN_SOURCE
+    assert "Резерв: нужна проверка" in ADMIN_SOURCE
+
+
+def test_admin_prioritizes_payment_reconciliation_incidents():
+    assert "payment_reconciliation_incidents" in ADMIN_SOURCE
+    assert "Платёжные операции требуют сверки" in ADMIN_SOURCE
+    assert "создание платежа: нужна проверка" in ADMIN_SOURCE
+    assert "частичный возврат: нужна сверка" in ADMIN_SOURCE
+    assert "Не создавайте повторный платёж или возврат" in ADMIN_SOURCE
+    assert "'init_ambiguous','capture_ambiguous','refund_ambiguous','partially_refunded'" in ADMIN_SOURCE
+    assert "Сайт не создаёт чек возврата и не меняет склад автоматически" in ADMIN_GUIDES
+
+
 def test_pickup_point_map_link_and_booking_total_are_rendered():
     assert 'id="c-pvz-map" hidden' in SOURCE
     assert 'id="c-pvz-map-address"' in SOURCE
@@ -140,7 +169,8 @@ def test_owner_guides_are_searchable_private_help_without_dangerous_actions():
     assert "СБИС: каталог и чеки покупок" in ADMIN_GUIDES
     assert "Один чек интернет-заказа" in ADMIN_GUIDES
     assert "Один чек, продажа и складской учёт" in ADMIN_GUIDES
-    assert "Отдельный чек при выдаче или отправке не нужен" in ADMIN_GUIDES
+    assert "Успех подтверждается только настоящим фискальным признаком" in ADMIN_GUIDES
+    assert "После подтверждённого чека проверьте, что товар списался" in ADMIN_GUIDES
     assert "Сверка каталога работает только на чтение" in ADMIN_GUIDES
     assert "нельзя включать поверх онлайн-чека Т‑Банка" in ADMIN_GUIDES
     assert "Создание отправления — отдельная реальная запись" in ADMIN_GUIDES
@@ -160,18 +190,45 @@ def test_admin_surfaces_saby_order_readiness_on_every_view():
     assert "Saby · Retail" in ADMIN_SOURCE
     assert "Saby · Delivery" in ADMIN_SOURCE
     assert "Saby · заказы" in ADMIN_SOURCE
+    assert "Saby · фискальные чеки" in ADMIN_SOURCE
+    assert "Saby принял операции, ждём кассу или ОФД" in ADMIN_SOURCE
+    assert "принят, ожидает кассу или ОФД" in ADMIN_SOURCE
     assert "Saby · способ учёта покупки" in ADMIN_SOURCE
     assert "Передача покупки в Saby безопасно заблокирована" in ADMIN_SOURCE
     assert "Заказы не передаются в Saby" in ADMIN_SOURCE
     assert "X-Chainya-Admin':'saby-readiness'" in ADMIN_SOURCE
     assert "loadSabyReadiness(true)" in ADMIN_SOURCE
+    assert "sabyReadiness?.fiscal_probe" in ADMIN_SOURCE
+    assert "Кассовый контур Saby требует настройки" in ADMIN_SOURCE
+    assert "company_not_found" in ADMIN_SOURCE
+    assert "separate_auth_required" in ADMIN_SOURCE
+    assert "ККТ проверяется отдельно" in ADMIN_SOURCE
+    assert "физическая ККТ проверяется отдельно" in ADMIN_SOURCE
+
+
+def test_admin_tbank_recovery_is_explicit_and_fail_closed():
+    assert "/tbank/status" in ADMIN_SOURCE
+    assert "/tbank/reconcile" in ADMIN_SOURCE
+    assert "X-Chainya-Admin':'tbank-reconcile'" in ADMIN_SOURCE
+    assert "Восстановить статус" in ADMIN_SOURCE
+    assert "Нового платежа или возврата не будет" in ADMIN_SOURCE
+    assert "identity_matches" in ADMIN_SOURCE
+    assert "amount_matches" in ADMIN_SOURCE
+
+
+def test_admin_saby_receipt_check_reads_only_a_known_receipt():
+    assert "/saby/receipts/${kind}/check" in ADMIN_SOURCE
+    assert "X-Chainya-Admin':'saby-receipt-check'" in ADMIN_SOURCE
+    assert "Проверить чек Saby" in ADMIN_SOURCE
+    assert "current?.id" in ADMIN_SOURCE
+    assert "новой продажи не будет" in ADMIN_SOURCE
 
 
 def test_booking_controls_have_accessible_names_and_heading_order():
     assert '<h2 class="summary__title" data-i18n="sum_h">' in SOURCE
     assert '<span class="sr-only">, ${fullDate}</span>' in SOURCE
     assert 'data-d="${key}" aria-label=' not in SOURCE
-    assert '.fmt__d{ font-size:11.5px; color:var(--text-2);' in SOURCE
+    assert '.fmt__d{ font-size:12.5px; color:var(--text-2);' in SOURCE
     assert ".scroll-shell--days{ overflow:hidden; }" in SOURCE
     assert "html,body{ overflow-x:hidden; overflow-x:clip; }" in SOURCE
 
@@ -230,6 +287,21 @@ def test_shop_defers_images_below_the_initial_catalog_view():
     assert "$('#shop-empty').hidden = shown !== 0 || curFilter === 'fav';\n    scheduleCatalogImages();" in SOURCE
 
 
+def test_initial_catalog_waits_for_live_data_before_showing_product_photos():
+    """Stale embedded photos must not flash before the owner-managed catalog loads."""
+
+    assert "let catalogReady = false" in SOURCE
+    assert "function renderCatalogLoading()" in SOURCE
+    assert "hero.removeAttribute('src')" in SOURCE
+    assert "home.replaceChildren(...skeleton(3))" in SOURCE
+    assert "menu.replaceChildren(...skeleton(8))" in SOURCE
+    assert "const firstResolution = !catalogReady" in SOURCE
+    assert "if (!catalogReady){ go('shop', false); return; }" in SOURCE
+    assert "if (!catalogReady){\n          catalogReady = true;\n          renderResolvedCatalog();" in SOURCE
+    assert "if (catalogReady){\n      selectHeroImage();\n      buildRange();\n      buildTeaGrids();" in SOURCE
+    assert "document.currentScript.previousElementSibling.src" not in SOURCE
+
+
 def test_web_build_uses_root_relative_assets_for_clean_routes():
     assert 'return f"/img/{name}.webp"' in BUILD_SOURCE
     assert 'url(/fonts/{name}.woff2)' in BUILD_SOURCE
@@ -240,10 +312,23 @@ def test_admin_catalog_surfaces_incomplete_food_labelling():
     assert 'id="stat-incomplete"' in ADMIN_CATALOG
     assert 'id="catalog-filter"' in ADMIN_CATALOG
     assert "function missingLabelFields(item)" in ADMIN_CATALOG
-    assert "Маркировка заполнена не полностью" in ADMIN_CATALOG
+    assert "Карточка заполнена не полностью" in ADMIN_CATALOG
     assert "function missingPublicationFields(item)" in ADMIN_CATALOG
-    assert "Перед публикацией заполните карточку" in ADMIN_CATALOG
-    assert "Всё равно показывать товар на сайте?" not in ADMIN_CATALOG
+    assert "не мешают публикации" in ADMIN_CATALOG
+    assert "publishingNow&&missing.length" not in ADMIN_CATALOG
+
+
+def test_catalog_supports_teaware_sections_and_multiple_product_photos():
+    for category in (
+        "teaware-teapots", "teaware-gaiwans", "teaware-cups", "teaware-chahai",
+        "teaware-chahe", "teaware-figurines", "teaware-tools", "teaware-sets",
+    ):
+        assert category in SOURCE
+    assert "Посуда" in ADMIN_CATALOG
+    assert 'id="ts-gallery"' in SOURCE
+    assert "image_urls" in SOURCE
+    assert "file.multiple=true" in ADMIN_CATALOG
+    assert "/images/${index}/primary" in ADMIN_CATALOG
 
 
 def test_admin_button_like_links_share_the_button_alignment_contract():
@@ -258,6 +343,12 @@ def test_admin_secondary_controls_are_visually_centered():
     assert ".dialog-close{width:42px;height:42px;border:1px solid var(--line2);background:transparent;color:var(--text);font-size:22px;display:grid;place-items:center;padding:0;line-height:1}" in ADMIN_CATALOG
     assert ".period__button{height:35px;min-width:54px;border-right:0;color:var(--muted);font-size:12px;display:inline-flex;align-items:center;justify-content:center;line-height:1.2;text-align:center}" in ADMIN_SOURCE
     assert ".owner-tools__actions .btn:first-child,.owner-tools__actions .btn:last-child{grid-column:1/-1}" in ADMIN_CATALOG
+
+
+def test_admin_catalog_mobile_summary_wraps_without_a_clipped_horizontal_strip():
+    assert ".stats{grid-template-columns:repeat(2,minmax(0,1fr));overflow:visible}" in ADMIN_CATALOG
+    assert ".stat:nth-child(2n){border-right:0}" in ADMIN_CATALOG
+    assert ".stat:nth-last-child(-n+2){border-bottom:0}" in ADMIN_CATALOG
 
 
 def test_catalog_escapes_owner_controlled_copy_before_using_inner_html():
@@ -277,3 +368,21 @@ def test_mobile_legal_header_has_accessible_touch_targets():
     assert ".brand{min-width:44px;min-height:44px}" in LEGAL_CSS
     assert ".back{display:inline-flex;align-items:center;min-height:44px}" in LEGAL_CSS
     assert ".langs a{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px}" in LEGAL_CSS
+
+
+def test_admin_guides_explain_stock_reservation_states():
+    for label in (
+        "Товар зарезервирован",
+        "Резерв до списания Saby",
+        "Остаток Saby обновлён",
+        "Резерв истёк",
+        "Резерв освобождён",
+        "Резерв: нужна проверка",
+    ):
+        assert label in ADMIN_GUIDES
+    assert "покупателю нужно начать оформление заново" in ADMIN_GUIDES
+
+
+def test_admin_uses_route_neutral_copy_for_blocked_saby_operations():
+    assert "Saby: отправка заблокирована" in ADMIN_SOURCE
+    assert "Saby Delivery не подключён" not in ADMIN_SOURCE

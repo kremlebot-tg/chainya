@@ -1,4 +1,5 @@
 import importlib
+from decimal import Decimal
 from urllib.parse import parse_qs, urlparse
 
 import pytest
@@ -172,6 +173,256 @@ def test_live_stock_guard_rejects_concurrent_oversell(tmp_path, monkeypatch):
     assert second.json()["detail"].startswith("Недостаточно товара:")
 
 
+def test_unrelated_saby_balance_drop_does_not_release_paid_online_reservation(
+    tmp_path, monkeypatch
+):
+    client, module = demo_app(tmp_path, monkeypatch)
+    monkeypatch.setattr(module, "TEST_MODE", False)
+    monkeypatch.setenv("SABY_STOCK_GUARD_MODE", "auto")
+    monkeypatch.setattr(module, "tbank_checkout_ready", lambda: True)
+    external_id = module.SABY_NOMENCLATURE_BY_SITE_ID["baihao"].external_id
+    monkeypatch.setattr(
+        module.saby_client,
+        "base_catalog_all",
+        lambda with_balance=False: [{
+            "externalId": external_id,
+            "name": "Бай Хао Инь Чжень",
+            "unit": "г",
+            "balance": 200,
+        }],
+    )
+    monkeypatch.setattr(
+        module.tbank_client, "create_payment", lambda *_a, **_k: bank_response()
+    )
+
+    with client:
+        created = client.post("/api/orders", json=order_payload()).json()["order"]
+        confirmed = client.post(
+            "/api/payments/tbank/notification",
+            json=signed_notification(
+                module, created["id"], "123456", 88_000, "CONFIRMED"
+            ),
+        )
+        with module.db() as con:
+            still_reserved = module.pending_reserved_quantity(
+                con, "baihao", Decimal(150), module.now_iso()
+            )
+            state = con.execute(
+                "SELECT state FROM stock_reservations WHERE order_id = ?",
+                (created["id"],),
+            ).fetchone()[0]
+
+    assert confirmed.status_code == 200
+    assert still_reserved == Decimal(50)
+    assert state == "paid"
+
+
+def test_confirmed_saby_sale_and_balance_drop_release_paid_reservation(
+    tmp_path, monkeypatch
+):
+    client, module = demo_app(tmp_path, monkeypatch)
+    monkeypatch.setattr(module, "TEST_MODE", False)
+    monkeypatch.setenv("SABY_STOCK_GUARD_MODE", "auto")
+    monkeypatch.setattr(module, "tbank_checkout_ready", lambda: True)
+    external_id = module.SABY_NOMENCLATURE_BY_SITE_ID["baihao"].external_id
+    monkeypatch.setattr(
+        module.saby_client,
+        "base_catalog_all",
+        lambda with_balance=False: [{
+            "externalId": external_id,
+            "name": "Бай Хао Инь Чжень",
+            "unit": "г",
+            "balance": 200,
+        }],
+    )
+    monkeypatch.setattr(
+        module.tbank_client, "create_payment", lambda *_a, **_k: bank_response()
+    )
+
+    with client:
+        created = client.post("/api/orders", json=order_payload()).json()["order"]
+        client.post(
+            "/api/payments/tbank/notification",
+            json=signed_notification(
+                module, created["id"], "123456", 88_000, "CONFIRMED"
+            ),
+        )
+        with module.db() as con:
+            con.execute(
+                "UPDATE orders SET saby_receipt_state = 'registered' WHERE id = ?",
+                (created["id"],),
+            )
+            still_reserved = module.pending_reserved_quantity(
+                con, "baihao", Decimal(150), module.now_iso()
+            )
+            state = con.execute(
+                "SELECT state FROM stock_reservations WHERE order_id = ?",
+                (created["id"],),
+            ).fetchone()[0]
+
+    assert still_reserved == Decimal(0)
+    assert state == "reflected"
+
+
+def test_one_balance_drop_releases_only_one_of_two_registered_reservations(
+    tmp_path, monkeypatch
+):
+    client, module = demo_app(tmp_path, monkeypatch)
+    monkeypatch.setattr(module, "TEST_MODE", False)
+    monkeypatch.setenv("SABY_STOCK_GUARD_MODE", "auto")
+    monkeypatch.setattr(module, "tbank_checkout_ready", lambda: True)
+    external_id = module.SABY_NOMENCLATURE_BY_SITE_ID["baihao"].external_id
+    monkeypatch.setattr(
+        module.saby_client,
+        "base_catalog_all",
+        lambda with_balance=False: [{
+            "externalId": external_id,
+            "name": "Бай Хао Инь Чжень",
+            "unit": "г",
+            "balance": 200,
+        }],
+    )
+    payment_ids = iter(("111111", "222222"))
+    monkeypatch.setattr(
+        module.tbank_client,
+        "create_payment",
+        lambda *_a, **_k: bank_response(payment_id=next(payment_ids)),
+    )
+
+    with client:
+        first = client.post(
+            "/api/orders",
+            json=order_payload(),
+            headers={"Idempotency-Key": "first-registered-reservation"},
+        ).json()["order"]
+        second = client.post(
+            "/api/orders",
+            json=order_payload(),
+            headers={"Idempotency-Key": "second-registered-reservation"},
+        ).json()["order"]
+        for order, payment_id in (
+            (first, "111111"),
+            (second, "222222"),
+        ):
+            client.post(
+                "/api/payments/tbank/notification",
+                json=signed_notification(
+                    module, order["id"], payment_id, 88_000, "CONFIRMED"
+                ),
+            )
+        with module.db() as con:
+            con.execute(
+                """UPDATE orders SET saby_receipt_state = 'registered'
+                   WHERE id IN (?, ?)""",
+                (first["id"], second["id"]),
+            )
+            still_reserved = module.pending_reserved_quantity(
+                con, "baihao", Decimal(150), module.now_iso()
+            )
+            states = [
+                row["state"]
+                for row in con.execute(
+                    """SELECT state FROM stock_reservations
+                       WHERE order_id IN (?, ?) ORDER BY available_at_check DESC""",
+                    (first["id"], second["id"]),
+                ).fetchall()
+            ]
+
+    assert still_reserved == Decimal(50)
+    assert states == ["reflected", "paid"]
+
+
+def test_live_stock_guard_fails_before_order_when_saby_balance_is_unavailable(
+    tmp_path, monkeypatch
+):
+    client, module = demo_app(tmp_path, monkeypatch)
+    monkeypatch.setattr(module, "TEST_MODE", False)
+    monkeypatch.setenv("SABY_STOCK_GUARD_MODE", "auto")
+    monkeypatch.setattr(module, "tbank_checkout_ready", lambda: True)
+    payment_calls = []
+
+    def unavailable_balance(*_args, **_kwargs):
+        raise module.SabyError("Saby temporarily unavailable")
+
+    monkeypatch.setattr(module.saby_client, "base_catalog_all", unavailable_balance)
+    monkeypatch.setattr(
+        module.tbank_client,
+        "create_payment",
+        lambda *_args, **_kwargs: payment_calls.append(1) or bank_response(),
+    )
+    with client:
+        response = client.post("/api/orders", json=order_payload())
+
+    assert response.status_code == 503
+    assert response.json()["detail"].startswith("Не удалось подтвердить остаток")
+    assert payment_calls == []
+    with module.db() as con:
+        assert con.execute("SELECT COUNT(*) FROM orders").fetchone()[0] == 0
+        assert con.execute("SELECT COUNT(*) FROM stock_reservations").fetchone()[0] == 0
+
+
+def test_ambiguous_tbank_init_keeps_stock_reserved_during_safe_recovery(
+    tmp_path, monkeypatch
+):
+    client, module = demo_app(tmp_path, monkeypatch)
+    monkeypatch.setattr(module, "TEST_MODE", False)
+    monkeypatch.setenv("SABY_STOCK_GUARD_MODE", "auto")
+    monkeypatch.setattr(module, "tbank_checkout_ready", lambda: True)
+    external_id = module.SABY_NOMENCLATURE_BY_SITE_ID["baihao"].external_id
+    monkeypatch.setattr(
+        module.saby_client,
+        "base_catalog_all",
+        lambda with_balance=False: [{
+            "externalId": external_id,
+            "name": "Бай Хао Инь Чжень",
+            "unit": "г",
+            "balance": 200,
+        }],
+    )
+    init_calls = []
+
+    def ambiguous_init(*_args, **_kwargs):
+        init_calls.append(1)
+        raise module.TBankError("Т-Банк временно недоступен")
+
+    monkeypatch.setattr(module.tbank_client, "create_payment", ambiguous_init)
+    monkeypatch.setattr(
+        module.tbank_client,
+        "check_order",
+        lambda order_id: {
+            "Success": True,
+            "OrderId": order_id,
+            "Payments": [{
+                "PaymentId": 7654321,
+                "Status": "NEW",
+                "Amount": 88_000,
+                "PaymentURL": "https://pay.tbank.ru/recovered",
+            }],
+        },
+    )
+    headers = {"Idempotency-Key": "ambiguous-init-keeps-stock"}
+    with client:
+        first = client.post("/api/orders", json=order_payload(), headers=headers)
+        with module.db() as con:
+            after_failure = con.execute(
+                "SELECT state, expires_at FROM stock_reservations"
+            ).fetchone()
+        replay = client.post("/api/orders", json=order_payload(), headers=headers)
+        with module.db() as con:
+            after_recovery = con.execute(
+                "SELECT state, expires_at FROM stock_reservations"
+            ).fetchone()
+
+    assert first.status_code == 502
+    assert after_failure["state"] == "held"
+    assert after_failure["expires_at"]
+    assert replay.status_code == 201
+    assert replay.json()["payment"]["url"] == "https://pay.tbank.ru/recovered"
+    assert after_recovery["state"] == "held"
+    assert after_recovery["expires_at"] == after_failure["expires_at"]
+    assert init_calls == [1]
+
+
 def test_authorized_callback_does_not_trigger_capture_in_one_stage_mode(tmp_path, monkeypatch):
     client, module = demo_app(tmp_path, monkeypatch)
     monkeypatch.setattr(module, "TEST_MODE", False)
@@ -206,6 +457,56 @@ def test_authorized_callback_does_not_trigger_capture_in_one_stage_mode(tmp_path
             (created["id"],),
         ).fetchone()
     assert reservation["state"] == "held"
+
+
+def test_terminal_failure_releases_hold_after_stock_guard_config_changes(
+    tmp_path, monkeypatch
+):
+    client, module = demo_app(tmp_path, monkeypatch)
+    monkeypatch.setattr(module, "TEST_MODE", False)
+    monkeypatch.setenv("SABY_STOCK_GUARD_MODE", "auto")
+    monkeypatch.setattr(module, "tbank_checkout_ready", lambda: True)
+    external_id = module.SABY_NOMENCLATURE_BY_SITE_ID["baihao"].external_id
+    monkeypatch.setattr(
+        module.saby_client,
+        "base_catalog_all",
+        lambda with_balance=False: [{
+            "externalId": external_id,
+            "name": "Бай Хао Инь Чжень",
+            "unit": "г",
+            "balance": 200,
+        }],
+    )
+    monkeypatch.setattr(
+        module.tbank_client, "create_payment", lambda *_a, **_k: bank_response()
+    )
+    auth = {"Authorization": "Bearer test-admin-token"}
+
+    with client:
+        created = client.post("/api/orders", json=order_payload()).json()["order"]
+        monkeypatch.setenv("SABY_STOCK_GUARD_MODE", "off")
+        rejected = client.post(
+            "/api/payments/tbank/notification",
+            json=signed_notification(
+                module, created["id"], "123456", 88_000, "REJECTED", success=False
+            ),
+        )
+        cancelled = client.patch(
+            f"/api/admin/orders/{created['id']}",
+            json={"status": "cancelled"},
+            headers=auth,
+        )
+        with module.db() as con:
+            reservation = con.execute(
+                "SELECT state, expires_at FROM stock_reservations WHERE order_id = ?",
+                (created["id"],),
+            ).fetchone()
+
+    assert rejected.status_code == 200
+    assert cancelled.status_code == 200
+    assert cancelled.json()["status"] == "cancelled"
+    assert reservation["state"] == "released"
+    assert reservation["expires_at"] is None
 
 
 def test_checkout_status_reports_configured_demo_as_available(tmp_path, monkeypatch):
@@ -808,13 +1109,214 @@ def test_admin_reads_live_tbank_status_without_mutating_order(tmp_path, monkeypa
         "provider_status": "CONFIRMED",
         "confirmed": True,
         "amount_matches": True,
+        "identity_matches": True,
         "amount_kopeks": 88_000,
         "expected_amount_kopeks": 88_000,
         "local_payment_state": "awaiting",
         "local_provider_status": "NEW",
+        "reconciliation_needed": True,
     }
     assert current["status"] == "pending_payment"
     assert current["integrations"]["payment"]["state"] == "awaiting"
+
+
+def test_admin_reconcile_recovers_confirmed_payment_after_missed_webhook(
+    tmp_path, monkeypatch
+):
+    client, module = demo_app(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        module.tbank_client, "create_payment", lambda *_a, **_k: bank_response()
+    )
+    calls = []
+    monkeypatch.setattr(module, "process_paid_order_effects", calls.append)
+    auth = {
+        "Authorization": "Bearer test-admin-token",
+        "X-Chainya-Admin": "tbank-reconcile",
+    }
+    with client:
+        created = client.post("/api/orders", json=order_payload()).json()["order"]
+        monkeypatch.setattr(module.tbank_client, "get_state", lambda _payment_id: {
+            "Success": True,
+            "Status": "CONFIRMED",
+            "Amount": 88_000,
+            "PaymentId": "123456",
+            "OrderId": created["id"],
+        })
+        forbidden = client.post(
+            f"/api/admin/orders/{created['id']}/tbank/reconcile",
+            headers={"Authorization": "Bearer test-admin-token"},
+        )
+        recovered = client.post(
+            f"/api/admin/orders/{created['id']}/tbank/reconcile", headers=auth
+        )
+        repeated = client.post(
+            f"/api/admin/orders/{created['id']}/tbank/reconcile", headers=auth
+        )
+        current = module.admin_order(module.order_row(created["id"]))
+        with module.db() as con:
+            effects = con.execute(
+                "SELECT effect FROM paid_order_effects WHERE order_id = ? ORDER BY effect",
+                (created["id"],),
+            ).fetchall()
+
+    assert forbidden.status_code == 403
+    assert recovered.status_code == 200
+    assert recovered.json()["reconciled"] is True
+    assert repeated.status_code == 200
+    assert repeated.json()["reconciled"] is False
+    assert current["status"] == "paid"
+    assert current["integrations"]["payment"]["state"] == "paid"
+    assert [row[0] for row in effects] == ["saby", "telegram"]
+    assert calls == [created["id"], created["id"]]
+
+
+def test_admin_reconcile_finishes_ambiguous_refund_without_second_refund(
+    tmp_path, monkeypatch
+):
+    client, module = demo_app(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        module.tbank_client, "create_payment", lambda *_a, **_k: bank_response()
+    )
+    calls = []
+    monkeypatch.setattr(module, "process_paid_order_effects", calls.append)
+    auth = {
+        "Authorization": "Bearer test-admin-token",
+        "X-Chainya-Admin": "tbank-reconcile",
+    }
+    with client:
+        created = client.post("/api/orders", json=order_payload()).json()["order"]
+        client.post(
+            "/api/payments/tbank/notification",
+            json=signed_notification(
+                module, created["id"], "123456", 88_000, "CONFIRMED"
+            ),
+        )
+        calls.clear()
+        with module.db() as con:
+            con.execute(
+                """UPDATE orders SET payment_state = 'refund_ambiguous',
+                       saby_receipt_state = 'registered' WHERE id = ?""",
+                (created["id"],),
+            )
+        monkeypatch.setattr(module.tbank_client, "get_state", lambda _payment_id: {
+            "Success": True,
+            "Status": "REFUNDED",
+            "Amount": 88_000,
+            "PaymentId": "123456",
+            "OrderId": created["id"],
+        })
+        recovered = client.post(
+            f"/api/admin/orders/{created['id']}/tbank/reconcile", headers=auth
+        )
+        current = module.admin_order(module.order_row(created["id"]))
+        with module.db() as con:
+            refund_effects = con.execute(
+                """SELECT COUNT(*) FROM paid_order_effects
+                   WHERE order_id = ? AND effect = 'saby_refund'""",
+                (created["id"],),
+            ).fetchone()[0]
+
+    assert recovered.status_code == 200
+    assert recovered.json()["reconciled"] is True
+    assert current["status"] == "cancelled"
+    assert current["integrations"]["payment"]["state"] == "refunded"
+    assert refund_effects == 1
+    assert calls == [created["id"]]
+
+
+@pytest.mark.parametrize(
+    ("provider_result", "detail"),
+    [
+        (
+            {"Success": True, "Status": "CONFIRMED", "Amount": 1},
+            "Сумма платежа в Т-Банке не совпадает с заказом",
+        ),
+        (
+            {
+                "Success": True,
+                "Status": "CONFIRMED",
+                "Amount": 88_000,
+                "PaymentId": "other-payment",
+            },
+            "Т-Банк вернул другой идентификатор платежа",
+        ),
+        (
+            {
+                "Success": True,
+                "Status": "CONFIRMED",
+                "Amount": 88_000,
+                "OrderId": "other-order",
+            },
+            "Т-Банк вернул другой идентификатор заказа",
+        ),
+    ],
+)
+def test_admin_reconcile_fails_closed_on_provider_mismatch(
+    tmp_path, monkeypatch, provider_result, detail
+):
+    client, module = demo_app(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        module.tbank_client, "create_payment", lambda *_a, **_k: bank_response()
+    )
+    monkeypatch.setattr(
+        module.tbank_client, "get_state", lambda _payment_id: provider_result
+    )
+    auth = {
+        "Authorization": "Bearer test-admin-token",
+        "X-Chainya-Admin": "tbank-reconcile",
+    }
+    with client:
+        created = client.post("/api/orders", json=order_payload()).json()["order"]
+        response = client.post(
+            f"/api/admin/orders/{created['id']}/tbank/reconcile", headers=auth
+        )
+        current = module.admin_order(module.order_row(created["id"]))
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == detail
+    assert current["status"] == "pending_payment"
+    assert current["integrations"]["payment"]["state"] == "awaiting"
+
+
+def test_admin_reconcile_does_not_cancel_ambiguous_refund_on_confirmation(
+    tmp_path, monkeypatch
+):
+    client, module = demo_app(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        module.tbank_client, "create_payment", lambda *_a, **_k: bank_response()
+    )
+    auth = {
+        "Authorization": "Bearer test-admin-token",
+        "X-Chainya-Admin": "tbank-reconcile",
+    }
+    with client:
+        created = client.post("/api/orders", json=order_payload()).json()["order"]
+        client.post(
+            "/api/payments/tbank/notification",
+            json=signed_notification(
+                module, created["id"], "123456", 88_000, "CONFIRMED"
+            ),
+        )
+        with module.db() as con:
+            con.execute(
+                "UPDATE orders SET payment_state = 'refund_ambiguous' WHERE id = ?",
+                (created["id"],),
+            )
+        monkeypatch.setattr(module.tbank_client, "get_state", lambda _payment_id: {
+            "Success": True,
+            "Status": "CONFIRMED",
+            "Amount": 88_000,
+            "PaymentId": "123456",
+            "OrderId": created["id"],
+        })
+        response = client.post(
+            f"/api/admin/orders/{created['id']}/tbank/reconcile", headers=auth
+        )
+        current = module.admin_order(module.order_row(created["id"]))
+
+    assert response.status_code == 200
+    assert response.json()["reconciled"] is False
+    assert current["integrations"]["payment"]["state"] == "refund_ambiguous"
 
 
 def test_admin_full_refund_calls_cancel_once(tmp_path, monkeypatch):
@@ -852,6 +1354,88 @@ def test_admin_full_refund_calls_cancel_once(tmp_path, monkeypatch):
     assert after_late_confirmation["status"] == "cancelled"
     assert after_late_confirmation["integrations"]["payment"]["state"] == "refunded"
     assert calls == [("123456", {})]
+
+
+def test_late_confirmation_revives_expired_hold_and_full_refund_releases_it(
+    tmp_path, monkeypatch
+):
+    client, module = demo_app(tmp_path, monkeypatch)
+    monkeypatch.setattr(module, "TEST_MODE", False)
+    monkeypatch.setenv("SABY_STOCK_GUARD_MODE", "auto")
+    monkeypatch.setattr(module, "tbank_checkout_ready", lambda: True)
+    external_id = module.SABY_NOMENCLATURE_BY_SITE_ID["baihao"].external_id
+    monkeypatch.setattr(
+        module.saby_client,
+        "base_catalog_all",
+        lambda with_balance=False: [{
+            "externalId": external_id,
+            "name": "Бай Хао Инь Чжень",
+            "unit": "г",
+            "balance": 200,
+        }],
+    )
+    monkeypatch.setattr(
+        module.tbank_client, "create_payment", lambda *_a, **_k: bank_response()
+    )
+    monkeypatch.setattr(
+        module.tbank_client,
+        "refund",
+        lambda _payment_id, **_kwargs: {"Success": True, "Status": "REFUNDED"},
+    )
+    monkeypatch.setattr(module, "notify_owners", lambda _row: None)
+    auth = {"Authorization": "Bearer test-admin-token"}
+
+    with client:
+        created = client.post("/api/orders", json=order_payload()).json()["order"]
+        with module.db() as con:
+            con.execute(
+                """UPDATE stock_reservations
+                   SET expires_at = '2000-01-01T00:00:00+00:00'
+                   WHERE order_id = ?""",
+                (created["id"],),
+            )
+        expired_view = client.get(
+            "/api/admin/orders", headers=auth
+        ).json()["orders"][0]
+        with module.db() as con:
+            con.execute(
+                """UPDATE stock_reservations
+                   SET state = 'released', expires_at = NULL
+                   WHERE order_id = ?""",
+                (created["id"],),
+            )
+        monkeypatch.setenv("SABY_STOCK_GUARD_MODE", "off")
+        confirmed = client.post(
+            "/api/payments/tbank/notification",
+            json=signed_notification(
+                module, created["id"], "123456", 88_000, "CONFIRMED"
+            ),
+        )
+        with module.db() as con:
+            after_confirmation = con.execute(
+                "SELECT state FROM stock_reservations WHERE order_id = ?",
+                (created["id"],),
+            ).fetchone()[0]
+        confirmation_view = client.get(
+            "/api/admin/orders", headers=auth
+        ).json()["orders"][0]
+        refunded = client.post(
+            f"/api/admin/orders/{created['id']}/tbank/refund", headers=auth
+        )
+        with module.db() as con:
+            after_refund = con.execute(
+                "SELECT state FROM stock_reservations WHERE order_id = ?",
+                (created["id"],),
+            ).fetchone()[0]
+
+    assert confirmed.status_code == 200
+    assert expired_view["integrations"]["stock"]["state"] == "expired"
+    assert after_confirmation == "paid"
+    assert confirmation_view["integrations"]["stock"]["state"] == "paid"
+    assert confirmation_view["integrations"]["stock"]["items"] == 1
+    assert refunded.status_code == 200
+    assert refunded.json()["integrations"]["stock"]["state"] == "released"
+    assert after_refund == "released"
 
 
 def test_admin_cannot_fake_or_cancel_tbank_payment_state(tmp_path, monkeypatch):

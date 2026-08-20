@@ -186,6 +186,16 @@ h1, h2, h3, p{ text-wrap:pretty; }
   width:100%; height:100%; object-fit:cover; object-position:50% 46%;
   filter:saturate(.88) contrast(.98); transition:opacity var(--motion-slow) var(--ease);
 }
+.hero__media.is-loading img{ opacity:0; }
+.hero__media.is-loading::after,
+.catalog-skeleton__art,
+.catalog-skeleton__line{
+  content:''; display:block;
+  background:linear-gradient(100deg,var(--bg-2) 20%,var(--bg-3) 42%,var(--bg-2) 64%);
+  background-size:240% 100%; animation:catalog-pulse 1.4s ease-in-out infinite;
+}
+.hero__media.is-loading::after{ position:absolute; inset:0; }
+@keyframes catalog-pulse{ from{background-position:100% 0} to{background-position:-100% 0} }
 .hero::after{
   content:''; position:absolute; inset:0; z-index:1; pointer-events:none;
   background:linear-gradient(to right, var(--bg) 42%, color-mix(in srgb, var(--bg) 78%, transparent) 58%, transparent 76%);
@@ -279,6 +289,19 @@ h1, h2, h3, p{ text-wrap:pretty; }
 
 /* ── Карточка чая ── */
 .tea-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(232px,1fr)); gap:clamp(14px,1.6vw,20px); }
+.catalog-skeleton{ min-width:0; }
+.catalog-skeleton__art{ aspect-ratio:1; border-radius:2px; }
+.catalog-skeleton__body{ padding:15px 2px 8px; }
+.catalog-skeleton__line{ height:14px; border-radius:2px; }
+.catalog-skeleton__line--name{ width:72%; height:18px; }
+.catalog-skeleton__line--meta{ width:46%; margin-top:10px; }
+.catalog-skeleton__line--price{ width:32%; margin-top:25px; }
+.brange__strip.is-loading::before{
+  content:''; grid-column:1/-1; display:block; aspect-ratio:4/1;
+  background:linear-gradient(100deg,var(--bg-2) 20%,var(--bg-3) 42%,var(--bg-2) 64%);
+  background-size:240% 100%; animation:catalog-pulse 1.4s ease-in-out infinite;
+  border-radius:var(--r);
+}
 .tea{
   position:relative; background:transparent; border:0;
   border-radius:0; overflow:hidden; display:flex; flex-direction:column;
@@ -371,6 +394,7 @@ h1, h2, h3, p{ text-wrap:pretty; }
 .scroll-shell.has-more::after{ opacity:1; }
 .scroll-shell--days::after{ background:linear-gradient(90deg,transparent,var(--bg-3)); }
 .chips{ display:flex; flex-wrap:wrap; gap:8px; }
+#subfilters-shell{margin-top:10px}
 .shop-count{ margin:12px 0 0; color:var(--text-3); font-size:12.5px; }
 .shop-count b{ color:var(--text-2); font-weight:600; margin-left:7px; }
 .chip{
@@ -434,6 +458,7 @@ h1, h2, h3, p{ text-wrap:pretty; }
 .sheet__art img{ width:100%; height:100%; object-fit:cover; }
 .ts-orig{ margin:0; font-size:13.5px; color:var(--text-3); }
 .ts-desc{ margin:14px 0 0; font-size:15px; line-height:1.62; color:var(--text-2); }
+.ts-gallery{display:flex;gap:8px;margin:10px 0 18px;overflow-x:auto;scrollbar-width:thin}.ts-gallery[hidden]{display:none}.ts-gallery button{flex:0 0 66px;width:66px;height:66px;padding:0;border:1px solid var(--line);background:var(--bg-3)}.ts-gallery button[aria-pressed="true"]{border-color:var(--text)}.ts-gallery img{width:100%;height:100%;object-fit:cover}
 .ts-food{margin-top:22px;padding-top:18px;border-top:1px solid var(--line)}
 .ts-food__h{margin:0 0 12px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-3)}
 .ts-food__row{display:grid;grid-template-columns:minmax(110px,.7fr) minmax(0,1.3fr);gap:14px;padding:9px 0;border-bottom:1px solid color-mix(in srgb,var(--line) 65%,transparent);font-size:13px;line-height:1.5}
@@ -581,7 +606,7 @@ select.input{
 }
 .fmt__opt .fmt__price{ margin-top:7px; font-family:'Prata',Georgia,serif; font-size:1.35rem; line-height:1.15; }
 .fmt__name{ font-size:14px; font-weight:600; letter-spacing:-.01em; }
-.fmt__d{ font-size:11.5px; color:var(--text-2); line-height:1.45; }
+.fmt__d{ font-size:12.5px; color:var(--text-2); line-height:1.45; }
 .fmt__incl{ margin:11px 0 0; font-size:12.5px; color:var(--text-3); line-height:1.5; }
 
 /* Дни лентой вместо календаря: год в чайной брони не нужен, он всегда текущий */
@@ -594,7 +619,7 @@ select.input{
 .day:hover{ border-color:var(--text-3); color:var(--text); }
 .day[aria-pressed="true"]{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
 .day b{ display:block; font-size:15px; font-weight:600; font-variant-numeric:tabular-nums; }
-.day span{ display:block; font-size:11px; opacity:.8; margin-top:1px; text-transform:lowercase; }
+.day span{ display:block; font-size:12px; opacity:.8; margin-top:1px; text-transform:lowercase; }
 .slots{ display:grid; grid-template-columns:repeat(auto-fill,minmax(74px,1fr)); gap:7px; }
 .slot{
   padding:9px 0; border:1px solid var(--line); border-radius:3px; font-size:13.5px;
@@ -872,12 +897,12 @@ select.input{
     line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
   }
   #menu-teas .tea__orig{
-    font-size:11.5px; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2;
+    font-size:12.5px; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2;
     -webkit-box-orient:vertical; overflow:hidden;
   }
   #menu-teas .tea__foot{ padding-top:9px; align-items:center; }
   #menu-teas .price{ font-family:'Golos Text',sans-serif; font-size:15px; font-weight:600; }
-  #menu-teas .price small{ display:block; margin:2px 0 0; font-size:10.5px; font-weight:400; }
+  #menu-teas .price small{ display:block; margin:2px 0 0; font-size:12px; font-weight:400; }
   #menu-teas .tea__quick{ width:44px; height:44px; }
 }
 @media (max-width:359px){
@@ -964,9 +989,6 @@ select.input{
   <div class="hero">
     <figure class="hero__media">
       <img id="hero-img" alt="" data-i18n-alt="alt_product" fetchpriority="high" decoding="async" width="800" height="800">
-      <script>
-        (()=>{const a=['{{img:tea-dancong}}','{{img:tea-gaba-honey}}','{{img:tea-baihao}}'];document.currentScript.previousElementSibling.src=a[Math.floor(Date.now()/86400000)%a.length]})()
-      </script>
     </figure>
     <div class="hero__in">
       <div class="hero__copy">
@@ -1144,7 +1166,8 @@ select.input{
   <div class="sec wrap">
     <h1 class="sr-only" data-i18n="shop_heading">Каталог китайского чая</h1>
     <div class="shop-toolbar">
-      <div class="scroll-shell scroll-shell--chips"><div class="chips" id="filters" role="group" data-i18n-aria="filters_label" aria-label="Фильтры каталога"></div></div>
+      <div class="scroll-shell scroll-shell--chips"><div class="chips" id="filters" role="group" data-i18n-aria="filters_label" aria-label="Разделы каталога"></div></div>
+      <div class="scroll-shell scroll-shell--chips" id="subfilters-shell"><div class="chips" id="subfilters" role="group" aria-label="Подразделы каталога"></div></div>
       <div class="shop-tools">
         <label class="shop-search" for="shop-search">
           <span class="sr-only" data-i18n="shop_search_label">Поиск по каталогу</span>
@@ -1428,6 +1451,7 @@ select.input{
   </div>
   <div class="sheet__body">
     <div class="sheet__art"><img id="ts-img" alt="" loading="lazy" width="800" height="800"></div>
+    <div class="ts-gallery" id="ts-gallery" hidden aria-label="Фотографии товара"></div>
     <div class="ts-meta"><span class="ts-stock" id="ts-stock"></span><p class="ts-orig" id="ts-orig"></p></div>
     <p class="ts-desc" id="ts-desc"></p>
     <section class="ts-food" id="ts-food" hidden aria-labelledby="ts-food-title">
@@ -1550,7 +1574,24 @@ select.input{
     heicha:  '#6B3A22',
     herbs:   '#8A7B5C',
   };
-  const TYPE_IDS = ['all','white','green','gaba','fujian','dancong','wuyi','red','sheng','shu','heicha','herbs'];
+  const FALLBACK_TYPES = [
+    ['white','tea','Белый чай','White tea','白茶'],['green','tea','Зелёный чай','Green tea','绿茶'],
+    ['gaba','tea','Габа','GABA','佳叶龙茶'],['fujian','tea','Улуны Южной Фуцзяни','Fujian oolong','闽南乌龙'],
+    ['dancong','tea','Улуны Гуандуна','Guangdong oolong','广东乌龙'],['wuyi','tea','Улуны Уишаня','Wuyi oolong','武夷岩茶'],
+    ['red','tea','Красный чай','Black tea','红茶'],['sheng','tea','Шэн Пуэр','Sheng pu-erh','生普洱'],
+    ['shu','tea','Шу Пуэр','Shou pu-erh','熟普洱'],['heicha','tea','Хэй Ча','Hei cha','黑茶'],
+    ['herbs','tea','Травы и добавки','Herbs & extras','花草与配料'],['tea-sets','tea','Чайные наборы','Tea sets','茶叶礼盒'],
+    ['teaware-teapots','teaware','Чайники','Teapots','茶壶'],['teaware-gaiwans','teaware','Гайвани','Gaiwans','盖碗'],
+    ['teaware-cups','teaware','Пиалы','Tea cups','茶杯'],['teaware-chahai','teaware','Чахаи','Chahai','公道杯'],
+    ['teaware-chahe','teaware','Чахэ','Chahe','茶荷'],['teaware-figurines','teaware','Фигурки','Tea pets','茶宠'],
+    ['teaware-tools','teaware','Инструменты','Tea tools','茶道工具'],['teaware-sets','teaware','Наборы посуды','Teaware sets','茶具套装'],
+  ].map(([id,group,ru,en,zh])=>({id,group,names:{ru,en,zh}}));
+  let CATALOG_TYPES = FALLBACK_TYPES;
+  let TYPE_IDS = ['all',...CATALOG_TYPES.map(type=>type.id)];
+  const GROUP_LABELS={ru:{tea:'Чай',teaware:'Посуда'},en:{tea:'Tea',teaware:'Teaware'},zh:{tea:'茶叶',teaware:'茶具'}};
+  const typeInfo=id=>CATALOG_TYPES.find(type=>type.id===id);
+  const typeGroup=id=>typeInfo(id)?.group||'tea';
+  const typeLabel=id=>typeInfo(id)?.names?.[LANG]||typeInfo(id)?.names?.ru||id;
 
   /* Языконезависимое: тип, цена, фото. Цена — за 10 г (на кассе она за грамм). */
   const TEA_META = [
@@ -1732,6 +1773,8 @@ select.input{
     cart_catalog_unavailable:'Не удалось обновить каталог. Проверьте интернет и попробуйте ещё раз.',
     cart_catalog_changed:'Каталог обновился. Проверьте корзину и повторите оформление.',
     cart_creating:'Создаём заказ…', cart_create_error:'Не удалось создать заказ. Попробуйте ещё раз.',
+    cart_stock_unavailable:'Одного из товаров уже недостаточно на складе. Измените количество в корзине и повторите оформление.',
+    cart_payment_checking:'Ответ банка не получен. Нажмите «Оформить заказ» ещё раз: мы проверим предыдущую попытку и не создадим второй платёж.',
     cart_payment_unavailable:'Онлайн-оплата временно недоступна. Попробуйте ещё раз чуть позже.', cart_created:id=>`Заказ ${id} создан. Переходим к защищённой форме Т-Банка…`, b2b_error:'Не удалось отправить заявку. Попробуйте ещё раз.',
     dlv:{ pickup:'Самовывоз · Острякова, 3', cdek_pvz:'СДЭК · пункт выдачи', cdek_courier:'СДЭК · курьер' },
     order_head:'🛒 Заказ чая — Чайня', order_done:'Спасибо! Завершите заказ в нашем боте @chainyabot или позвоните +7 905 590-88-01 — подтвердим и посчитаем доставку.',
@@ -1912,6 +1955,8 @@ select.input{
     cart_catalog_unavailable:'Could not refresh the catalogue. Check your connection and try again.',
     cart_catalog_changed:'The catalogue has changed. Review your cart and try again.',
     cart_creating:'Creating your order…', cart_create_error:'Could not create the order. Please try again.',
+    cart_stock_unavailable:'One of the items is no longer available in the requested quantity. Update your cart and try again.',
+    cart_payment_checking:'The bank response was not received. Select “Place order” again: we will check the previous attempt without creating a second payment.',
     cart_payment_unavailable:'Online payment is temporarily unavailable. Please try again shortly.', cart_created:id=>`Order ${id} created. Opening the secure T-Bank payment form…`, b2b_error:'Could not send your request. Please try again.',
     dlv:{ pickup:'Pickup · Ostryakova 3', cdek_pvz:'CDEK · pickup point', cdek_courier:'CDEK · courier' },
     order_head:'🛒 Tea order — Chaynya', order_done:'Thanks! Finish your order in our bot @chainyabot or call +7 905 590-88-01 — we’ll confirm and calculate shipping.',
@@ -2092,6 +2137,8 @@ select.input{
     cart_catalog_unavailable:'无法更新商品目录，请检查网络后重试。',
     cart_catalog_changed:'商品目录已更新，请检查购物车后重新结算。',
     cart_creating:'正在创建订单…', cart_create_error:'订单创建失败，请重试。',
+    cart_stock_unavailable:'部分商品库存不足，请调整购物车数量后重新结算。',
+    cart_payment_checking:'尚未收到银行响应。请再次点击“提交订单”：系统只会检查上一次尝试，不会创建重复付款。',
     cart_payment_unavailable:'在线支付暂时不可用，请稍后重试。', cart_created:id=>`订单 ${id} 已创建，正在进入T-Bank安全支付页面…`, b2b_error:'申请发送失败，请重试。',
     dlv:{ pickup:'自取 · 奥斯特里亚科娃街3号', cdek_pvz:'CDEK · 自提点', cdek_courier:'CDEK · 送货上门' },
     order_head:'🛒 茶订单 — Chaynya', order_done:'谢谢！请在我们的机器人 @chainyabot 中完成订单，或致电 +7 905 590-88-01，我们会确认并计算运费。',
@@ -2379,8 +2426,8 @@ select.input{
     if (canonical) canonical.href = routeUrl;
   }
   function syncProductMetadata(m, txt){
-    const title = `${txt.n} — купить китайский чай · Чайня`;
-    const description = txt.d || `${txt.n} в каталоге китайского чая Чайни.`;
+    const title = `${txt.n} — купить в Чайне`;
+    const description = txt.d || `${txt.n} в каталоге Чайни.`;
     const routeUrl = new URL(productRoute(m.id), location.origin).href;
     document.title = title;
     const values = {
@@ -2439,6 +2486,7 @@ select.input{
     const h = location.hash.replace('#', '');
     if (HASH_VIEWS.includes(h)){ go(h, false); return; }
     if (h.startsWith('tea-')){
+      if (!catalogReady){ go('shop', false); return; }
       const m = TEA_META.find(x => x.id === h.slice(4));
       if (m){ go('shop', false); openTea(m, false); }
       else go('shop', false);
@@ -2448,6 +2496,7 @@ select.input{
     if (productPath){
       const routeLanguage = productPath[1] || 'ru';
       if (LANG !== routeLanguage) LANG = routeLanguage;
+      if (!catalogReady){ go('shop', false); return; }
       const m = TEA_META.find(x => x.id === productPath[2]);
       if (m){ go('shop', false); openTea(m, false); }
       else go('shop', false);
@@ -2518,7 +2567,7 @@ select.input{
       <article class="tea" data-type="${m.t}" data-id="${m.id}" data-price="${m.unit === 'pc' ? m.p : packPrice(m.p, PACKS[0])}" data-stock="${inStock(m) ? 1 : 0}">
         <div class="tea__art${inStock(m) ? '' : ' tea__art--oos'}">
           <img ${deferImage ? `data-catalog-src="${m.img}"${eagerImage ? ' data-catalog-eager="1"' : ''}` : `src="${m.img}"`} alt="${escAttr(txt.n)}" loading="lazy" decoding="async"${deferImage ? ' fetchpriority="low"' : ''} width="800" height="800">
-          <span class="tea__dot" style="background:${LQ[m.t]}"></span>
+          <span class="tea__dot" style="background:${LQ[m.t] || '#b99b78'}"></span>
           ${inStock(m) ? '' : `<span class="tea__oos">${T().oos}</span>`}
           <button class="tea__fav" data-id="${m.id}" aria-pressed="${isFav(m.id)}" aria-label="${escAttr(T().fav_label)}" title="${escAttr(T().fav_label)}">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
@@ -2556,12 +2605,14 @@ select.input{
     const seen = new Set(), pick = [];
     for (const m of TEA_META){
       if (pick.length >= 8) break;
+      if (typeGroup(m.t) !== 'tea') continue;
       if (seen.has(m.t)) continue;
       seen.add(m.t); pick.push(m);
     }
     // добиваем до восьми, чтобы полоса не выглядела куцей
     for (const m of TEA_META){
       if (pick.length >= 8) break;
+      if (typeGroup(m.t) !== 'tea') continue;
       if (!pick.includes(m)) pick.push(m);
     }
     pick.forEach(m => strip.append(el(`<img src="${m.img}" alt="" loading="lazy" width="800" height="800">`)));
@@ -2575,6 +2626,7 @@ select.input{
     img.src = tea?.img || HERO_FALLBACK;
     img.alt = T().alt_product || '';
     img.style.objectPosition = '50% 50%';
+    img.closest('.hero__media').classList.remove('is-loading');
   }
 
   let lastCard = null, lastCartTrigger = null;   // куда вернуть фокус после закрытия панели
@@ -2654,17 +2706,60 @@ select.input{
     applyFilter();
   }
 
-  /* Встроенный каталог — мгновенный безопасный fallback. После ответа backend
-     заменяем его целиком: так новые позиции, тексты, фото, порядок и наличие из
-     панели владельца появляются на витрине без нового релиза сайта. */
+  /* Встроенный каталог — только аварийный fallback. При первом открытии не
+     показываем его фотографии: владелец мог уже заменить их в панели. До ответа
+     backend держим размеры страницы нейтральными скелетонами, затем одним
+     обновлением рисуем актуальный каталог. */
   let catalogRefreshPending = null;
+  let catalogReady = false;
+  function renderCatalogLoading(){
+    const hero = $('#hero-img');
+    hero.removeAttribute('src');
+    hero.alt = '';
+    hero.closest('.hero__media').classList.add('is-loading');
+    const skeleton = count => Array.from({length:count},()=>el(`
+      <div class="catalog-skeleton" aria-hidden="true">
+        <div class="catalog-skeleton__art"></div>
+        <div class="catalog-skeleton__body">
+          <span class="catalog-skeleton__line catalog-skeleton__line--name"></span>
+          <span class="catalog-skeleton__line catalog-skeleton__line--meta"></span>
+          <span class="catalog-skeleton__line catalog-skeleton__line--price"></span>
+        </div>
+      </div>`));
+    const home = $('#home-teas'), menu = $('#menu-teas');
+    home.replaceChildren(...skeleton(3));
+    menu.replaceChildren(...skeleton(8));
+    home.setAttribute('aria-busy','true');
+    menu.setAttribute('aria-busy','true');
+    $('#brange').replaceChildren();
+    $('#brange').classList.add('is-loading');
+    $('#shop-count').textContent = '…';
+    $('#fav-empty').hidden = true;
+    $('#shop-empty').hidden = true;
+  }
+  function renderResolvedCatalog(){
+    $('#home-teas').removeAttribute('aria-busy');
+    $('#menu-teas').removeAttribute('aria-busy');
+    $('#brange').classList.remove('is-loading');
+    syncCatalogCounters();
+    buildFilters();
+    selectHeroImage();
+    buildRange();
+    buildTeaGrids();
+    syncCart();
+  }
+  function hydrateProductRouteAfterCatalog(){
+    const productHash = location.hash.startsWith('#tea-');
+    const productPath = /^\/(?:(?:en|zh)\/)?tea\/[a-z0-9][a-z0-9-]{0,79}\/?$/.test(location.pathname);
+    if (productHash || productPath) goFromLocation();
+  }
   function syncCatalogCounters(){
-    I18N.ru.fact1_v = TEA_META.length+' позиции';
+    I18N.ru.fact1_v = TEA_META.length+' товаров';
     I18N.ru.fromcard_link = 'Весь каталог · '+TEA_META.length;
-    I18N.en.fact1_v = TEA_META.length+' teas';
+    I18N.en.fact1_v = TEA_META.length+' products';
     I18N.en.fromcard_link = 'Full catalogue · '+TEA_META.length;
-    I18N.zh.fact1_v = TEA_META.length+'款';
-    I18N.zh.fromcard_link = '完整目录 · '+TEA_META.length+'款';
+    I18N.zh.fact1_v = TEA_META.length+'件商品';
+    I18N.zh.fromcard_link = '完整目录 · '+TEA_META.length+'件';
     $$('[data-i18n="fact1_v"], [data-i18n="fromcard_link"]').forEach(node => {
       const value = T()[node.dataset.i18n];
       if (value != null) node.textContent = value;
@@ -2686,16 +2781,34 @@ select.input{
         if (!Array.isArray(data.packs) || !data.packs.length || data.packs.some(pack => !Number.isInteger(pack) || pack <= 0 || pack > 1000)) throw new Error('catalog_packs');
         PACKS = [...new Set(data.packs)].sort((a,b) => a-b);
         const languages = ['ru','en','zh'], seen = new Set(), next = [];
+        if (!Array.isArray(data.types) || !data.types.length) throw new Error('catalog_types');
+        const nextTypes = data.types.map(type => {
+          if (!type || !/^[a-z0-9][a-z0-9-]{0,39}$/.test(type.id)) throw new Error('catalog_type');
+          const fallback = FALLBACK_TYPES.find(row => row.id === type.id);
+          const group = type.group === 'teaware' ? 'teaware' : 'tea';
+          const names = {};
+          languages.forEach(language => {
+            const value = type.names?.[language] || (language === 'ru' ? type.name : '') || fallback?.names?.[language] || type.name;
+            if (typeof value !== 'string' || !value.trim()) throw new Error('catalog_type_name');
+            names[language] = value.trim();
+          });
+          return {id:type.id,group,names};
+        });
+        CATALOG_TYPES = nextTypes;
+        TYPE_IDS = ['all',...nextTypes.map(type=>type.id)];
         for (const item of data.teas){
           if (!item || !/^[a-z0-9][a-z0-9-]{0,79}$/.test(item.id) || seen.has(item.id)) throw new Error('catalog_item');
           if (!TYPE_IDS.includes(item.type) || !Number.isInteger(item.price) || item.price < 0 || !['g','pc'].includes(item.unit)) throw new Error('catalog_item');
           if (!validCatalogImage(item.image_url) || !item.taste || !item.translations) throw new Error('catalog_item');
+          const images = Array.isArray(item.image_urls) && item.image_urls.length ? item.image_urls : [item.image_url];
+          if (images.length > 8 || images.some(image=>!validCatalogImage(image))) throw new Error('catalog_images');
           for (const language of languages){
             const text = item.translations[language];
-            if (!text || typeof text.name !== 'string' || !text.name.trim() || typeof text.orig !== 'string' || typeof text.desc !== 'string') throw new Error('catalog_translation');
+            if (!text || typeof text.name !== 'string' || typeof text.orig !== 'string' || typeof text.desc !== 'string') throw new Error('catalog_translation');
           }
+          if (!languages.some(language=>item.translations[language].name.trim())) throw new Error('catalog_translation_name');
           seen.add(item.id);
-          next.push({id:item.id,t:item.type,p:item.price,unit:item.unit,stock:Boolean(item.stock),img:item.image_url});
+          next.push({id:item.id,t:item.type,p:item.price,unit:item.unit,stock:Boolean(item.stock),img:item.image_url,images});
         }
         if (!next.length) throw new Error('catalog_empty');
         TEA_META.splice(0,TEA_META.length,...next);
@@ -2703,29 +2816,34 @@ select.input{
         for (const item of data.teas){
           TASTE[item.id] = item.taste;
           for (const language of languages){
-            const text = item.translations[language];
+            const sources=[item.translations[language],item.translations.ru,...languages.filter(code=>code!==language&&code!=='ru').map(code=>item.translations[code])];
+            const value=field=>sources.find(source=>typeof source?.[field]==='string'&&source[field].trim())?.[field]||'';
             I18N[language].teas[item.id] = {
-              n:text.name,o:text.orig,d:text.desc,
-              composition:text.composition || '', manufacturer:text.manufacturer || '',
-              shelf_life:text.shelf_life || '', storage:text.storage || '',
+              n:value('name'),o:value('orig'),d:value('desc'),
+              composition:value('composition'), manufacturer:value('manufacturer'),
+              shelf_life:value('shelf_life'), storage:value('storage'),
             };
           }
         }
         for (const language of languages){
           for (const id of Object.keys(I18N[language].teas)) if (!seen.has(id)) delete I18N[language].teas[id];
         }
-        syncCatalogCounters();
-        selectHeroImage();
-        buildRange();
-        buildTeaGrids();
-        syncCart();
+        const firstResolution = !catalogReady;
+        catalogReady = true;
+        renderResolvedCatalog();
         if (curTea && sheet.classList.contains('on')){
           curTea = TEA_META.find(item => item.id === curTea.id) || null;
           if (curTea) openTea(curTea, false); else closeTea(false);
         }
+        if (firstResolution) hydrateProductRouteAfterCatalog();
         catalogLastSuccess = Date.now();
         return true;
       }catch(e){
+        if (!catalogReady){
+          catalogReady = true;
+          renderResolvedCatalog();
+          hydrateProductRouteAfterCatalog();
+        }
         return false;
       }finally{
         clearTimeout(timeout);
@@ -2743,10 +2861,11 @@ select.input{
     cards.forEach(c => {
       const m = TEA_META.find(item => item.id === c.dataset.id);
       const txt = m && T().teas[m.id];
-      const category = m ? T().types[TYPE_IDS.indexOf(m.t)] : '';
+      const category = m ? typeLabel(m.t) : '';
       const haystack = txt ? `${txt.n} ${txt.o} ${txt.d} ${category}`.toLocaleLowerCase(LANG) : '';
       const categoryOk = curFilter === 'all' ? true
         : curFilter === 'fav' ? favs.has(c.dataset.id)
+        : curFilter === 'tea' || curFilter === 'teaware' ? typeGroup(c.dataset.type) === curFilter
         : c.dataset.type === curFilter;
       const ok = categoryOk && (!query || haystack.includes(query));
       c.style.display = ok ? '' : 'none';
@@ -2768,33 +2887,44 @@ select.input{
     scheduleCatalogImages();
   }
   function buildFilters(){
-    const f = $('#filters');
-    f.innerHTML = '';
-    // Чип «Избранное» — первым, отдельно от типов
+    const f = $('#filters'), sub = $('#subfilters'), subShell = $('#subfilters-shell');
+    f.innerHTML = ''; sub.innerHTML = '';
+    // Верхний уровень отделяет чай от посуды; подразделы живут на второй строке.
     const fav = el(`<button class="chip chip--fav" data-t="fav" aria-pressed="${curFilter === 'fav'}">
       <svg class="chip__heart" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>${T().filter_fav}<span class="chip__n num" id="fav-count"></span>
     </button>`);
     fav.addEventListener('click', () => {
       curFilter = 'fav';
-      $$('.chip', f).forEach(x => x.setAttribute('aria-pressed', x === fav));
+      buildFilters();
       applyFilter();
     });
     f.append(fav);
+    const mainLabels = {all:T().types[0],tea:GROUP_LABELS[LANG].tea,teaware:GROUP_LABELS[LANG].teaware};
+    ['all','tea','teaware'].forEach(id => {
+      const active = curFilter === id || (id !== 'all' && typeGroup(curFilter) === id && !['all','fav'].includes(curFilter));
+      const button = el(`<button class="chip" aria-pressed="${active}" data-t="${id}">${mainLabels[id]}</button>`);
+      button.addEventListener('click',()=>{curFilter=id;buildFilters();applyFilter()});
+      f.append(button);
+    });
     updateFavCount();
-    TYPE_IDS.forEach((id, i) => {
-      const c = id === 'all' ? null : LQ[id];
-      const b = el(`<button class="chip" aria-pressed="${id === curFilter}" data-t="${id}">
-        ${c ? `<span class="dot" style="background:${c}"></span>` : ''}${T().types[i]}
+    const activeGroup = curFilter === 'teaware' || typeGroup(curFilter) === 'teaware' ? 'teaware' : 'tea';
+    CATALOG_TYPES.filter(type=>type.group===activeGroup).forEach(type => {
+      const c = LQ[type.id];
+      const b = el(`<button class="chip" aria-pressed="${type.id === curFilter}" data-t="${type.id}">
+        ${c ? `<span class="dot" style="background:${c}"></span>` : ''}${typeLabel(type.id)}
       </button>`);
       b.addEventListener('click', () => {
-        curFilter = id;
-        $$('.chip', f).forEach(x => x.setAttribute('aria-pressed', x === b));
+        curFilter = type.id;
+        buildFilters();
         applyFilter();
       });
-      f.append(b);
+      sub.append(b);
     });
+    subShell.hidden = curFilter === 'fav';
     wireScrollCue(f);
+    wireScrollCue(sub);
     updateScrollCue(f);
+    updateScrollCue(sub);
   }
 
   function buildShopTools(){
@@ -2864,6 +2994,23 @@ select.input{
     food.hidden = !foodFields.length;
     $('#ts-img').src = m.img;
     $('#ts-img').alt = txt.n;
+    const gallery = $('#ts-gallery'), images = Array.isArray(m.images) && m.images.length ? m.images : [m.img];
+    gallery.replaceChildren();
+    images.forEach((url,index) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.setAttribute('aria-pressed', String(index === 0));
+      button.setAttribute('aria-label', `${txt.n}: фото ${index + 1}`);
+      const thumbnail = document.createElement('img');
+      thumbnail.src = url; thumbnail.alt = ''; thumbnail.loading = 'lazy';
+      button.append(thumbnail);
+      button.addEventListener('click', () => {
+        $('#ts-img').src = url;
+        $$('#ts-gallery button').forEach(node => node.setAttribute('aria-pressed', String(node === button)));
+      });
+      gallery.append(button);
+    });
+    gallery.hidden = images.length < 2;
     const sf = $('#ts-fav');
     sf.dataset.id = m.id;
     sf.setAttribute('aria-pressed', isFav(m.id));
@@ -2964,10 +3111,9 @@ select.input{
   });
 
   /* ─────────────  КОРЗИНА  ─────────────
-     Чистый фронт: позиции {id, pack, qty} в localStorage. Оформление собирает
-     заказ и шлёт его боту (sendData в мини-аппе) или открывает бота @chainyabot
-     (обычный браузер) — оплата и подтверждение вручную, как бронь.
-     Когда появится бэкенд магазина — сюда встанет отправка на его эндпоинт. */
+     Позиции {id, pack, qty} хранятся в localStorage. В production оформление
+     идёт через backend и защищённую форму Т-Банка; Telegram остаётся резервным
+     каналом только для сборок, где CHECKOUT_API явно отключён. */
   const CART_KEY = 'chaynya-cart';
   const CHECKOUT_ATTEMPT_KEY = 'chaynya-checkout-attempt';
   const cartSheet = $('#cart-sheet');
@@ -3023,8 +3169,8 @@ select.input{
         /^[A-Za-z0-9_-]{16,128}$/.test(value.key) ? value : null;
     }catch(e){ return null; }
   }
-  function saveCheckoutAttempt(fingerprint,key){
-    try{ sessionStorage.setItem(CHECKOUT_ATTEMPT_KEY,JSON.stringify({fingerprint,key})); }catch(e){}
+  function saveCheckoutAttempt(fingerprint,key,recovery=false){
+    try{ sessionStorage.setItem(CHECKOUT_ATTEMPT_KEY,JSON.stringify({fingerprint,key,recovery})); }catch(e){}
   }
   function clearCheckoutAttempt(){
     try{ sessionStorage.removeItem(CHECKOUT_ATTEMPT_KEY); }catch(e){}
@@ -3478,16 +3624,25 @@ select.input{
       if (submit.dataset.idempotencyPayload !== attemptSignature){
         const savedAttempt = savedCheckoutAttempt();
         submit.dataset.idempotencyPayload = attemptSignature;
-        submit.dataset.idempotencyKey = savedAttempt?.fingerprint === attemptSignature
+        const reuseSavedAttempt = savedAttempt?.fingerprint === attemptSignature;
+        submit.dataset.idempotencyKey = reuseSavedAttempt
           ? savedAttempt.key
           : (crypto.randomUUID
             ? crypto.randomUUID()
             : `web-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`);
-        saveCheckoutAttempt(attemptSignature,submit.dataset.idempotencyKey);
+        if (reuseSavedAttempt && savedAttempt.recovery === true)
+          submit.dataset.paymentRecovery = '1';
+        else delete submit.dataset.paymentRecovery;
+        saveCheckoutAttempt(
+          attemptSignature,
+          submit.dataset.idempotencyKey,
+          submit.dataset.paymentRecovery === '1'
+        );
       }
       const startNewPaymentAttempt = () => {
         delete submit.dataset.idempotencyPayload;
         delete submit.dataset.idempotencyKey;
+        delete submit.dataset.paymentRecovery;
         clearCheckoutAttempt();
       };
       submit.disabled = true; status.textContent = T().cart_creating;
@@ -3503,8 +3658,21 @@ select.input{
           // Даже при 502 сохраняем ключ: банк мог принять Init, а ответ мог
           // потеряться по дороге. Новый ключ в таком случае создал бы риск
           // второго заказа/платежа; восстановлением занимается backend.
-          if (response.status === 503) publicMessage = T().cart_payment_unavailable;
-          else if (response.status === 422) publicMessage = T().cart_catalog_changed;
+          if (response.status === 502){
+            submit.dataset.paymentRecovery = '1';
+            saveCheckoutAttempt(
+              attemptSignature, submit.dataset.idempotencyKey, true
+            );
+            publicMessage = T().cart_payment_checking;
+          } else if (response.status === 503){
+            publicMessage = submit.dataset.paymentRecovery === '1'
+              ? T().cart_payment_checking
+              : T().cart_payment_unavailable;
+          } else if (response.status === 409){
+            publicMessage = T().cart_stock_unavailable;
+          } else if (response.status === 422){
+            publicMessage = T().cart_catalog_changed;
+          }
           throw new Error('order_rejected');
         }
         if (!result.payment || !result.payment.url){
@@ -3924,11 +4092,15 @@ select.input{
     $$('a[href^="/privacy.html"]').forEach(a => { a.href = `/privacy.html?lang=${LANG}`; });
     $$('a[href^="/legal.html"]').forEach(a => { a.href = `/legal.html?lang=${LANG}`; });
     $('#account-open').href = `/account?lang=${LANG}`;
-    selectHeroImage();
-    buildRange();
     buildFilters();
     buildShopTools();
-    buildTeaGrids();
+    if (catalogReady){
+      selectHeroImage();
+      buildRange();
+      buildTeaGrids();
+    }else{
+      renderCatalogLoading();
+    }
     buildDays();
     buildGuests();
     refreshSlots();

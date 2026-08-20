@@ -79,7 +79,6 @@ previous_target=""
 legacy_directory=0
 release_created=0
 cutover_started=0
-nginx_was_active=0
 deployment_committed=0
 marker_had_previous=0
 marker_mutation_started=0
@@ -148,13 +147,8 @@ rollback_step() {
 }
 
 restore_nginx_runtime() {
-  if [ "$nginx_was_active" != 1 ]; then
-    sudo systemctl stop nginx >/dev/null 2>&1 || true
-    ! sudo systemctl is-active --quiet nginx
-    return
-  fi
   sudo nginx -t || return 1
-  sudo systemctl start nginx || return 1
+  sudo systemctl is-active --quiet nginx || return 1
   curl -fkSs --max-time 10 \
     --resolve chainya.ru:443:127.0.0.1 \
     https://chainya.ru/ >/dev/null
@@ -178,9 +172,6 @@ rollback_release() {
 
   echo "✗ static-релиз не прошёл проверку; выполняется rollback" >&2
   if [ "$cutover_started" = 1 ]; then
-    if [ "$legacy_directory" = 1 ] && [ "$nginx_was_active" = 1 ]; then
-      rollback_step "не удалось остановить Nginx" sudo systemctl stop nginx
-    fi
     rollback_step "не удалось вернуть web symlink" restore_active
   fi
   if [ "$marker_mutation_started" = 1 ]; then
@@ -243,15 +234,15 @@ if sudo test -L "$active"; then
   previous_target=$(sudo readlink -f "$active")
   sudo test -d "$previous_target"
 elif sudo test -d "$active"; then
-  previous_target="${releases}/legacy-${release_id}"
-  legacy_directory=1
+  echo "✗ $active является legacy-каталогом; безопасно преобразуйте его в symlink отдельной согласованной процедурой" >&2
+  false
 elif sudo test -e "$active"; then
   echo "✗ $active существует и не является каталогом или symlink" >&2
   false
 fi
 
 if sudo systemctl is-active --quiet nginx; then
-  nginx_was_active=1
+  :
 else
   echo "✗ Nginx не запущен; static-релиз не переключён" >&2
   false
@@ -259,16 +250,7 @@ fi
 
 sudo ln -sfnT "$release_dir" "${active}.next"
 cutover_started=1
-if [ "$legacy_directory" = 1 ]; then
-  # Обычный каталог нельзя превратить в symlink одной операцией rename.
-  # На первой миграции кратко останавливаем Nginx, чтобы не было окна 404.
-  sudo systemctl stop nginx
-  sudo mv "$active" "$previous_target"
-fi
 sudo mv -Tf "${active}.next" "$active"
-if [ "$legacy_directory" = 1 ]; then
-  sudo systemctl start nginx
-fi
 
 test "$(sudo readlink -f "$active")" = "$release_dir"
 code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 10 \

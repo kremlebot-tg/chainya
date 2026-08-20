@@ -17,7 +17,7 @@ import urllib.request
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import datetime
 from typing import Any
 
 # Service OAuth returns an application token for ``X-SBISAccessToken``.  Do
@@ -97,7 +97,7 @@ class SabySettings:
     error_url: str = "https://chainya.ru/payment/fail"
 
     @classmethod
-    def from_env(cls) -> "SabySettings":
+    def from_env(cls) -> SabySettings:
         def optional_int(name: str) -> int | None:
             value = os.getenv(name, "").strip()
             return int(value) if value else None
@@ -235,7 +235,19 @@ class SabyClient:
             payload = re.sub(r"<[^>]+>", " ", raw)
 
         candidates: list[str] = []
+        codes: list[str] = []
         allowed = {"error", "message", "detail", "description", "errormessage", "reason"}
+        code_fields = {"code", "errorcode", "statuscode"}
+
+        def safe_code(value: Any) -> str:
+            candidate = str(value).strip()
+            if (
+                candidate
+                and len(candidate) <= 32
+                and re.fullmatch(r"[A-Za-z0-9_-]+", candidate)
+            ):
+                return candidate
+            return ""
 
         def collect(value: Any, depth: int = 0) -> None:
             if depth > 4:
@@ -245,6 +257,9 @@ class SabyClient:
                     normalized = re.sub(r"[^a-z]", "", str(key).casefold())
                     if normalized in allowed and isinstance(nested, str):
                         candidates.append(nested)
+                    elif normalized in code_fields and not isinstance(nested, (dict, list)):
+                        if code := safe_code(nested):
+                            codes.append(code)
                     elif isinstance(nested, (dict, list)):
                         collect(nested, depth + 1)
             elif isinstance(value, list):
@@ -254,8 +269,9 @@ class SabyClient:
                 candidates.append(value)
 
         collect(payload)
+        code_suffix = f" (код {codes[0]})" if codes else ""
         if not candidates:
-            return ""
+            return f"Saby отклонил запрос{code_suffix}" if code_suffix else ""
         message = " ".join(candidates)
         for secret in (
             self.settings.app_client_id,
@@ -286,8 +302,8 @@ class SabyClient:
         )
         for markers, safe_message in categories:
             if any(marker in normalized for marker in markers):
-                return safe_message
-        return ""
+                return f"{safe_message}{code_suffix}"
+        return f"Saby отклонил запрос{code_suffix}" if code_suffix else ""
 
     def access_token(self, force: bool = False) -> str:
         if not self.settings.configured:
@@ -376,7 +392,9 @@ class SabyClient:
         if not point:
             raise SabyError("Не выбран идентификатор точки продаж Saby")
         return self.api("/retail/nomenclature/price-list", {
-            "pointId": point, "actualDate": date.today().isoformat(), "pageSize": 500,
+            "pointId": point,
+            "actualDate": datetime.now().astimezone().date().isoformat(),
+            "pageSize": 500,
         })
 
     def catalog(

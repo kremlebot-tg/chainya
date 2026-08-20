@@ -10,6 +10,10 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from backend.catalog_store import CATALOG_TYPE_DEFAULTS
+
 SOURCE = ROOT / "src.html"
 BOT_CATALOG = ROOT / "telegram-bot" / "teas.json"
 OUTPUT = ROOT / "backend" / "catalog.seed.json"
@@ -104,9 +108,17 @@ def main() -> None:
             "translations": localized,
         })
     result = {
-        "schema_version": 3,
+        "schema_version": 4,
         "revision": 1,
-        "types": bot["types"],
+        "types": [
+            {
+                "id": type_id,
+                "name": ru,
+                "group": group,
+                "names": {"ru": ru, "en": en, "zh": zh},
+            }
+            for type_id, group, ru, en, zh in CATALOG_TYPE_DEFAULTS
+        ],
         "axes": bot["axes"],
         "packs": bot["packs"],
         "teas": teas,

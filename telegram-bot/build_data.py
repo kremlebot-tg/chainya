@@ -77,7 +77,12 @@ d = json.loads(raw)
 TYPES = [("white", "Белый чай"), ("green", "Зелёный чай"), ("gaba", "Габа"),
          ("fujian", "Улуны Южной Фуцзяни"), ("dancong", "Улуны Гуандуна"),
          ("wuyi", "Улуны Уишаня"), ("red", "Красный чай"), ("sheng", "Шэн Пуэр"),
-         ("shu", "Шу Пуэр"), ("heicha", "Хэй Ча"), ("herbs", "Травы и добавки")]
+         ("shu", "Шу Пуэр"), ("heicha", "Хэй Ча"), ("herbs", "Травы и добавки"),
+         ("tea-sets", "Чайные наборы"), ("teaware-teapots", "Чайники"),
+         ("teaware-gaiwans", "Гайвани"), ("teaware-cups", "Пиалы"),
+         ("teaware-chahai", "Чахаи"), ("teaware-chahe", "Чахэ"),
+         ("teaware-figurines", "Фигурки"), ("teaware-tools", "Инструменты"),
+         ("teaware-sets", "Наборы посуды")]
 AXES = [("floral", "Цветочный"), ("fruity", "Фруктовый"), ("driedfruit", "Сухофрукты"),
         ("honey", "Медовый"), ("nutty", "Ореховый"), ("roasted", "Жареный"),
         ("spicy", "Пряный"), ("woody", "Древесный"), ("herbal", "Травяной")]
@@ -105,4 +110,4 @@ OUT.write_text(json.dumps({
     "packs": [10, 25, 50, 100],
     "teas": teas,
 }, ensure_ascii=False, indent=1), encoding="utf-8")
-print(f"teas.json: {len(teas)} чаёв, {len(TYPES)} категорий")
+print(f"teas.json: {len(teas)} товаров, {len(TYPES)} категорий")

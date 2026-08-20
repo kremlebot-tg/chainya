@@ -43,6 +43,42 @@
   {
    "id": "herbs",
    "name": "Травы и добавки"
+  },
+  {
+   "id": "tea-sets",
+   "name": "Чайные наборы"
+  },
+  {
+   "id": "teaware-teapots",
+   "name": "Чайники"
+  },
+  {
+   "id": "teaware-gaiwans",
+   "name": "Гайвани"
+  },
+  {
+   "id": "teaware-cups",
+   "name": "Пиалы"
+  },
+  {
+   "id": "teaware-chahai",
+   "name": "Чахаи"
+  },
+  {
+   "id": "teaware-chahe",
+   "name": "Чахэ"
+  },
+  {
+   "id": "teaware-figurines",
+   "name": "Фигурки"
+  },
+  {
+   "id": "teaware-tools",
+   "name": "Инструменты"
+  },
+  {
+   "id": "teaware-sets",
+   "name": "Наборы посуды"
   }
  ],
  "axes": [

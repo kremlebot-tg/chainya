@@ -1,0 +1,30 @@
+[Unit]
+Description=Encrypt and upload the latest Chainya recovery bundle
+After=network-online.target chainya-backup.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+EnvironmentFile=/etc/chainya-offsite-backup.env
+ExecStartPre=/usr/bin/install -d -o root -g root -m 0700 /var/backups/chainya-shop/offsite-out
+ExecStartPre=/opt/chainya-shop/.venv/bin/python /opt/chainya-shop/ops/verify_chainya_backups.py --directory /var/backups/chainya-shop --max-age-hours 36
+ExecStart=/opt/chainya-shop/.venv/bin/python /opt/chainya-shop/ops/recovery_bundle.py create --backup-directory /var/backups/chainya-shop --recipient-certificate ${CHAINYA_OFFSITE_RECIPIENT_CERT} --output-directory /var/backups/chainya-shop/offsite-out --destination ${CHAINYA_OFFSITE_DESTINATION} --ssh-identity ${CHAINYA_OFFSITE_SSH_IDENTITY} --known-hosts ${CHAINYA_OFFSITE_KNOWN_HOSTS}
+Nice=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/var/backups/chainya-shop/offsite-out

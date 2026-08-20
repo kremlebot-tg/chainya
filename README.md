@@ -86,17 +86,29 @@ Telegram-бот публикуется отдельно, но тоже атом�
 production-кандидат сайта и бота без зависимости от соседних папок.
 
 Локальные тесты разделены по окружениям: корневой `pytest` проверяет backend,
-а тест бота запускается после установки `telegram-bot/requirements.txt`:
+а тест бота запускается после установки точных зависимостей из
+`telegram-bot/requirements.lock.txt`:
 
 ```bash
 .venv/bin/python -m pytest -q
 telegram-bot/.venv/bin/python -m pytest -q telegram-bot/test_bot_booking.py
 ```
 
+Файлы `requirements*.txt` верхнего уровня зависимостей используются как
+читаемая спецификация, а deploy и CI устанавливают проверенные lock-файлы для
+Python 3.12. Обновлять lock-файлы нужно осознанно через `uv pip compile` и только
+вместе с полным тестовым прогоном.
+
 Перед рекламой, реальным платёжным тестом или внешними записями пройти
 [`ops/PRELAUNCH_CHECKLIST.md`](ops/PRELAUNCH_CHECKLIST.md). Проверка сайта сама
 по себе не разрешает возвраты, создание отправлений CDEK или передачу заказов в
 Saby.
+
+Аварийное восстановление из GitHub и зашифрованной копии бизнес-данных описано в
+[`ops/DISASTER_RECOVERY.md`](ops/DISASTER_RECOVERY.md). GitHub хранит весь
+воспроизводимый код, но намеренно не содержит SQLite, production env и
+загруженные через админ-панель фотографии: для полного восстановления вместе с
+commit нужен проверенный off-site recovery bundle.
 
 ## Картинки
 

@@ -258,7 +258,7 @@ stage_release() {
 
   if [ -z "$test_root" ]; then
     python3 -m venv "$stage/test-venv"
-    "$stage/test-venv/bin/pip" install -q -r "$backend_release/backend/requirements-dev.txt"
+    "$stage/test-venv/bin/pip" install -q -r "$backend_release/backend/requirements-dev.lock.txt"
     (
       cd "$backend_release"
       CHAINYA_DATA_DIR="$stage/test-data" \
@@ -266,7 +266,7 @@ stage_release() {
     )
     rm -rf -- "$stage/test-venv" "$stage/test-data"
     python3 -m venv "$backend_release/.venv"
-    "$backend_release/.venv/bin/pip" install -q -r "$backend_release/backend/requirements.txt"
+    "$backend_release/.venv/bin/pip" install -q -r "$backend_release/backend/requirements.lock.txt"
     chown -R root:root "$backend_release" "$web_release"
     chmod -R a+rX "$backend_release" "$web_release"
   fi

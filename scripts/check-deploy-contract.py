@@ -44,6 +44,31 @@ def main() -> None:
     compose = (ROOT / "ops/timeweb/docker-compose.edge.yml").read_text(
         encoding="utf-8"
     )
+    bot_deploy = (ROOT / "deploy-bot.sh").read_text(encoding="utf-8")
+    offsite_service = (ROOT / "ops/chainya-offsite-backup.service").read_text(
+        encoding="utf-8"
+    )
+
+    for lock in (
+        ROOT / "backend/requirements.lock.txt",
+        ROOT / "backend/requirements-dev.lock.txt",
+        ROOT / "telegram-bot/requirements.lock.txt",
+    ):
+        require(lock.is_file() and lock.stat().st_size > 0, f"missing {lock.name}")
+    require(
+        "backend/requirements-dev.lock.txt" in remote
+        and "backend/requirements.lock.txt" in remote,
+        "origin deploy must use locked Python dependencies",
+    )
+    require(
+        "requirements.lock.txt" in bot_deploy,
+        "Telegram bot deploy must use locked Python dependencies",
+    )
+    require(
+        "--private-key" not in offsite_service
+        and "CHAINYA_OFFSITE_RECIPIENT_CERT" in offsite_service,
+        "off-site service must use only the public recovery certificate",
+    )
 
     require('"$MAINTENANCE" on' in deploy, "maintenance enable is missing")
     require('"$MAINTENANCE" off' in deploy, "maintenance disable is missing")

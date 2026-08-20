@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily encrypted off-site backup for Chainya
+
+[Timer]
+OnCalendar=*-*-* 04:10:00 Europe/Moscow
+Persistent=true
+RandomizedDelaySec=10m
+Unit=chainya-offsite-backup.service
+
+[Install]
+WantedBy=timers.target

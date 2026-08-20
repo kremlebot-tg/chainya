@@ -12,7 +12,7 @@ case "$BOT_ROOT" in
   "$ROOT/telegram-bot") ;;
   *) echo "бот должен публиковаться только из Git-репозитория" >&2; exit 1 ;;
 esac
-for file in bot.py teas.json requirements.txt test_bot_booking.py; do
+for file in bot.py teas.json requirements.txt requirements.lock.txt test_bot_booking.py; do
   test -s "$BOT_ROOT/$file" || { echo "нет $BOT_ROOT/$file" >&2; exit 1; }
   git -C "$ROOT" ls-files --error-unmatch "telegram-bot/$file" >/dev/null || {
     echo "telegram-bot/$file не отслеживается Git" >&2
@@ -28,7 +28,7 @@ test -z "$(git -C "$ROOT" status --porcelain)" || {
 echo "→ локальная проверка Telegram-бота"
 python3 -m venv "$TMP/test-venv"
 "$TMP/test-venv/bin/pip" install -q \
-  -r "$BOT_ROOT/requirements.txt" 'pytest>=9.0.3,<10'
+  -r "$BOT_ROOT/requirements.lock.txt" 'pytest==9.0.3'
 (
   cd "$BOT_ROOT"
   BOT_TOKEN=test-token "$TMP/test-venv/bin/python" -m pytest -q test_bot_booking.py
@@ -111,7 +111,7 @@ sudo test ! -e "$release"
 sudo mkdir "$release"
 sudo tar xzf "$stage/bot.tgz" -C "$release"
 sudo python3 -m venv "$release/.venv"
-sudo "$release/.venv/bin/pip" install -q -r "$release/requirements.txt"
+sudo "$release/.venv/bin/pip" install -q -r "$release/requirements.lock.txt"
 sudo chown -R root:root "$release"
 sudo chmod -R a+rX "$release"
 sudo test -s "$release/bot.py"

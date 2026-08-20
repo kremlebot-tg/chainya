@@ -196,11 +196,14 @@ def test_bot_deploy_uses_versioned_repository_sources() -> None:
     for required in (
         "bot.py",
         "requirements.txt",
+        "requirements.lock.txt",
         "teas.json",
         "test_bot_booking.py",
         "media/start.jpg",
     ):
         assert (ROOT / "telegram-bot" / required).is_file(), required
+    assert 'requirements.lock.txt"' in deploy
+    assert 'pip" install -q -r "$release/requirements.lock.txt"' in deploy
     catalog_builder = (ROOT / "scripts/build-catalog-seed.py").read_text(encoding="utf-8")
     assert 'BOT_CATALOG = ROOT / "telegram-bot" / "teas.json"' in catalog_builder
     assert 'ROOT.parent / "telegram-bot"' not in catalog_builder

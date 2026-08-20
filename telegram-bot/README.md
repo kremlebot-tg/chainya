@@ -50,7 +50,7 @@ python make_start.py     # обложка витрины → media/start.jpg
 cd /Users/mac/Desktop/Чайня/site/telegram-bot
 cp .env.example .env        # впишите BOT_TOKEN и при желании OWNER_CHAT_ID
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.lock.txt
 python bot.py
 ```
 
@@ -110,7 +110,7 @@ WantedBy=multi-user.target
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt 'pytest>=9,<10'
+.venv/bin/pip install -r requirements.lock.txt 'pytest==9.0.3'
 .venv/bin/python -m pytest -q
 ```
 

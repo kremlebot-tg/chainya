@@ -19,13 +19,13 @@ jobs:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: |
-            backend/requirements.txt
-            backend/requirements-dev.txt
-            telegram-bot/requirements.txt
+            backend/requirements.lock.txt
+            backend/requirements-dev.lock.txt
+            telegram-bot/requirements.lock.txt
       - name: Install backend dependencies
         run: |
-          python -m pip install -r backend/requirements-dev.txt
-          python -m pip install -r telegram-bot/requirements.txt
+          python -m pip install -r backend/requirements-dev.lock.txt
+          python -m pip install -r telegram-bot/requirements.lock.txt
       - name: Run backend tests
         run: python -m pytest -q
       - name: Run Telegram bot tests
@@ -35,7 +35,7 @@ jobs:
           bash -n deploy.sh deploy-shop.sh deploy-edge.sh deploy-bot.sh ops/deploy-shop-remote.sh ops/timeweb/edge-maintenance.sh
           python scripts/check-deploy-contract.py
       - name: Audit Python dependencies
-        run: python -m pip_audit -r backend/requirements.txt
+        run: python -m pip_audit -r backend/requirements.lock.txt
       - name: Check blocking Python errors
         run: python -m ruff check backend scripts build.py --select E9,F
       - name: Build production site

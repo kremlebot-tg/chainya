@@ -438,6 +438,7 @@ if web:
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
         f"  <url><loc>{SITE}</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>\n"
         f"  <url><loc>{SITE}shop</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>\n"
+        f"  <url><loc>{SITE}teaware</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>\n"
         f"  <url><loc>{SITE}business</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>\n"
         f"  <url><loc>{SITE}booking</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>\n"
         f"  <url><loc>{SITE}legal.html</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>\n"
@@ -453,6 +454,11 @@ if web:
             "Китайский чай в пакетах 10, 25, 50 и 100 г с доставкой СДЭК по Москве и России.",
             "Купить чай",
         ),
+        "teaware": (
+            "Чайная посуда · Чайня",
+            "Чайники, гайвани, пиалы, чахаи, чахэ, чайные фигурки, инструменты и наборы в каталоге Чайни.",
+            "Посуда",
+        ),
         "business": (
             "Чай для бизнеса и мероприятий · Чайня",
             "Поставки китайского чая для бизнеса и выездные чайные церемонии в Москве.",
@@ -464,7 +470,7 @@ if web:
             "Бронь",
         ),
     }
-    route_views = {"shop": "shop", "business": "b2b", "booking": "book"}
+    route_views = {"shop": "shop", "teaware": "shop", "business": "b2b", "booking": "book"}
     for route, (route_title, route_desc, route_label) in route_meta.items():
         route_url = f"{SITE}{route}"
         route_head = seo_head(

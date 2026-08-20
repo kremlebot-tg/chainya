@@ -43,6 +43,7 @@ SENSITIVE_PATHS = (
 PUBLIC_PATHS = (
     ("/", "text/html"),
     ("/shop", "text/html"),
+    ("/teaware", "text/html"),
     ("/business", "text/html"),
     ("/booking", "text/html"),
     ("/account", "text/html"),
@@ -95,6 +96,7 @@ def check_dist(root: pathlib.Path) -> list[str]:
     required = {
         "index.html",
         "shop/index.html",
+        "teaware/index.html",
         "business/index.html",
         "booking/index.html",
         "404.html",
@@ -125,7 +127,7 @@ def check_dist(root: pathlib.Path) -> list[str]:
         if "<script" in text.lower():
             errors.append(f"{name}: служебная страница не должна выполнять JavaScript")
     for name in (
-        "index.html", "shop/index.html", "business/index.html", "booking/index.html",
+        "index.html", "shop/index.html", "teaware/index.html", "business/index.html", "booking/index.html",
         "privacy.html", "legal.html",
     ):
         path = root / name
@@ -135,7 +137,7 @@ def check_dist(root: pathlib.Path) -> list[str]:
         for detail in SELLER_DETAILS:
             if detail not in text:
                 errors.append(f"{name}: отсутствуют подтверждённые реквизиты {detail!r}")
-        if name in {"index.html", "shop/index.html", "business/index.html", "booking/index.html"}:
+        if name in {"index.html", "shop/index.html", "teaware/index.html", "business/index.html", "booking/index.html"}:
             for detail in REGISTERED_ADDRESS_PARTS:
                 if detail not in text:
                     errors.append(
@@ -150,7 +152,7 @@ def check_dist(root: pathlib.Path) -> list[str]:
                 errors.append(f"{name}: найдена юридическая заглушка {placeholder.pattern!r}")
         if any(pattern.search(text) for pattern in PRIVATE_BANK_PATTERNS):
             errors.append(f"{name}: обнаружены лишние банковские реквизиты")
-        if name in {"index.html", "shop/index.html", "legal.html"}:
+        if name in {"index.html", "shop/index.html", "teaware/index.html", "legal.html"}:
             if FULL_SETTLEMENT_NOTICE not in text:
                 errors.append(
                     f"{name}: отсутствует предупреждение об одном чеке полного расчёта"
@@ -158,11 +160,13 @@ def check_dist(root: pathlib.Path) -> list[str]:
     route_canonicals = {
         "index.html": "https://chainya.ru/",
         "shop/index.html": "https://chainya.ru/shop",
+        "teaware/index.html": "https://chainya.ru/teaware",
         "business/index.html": "https://chainya.ru/business",
         "booking/index.html": "https://chainya.ru/booking",
     }
     route_views = {
         "shop/index.html": "shop",
+        "teaware/index.html": "shop",
         "business/index.html": "b2b",
         "booking/index.html": "book",
     }

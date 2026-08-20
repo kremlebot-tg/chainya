@@ -957,6 +957,7 @@ select.input{
     <nav class="nav__links" data-i18n-aria="a_nav" aria-label="Разделы сайта">
       <a class="nav__link" href="/" data-go="home" data-i18n="nav_home" aria-current="page">Главная</a>
       <a class="nav__link" href="/shop" data-go="shop" data-i18n="nav_shop">Купить чай</a>
+      <a class="nav__link" href="/teaware" data-go="teaware" data-i18n="nav_teaware">Посуда</a>
       <a class="nav__link" href="/business" data-go="b2b" data-i18n="nav_b2b">Для бизнеса</a>
       <a class="nav__link" href="/booking" data-go="book" data-i18n="nav_book">Бронь</a>
     </nav>
@@ -978,6 +979,7 @@ select.input{
   <nav class="nav--mob" data-i18n-aria="a_nav" aria-label="Разделы сайта">
     <a class="nav__link" href="/" data-go="home" data-i18n="nav_home" aria-current="page">Главная</a>
     <a class="nav__link" href="/shop" data-go="shop" data-i18n="nav_shop">Купить чай</a>
+    <a class="nav__link" href="/teaware" data-go="teaware" data-i18n="nav_teaware">Посуда</a>
     <a class="nav__link" href="/business" data-go="b2b" data-i18n="nav_b2b">Для бизнеса</a>
     <a class="nav__link" href="/booking" data-go="book" data-i18n="nav_book">Бронь</a>
   </nav>
@@ -1164,7 +1166,7 @@ select.input{
 <!-- ══════════════════  КУПИТЬ ЧАЙ  ══════════════════ -->
 <section class="view" id="view-shop">
   <div class="sec wrap">
-    <h1 class="sr-only" data-i18n="shop_heading">Каталог китайского чая</h1>
+    <h1 class="sr-only" id="shop-heading" data-i18n="shop_heading">Каталог китайского чая</h1>
     <div class="shop-toolbar">
       <div class="scroll-shell scroll-shell--chips"><div class="chips" id="filters" role="group" data-i18n-aria="filters_label" aria-label="Разделы каталога"></div></div>
       <div class="scroll-shell scroll-shell--chips" id="subfilters-shell"><div class="chips" id="subfilters" role="group" aria-label="Подразделы каталога"></div></div>
@@ -1178,7 +1180,7 @@ select.input{
         <select class="input" id="shop-sort" data-i18n-aria="shop_sort_label" aria-label="Сортировка"></select>
       </div>
       <p class="shop-count" aria-live="polite"><span data-i18n="shop_count">В подборке</span><b class="num" id="shop-count">0</b></p>
-      <details class="shop-note">
+      <details class="shop-note" id="shop-note">
         <summary data-i18n="shop_note_h">Фасовка и прессованный чай</summary>
         <p data-i18n="shop_note_p">Вес выбирается в карточке чая. Мандарин и квадратик продаём поштучно, блины — по запросу.</p>
       </details>
@@ -1687,8 +1689,8 @@ select.input{
     locale:'ru-RU',
     og_locale:'ru_RU',
     title:'Чайня · китайский чай с доставкой',
-    route_titles:{home:'Чайня · китайский чай с доставкой',shop:'Купить китайский чай · Чайня',b2b:'Чай для бизнеса и мероприятий · Чайня',book:'Бронь чайной церемонии · Чайня'},
-    route_descriptions:{home:'Китайский чай с доставкой по Москве и России: белый, зелёный, улуны, красный чай, пуэр и авторские сборы. Чайная на Острякова, 3.',shop:'Китайский чай в пакетах 10, 25, 50 и 100 г с доставкой СДЭК по Москве и России.',b2b:'Поставки китайского чая для бизнеса и выездные чайные церемонии в Москве.',book:'Забронируйте чайную церемонию с мастером или самостоятельное чаепитие на Острякова, 3.'},
+    route_titles:{home:'Чайня · китайский чай с доставкой',shop:'Купить китайский чай · Чайня',teaware:'Чайная посуда · Чайня',b2b:'Чай для бизнеса и мероприятий · Чайня',book:'Бронь чайной церемонии · Чайня'},
+    route_descriptions:{home:'Китайский чай с доставкой по Москве и России: белый, зелёный, улуны, красный чай, пуэр и авторские сборы. Чайная на Острякова, 3.',shop:'Китайский чай в пакетах 10, 25, 50 и 100 г с доставкой СДЭК по Москве и России.',teaware:'Чайники, гайвани, пиалы, чахаи, чахэ, чайные фигурки, инструменты и наборы в каталоге Чайни.',b2b:'Поставки китайского чая для бизнеса и выездные чайные церемонии в Москве.',book:'Забронируйте чайную церемонию с мастером или самостоятельное чаепитие на Острякова, 3.'},
     food_info_h:'Информация о товаре', food_composition:'Состав', food_manufacturer:'Изготовитель и упаковщик', food_shelf_life:'Срок годности', food_storage:'Условия хранения',
     a_lang:'Язык', a_close:'Закрыть', a_tea:'О чае', a_nav:'Разделы сайта', a_account:'Личный кабинет', filters_label:'Фильтры каталога', skip:'Перейти к содержимому',
     alt_master:'Чайный мастер разливает настой из чахая по чашкам',
@@ -1704,7 +1706,7 @@ select.input{
     alt_bar:'Стойка с сифоном и полки с чаем',
     alt_shelf:'Полки с чаем в красных коробках и блины пуэра',
     brand:'Чайня', brand_sup:'МСК',
-    nav_home:'Главная', nav_shop:'Купить чай', nav_b2b:'Для бизнеса', nav_book:'Бронь',
+    nav_home:'Главная', nav_shop:'Купить чай', nav_teaware:'Посуда', nav_b2b:'Для бизнеса', nav_book:'Бронь',
     hero_label:'Китайский чай · доставка по России',
     hero_h:'Чай, <br>к которому <br><em>возвращаются</em>',
     hero_lead:'Отбираем китайский чай, который сами пьём и завариваем в Чайне. Можно взять небольшой пакет на пробу, собрать заказ домой или сначала познакомиться с чаем за нашим столом.',
@@ -1737,8 +1739,8 @@ select.input{
     visit_address_label:'Адрес', visit_address:'Москва, ул. Острякова, 3', visit_place:'Первый этаж · помещение 114',
     visit_metro_label:'Метро', visit_metro:'Аэропорт', visit_hours_label:'Открыты', visit_hours:'<span class="visit__hours-line">Ежедневно</span><span class="visit__hours-line num">12:00–22:00</span>',
     visit_route:'Построить маршрут', visit_open:'Открыть карточку в Яндекс Картах', visit_map_title:'Чайня на карте Москвы',
-    shop_heading:'Каталог китайского чая', shop_note_h:'Фасовка и прессованный чай', shop_note_p:'Вес выбирается в карточке чая. Мандарин и квадратик продаём поштучно, блины — по запросу.', shop_count:'В подборке',
-    shop_search_label:'Поиск по каталогу', shop_search_ph:'Название, регион или вкус', shop_sort_label:'Сортировка', shop_empty:'По этому запросу ничего не найдено. Попробуйте другое название или сбросьте фильтр.',
+    shop_heading:'Каталог китайского чая', teaware_heading:'Каталог чайной посуды', shop_note_h:'Фасовка и прессованный чай', shop_note_p:'Вес выбирается в карточке чая. Мандарин и квадратик продаём поштучно, блины — по запросу.', shop_count:'В подборке',
+    shop_search_label:'Поиск по каталогу', shop_search_ph:'Название, регион или вкус', teaware_search_ph:'Название или материал', shop_sort_label:'Сортировка', shop_empty:'По этому запросу ничего не найдено. Попробуйте другое название или сбросьте фильтр.',
     shop_sort_default:'Сначала рекомендованные', shop_sort_price_asc:'Сначала дешевле', shop_sort_price_desc:'Сначала дороже', shop_sort_name:'По названию',
     types:['Все','Белый','Зелёный','Габа','Улуны Фуцзяни','Улуны Гуандуна','Улуны Уишаня','Красный','Шэн Пуэр','Шу Пуэр','Хэй Ча','Травы и добавки'],
     more:'о чае', per_pc:'за штуку', per_pack25:'за 10 г', gram:'г',
@@ -1869,8 +1871,8 @@ select.input{
     locale:'en-GB',
     og_locale:'en_GB',
     title:'Chaynya · Chinese tea delivered',
-    route_titles:{home:'Chaynya · Chinese tea delivered',shop:'Buy Chinese tea · Chaynya',b2b:'Tea for business and events · Chaynya',book:'Book a tea ceremony · Chaynya'},
-    route_descriptions:{home:'Chinese tea delivered across Moscow and Russia: white, green, oolong, black tea, pu-erh and house herbal blends. Tea room at 3 Ostryakova Street.',shop:'Chinese tea in 10, 25, 50 and 100 g packs, delivered by CDEK across Moscow and Russia.',b2b:'Wholesale Chinese tea for businesses and off-site tea ceremonies in Moscow.',book:'Book a hosted tea ceremony or a private self-service tea session at 3 Ostryakova Street.'},
+    route_titles:{home:'Chaynya · Chinese tea delivered',shop:'Buy Chinese tea · Chaynya',teaware:'Chinese teaware · Chaynya',b2b:'Tea for business and events · Chaynya',book:'Book a tea ceremony · Chaynya'},
+    route_descriptions:{home:'Chinese tea delivered across Moscow and Russia: white, green, oolong, black tea, pu-erh and house herbal blends. Tea room at 3 Ostryakova Street.',shop:'Chinese tea in 10, 25, 50 and 100 g packs, delivered by CDEK across Moscow and Russia.',teaware:'Teapots, gaiwans, tea cups, chahai, chahe, tea pets, tools and teaware sets from Chaynya.',b2b:'Wholesale Chinese tea for businesses and off-site tea ceremonies in Moscow.',book:'Book a hosted tea ceremony or a private self-service tea session at 3 Ostryakova Street.'},
     food_info_h:'Product information', food_composition:'Ingredients', food_manufacturer:'Producer and packer', food_shelf_life:'Shelf life', food_storage:'Storage conditions',
     a_lang:'Language', a_close:'Close', a_tea:'About the tea', a_nav:'Site sections', a_account:'Personal account', filters_label:'Catalogue filters', skip:'Skip to content',
     alt_master:'A tea master pouring the liquor from a pitcher into cups',
@@ -1886,7 +1888,7 @@ select.input{
     alt_bar:'The counter with a siphon and shelves of tea',
     alt_shelf:'Shelves of tea in red boxes and pressed pu-erh cakes',
     brand:'Chaynya', brand_sup:'MSK',
-    nav_home:'Home', nav_shop:'Buy tea', nav_b2b:'For business', nav_book:'Booking',
+    nav_home:'Home', nav_shop:'Buy tea', nav_teaware:'Teaware', nav_b2b:'For business', nav_book:'Booking',
     hero_label:'Chinese tea · delivery across Russia',
     hero_h:'Tea <br>you will want <br><em>to return to</em>',
     hero_lead:'We select the Chinese teas we drink and brew at Chaynya ourselves. Start with a small bag, build an order for home, or get to know the tea at our table first.',
@@ -1919,8 +1921,8 @@ select.input{
     visit_address_label:'Address', visit_address:'3 Ostryakova St., Moscow', visit_place:'Ground floor · unit 114',
     visit_metro_label:'Metro', visit_metro:'Aeroport', visit_hours_label:'Hours', visit_hours:'<span class="visit__hours-line">Daily</span><span class="visit__hours-line num">12:00–22:00</span>',
     visit_route:'Get directions', visit_open:'Open in Yandex Maps', visit_map_title:'Chainya on the Moscow map',
-    shop_heading:'Chinese tea catalogue', shop_note_h:'Pack sizes and pressed tea', shop_note_p:'Choose the weight in each tea card. Mandarin and mini bricks are sold by the piece; cakes are available on request.', shop_count:'In this selection',
-    shop_search_label:'Search the catalogue', shop_search_ph:'Name, origin or flavour', shop_sort_label:'Sort', shop_empty:'Nothing matches this search. Try another name or reset the filter.',
+    shop_heading:'Chinese tea catalogue', teaware_heading:'Chinese teaware catalogue', shop_note_h:'Pack sizes and pressed tea', shop_note_p:'Choose the weight in each tea card. Mandarin and mini bricks are sold by the piece; cakes are available on request.', shop_count:'In this selection',
+    shop_search_label:'Search the catalogue', shop_search_ph:'Name, origin or flavour', teaware_search_ph:'Name or material', shop_sort_label:'Sort', shop_empty:'Nothing matches this search. Try another name or reset the filter.',
     shop_sort_default:'Recommended first', shop_sort_price_asc:'Lowest price first', shop_sort_price_desc:'Highest price first', shop_sort_name:'By name',
     types:['All','White','Green','GABA','Fujian oolong','Guangdong oolong','Wuyi oolong','Black','Sheng pu-erh','Shou pu-erh','Hei cha','Herbs & extras'],
     more:'more', per_pc:'each', per_pack25:'for 10 g', gram:'g',
@@ -2051,8 +2053,8 @@ select.input{
     locale:'zh-CN',
     og_locale:'zh_CN',
     title:'Chaynya · 中国茶配送',
-    route_titles:{home:'Chaynya · 中国茶配送',shop:'购买中国茶 · Chaynya',b2b:'企业与活动用茶 · Chaynya',book:'预约茶会 · Chaynya'},
-    route_descriptions:{home:'中国茶配送至莫斯科及俄罗斯各地：白茶、绿茶、乌龙茶、红茶、普洱茶和自制草本拼配。茶室位于奥斯特里亚科娃街3号。',shop:'中国茶提供10克、25克、50克和100克包装，由CDEK配送至莫斯科及俄罗斯各地。',b2b:'为企业提供中国茶批发，并在莫斯科承办外出茶会。',book:'预约茶艺师主持的茶会，或在奥斯特里亚科娃街3号自行泡茶。'},
+    route_titles:{home:'Chaynya · 中国茶配送',shop:'购买中国茶 · Chaynya',teaware:'茶具 · Chaynya',b2b:'企业与活动用茶 · Chaynya',book:'预约茶会 · Chaynya'},
+    route_descriptions:{home:'中国茶配送至莫斯科及俄罗斯各地：白茶、绿茶、乌龙茶、红茶、普洱茶和自制草本拼配。茶室位于奥斯特里亚科娃街3号。',shop:'中国茶提供10克、25克、50克和100克包装，由CDEK配送至莫斯科及俄罗斯各地。',teaware:'Chaynya茶具目录：茶壶、盖碗、茶杯、公道杯、茶荷、茶宠、茶道工具和茶具套装。',b2b:'为企业提供中国茶批发，并在莫斯科承办外出茶会。',book:'预约茶艺师主持的茶会，或在奥斯特里亚科娃街3号自行泡茶。'},
     food_info_h:'商品信息', food_composition:'配料', food_manufacturer:'生产商及包装商', food_shelf_life:'保质期', food_storage:'储存条件',
     a_lang:'语言', a_close:'关闭', a_tea:'茶叶详情', a_nav:'网站栏目', a_account:'个人中心', filters_label:'茶叶分类筛选', skip:'跳到内容',
     alt_master:'茶艺师正把茶汤从茶海分入茶杯',
@@ -2068,7 +2070,7 @@ select.input{
     alt_bar:'吧台上的虹吸壶与茶叶货架',
     alt_shelf:'红色茶盒货架与普洱茶饼',
     brand:'Chaynya', brand_sup:'莫斯科',
-    nav_home:'首页', nav_shop:'买茶', nav_b2b:'企业合作', nav_book:'订座',
+    nav_home:'首页', nav_shop:'买茶', nav_teaware:'茶具', nav_b2b:'企业合作', nav_book:'订座',
     hero_label:'中国茶 · 俄罗斯境内配送',
     hero_h:'一杯让人<br>愿意一次次<br><em>回来品的茶</em>',
     hero_lead:'我们只挑自己会喝、也会在Chaynya亲手冲泡的中国茶。可以买一小包试喝，也可以为家里组合一份订单；还可以先到店里坐下来认识这款茶。',
@@ -2101,8 +2103,8 @@ select.input{
     visit_address_label:'地址', visit_address:'莫斯科奥斯特里亚科娃街3号', visit_place:'一层 · 114室',
     visit_metro_label:'地铁', visit_metro:'机场站', visit_hours_label:'营业时间', visit_hours:'<span class="visit__hours-line">每天</span><span class="visit__hours-line num">12:00–22:00</span>',
     visit_route:'规划路线', visit_open:'在Yandex地图中打开', visit_map_title:'莫斯科茶室地图',
-    shop_heading:'中国茶目录', shop_note_h:'分装与紧压茶', shop_note_p:'请在茶品详情中选择重量。小青柑和小金砖按个出售，茶饼可另询。', shop_count:'当前选择',
-    shop_search_label:'搜索茶叶目录', shop_search_ph:'名称、产地或风味', shop_sort_label:'排序', shop_empty:'没有找到符合条件的茶。请尝试其他名称或重置筛选。',
+    shop_heading:'中国茶目录', teaware_heading:'茶具目录', shop_note_h:'分装与紧压茶', shop_note_p:'请在茶品详情中选择重量。小青柑和小金砖按个出售，茶饼可另询。', shop_count:'当前选择',
+    shop_search_label:'搜索茶叶目录', shop_search_ph:'名称、产地或风味', teaware_search_ph:'名称或材质', shop_sort_label:'排序', shop_empty:'没有找到符合条件的茶。请尝试其他名称或重置筛选。',
     shop_sort_default:'推荐优先', shop_sort_price_asc:'价格从低到高', shop_sort_price_desc:'价格从高到低', shop_sort_name:'按名称',
     types:['全部','白茶','绿茶','佳叶龙茶','闽南乌龙','广东乌龙','武夷岩茶','红茶','生普洱','熟普洱','黑茶','花草与配料'],
     more:'详情', per_pc:'每个', per_pack25:'10克装', gram:'克',
@@ -2399,8 +2401,9 @@ select.input{
   addEventListener('chainya:telegram-ready', connectTelegram);
 
   /* ─────────────  НАВИГАЦИЯ  ───────────── */
-  const VIEW_PATHS = { home:'/', shop:'/shop', b2b:'/business', book:'/booking' };
+  const VIEW_PATHS = { home:'/', shop:'/shop', teaware:'/teaware', b2b:'/business', book:'/booking' };
   const PATH_VIEWS = Object.fromEntries(Object.entries(VIEW_PATHS).map(([view,path]) => [path,view]));
+  const CATALOG_VIEWS = new Set(['shop','teaware']);
   function productRoute(id, language=LANG){
     const prefix = language === 'ru' ? '' : `/${language}`;
     return `${prefix}/tea/${id}`;
@@ -2447,8 +2450,25 @@ select.input{
     if (canonical) canonical.href = routeUrl;
   }
   function go(view, updateHistory=true){
-    const changingView = ($('.view.is-active') || {}).id !== 'view-' + view;
-    $$('.view').forEach(v => v.classList.toggle('is-active', v.id === 'view-' + view));
+    const catalogView = CATALOG_VIEWS.has(view) ? 'shop' : view;
+    const previousRoute = $('.nav__link[aria-current="page"]')?.dataset.go || '';
+    const changingView = ($('.view.is-active') || {}).id !== 'view-' + catalogView;
+    const changingRoute = previousRoute !== view;
+    if (CATALOG_VIEWS.has(view)){
+      if (changingRoute){ curSearch = ''; curSort = 'default'; }
+      curFilter = view === 'teaware' ? 'teaware' : 'tea';
+      const heading = $('#shop-heading');
+      heading.dataset.i18n = view === 'teaware' ? 'teaware_heading' : 'shop_heading';
+      heading.textContent = T()[heading.dataset.i18n];
+      const search = $('#shop-search');
+      search.dataset.i18nPh = view === 'teaware' ? 'teaware_search_ph' : 'shop_search_ph';
+      search.placeholder = T()[search.dataset.i18nPh];
+      $('#shop-note').hidden = view === 'teaware';
+      buildFilters();
+      buildShopTools();
+      applyFilter();
+    }
+    $$('.view').forEach(v => v.classList.toggle('is-active', v.id === 'view-' + catalogView));
     $$('.nav__link').forEach(a => {
       if (a.dataset.go === view) a.setAttribute('aria-current','page');
       else a.removeAttribute('aria-current');
@@ -2466,8 +2486,8 @@ select.input{
     closeTea(false);
     if (updateHistory && (location.pathname !== VIEW_PATHS[view] || location.hash))
       history.pushState({ view }, '', VIEW_PATHS[view]);
-    if (changingView) scrollTo({ top:0, behavior:'instant' });
-    if (view === 'shop') activateCatalogImages();
+    if (changingView || changingRoute) scrollTo({ top:0, behavior:'instant' });
+    if (CATALOG_VIEWS.has(view)) activateCatalogImages();
     tgSyncBack();
     trackOnce('section_view', view);
     if (view === 'book') trackOnce('booking_start', 'book');
@@ -2479,16 +2499,16 @@ select.input{
     go(t.dataset.go);
   });
 
-  // Читаемые URL — /shop, /business, /booking и /tea/<id>. Старые #shop,
+  // Читаемые URL — /shop, /teaware, /business, /booking и /tea/<id>. Старые #shop,
   // #book, #b2b и #tea-<id> продолжают работать для ссылок из переписок.
-  const HASH_VIEWS = ['home', 'shop', 'b2b', 'book'];
+  const HASH_VIEWS = ['home', 'shop', 'teaware', 'b2b', 'book'];
   function goFromLocation(){
     const h = location.hash.replace('#', '');
     if (HASH_VIEWS.includes(h)){ go(h, false); return; }
     if (h.startsWith('tea-')){
       if (!catalogReady){ go('shop', false); return; }
       const m = TEA_META.find(x => x.id === h.slice(4));
-      if (m){ go('shop', false); openTea(m, false); }
+      if (m){ go(typeGroup(m.t) === 'teaware' ? 'teaware' : 'shop', false); openTea(m, false); }
       else go('shop', false);
       return;
     }
@@ -2498,7 +2518,7 @@ select.input{
       if (LANG !== routeLanguage) LANG = routeLanguage;
       if (!catalogReady){ go('shop', false); return; }
       const m = TEA_META.find(x => x.id === productPath[2]);
-      if (m){ go('shop', false); openTea(m, false); }
+      if (m){ go(typeGroup(m.t) === 'teaware' ? 'teaware' : 'shop', false); openTea(m, false); }
       else go('shop', false);
       return;
     }
@@ -2901,7 +2921,8 @@ select.input{
     f.append(fav);
     const mainLabels = {all:T().types[0],tea:GROUP_LABELS[LANG].tea,teaware:GROUP_LABELS[LANG].teaware};
     ['all','tea','teaware'].forEach(id => {
-      const active = curFilter === id || (id !== 'all' && typeGroup(curFilter) === id && !['all','fav'].includes(curFilter));
+      const filterGroup = ['tea','teaware'].includes(curFilter) ? curFilter : typeGroup(curFilter);
+      const active = curFilter === id || (id !== 'all' && filterGroup === id && !['all','fav'].includes(curFilter));
       const button = el(`<button class="chip" aria-pressed="${active}" data-t="${id}">${mainLabels[id]}</button>`);
       button.addEventListener('click',()=>{curFilter=id;buildFilters();applyFilter()});
       f.append(button);
@@ -3074,8 +3095,9 @@ select.input{
     if (updateHistory && (location.hash.startsWith('#tea-') || /^\/(?:(?:en|zh)\/)?tea\//.test(location.pathname))){
       if (history.state && history.state.tea) history.back();
       else {
-        history.replaceState({ view:'shop' }, '', VIEW_PATHS.shop);
-        syncDocumentMetadata('shop');
+        const view = curTea && typeGroup(curTea.t) === 'teaware' ? 'teaware' : 'shop';
+        history.replaceState({ view }, '', VIEW_PATHS[view]);
+        syncDocumentMetadata(view);
       }
     }
     tgSyncBack();
@@ -4142,7 +4164,7 @@ select.input{
 
   const initialAnalyticsSection = (() => {
     const raw = location.hash.replace('#','').split('-')[0] || PATH_VIEWS[location.pathname.replace(/\/$/,'') || '/'] || 'home';
-    return ['home','shop','tea','cart','book','b2b','payment'].includes(raw) ? raw : 'home';
+    return ['home','shop','teaware','tea','cart','book','b2b','payment'].includes(raw) ? raw : 'home';
   })();
   applyLang();
   hydrateCustomerAccount();

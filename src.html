@@ -2416,7 +2416,9 @@ select.input{
   const CATALOG_VIEWS = new Set(['shop','teaware']);
   function productRoute(id, language=LANG){
     const prefix = language === 'ru' ? '' : `/${language}`;
-    return `${prefix}/tea/${id}`;
+    const product = TEA_META.find(item => item.id === id);
+    const section = product && typeGroup(product.t) === 'teaware' ? 'teaware' : 'tea';
+    return `${prefix}/${section}/${id}`;
   }
   function syncDocumentMetadata(view){
     const title = T().route_titles?.[view] || T().title;
@@ -2510,7 +2512,8 @@ select.input{
     go(t.dataset.go);
   });
 
-  // Читаемые URL — /shop, /teaware, /business, /booking и /tea/<id>. Старые #shop,
+  // Читаемые URL — /shop, /teaware, /business, /booking, /tea/<id> и
+  // /teaware/<id>. Старые #shop,
   // #book, #b2b и #tea-<id> продолжают работать для ссылок из переписок.
   const HASH_VIEWS = ['home', 'shop', 'teaware', 'b2b', 'book'];
   function goFromLocation(){
@@ -2523,14 +2526,16 @@ select.input{
       else go('shop', false);
       return;
     }
-    const productPath = location.pathname.match(/^\/(?:(en|zh)\/)?tea\/([a-z0-9][a-z0-9-]{0,79})\/?$/);
+    const productPath = location.pathname.match(/^\/(?:(en|zh)\/)?(tea|teaware)\/([a-z0-9][a-z0-9-]{0,79})\/?$/);
     if (productPath){
       const routeLanguage = productPath[1] || 'ru';
       if (LANG !== routeLanguage) LANG = routeLanguage;
-      if (!catalogReady){ go('shop', false); return; }
-      const m = TEA_META.find(x => x.id === productPath[2]);
-      if (m){ go(typeGroup(m.t) === 'teaware' ? 'teaware' : 'shop', false); openTea(m, false); }
-      else go('shop', false);
+      const routeView = productPath[2] === 'teaware' ? 'teaware' : 'shop';
+      if (!catalogReady){ go(routeView, false); return; }
+      const m = TEA_META.find(x => x.id === productPath[3]);
+      const productView = m && typeGroup(m.t) === 'teaware' ? 'teaware' : 'shop';
+      if (m && productView === routeView){ go(productView, false); openTea(m, false); }
+      else go(routeView, false);
       return;
     }
     go(PATH_VIEWS[location.pathname.replace(/\/$/,'') || '/'] || 'home', false);
@@ -3121,7 +3126,7 @@ select.input{
     unlockScroll();
     bgInert(false);
     if (lastCard){ lastCard.focus({ preventScroll:true }); lastCard = null; }
-    if (updateHistory && (location.hash.startsWith('#tea-') || /^\/(?:(?:en|zh)\/)?tea\//.test(location.pathname))){
+    if (updateHistory && (location.hash.startsWith('#tea-') || /^\/(?:(?:en|zh)\/)?(?:tea|teaware)\//.test(location.pathname))){
       if (history.state && history.state.tea) history.back();
       else {
         const view = curTea && typeGroup(curTea.t) === 'teaware' ? 'teaware' : 'shop';

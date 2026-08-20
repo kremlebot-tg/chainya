@@ -92,6 +92,7 @@ def main() -> None:
     require("/__chainya_edge_health" in caddy, "local edge health is missing")
     require("/manage/*" in caddy, "private owner subroutes must reach the origin")
     require("@productPage path_regexp" in caddy, "product pages must reach the origin")
+    require("(tea|teaware)" in caddy, "tea and teaware product pages must reach the origin")
     require("@sitemap path /sitemap.xml" in caddy, "dynamic sitemap must reach the origin")
     require(
         "/__chainya_edge_health" in compose and "/api/health" not in compose,

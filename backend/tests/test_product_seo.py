@@ -72,6 +72,38 @@ def test_product_pages_have_localized_urls_content_and_reciprocal_hreflang(tmp_p
     assert json_ld(chinese.text)["@graph"][1]["inLanguage"] == "zh-CN"
 
 
+def test_teaware_product_has_its_own_routes_breadcrumbs_and_canonical(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    document = module.get_catalog_store().get()
+    item = next(row for row in document["teas"] if row["id"] == "baihao")
+    item["type"] = "teaware-teapots"
+    item["unit"] = "pc"
+    module.get_catalog_store()._write(document)
+
+    with client:
+        russian = client.get("/teaware/baihao")
+        english = client.get("/en/teaware/baihao")
+        wrong_section = client.get("/tea/baihao", follow_redirects=False)
+        teaware_head = client.head("/teaware/baihao")
+        wrong_head = client.head("/tea/baihao", follow_redirects=False)
+        wrong_head_en = client.head("/en/tea/baihao", follow_redirects=False)
+
+    assert russian.status_code == english.status_code == teaware_head.status_code == 200
+    assert wrong_section.status_code == wrong_head.status_code == 308
+    assert wrong_section.headers["location"] == wrong_head.headers["location"] == "/teaware/baihao"
+    assert wrong_head_en.status_code == 308
+    assert wrong_head_en.headers["location"] == "/en/teaware/baihao"
+    assert '<link rel="canonical" href="https://chainya.ru/teaware/baihao">' in russian.text
+    assert "купить чайную посуду" in russian.text
+    assert 'href="/teaware?lang=ru"' in russian.text
+    assert '<link rel="canonical" href="https://chainya.ru/en/teaware/baihao">' in english.text
+    data = json_ld(russian.text)
+    breadcrumb = next(row for row in data["@graph"] if row.get("@type") == "BreadcrumbList")
+    assert breadcrumb["itemListElement"][1]["name"] == "Посуда"
+    assert breadcrumb["itemListElement"][1]["item"] == "https://chainya.ru/teaware?lang=ru"
+    assert "Эта вещь уже ушла с полки" in client.get("/teaware/missing-item").text
+
+
 def test_product_page_escapes_catalog_text_and_json_ld(tmp_path, monkeypatch):
     client, module = app_client(tmp_path, monkeypatch)
     document = module.get_catalog_store().get()
@@ -133,6 +165,7 @@ def test_dynamic_sitemap_tracks_only_published_catalog_items(tmp_path, monkeypat
     assert "https://chainya.ru/en/tea/chongshicha" not in locations
     assert "https://chainya.ru/zh/tea/chongshicha" not in locations
     assert "https://chainya.ru/shop" in locations
+    assert "https://chainya.ru/teaware" in locations
     baihao = next(
         node
         for node in root.findall("sm:url", namespace)
@@ -146,3 +179,20 @@ def test_dynamic_sitemap_tracks_only_published_catalog_items(tmp_path, monkeypat
     assert ("en", "https://chainya.ru/en/tea/baihao") in alternates
     assert ("zh-CN", "https://chainya.ru/zh/tea/baihao") in alternates
     assert ("x-default", "https://chainya.ru/tea/baihao") in alternates
+
+
+def test_dynamic_sitemap_uses_teaware_urls_for_teaware_items(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    document = module.get_catalog_store().get()
+    item = next(row for row in document["teas"] if row["id"] == "baihao")
+    item["type"] = "teaware-teapots"
+    item["unit"] = "pc"
+    module.get_catalog_store()._write(document)
+
+    root = ET.fromstring(client.get("/sitemap.xml").text)
+    namespace = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+    locations = {node.text for node in root.findall("sm:url/sm:loc", namespace)}
+    assert "https://chainya.ru/teaware/baihao" in locations
+    assert "https://chainya.ru/en/teaware/baihao" in locations
+    assert "https://chainya.ru/zh/teaware/baihao" in locations
+    assert "https://chainya.ru/tea/baihao" not in locations

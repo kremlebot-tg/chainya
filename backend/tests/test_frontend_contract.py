@@ -134,8 +134,9 @@ def test_teaware_has_a_separate_public_navigation_route():
 def test_catalog_cards_expose_indexable_product_links_and_keep_modal_navigation():
     assert 'href="${productRoute(m.id)}"' in SOURCE
     assert "function productRoute(id, language=LANG)" in SOURCE
+    assert "typeGroup(product.t) === 'teaware' ? 'teaware' : 'tea'" in SOURCE
     assert "event.preventDefault(); lastCard = hit; openTea(m);" in SOURCE
-    assert "location.pathname.match(/^\\/(?:(en|zh)\\/)?tea\\/" in SOURCE
+    assert "location.pathname.match(/^\\/(?:(en|zh)\\/)?(tea|teaware)\\/" in SOURCE
     assert "history.pushState({ tea:m.id }, '', productRoute(m.id))" in SOURCE
     assert "syncProductMetadata(m, txt)" in SOURCE
     assert "setMeta('meta[property=\"og:type\"]', 'website')" in SOURCE
@@ -187,6 +188,14 @@ def test_catalog_admin_distinguishes_saby_price_list_from_base_catalog():
     assert "в основном каталоге:" in ADMIN_CATALOG_JS
     assert "not_in_price_list" in ADMIN_CATALOG_JS
     assert "Сначала добавить в прайс-лист СБИС" in ADMIN_CATALOG_JS
+
+
+def test_catalog_admin_links_to_the_correct_public_product_section():
+    assert "itemGroup(draft) === 'teaware' ? 'teaware' : 'tea'" in ADMIN_CATALOG_JS
+    assert "open.href = `/${section}/${encodeURIComponent(draft.id)}`" in ADMIN_CATALOG_JS
+    assert "Дополнить РУ" not in ADMIN_CATALOG_JS
+    assert "Дополнить · ${missingCount}" in ADMIN_CATALOG_JS
+    assert ".editor>.empty{align-items:start;padding-top:0}" in ADMIN_CATALOG
 
 
 def test_owner_guides_are_searchable_private_help_without_dangerous_actions():

@@ -44,7 +44,12 @@ from fastapi import (
     Request,
     Response,
 )
-from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    PlainTextResponse,
+    RedirectResponse,
+)
 from fastapi.staticfiles import StaticFiles
 from PIL import Image, ImageOps, UnidentifiedImageError
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -4143,7 +4148,9 @@ PRODUCT_LOCALES = {
         "category": "Товары Чайни",
         "home": "Главная",
         "shop": "Чай",
+        "teaware": "Посуда",
         "all_teas": "Все товары",
+        "all_teaware": "Вся посуда",
         "in_stock": "В наличии",
         "out_of_stock": "Нет в наличии",
         "per_piece": "за штуку",
@@ -4163,7 +4170,9 @@ PRODUCT_LOCALES = {
         "category": "Chainya products",
         "home": "Home",
         "shop": "Tea",
+        "teaware": "Teaware",
         "all_teas": "All products",
+        "all_teaware": "All teaware",
         "in_stock": "In stock",
         "out_of_stock": "Out of stock",
         "per_piece": "per piece",
@@ -4183,7 +4192,9 @@ PRODUCT_LOCALES = {
         "category": "茶饮屋商品",
         "home": "首页",
         "shop": "茶",
+        "teaware": "茶具",
         "all_teas": "全部商品",
+        "all_teaware": "全部茶具",
         "in_stock": "有货",
         "out_of_stock": "缺货",
         "per_piece": "每块",
@@ -4206,12 +4217,28 @@ PRODUCT_TYPE_NAMES = {
 }
 
 
-def _product_url(item_id: str, language: str) -> str:
-    return f"{PUBLIC_SITE}{PRODUCT_LOCALES[language]['prefix']}/tea/{item_id}"
+def _catalog_product_group(document: dict, item: dict) -> str:
+    category = next(
+        (
+            current
+            for current in document.get("types", [])
+            if current.get("id") == item.get("type")
+        ),
+        {},
+    )
+    return "teaware" if category.get("group") == "teaware" else "tea"
 
 
-def _product_alternates(item_id: str) -> dict[str, str]:
-    return {language: _product_url(item_id, language) for language in PRODUCT_LOCALES}
+def _product_url(item_id: str, language: str, group: str = "tea") -> str:
+    section = "teaware" if group == "teaware" else "tea"
+    return f"{PUBLIC_SITE}{PRODUCT_LOCALES[language]['prefix']}/{section}/{item_id}"
+
+
+def _product_alternates(item_id: str, group: str = "tea") -> dict[str, str]:
+    return {
+        language: _product_url(item_id, language, group)
+        for language in PRODUCT_LOCALES
+    }
 
 
 def _script_json(value: object) -> str:
@@ -4261,8 +4288,9 @@ def _product_page_html(document: dict, item: dict, language: str = "ru") -> str:
     name = translated["name"]
     origin = translated.get("orig", "")
     description = translated.get("desc", "") or locale["fallback"].format(name=name)
-    canonical = _product_url(item["id"], language)
-    alternates = _product_alternates(item["id"])
+    product_group = _catalog_product_group(document, item)
+    canonical = _product_url(item["id"], language, product_group)
+    alternates = _product_alternates(item["id"], product_group)
     image_path = catalog_image_url(item)
     image_url = PUBLIC_SITE + image_path
     unit_label = locale["per_piece"] if item["unit"] == "pc" else locale["per_10g"]
@@ -4358,8 +4386,12 @@ def _product_page_html(document: dict, item: dict, language: str = "ru") -> str:
                     {
                         "@type": "ListItem",
                         "position": 2,
-                        "name": locale["shop"],
-                        "item": PUBLIC_SITE + f"/shop?lang={language}",
+                        "name": locale["teaware"] if product_group == "teaware" else locale["shop"],
+                        "item": PUBLIC_SITE + (
+                            f"/teaware?lang={language}"
+                            if product_group == "teaware"
+                            else f"/shop?lang={language}"
+                        ),
                     },
                     {
                         "@type": "ListItem",
@@ -4393,7 +4425,9 @@ def _product_page_html(document: dict, item: dict, language: str = "ru") -> str:
         for code, details in PRODUCT_LOCALES.items()
         if code != language
     )
-    shop_href = f"/shop?lang={language}#tea-{item['id']}"
+    section_path = "/teaware" if product_group == "teaware" else "/shop"
+    section_label = locale["all_teaware"] if product_group == "teaware" else locale["all_teas"]
+    shop_href = f"{section_path}?lang={language}#tea-{item['id']}"
     return f"""<!doctype html>
 <html lang="{locale['html_lang']}">
 <head>
@@ -4436,7 +4470,7 @@ h1{{margin:0;font:clamp(42px,6vw,78px)/1.06 Prata,Georgia,serif;letter-spacing:-
 </style>
 </head>
 <body><div class="shell">
-<header class="nav"><a class="brand" href="/"><img src="/img/logo-mark.webp" alt=""><span>ЧАЙНЯ</span></a><a class="back" href="/shop?lang={language}">{locale['all_teas']}</a></header>
+<header class="nav"><a class="brand" href="/"><img src="/img/logo-mark.webp" alt=""><span>ЧАЙНЯ</span></a><a class="back" href="{section_path}?lang={language}">{section_label}</a></header>
 <main class="product">
   <img class="product__image" src="{safe_image}" alt="{safe_name}" width="900" height="900">
   <article>
@@ -4453,23 +4487,43 @@ h1{{margin:0;font:clamp(42px,6vw,78px)/1.06 Prata,Georgia,serif;letter-spacing:-
 </main></div></body></html>"""
 
 
-def _missing_product_html() -> str:
-    return """<!doctype html><html lang="ru"><head><meta charset="utf-8">
+def _missing_product_html(group: str = "tea") -> str:
+    heading = "Эта вещь уже ушла с полки" if group == "teaware" else "Этот чай уже выпит"
+    section = "/teaware" if group == "teaware" else "/shop"
+    label = "Вернуться к посуде" if group == "teaware" else "Вернуться к чаю"
+    title = "Посуда не найдена · Чайня" if group == "teaware" else "Чай не найден · Чайня"
+    template = """<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="robots" content="noindex,nofollow"><title>Чай не найден · Чайня</title>
+<meta name="robots" content="noindex,nofollow"><title>__TITLE__</title>
 <style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#141110;color:#f1ece4;font:18px Arial,sans-serif}.box{max-width:560px;padding:40px}h1{font:52px Georgia,serif}p{color:#b9afa4;line-height:1.6}a{color:#df6b66}</style></head>
-<body><main class="box"><h1>Этот чай уже выпит</h1><p>Карточка могла быть скрыта или адрес изменился.</p><a href="/shop">Вернуться в каталог</a></main></body></html>"""
+<body><main class="box"><h1>__HEADING__</h1><p>Карточка могла быть скрыта или адрес изменился.</p><a href="__SECTION__">__LABEL__</a></main></body></html>"""
+    return (
+        template.replace("__TITLE__", title)
+        .replace("__HEADING__", heading)
+        .replace("__SECTION__", section)
+        .replace("__LABEL__", label)
+    )
 
 
-def _product_page_response(item_id: str, language: str = "ru") -> HTMLResponse:
+def _product_page_response(
+    item_id: str, language: str = "ru", expected_group: str = "tea"
+) -> Response:
     found = _public_product(item_id)
     if not found:
         return HTMLResponse(
-            _missing_product_html(),
+            _missing_product_html(expected_group),
             status_code=404,
             headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow"},
         )
     document, item = found
+    actual_group = _catalog_product_group(document, item)
+    if actual_group != expected_group:
+        prefix = PRODUCT_LOCALES[language]["prefix"]
+        return RedirectResponse(
+            f"{prefix}/{actual_group}/{item_id}",
+            status_code=308,
+            headers={"Cache-Control": "public, max-age=60"},
+        )
     return HTMLResponse(
         _product_page_html(document, item, language),
         headers={"Cache-Control": "public, max-age=60, stale-while-revalidate=300"},
@@ -4478,33 +4532,85 @@ def _product_page_response(item_id: str, language: str = "ru") -> HTMLResponse:
 
 @app.get("/tea/{item_id}", response_class=HTMLResponse)
 def product_page(item_id: str):
-    return _product_page_response(item_id)
+    return _product_page_response(item_id, expected_group="tea")
 
 
 @app.get("/en/tea/{item_id}", response_class=HTMLResponse)
 def product_page_en(item_id: str):
-    return _product_page_response(item_id, "en")
+    return _product_page_response(item_id, "en", "tea")
 
 
 @app.get("/zh/tea/{item_id}", response_class=HTMLResponse)
 def product_page_zh(item_id: str):
-    return _product_page_response(item_id, "zh")
+    return _product_page_response(item_id, "zh", "tea")
 
 
-@app.head("/tea/{item_id}")
-def product_page_head(item_id: str):
-    if not _public_product(item_id):
+@app.get("/teaware/{item_id}", response_class=HTMLResponse)
+def teaware_product_page(item_id: str):
+    return _product_page_response(item_id, expected_group="teaware")
+
+
+@app.get("/en/teaware/{item_id}", response_class=HTMLResponse)
+def teaware_product_page_en(item_id: str):
+    return _product_page_response(item_id, "en", "teaware")
+
+
+@app.get("/zh/teaware/{item_id}", response_class=HTMLResponse)
+def teaware_product_page_zh(item_id: str):
+    return _product_page_response(item_id, "zh", "teaware")
+
+
+def _product_page_head(
+    item_id: str, expected_group: str, language: str = "ru"
+) -> Response:
+    found = _public_product(item_id)
+    if not found:
         return Response(
             status_code=404,
             headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow"},
         )
+    actual_group = _catalog_product_group(*found)
+    if actual_group != expected_group:
+        section = "teaware" if actual_group == "teaware" else "tea"
+        prefix = PRODUCT_LOCALES[language]["prefix"]
+        return Response(
+            status_code=308,
+            headers={
+                "Location": f"{prefix}/{section}/{item_id}",
+                "Cache-Control": "public, max-age=60",
+            },
+        )
     return Response(headers={"Cache-Control": "public, max-age=60, stale-while-revalidate=300"})
 
 
+@app.head("/tea/{item_id}")
+def product_page_head(item_id: str):
+    return _product_page_head(item_id, "tea")
+
+
 @app.head("/en/tea/{item_id}")
+def product_page_head_en(item_id: str):
+    return _product_page_head(item_id, "tea", "en")
+
+
 @app.head("/zh/tea/{item_id}")
-def localized_product_page_head(item_id: str):
-    return product_page_head(item_id)
+def product_page_head_zh(item_id: str):
+    return _product_page_head(item_id, "tea", "zh")
+
+
+@app.head("/teaware/{item_id}")
+def teaware_product_page_head(item_id: str):
+    return _product_page_head(item_id, "teaware")
+
+
+@app.head("/en/teaware/{item_id}")
+def teaware_product_page_head_en(item_id: str):
+    return _product_page_head(item_id, "teaware", "en")
+
+
+@app.head("/zh/teaware/{item_id}")
+def teaware_product_page_head_zh(item_id: str):
+    return _product_page_head(item_id, "teaware", "zh")
 
 
 @app.get("/sitemap.xml", response_class=PlainTextResponse)
@@ -4515,6 +4621,7 @@ def dynamic_sitemap():
     base_urls = (
         ("/", "weekly", "1.0"),
         ("/shop", "weekly", "0.9"),
+        ("/teaware", "weekly", "0.8"),
         ("/business", "monthly", "0.7"),
         ("/booking", "monthly", "0.7"),
         ("/legal.html", "monthly", "0.4"),
@@ -4527,7 +4634,9 @@ def dynamic_sitemap():
     for item in document["teas"]:
         if not item.get("published", True):
             continue
-        alternates = _product_alternates(item["id"])
+        alternates = _product_alternates(
+            item["id"], _catalog_product_group(document, item)
+        )
         alternate_xml = "".join(
             f'<xhtml:link rel="alternate" hreflang="{PRODUCT_LOCALES[code]["hreflang"]}" href="{url}"/>'
             for code, url in alternates.items()

@@ -123,9 +123,10 @@ function completionState(item) {
   );
   const ru = missing.ru;
   const translations = missing.en.length + missing.zh.length;
+  const missingCount = ru.length + translations;
   if (essentials.length) return {level: 'need', label: 'Нужно дополнить', essentials, missing};
-  if (ru.length) return {level: 'warn', label: 'Дополнить РУ', essentials, missing};
-  if (translations) return {level: 'translate', label: 'Дополнить переводы', essentials, missing};
+  if (ru.length) return {level: 'warn', label: `Дополнить · ${missingCount}`, essentials, missing};
+  if (translations) return {level: 'translate', label: `Переводы · ${translations}`, essentials, missing};
   return {level: 'ready', label: 'Карточка готова', essentials, missing};
 }
 
@@ -622,7 +623,8 @@ function renderEditor() {
   if (selectedId && draft.published) {
     const open = document.createElement('a');
     open.className = 'editor-link';
-    open.href = `/tea/${encodeURIComponent(draft.id)}`;
+    const section = itemGroup(draft) === 'teaware' ? 'teaware' : 'tea';
+    open.href = `/${section}/${encodeURIComponent(draft.id)}`;
     open.target = '_blank';
     open.rel = 'noopener';
     open.textContent = 'Открыть на сайте ↗';

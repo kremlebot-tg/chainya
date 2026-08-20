@@ -116,10 +116,10 @@ http://127.0.0.1:8078 {
 
 	# Товарные страницы и sitemap формируются backend из живого каталога.
 	# Так публикация и скрытие карточки в панели сразу отражаются в SEO-контуре.
-	@productSlash path_regexp productSlash ^/((en/|zh/)?tea/[a-z0-9][a-z0-9-]{0,79})/$
+	@productSlash path_regexp productSlash ^/((en/|zh/)?(tea|teaware)/[a-z0-9][a-z0-9-]{0,79})/$
 	redir @productSlash /{re.productSlash.1} 308
 
-	@productPage path_regexp productPage ^/(en/|zh/)?tea/[a-z0-9][a-z0-9-]{0,79}$
+	@productPage path_regexp productPage ^/(en/|zh/)?(tea|teaware)/[a-z0-9][a-z0-9-]{0,79}$
 	handle @productPage {
 		import chainya_public_headers
 		import chainya_origin

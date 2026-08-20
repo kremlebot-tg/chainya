@@ -123,6 +123,10 @@ def test_teaware_has_a_separate_public_navigation_route():
     assert "nav_teaware:'Посуда'" in SOURCE
     assert "nav_teaware:'Teaware'" in SOURCE
     assert "nav_teaware:'茶具'" in SOURCE
+    assert "nav_shop:'Чай'" in SOURCE
+    assert "nav_shop:'Tea'" in SOURCE
+    assert "nav_shop:'茶'" in SOURCE
+    assert 'data-i18n="nav_shop">Купить чай</a>' not in SOURCE
 
 
 def test_catalog_cards_expose_indexable_product_links_and_keep_modal_navigation():

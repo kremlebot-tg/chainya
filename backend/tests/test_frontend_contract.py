@@ -2,7 +2,6 @@ from pathlib import Path
 
 import pytest
 
-
 SOURCE_PATH = Path(__file__).resolve().parents[2] / "src.html"
 BUILD_PATH = Path(__file__).resolve().parents[2] / "build.py"
 ADMIN_CATALOG_PATH = Path(__file__).resolve().parents[1] / "admin-catalog.html"
@@ -401,7 +400,8 @@ def test_admin_catalog_has_owner_safe_creation_filters_preview_and_photo_queue()
 
 def test_admin_button_like_links_share_the_button_alignment_contract():
     assert "display:inline-flex;align-items:center;justify-content:center;gap:7px;line-height:1.2;text-align:center;text-decoration:none" in ADMIN_CATALOG
-    assert '<a class="btn" href="/manage">Обзор</a>' in ADMIN_CATALOG
+    assert '<a class="admin-nav__link" href="/manage">Обзор</a>' in ADMIN_CATALOG
+    assert '<a class="admin-nav__link" href="/manage/catalog" aria-current="page">Каталог</a>' in ADMIN_CATALOG
     assert '<a class="btn" href="/shop" target="_blank" rel="noopener">Открыть магазин ↗</a>' in ADMIN_CATALOG
     assert "display:inline-flex;align-items:center;justify-content:center;line-height:1.2;text-align:center;text-decoration:none" in ADMIN_SOURCE
 
@@ -414,10 +414,17 @@ def test_admin_secondary_controls_are_visually_centered():
 
 
 def test_admin_catalog_mobile_summary_wraps_without_a_clipped_horizontal_strip():
-    assert ".stats{grid-template-columns:repeat(2,minmax(0,1fr));overflow:visible}" in ADMIN_CATALOG
-    assert ".stat:nth-child(2n){border-right:0}" in ADMIN_CATALOG
-    assert ".stat:nth-last-child(-n+2){border-bottom:0}" in ADMIN_CATALOG
+    assert ".stats{display:flex;overflow-x:auto;scroll-snap-type:x proximity" in ADMIN_CATALOG
+    assert ".stats .stat{min-width:132px" in ADMIN_CATALOG
     assert "@media(max-width:900px){.items{max-height:none;overflow:visible}" in ADMIN_CATALOG
+
+
+def test_admin_catalog_prioritizes_daily_work_and_keeps_optional_fields_non_blocking():
+    assert ADMIN_CATALOG.index('class="layout"') < ADMIN_CATALOG.index('aria-label="Сервисные инструменты"')
+    assert 'data-stat-filter="incomplete"' in ADMIN_CATALOG
+    assert "optional.className = 'optional-fields'" in ADMIN_CATALOG_JS
+    assert "Публикация не заблокирована" in ADMIN_CATALOG_JS
+    assert "form.requestSubmit()" in ADMIN_CATALOG_JS
 
 
 def test_catalog_escapes_owner_controlled_copy_before_using_inner_html():

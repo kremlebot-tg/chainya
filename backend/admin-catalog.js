@@ -445,18 +445,40 @@ function buildCompletion(item, node) {
       ? 'Карточку можно сохранить; важное ещё не заполнено'
       : 'Карточку можно опубликовать и дополнить позже';
   node.append(strong);
+  const summary = document.createElement('p');
+  summary.className = 'completion-summary';
+  summary.textContent = state.level === 'ready'
+    ? groupCopy(item).complete
+    : state.essentials.length
+      ? 'Сохранение доступно. Перед продажей проверьте название, цену и фотографию.'
+      : 'Публикация не заблокирована: недостающие сведения останутся напоминанием только в панели.';
+  node.append(summary);
+  const chips = document.createElement('div');
+  chips.className = 'completion-chips';
+  for (const [language, , short] of LANGUAGES) {
+    const count = state.missing[language].length;
+    const chip = document.createElement('span');
+    chip.className = 'completion-chip' + (count ? '' : ' is-ready');
+    chip.textContent = count ? `${short}: дополнить ${count}` : `${short}: готово`;
+    chips.append(chip);
+  }
+  node.append(chips);
+  if (state.level === 'ready') {
+    return;
+  }
+  const details = document.createElement('details');
+  details.className = 'completion-details';
+  const detailsSummary = document.createElement('summary');
+  detailsSummary.textContent = 'Показать, что именно нужно дополнить';
   const list = document.createElement('div');
   list.className = 'completion-list';
-  if (state.level === 'ready') {
-    list.textContent = groupCopy(item).complete;
-  } else {
-    if (state.essentials.length) addCompletionLine(list, 'Важно', state.essentials.join(', '));
-    for (const [language, , short] of LANGUAGES) {
-      const missing = state.missing[language];
-      if (missing.length) addCompletionLine(list, short, `${missing.length}: ${missing.map(row => row.label).join(', ')}`);
-    }
+  if (state.essentials.length) addCompletionLine(list, 'Важно', state.essentials.join(', '));
+  for (const [language, , short] of LANGUAGES) {
+    const missing = state.missing[language];
+    if (missing.length) addCompletionLine(list, short, missing.map(row => row.label).join(', '));
   }
-  node.append(list);
+  details.append(detailsSummary, list);
+  node.append(details);
 }
 
 function addCompletionLine(root, label, value) {
@@ -638,7 +660,7 @@ function renderEditor() {
     duplicate.onclick = cloneItem;
     links.append(duplicate);
   }
-  title.append(eyebrow, heading, note, saveState, links);
+  title.append(eyebrow, heading, note, saveState);
   if (draft.saby) {
     const link = document.createElement('span');
     link.className = 'saby-link' + (draft.saby.image_pending ? ' saby-photo-pending' : '');
@@ -647,7 +669,7 @@ function renderEditor() {
       : 'Связано со СБИС';
     title.append(link);
   }
-  head.append(photoStack, title);
+  head.append(photoStack, title, links);
   form.append(head);
 
   if (draft.saby?.image_pending) {
@@ -660,7 +682,6 @@ function renderEditor() {
   const completion = document.createElement('div');
   completion.id = 'completion';
   buildCompletion(draft, completion);
-  form.append(completion);
 
   const base = document.createElement('div');
   base.className = 'section';
@@ -697,7 +718,7 @@ function renderEditor() {
   $('select', unitField).value = draft.unit;
   const checks = document.createElement('div');
   checks.className = 'checks field--wide';
-  checks.innerHTML = `<label class="check"><input type="checkbox" name="stock" ${draft.stock ? 'checked' : ''}> В наличии</label><label class="check"><input type="checkbox" name="published" ${draft.published ? 'checked' : ''} ${draft.saby?.image_pending ? 'disabled' : ''}> Показывать на сайте${draft.saby?.image_pending ? ' (сначала фото)' : ''}</label>`;
+  checks.innerHTML = `<label class="check"><input type="checkbox" name="stock" ${draft.stock ? 'checked' : ''}><span>В наличии<small>Покупатель может добавить товар в корзину</small></span></label><label class="check"><input type="checkbox" name="published" ${draft.published ? 'checked' : ''} ${draft.saby?.image_pending ? 'disabled' : ''}><span>Показывать на сайте<small>${draft.saby?.image_pending ? 'Сначала добавьте настоящее фото' : 'Скрытая карточка остаётся в панели'}</small></span></label>`;
   baseGrid.append(typeField, priceField, unitField, checks);
   base.append(baseGrid);
   const technical = document.createElement('details');
@@ -716,6 +737,7 @@ function renderEditor() {
   technical.append(technicalSummary, technicalBody);
   base.append(technical);
   form.append(base);
+  form.append(completion);
 
   const textSection = document.createElement('div');
   textSection.className = 'section';
@@ -765,11 +787,30 @@ function renderEditor() {
     panel.setAttribute('aria-labelledby', `catalog-lang-tab-${language}`);
     panel.hidden = language !== 'ru';
     const translation = draft.translations[language] || {};
-    copy.fields.forEach(([field, label, control]) => {
+    copy.fields.slice(0, 3).forEach(([field, label, control]) => {
       panel.append(control === 'textarea'
         ? makeTextarea(label, `${language}.${field}`, translation[field])
         : makeInput(label, `${language}.${field}`, translation[field]));
     });
+    const optional = document.createElement('details');
+    optional.className = 'optional-fields';
+    const optionalSummary = document.createElement('summary');
+    const optionalTitle = document.createElement('span');
+    optionalTitle.textContent = itemGroup(draft) === 'tea'
+      ? 'Маркировка и хранение'
+      : 'Характеристики и уход';
+    const optionalStatus = document.createElement('small');
+    optionalStatus.dataset.optionalStatus = language;
+    optionalSummary.append(optionalTitle, optionalStatus);
+    const optionalBody = document.createElement('div');
+    optionalBody.className = 'optional-fields__body';
+    copy.fields.slice(3).forEach(([field, label, control]) => {
+      optionalBody.append(control === 'textarea'
+        ? makeTextarea(label, `${language}.${field}`, translation[field])
+        : makeInput(label, `${language}.${field}`, translation[field]));
+    });
+    optional.append(optionalSummary, optionalBody);
+    panel.append(optional);
     textSection.append(panel);
   }
   form.append(textSection);
@@ -889,6 +930,12 @@ function updateEditorFeedback(form) {
     const count = missingByLanguage(item, language).length;
     const status = $(`[data-lang-status="${language}"]`);
     if (status) status.textContent = count ? String(count) : '✓';
+    const optionalStatus = $(`[data-optional-status="${language}"]`);
+    if (optionalStatus) {
+      const text = item.translations?.[language] || {};
+      const missing = groupCopy(item).fields.slice(3).filter(([field]) => !visibleText(text[field])).length;
+      optionalStatus.textContent = missing ? `не заполнено: ${missing}` : 'заполнено';
+    }
   }
   const hint = $('#publish-hint');
   if (hint) hint.textContent = item.published
@@ -1265,7 +1312,20 @@ async function loadCatalog(preserve = true) {
 }
 
 $('#search').addEventListener('input', renderList);
-$('#catalog-filter').addEventListener('change', renderList);
+$('#catalog-filter').addEventListener('change', event => {
+  $$('[data-stat-filter]').forEach(node => {
+    node.setAttribute('aria-pressed', String(node.dataset.statFilter === event.target.value));
+  });
+  renderList();
+});
+$$('[data-stat-filter]').forEach(button => {
+  button.addEventListener('click', () => {
+    $('#catalog-filter').value = button.dataset.statFilter;
+    $$('[data-stat-filter]').forEach(node => node.setAttribute('aria-pressed', String(node === button)));
+    renderList();
+    if (innerWidth <= 900) $('.sidebar').scrollIntoView({block: 'start', behavior: 'smooth'});
+  });
+});
 $('#group-filter').addEventListener('click', event => {
   const button = event.target.closest('[data-group]');
   if (!button) return;
@@ -1279,6 +1339,7 @@ $$('[data-add-group]').forEach(button => { button.onclick = () => chooseNewGroup
 $('#close-kind').onclick = () => $('#kind-dialog').close();
 $('#close-preview').onclick = () => $('#preview-dialog').close();
 $('#show-saby').onclick = showSaby;
+$('#stat-saby-card').onclick = showSaby;
 $('#close-saby').onclick = () => $('#saby-dialog').close();
 $('#export-catalog').onclick = downloadCatalog;
 $('#show-history').onclick = showHistory;
@@ -1290,6 +1351,13 @@ $('#reload').onclick = () => { if (confirmDiscard()) { loadCatalog(true); loadSa
 $('#logout').onclick = async () => { await fetch('/api/admin/session', {method: 'DELETE'}); location.replace('/manage'); };
 addEventListener('beforeunload', event => {
   if (dirty) { event.preventDefault(); event.returnValue = ''; }
+});
+addEventListener('keydown', event => {
+  if (!(event.metaKey || event.ctrlKey) || event.key.toLocaleLowerCase('ru') !== 's') return;
+  const form = $('#catalog-form');
+  if (!form || !dirty) return;
+  event.preventDefault();
+  form.requestSubmit();
 });
 
 loadCatalog(false);

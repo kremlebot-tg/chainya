@@ -6,6 +6,10 @@ Type=oneshot
 User=chainya-shop
 Group=chainya-shop
 UMask=0077
+# The directory may have been created by an earlier root-run deployment.  The
+# privileged prefix applies only to this exact install command; the backup
+# itself still runs as the unprivileged chainya-shop account below.
+ExecStartPre=+/usr/bin/install -d -o chainya-shop -g chainya-shop -m 0700 /var/backups/chainya-shop
 ExecStart=/opt/chainya-shop/.venv/bin/python /opt/chainya-shop/ops/backup-chainya.py
 Nice=10
 NoNewPrivileges=true

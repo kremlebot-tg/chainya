@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 SCRIPT = Path(__file__).parents[2] / "ops" / "backup-chainya.py"
+SERVICE = Path(__file__).parents[2] / "ops" / "chainya-backup.service"
 SPEC = importlib.util.spec_from_file_location("chainya_backup_retention", SCRIPT)
 assert SPEC and SPEC.loader
 backup_retention = importlib.util.module_from_spec(SPEC)
@@ -430,3 +431,17 @@ def test_privacy_copy_matches_enforced_retention_periods():
         "32天",
     ):
         assert phrase in policy
+
+
+def test_backup_service_repairs_destination_before_dropping_privileges():
+    unit = SERVICE.read_text(encoding="utf-8")
+    prepare = (
+        "ExecStartPre=+/usr/bin/install -d -o chainya-shop -g chainya-shop "
+        "-m 0700 /var/backups/chainya-shop"
+    )
+
+    assert "User=chainya-shop" in unit
+    assert "Group=chainya-shop" in unit
+    assert prepare in unit
+    assert unit.index(prepare) < unit.index("ExecStart=/opt/chainya-shop/.venv/bin/python")
+    assert "ExecStart=+/opt/chainya-shop" not in unit

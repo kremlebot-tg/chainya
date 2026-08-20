@@ -100,7 +100,7 @@ def test_public_pages_use_quiet_account_probe_and_eager_hero_image():
 
 
 def test_catalog_keeps_a_semantic_heading_without_restoring_visual_clutter():
-    assert '<h1 class="sr-only" id="shop-heading" data-i18n="shop_heading">' in SOURCE
+    assert '<h1 class="shop-heading" id="shop-heading" data-i18n="shop_heading">' in SOURCE
     assert "shop_heading:'Каталог китайского чая'" in SOURCE
     assert "teaCard(m, 'h2', true, index < 8)" in SOURCE
 
@@ -108,11 +108,18 @@ def test_catalog_keeps_a_semantic_heading_without_restoring_visual_clutter():
 def test_teaware_has_a_separate_public_navigation_route():
     assert SOURCE.count('href="/teaware" data-go="teaware" data-i18n="nav_teaware"') == 2
     assert "const VIEW_PATHS = { home:'/', shop:'/shop', teaware:'/teaware'" in SOURCE
-    assert "curFilter = view === 'teaware' ? 'teaware' : 'tea'" in SOURCE
+    assert "catalogGroup = view === 'teaware' ? 'teaware' : 'tea'" in SOURCE
+    assert "curFilter = catalogGroup" in SOURCE
     assert "heading.dataset.i18n = view === 'teaware' ? 'teaware_heading' : 'shop_heading'" in SOURCE
     assert "search.dataset.i18nPh = view === 'teaware' ? 'teaware_search_ph' : 'shop_search_ph'" in SOURCE
     assert "$('#shop-note').hidden = view === 'teaware'" in SOURCE
-    assert "const filterGroup = ['tea','teaware'].includes(curFilter) ? curFilter : typeGroup(curFilter)" in SOURCE
+    assert "filter_all_tea:'Все чаи'" in SOURCE
+    assert "filter_all_teaware:'Вся посуда'" in SOURCE
+    assert "['all','tea','teaware'].forEach" not in SOURCE
+    assert "typeGroup(c.dataset.type) === catalogGroup" in SOURCE
+    assert "type.group === catalogGroup && TEA_META.some(item => item.t === type.id)" in SOURCE
+    assert "empty.dataset.i18n = sectionEmpty ? 'catalog_empty' : 'shop_empty'" in SOURCE
+    assert "$('#filters-shell').hidden = sectionEmpty" in SOURCE
     assert "nav_teaware:'Посуда'" in SOURCE
     assert "nav_teaware:'Teaware'" in SOURCE
     assert "nav_teaware:'茶具'" in SOURCE
@@ -297,7 +304,7 @@ def test_shop_defers_images_below_the_initial_catalog_view():
     assert "rect.top > innerHeight + 600" in SOURCE
     assert "if (CATALOG_VIEWS.has(view)) activateCatalogImages()" in SOURCE
     assert "if ($('#view-shop').classList.contains('is-active')) activateCatalogImages()" in SOURCE
-    assert "$('#shop-empty').hidden = shown !== 0 || curFilter === 'fav';\n    scheduleCatalogImages();" in SOURCE
+    assert "empty.hidden = shown !== 0 || curFilter === 'fav';\n    scheduleCatalogImages();" in SOURCE
 
 
 def test_initial_catalog_waits_for_live_data_before_showing_product_photos():

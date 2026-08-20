@@ -341,7 +341,7 @@ h1, h2, h3, p{ text-wrap:pretty; }
 .chip__heart{ width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:1.7; margin-right:1px; }
 .chip--fav[aria-pressed="true"] .chip__heart{ fill:currentColor; }
 .chip__n{ margin-left:4px; opacity:.65; }
-#fav-empty,#shop-empty{ margin:26px 0 0; color:var(--text-3); font-size:14.5px; }
+#fav-empty,#shop-empty{ max-width:42rem; margin:26px 0 0; color:var(--text-3); font-size:14.5px; line-height:1.6; }
 .tea__body{ padding:15px 2px 8px; display:flex; flex-direction:column; flex:1; }
 .tea__name{ font-family:'Prata',Georgia,serif; font-size:1.18rem; line-height:1.22; letter-spacing:-.01em; overflow-wrap:anywhere; }
 .tea__orig{ margin-top:5px; font-size:12.5px; color:var(--text-3); overflow-wrap:anywhere; }
@@ -378,8 +378,14 @@ h1, h2, h3, p{ text-wrap:pretty; }
 .pack span{ display:block; font-size:11.5px; opacity:.75; font-variant-numeric:tabular-nums; margin-top:1px; }
 
 /* ── Фильтры карты ── */
+.shop-heading{
+  margin:0 0 clamp(28px,4vw,44px); max-width:16ch;
+  font-family:'Prata',Georgia,serif; font-size:clamp(2.35rem,4.4vw,4.25rem);
+  font-weight:400; line-height:1.05; letter-spacing:-.035em;
+}
 .shop-toolbar{ margin-bottom:28px; }
 .shop-tools{ display:grid; grid-template-columns:minmax(220px,1fr) minmax(190px,.35fr); gap:10px; margin-top:14px; }
+.shop-tools[hidden],.shop-count[hidden],.scroll-shell[hidden],.shop-note[hidden]{ display:none; }
 .shop-search{ position:relative; }
 .shop-search svg{ position:absolute; left:14px; top:50%; width:17px; height:17px; transform:translateY(-50%); fill:none; stroke:var(--text-3); stroke-width:1.7; pointer-events:none; }
 .shop-search .input{ padding-left:42px; }
@@ -869,6 +875,7 @@ select.input{
   }
   .hero__media img{ object-position:50% 42%; }
   .hero h1{ font-size:clamp(2.25rem,11vw,3.25rem); }
+  .shop-heading{ margin-bottom:26px; font-size:clamp(2.2rem,11vw,3.15rem); }
   .hero__lead{ margin-top:21px; }
   .hero__cta{ margin-top:24px; }
 }
@@ -1166,11 +1173,11 @@ select.input{
 <!-- ══════════════════  КУПИТЬ ЧАЙ  ══════════════════ -->
 <section class="view" id="view-shop">
   <div class="sec wrap">
-    <h1 class="sr-only" id="shop-heading" data-i18n="shop_heading">Каталог китайского чая</h1>
+    <h1 class="shop-heading" id="shop-heading" data-i18n="shop_heading">Каталог китайского чая</h1>
     <div class="shop-toolbar">
-      <div class="scroll-shell scroll-shell--chips"><div class="chips" id="filters" role="group" data-i18n-aria="filters_label" aria-label="Разделы каталога"></div></div>
+      <div class="scroll-shell scroll-shell--chips" id="filters-shell"><div class="chips" id="filters" role="group" data-i18n-aria="filters_label" aria-label="Фильтры каталога"></div></div>
       <div class="scroll-shell scroll-shell--chips" id="subfilters-shell"><div class="chips" id="subfilters" role="group" aria-label="Подразделы каталога"></div></div>
-      <div class="shop-tools">
+      <div class="shop-tools" id="shop-tools">
         <label class="shop-search" for="shop-search">
           <span class="sr-only" data-i18n="shop_search_label">Поиск по каталогу</span>
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
@@ -1179,7 +1186,7 @@ select.input{
         <label class="sr-only" for="shop-sort" data-i18n="shop_sort_label">Сортировка</label>
         <select class="input" id="shop-sort" data-i18n-aria="shop_sort_label" aria-label="Сортировка"></select>
       </div>
-      <p class="shop-count" aria-live="polite"><span data-i18n="shop_count">В подборке</span><b class="num" id="shop-count">0</b></p>
+      <p class="shop-count" id="shop-count-row" aria-live="polite"><span data-i18n="shop_count">В подборке</span><b class="num" id="shop-count">0</b></p>
       <details class="shop-note" id="shop-note">
         <summary data-i18n="shop_note_h">Фасовка и прессованный чай</summary>
         <p data-i18n="shop_note_p">Вес выбирается в карточке чая. Мандарин и квадратик продаём поштучно, блины — по запросу.</p>
@@ -1740,11 +1747,11 @@ select.input{
     visit_metro_label:'Метро', visit_metro:'Аэропорт', visit_hours_label:'Открыты', visit_hours:'<span class="visit__hours-line">Ежедневно</span><span class="visit__hours-line num">12:00–22:00</span>',
     visit_route:'Построить маршрут', visit_open:'Открыть карточку в Яндекс Картах', visit_map_title:'Чайня на карте Москвы',
     shop_heading:'Каталог китайского чая', teaware_heading:'Каталог чайной посуды', shop_note_h:'Фасовка и прессованный чай', shop_note_p:'Вес выбирается в карточке чая. Мандарин и квадратик продаём поштучно, блины — по запросу.', shop_count:'В подборке',
-    shop_search_label:'Поиск по каталогу', shop_search_ph:'Название, регион или вкус', teaware_search_ph:'Название или материал', shop_sort_label:'Сортировка', shop_empty:'По этому запросу ничего не найдено. Попробуйте другое название или сбросьте фильтр.',
+    shop_search_label:'Поиск по каталогу', shop_search_ph:'Название, регион или вкус', teaware_search_ph:'Название или материал', shop_sort_label:'Сортировка', shop_empty:'По этому запросу ничего не найдено. Попробуйте другое название или сбросьте фильтр.', catalog_empty:'В этом разделе пока нет опубликованных товаров.',
     shop_sort_default:'Сначала рекомендованные', shop_sort_price_asc:'Сначала дешевле', shop_sort_price_desc:'Сначала дороже', shop_sort_name:'По названию',
     types:['Все','Белый','Зелёный','Габа','Улуны Фуцзяни','Улуны Гуандуна','Улуны Уишаня','Красный','Шэн Пуэр','Шу Пуэр','Хэй Ча','Травы и добавки'],
     more:'о чае', per_pc:'за штуку', per_pack25:'за 10 г', gram:'г',
-    fav_label:'В избранное', filter_fav:'Избранное', fav_empty:'Здесь появится то, что вы отметите сердечком.',
+    fav_label:'В избранное', filter_fav:'Избранное', filter_all_tea:'Все чаи', filter_all_teaware:'Вся посуда', fav_empty:'Здесь появятся товары, которые вы отметите сердечком.',
     in_stock:'в наличии', oos:'нет в наличии',
     unit_pc:'Одна штука', unit_pack:'Пакет {g} г',
     ts_buy:'Купить с доставкой', order_prefill:'Здравствуйте! Хочу заказать с доставкой: ',
@@ -1922,11 +1929,11 @@ select.input{
     visit_metro_label:'Metro', visit_metro:'Aeroport', visit_hours_label:'Hours', visit_hours:'<span class="visit__hours-line">Daily</span><span class="visit__hours-line num">12:00–22:00</span>',
     visit_route:'Get directions', visit_open:'Open in Yandex Maps', visit_map_title:'Chainya on the Moscow map',
     shop_heading:'Chinese tea catalogue', teaware_heading:'Chinese teaware catalogue', shop_note_h:'Pack sizes and pressed tea', shop_note_p:'Choose the weight in each tea card. Mandarin and mini bricks are sold by the piece; cakes are available on request.', shop_count:'In this selection',
-    shop_search_label:'Search the catalogue', shop_search_ph:'Name, origin or flavour', teaware_search_ph:'Name or material', shop_sort_label:'Sort', shop_empty:'Nothing matches this search. Try another name or reset the filter.',
+    shop_search_label:'Search the catalogue', shop_search_ph:'Name, origin or flavour', teaware_search_ph:'Name or material', shop_sort_label:'Sort', shop_empty:'Nothing matches this search. Try another name or reset the filter.', catalog_empty:'There are no published products in this section yet.',
     shop_sort_default:'Recommended first', shop_sort_price_asc:'Lowest price first', shop_sort_price_desc:'Highest price first', shop_sort_name:'By name',
     types:['All','White','Green','GABA','Fujian oolong','Guangdong oolong','Wuyi oolong','Black','Sheng pu-erh','Shou pu-erh','Hei cha','Herbs & extras'],
     more:'more', per_pc:'each', per_pack25:'for 10 g', gram:'g',
-    fav_label:'Add to favourites', filter_fav:'Favourites', fav_empty:'Teas you save will appear here.',
+    fav_label:'Add to favourites', filter_fav:'Favourites', filter_all_tea:'All teas', filter_all_teaware:'All teaware', fav_empty:'Products you save will appear here.',
     in_stock:'in stock', oos:'out of stock',
     unit_pc:'One piece', unit_pack:'A {g} g bag',
     ts_buy:'Buy with delivery', order_prefill:'Hello! I’d like to order with delivery: ',
@@ -2104,11 +2111,11 @@ select.input{
     visit_metro_label:'地铁', visit_metro:'机场站', visit_hours_label:'营业时间', visit_hours:'<span class="visit__hours-line">每天</span><span class="visit__hours-line num">12:00–22:00</span>',
     visit_route:'规划路线', visit_open:'在Yandex地图中打开', visit_map_title:'莫斯科茶室地图',
     shop_heading:'中国茶目录', teaware_heading:'茶具目录', shop_note_h:'分装与紧压茶', shop_note_p:'请在茶品详情中选择重量。小青柑和小金砖按个出售，茶饼可另询。', shop_count:'当前选择',
-    shop_search_label:'搜索茶叶目录', shop_search_ph:'名称、产地或风味', teaware_search_ph:'名称或材质', shop_sort_label:'排序', shop_empty:'没有找到符合条件的茶。请尝试其他名称或重置筛选。',
+    shop_search_label:'搜索茶叶目录', shop_search_ph:'名称、产地或风味', teaware_search_ph:'名称或材质', shop_sort_label:'排序', shop_empty:'没有找到符合条件的商品。请尝试其他名称或重置筛选。', catalog_empty:'此栏目暂时没有已发布的商品。',
     shop_sort_default:'推荐优先', shop_sort_price_asc:'价格从低到高', shop_sort_price_desc:'价格从高到低', shop_sort_name:'按名称',
     types:['全部','白茶','绿茶','佳叶龙茶','闽南乌龙','广东乌龙','武夷岩茶','红茶','生普洱','熟普洱','黑茶','花草与配料'],
     more:'详情', per_pc:'每个', per_pack25:'10克装', gram:'克',
-    fav_label:'加入收藏', filter_fav:'收藏', fav_empty:'您用爱心标记的茶会显示在这里。',
+    fav_label:'加入收藏', filter_fav:'收藏', filter_all_tea:'全部茶叶', filter_all_teaware:'全部茶具', fav_empty:'您收藏的商品会显示在这里。',
     in_stock:'现货', oos:'暂时售罄',
     unit_pc:'一个', unit_pack:'{g}克装',
     ts_buy:'下单配送', order_prefill:'您好！我想下单配送：',
@@ -2456,7 +2463,8 @@ select.input{
     const changingRoute = previousRoute !== view;
     if (CATALOG_VIEWS.has(view)){
       if (changingRoute){ curSearch = ''; curSort = 'default'; }
-      curFilter = view === 'teaware' ? 'teaware' : 'tea';
+      catalogGroup = view === 'teaware' ? 'teaware' : 'tea';
+      curFilter = catalogGroup;
       const heading = $('#shop-heading');
       heading.dataset.i18n = view === 'teaware' ? 'teaware_heading' : 'shop_heading';
       heading.textContent = T()[heading.dataset.i18n];
@@ -2706,11 +2714,12 @@ select.input{
     if (curFilter === 'fav') applyFilter();   // снятое сердце сразу исчезает из подборки
   }
   function updateFavCount(){
-    const n = getFavs().size;
+    const favs = getFavs();
+    const n = TEA_META.filter(m => typeGroup(m.t) === catalogGroup && favs.has(m.id)).length;
     const el = $('#fav-count'); if (el) el.textContent = n ? n : '';
   }
 
-  let curFilter = 'all', curSearch = '', curSort = 'default';
+  let catalogGroup = 'tea', curFilter = 'tea', curSearch = '', curSort = 'default';
   function buildTeaGrids(){
     const home = $('#home-teas'), menu = $('#menu-teas');
     home.innerHTML = ''; menu.innerHTML = '';
@@ -2878,13 +2887,13 @@ select.input{
     const query = curSearch.trim().toLocaleLowerCase(LANG);
     let shown = 0;
     const cards = $$('#menu-teas .tea');
+    const sectionCount = cards.filter(c => typeGroup(c.dataset.type) === catalogGroup).length;
     cards.forEach(c => {
       const m = TEA_META.find(item => item.id === c.dataset.id);
       const txt = m && T().teas[m.id];
       const category = m ? typeLabel(m.t) : '';
       const haystack = txt ? `${txt.n} ${txt.o} ${txt.d} ${category}`.toLocaleLowerCase(LANG) : '';
-      const categoryOk = curFilter === 'all' ? true
-        : curFilter === 'fav' ? favs.has(c.dataset.id)
+      const categoryOk = curFilter === 'fav' ? favs.has(c.dataset.id) && typeGroup(c.dataset.type) === catalogGroup
         : curFilter === 'tea' || curFilter === 'teaware' ? typeGroup(c.dataset.type) === curFilter
         : c.dataset.type === curFilter;
       const ok = categoryOk && (!query || haystack.includes(query));
@@ -2901,15 +2910,29 @@ select.input{
       return originalOrder.get(a.dataset.id) - originalOrder.get(b.dataset.id);
     }).forEach(card => grid.append(card));
     $('#shop-count').textContent = shown;
-    // подсказка, когда в избранном пусто
-    $('#fav-empty').hidden = !(curFilter === 'fav' && shown === 0);
-    $('#shop-empty').hidden = shown !== 0 || curFilter === 'fav';
+    const sectionEmpty = sectionCount === 0;
+    $('#filters-shell').hidden = sectionEmpty;
+    $('#shop-tools').hidden = sectionEmpty;
+    $('#shop-count-row').hidden = sectionEmpty;
+    $('#shop-note').hidden = sectionEmpty || catalogGroup === 'teaware';
+    // Отличаем пустой раздел от пустого результата поиска и избранного.
+    $('#fav-empty').hidden = sectionEmpty || !(curFilter === 'fav' && shown === 0);
+    const empty = $('#shop-empty');
+    empty.dataset.i18n = sectionEmpty ? 'catalog_empty' : 'shop_empty';
+    empty.textContent = T()[empty.dataset.i18n];
+    empty.hidden = shown !== 0 || curFilter === 'fav';
     scheduleCatalogImages();
   }
   function buildFilters(){
     const f = $('#filters'), sub = $('#subfilters'), subShell = $('#subfilters-shell');
     f.innerHTML = ''; sub.innerHTML = '';
-    // Верхний уровень отделяет чай от посуды; подразделы живут на второй строке.
+    const availableTypes = CATALOG_TYPES.filter(type =>
+      type.group === catalogGroup && TEA_META.some(item => item.t === type.id)
+    );
+    if (curFilter !== 'fav' && curFilter !== catalogGroup && !availableTypes.some(type => type.id === curFilter))
+      curFilter = catalogGroup;
+    // Чай и посуда уже разделены верхним меню. Здесь остаются только фильтры
+    // текущего раздела, чтобы навигация не дублировалась и не противоречила URL.
     const fav = el(`<button class="chip chip--fav" data-t="fav" aria-pressed="${curFilter === 'fav'}">
       <svg class="chip__heart" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>${T().filter_fav}<span class="chip__n num" id="fav-count"></span>
     </button>`);
@@ -2919,17 +2942,12 @@ select.input{
       applyFilter();
     });
     f.append(fav);
-    const mainLabels = {all:T().types[0],tea:GROUP_LABELS[LANG].tea,teaware:GROUP_LABELS[LANG].teaware};
-    ['all','tea','teaware'].forEach(id => {
-      const filterGroup = ['tea','teaware'].includes(curFilter) ? curFilter : typeGroup(curFilter);
-      const active = curFilter === id || (id !== 'all' && filterGroup === id && !['all','fav'].includes(curFilter));
-      const button = el(`<button class="chip" aria-pressed="${active}" data-t="${id}">${mainLabels[id]}</button>`);
-      button.addEventListener('click',()=>{curFilter=id;buildFilters();applyFilter()});
-      f.append(button);
-    });
+    const allLabel = catalogGroup === 'teaware' ? T().filter_all_teaware : T().filter_all_tea;
+    const all = el(`<button class="chip" aria-pressed="${curFilter === catalogGroup}" data-t="${catalogGroup}">${allLabel}</button>`);
+    all.addEventListener('click',()=>{curFilter=catalogGroup;buildFilters();applyFilter()});
+    f.append(all);
     updateFavCount();
-    const activeGroup = curFilter === 'teaware' || typeGroup(curFilter) === 'teaware' ? 'teaware' : 'tea';
-    CATALOG_TYPES.filter(type=>type.group===activeGroup).forEach(type => {
+    availableTypes.forEach(type => {
       const c = LQ[type.id];
       const b = el(`<button class="chip" aria-pressed="${type.id === curFilter}" data-t="${type.id}">
         ${c ? `<span class="dot" style="background:${c}"></span>` : ''}${typeLabel(type.id)}
@@ -2941,7 +2959,7 @@ select.input{
       });
       sub.append(b);
     });
-    subShell.hidden = curFilter === 'fav';
+    subShell.hidden = curFilter === 'fav' || availableTypes.length === 0;
     wireScrollCue(f);
     wireScrollCue(sub);
     updateScrollCue(f);

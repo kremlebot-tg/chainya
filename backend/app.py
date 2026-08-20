@@ -7057,6 +7057,37 @@ def management_catalog_page(request: Request):
     return owner_page(request, "admin-catalog.html")
 
 
+@app.get("/manage/catalog.js", include_in_schema=False)
+def management_catalog_script(request: Request):
+    """Serve owner-only catalog logic outside the public site mount."""
+    if not valid_admin_session(request.cookies.get(ADMIN_SESSION_COOKIE, "")):
+        raise HTTPException(404, "Страница не найдена")
+    return FileResponse(
+        ROOT / "backend" / "admin-catalog.js",
+        media_type="text/javascript",
+        headers={
+            "Cache-Control": "no-store",
+            "Referrer-Policy": "no-referrer",
+            "X-Robots-Tag": "noindex, nofollow",
+        },
+    )
+
+
+@app.head("/manage/catalog.js", include_in_schema=False)
+def management_catalog_script_head(request: Request):
+    """Keep the owner-only script private for HEAD requests as well."""
+    if not valid_admin_session(request.cookies.get(ADMIN_SESSION_COOKIE, "")):
+        raise HTTPException(404, "Страница не найдена")
+    return Response(
+        media_type="text/javascript",
+        headers={
+            "Cache-Control": "no-store",
+            "Referrer-Policy": "no-referrer",
+            "X-Robots-Tag": "noindex, nofollow",
+        },
+    )
+
+
 @app.get("/manage/guides")
 def management_guides_page(request: Request):
     """Owner knowledge base protected by the same server-side session."""

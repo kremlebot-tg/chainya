@@ -1699,6 +1699,7 @@ select.input{
     route_titles:{home:'Чайня · китайский чай с доставкой',shop:'Купить китайский чай · Чайня',teaware:'Чайная посуда · Чайня',b2b:'Чай для бизнеса и мероприятий · Чайня',book:'Бронь чайной церемонии · Чайня'},
     route_descriptions:{home:'Китайский чай с доставкой по Москве и России: белый, зелёный, улуны, красный чай, пуэр и авторские сборы. Чайная на Острякова, 3.',shop:'Китайский чай в пакетах 10, 25, 50 и 100 г с доставкой СДЭК по Москве и России.',teaware:'Чайники, гайвани, пиалы, чахаи, чахэ, чайные фигурки, инструменты и наборы в каталоге Чайни.',b2b:'Поставки китайского чая для бизнеса и выездные чайные церемонии в Москве.',book:'Забронируйте чайную церемонию с мастером или самостоятельное чаепитие на Острякова, 3.'},
     food_info_h:'Информация о товаре', food_composition:'Состав', food_manufacturer:'Изготовитель и упаковщик', food_shelf_life:'Срок годности', food_storage:'Условия хранения',
+    teaware_info_h:'О посуде', teaware_material:'Материал и техника', teaware_maker:'Мастерская или изготовитель', teaware_dimensions:'Размеры и объём', teaware_care:'Уход и использование',
     a_lang:'Язык', a_close:'Закрыть', a_tea:'О чае', a_nav:'Разделы сайта', a_account:'Личный кабинет', filters_label:'Фильтры каталога', skip:'Перейти к содержимому',
     alt_master:'Чайный мастер разливает настой из чахая по чашкам',
     alt_product:'Сухой китайский чай в чайной посуде',
@@ -1881,6 +1882,7 @@ select.input{
     route_titles:{home:'Chaynya · Chinese tea delivered',shop:'Buy Chinese tea · Chaynya',teaware:'Chinese teaware · Chaynya',b2b:'Tea for business and events · Chaynya',book:'Book a tea ceremony · Chaynya'},
     route_descriptions:{home:'Chinese tea delivered across Moscow and Russia: white, green, oolong, black tea, pu-erh and house herbal blends. Tea room at 3 Ostryakova Street.',shop:'Chinese tea in 10, 25, 50 and 100 g packs, delivered by CDEK across Moscow and Russia.',teaware:'Teapots, gaiwans, tea cups, chahai, chahe, tea pets, tools and teaware sets from Chaynya.',b2b:'Wholesale Chinese tea for businesses and off-site tea ceremonies in Moscow.',book:'Book a hosted tea ceremony or a private self-service tea session at 3 Ostryakova Street.'},
     food_info_h:'Product information', food_composition:'Ingredients', food_manufacturer:'Producer and packer', food_shelf_life:'Shelf life', food_storage:'Storage conditions',
+    teaware_info_h:'About this piece', teaware_material:'Material and technique', teaware_maker:'Maker or workshop', teaware_dimensions:'Dimensions and volume', teaware_care:'Care and use',
     a_lang:'Language', a_close:'Close', a_tea:'About the tea', a_nav:'Site sections', a_account:'Personal account', filters_label:'Catalogue filters', skip:'Skip to content',
     alt_master:'A tea master pouring the liquor from a pitcher into cups',
     alt_product:'Loose Chinese tea presented in tea ware',
@@ -2063,6 +2065,7 @@ select.input{
     route_titles:{home:'Chaynya · 中国茶配送',shop:'购买中国茶 · Chaynya',teaware:'茶具 · Chaynya',b2b:'企业与活动用茶 · Chaynya',book:'预约茶会 · Chaynya'},
     route_descriptions:{home:'中国茶配送至莫斯科及俄罗斯各地：白茶、绿茶、乌龙茶、红茶、普洱茶和自制草本拼配。茶室位于奥斯特里亚科娃街3号。',shop:'中国茶提供10克、25克、50克和100克包装，由CDEK配送至莫斯科及俄罗斯各地。',teaware:'Chaynya茶具目录：茶壶、盖碗、茶杯、公道杯、茶荷、茶宠、茶道工具和茶具套装。',b2b:'为企业提供中国茶批发，并在莫斯科承办外出茶会。',book:'预约茶艺师主持的茶会，或在奥斯特里亚科娃街3号自行泡茶。'},
     food_info_h:'商品信息', food_composition:'配料', food_manufacturer:'生产商及包装商', food_shelf_life:'保质期', food_storage:'储存条件',
+    teaware_info_h:'茶具信息', teaware_material:'材质与工艺', teaware_maker:'作者、工作室或生产商', teaware_dimensions:'尺寸与容量', teaware_care:'保养与使用',
     a_lang:'语言', a_close:'关闭', a_tea:'茶叶详情', a_nav:'网站栏目', a_account:'个人中心', filters_label:'茶叶分类筛选', skip:'跳到内容',
     alt_master:'茶艺师正把茶汤从茶海分入茶杯',
     alt_product:'茶器中展示的中国散茶',
@@ -3015,13 +3018,21 @@ select.input{
     $('#ts-name').textContent = txt.n;
     $('#ts-orig').textContent = txt.o;
     $('#ts-desc').textContent = txt.d;
+    const teaware = typeGroup(m.t) === 'teaware';
+    const infoTitleKey = teaware ? 'teaware_info_h' : 'food_info_h';
+    const infoLabels = teaware
+      ? [T().teaware_material, T().teaware_maker, T().teaware_dimensions, T().teaware_care]
+      : [T().food_composition, T().food_manufacturer, T().food_shelf_life, T().food_storage];
     const foodFields = [
-      [T().food_composition, txt.composition],
-      [T().food_manufacturer, txt.manufacturer],
-      [T().food_shelf_life, txt.shelf_life],
-      [T().food_storage, txt.storage],
+      [infoLabels[0], txt.composition],
+      [infoLabels[1], txt.manufacturer],
+      [infoLabels[2], txt.shelf_life],
+      [infoLabels[3], txt.storage],
     ].filter(([,value]) => typeof value === 'string' && value.trim());
     const food = $('#ts-food'), foodRows = $('#ts-food-rows');
+    const foodTitle = $('#ts-food-title');
+    foodTitle.dataset.i18n = infoTitleKey;
+    foodTitle.textContent = T()[infoTitleKey];
     foodRows.replaceChildren();
     foodFields.forEach(([label,value]) => {
       const row = document.createElement('div');

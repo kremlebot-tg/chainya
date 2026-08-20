@@ -6,6 +6,7 @@ import pytest
 SOURCE_PATH = Path(__file__).resolve().parents[2] / "src.html"
 BUILD_PATH = Path(__file__).resolve().parents[2] / "build.py"
 ADMIN_CATALOG_PATH = Path(__file__).resolve().parents[1] / "admin-catalog.html"
+ADMIN_CATALOG_JS_PATH = Path(__file__).resolve().parents[1] / "admin-catalog.js"
 ADMIN_PATH = Path(__file__).resolve().parents[1] / "admin.html"
 ADMIN_GUIDES_PATH = Path(__file__).resolve().parents[1] / "admin-guides.html"
 ACCOUNT_PATH = Path(__file__).resolve().parents[1] / "account.html"
@@ -17,6 +18,7 @@ pytestmark = pytest.mark.skipif(
 SOURCE = SOURCE_PATH.read_text(encoding="utf-8") if SOURCE_PATH.exists() else ""
 BUILD_SOURCE = BUILD_PATH.read_text(encoding="utf-8") if BUILD_PATH.exists() else ""
 ADMIN_CATALOG = ADMIN_CATALOG_PATH.read_text(encoding="utf-8")
+ADMIN_CATALOG_JS = ADMIN_CATALOG_JS_PATH.read_text(encoding="utf-8")
 ADMIN_SOURCE = ADMIN_PATH.read_text(encoding="utf-8")
 ADMIN_GUIDES = ADMIN_GUIDES_PATH.read_text(encoding="utf-8")
 ACCOUNT_SOURCE = ACCOUNT_PATH.read_text(encoding="utf-8")
@@ -180,11 +182,11 @@ def test_account_respects_reduced_motion_preference():
 def test_catalog_admin_distinguishes_saby_price_list_from_base_catalog():
     assert 'id="stat-saby"' in ADMIN_CATALOG
     assert "В каталоге СБИС" in ADMIN_CATALOG
-    assert "в прайс-листе сайта" in ADMIN_CATALOG
-    assert "В прайс-листе сайта:" in ADMIN_CATALOG
-    assert "в основном каталоге:" in ADMIN_CATALOG
-    assert "not_in_price_list" in ADMIN_CATALOG
-    assert "Сначала добавить в прайс-лист СБИС" in ADMIN_CATALOG
+    assert "в прайс-листе сайта" in ADMIN_CATALOG_JS
+    assert "В прайс-листе сайта:" in ADMIN_CATALOG_JS
+    assert "в основном каталоге:" in ADMIN_CATALOG_JS
+    assert "not_in_price_list" in ADMIN_CATALOG_JS
+    assert "Сначала добавить в прайс-лист СБИС" in ADMIN_CATALOG_JS
 
 
 def test_owner_guides_are_searchable_private_help_without_dangerous_actions():
@@ -335,11 +337,15 @@ def test_web_build_uses_root_relative_assets_for_clean_routes():
 def test_admin_catalog_surfaces_incomplete_food_labelling():
     assert 'id="stat-incomplete"' in ADMIN_CATALOG
     assert 'id="catalog-filter"' in ADMIN_CATALOG
-    assert "function missingLabelFields(item)" in ADMIN_CATALOG
-    assert "Карточка заполнена не полностью" in ADMIN_CATALOG
-    assert "function missingPublicationFields(item)" in ADMIN_CATALOG
+    assert "function completionState(item)" in ADMIN_CATALOG_JS
+    assert "function missingPublicationFields(item)" in ADMIN_CATALOG_JS
+    assert "Карточку можно опубликовать и дополнить позже" in ADMIN_CATALOG_JS
+    assert "Карточку можно сохранить; важное ещё не заполнено" in ADMIN_CATALOG_JS
+    assert "label: 'Нужно дополнить'" in ADMIN_CATALOG_JS
     assert "не мешают публикации" in ADMIN_CATALOG
-    assert "publishingNow&&missing.length" not in ADMIN_CATALOG
+    assert "publishingNow&&missing.length" not in ADMIN_CATALOG_JS
+    assert "visibleText(value)" in ADMIN_CATALOG_JS
+    assert "\\u3164" in ADMIN_CATALOG_JS
 
 
 def test_catalog_supports_teaware_sections_and_multiple_product_photos():
@@ -351,8 +357,37 @@ def test_catalog_supports_teaware_sections_and_multiple_product_photos():
     assert "Посуда" in ADMIN_CATALOG
     assert 'id="ts-gallery"' in SOURCE
     assert "image_urls" in SOURCE
-    assert "file.multiple=true" in ADMIN_CATALOG
-    assert "/images/${index}/primary" in ADMIN_CATALOG
+    assert "file.multiple = true" in ADMIN_CATALOG_JS
+    assert "/images/${index}/primary" in ADMIN_CATALOG_JS
+    assert "data-add-group=\"teaware\"" in ADMIN_CATALOG
+    assert "Форма переключена на посуду" in ADMIN_CATALOG_JS
+    assert "Материал и техника изготовления" in ADMIN_CATALOG_JS
+    assert "Вкусовой профиль" in ADMIN_CATALOG_JS
+    assert "itemGroup(draft) === 'tea'" in ADMIN_CATALOG_JS
+    assert "const teaware = typeGroup(m.t) === 'teaware'" in SOURCE
+    assert "teaware_info_h:'О посуде'" in SOURCE
+    assert "teaware_material:'Материал и техника'" in SOURCE
+    assert "foodTitle.dataset.i18n = infoTitleKey" in SOURCE
+
+
+def test_admin_catalog_has_owner_safe_creation_filters_preview_and_photo_queue():
+    assert 'id="group-filter"' in ADMIN_CATALOG
+    assert 'id="kind-dialog"' in ADMIN_CATALOG
+    assert 'id="preview-dialog"' in ADMIN_CATALOG
+    assert "img: 'logo-mark'" in ADMIN_CATALOG_JS
+    assert "photo-pending__row" in ADMIN_CATALOG_JS
+    assert "Порядок фотографий сохранён" in ADMIN_CATALOG_JS
+    assert "Карточка сохранена, загружено фото" in ADMIN_CATALOG_JS
+    assert "Технические настройки ссылки" in ADMIN_CATALOG_JS
+    assert "catalog-row__open" in ADMIN_CATALOG_JS
+    assert ".catalog-row{grid-template-columns:minmax(0,1fr) auto;padding:0;gap:0}" in ADMIN_CATALOG
+    assert "catalog-lang-tab-${language}" in ADMIN_CATALOG_JS
+    assert "catalog-lang-panel-${language}" in ADMIN_CATALOG_JS
+    assert "['ArrowLeft', 'ArrowRight', 'Home', 'End']" in ADMIN_CATALOG_JS
+    assert "function showSabyKindDialog(item)" in ADMIN_CATALOG_JS
+    assert "const next = blankItem(group)" in ADMIN_CATALOG_JS
+    assert ".photo input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}" in ADMIN_CATALOG
+    assert "label.setAttribute('role', 'button')" not in ADMIN_CATALOG_JS
 
 
 def test_admin_button_like_links_share_the_button_alignment_contract():
@@ -373,6 +408,7 @@ def test_admin_catalog_mobile_summary_wraps_without_a_clipped_horizontal_strip()
     assert ".stats{grid-template-columns:repeat(2,minmax(0,1fr));overflow:visible}" in ADMIN_CATALOG
     assert ".stat:nth-child(2n){border-right:0}" in ADMIN_CATALOG
     assert ".stat:nth-last-child(-n+2){border-bottom:0}" in ADMIN_CATALOG
+    assert "@media(max-width:900px){.items{max-height:none;overflow:visible}" in ADMIN_CATALOG
 
 
 def test_catalog_escapes_owner_controlled_copy_before_using_inner_html():
@@ -384,8 +420,8 @@ def test_catalog_escapes_owner_controlled_copy_before_using_inner_html():
 
 
 def test_saby_review_distinguishes_unknown_stock_from_out_of_stock():
-    assert "item.suggested_stock===null?'остаток не определён'" in ADMIN_CATALOG
-    assert "товар безопасно отмечен как недоступный" in ADMIN_CATALOG
+    assert "item.suggested_stock === null ? 'остаток не определён'" in ADMIN_CATALOG_JS
+    assert "товар отмечен как недоступный" in ADMIN_CATALOG_JS
 
 
 def test_mobile_legal_header_has_accessible_touch_targets():

@@ -16,11 +16,29 @@ def test_owner_catalog_page_uses_existing_admin_session(tmp_path, monkeypatch):
         anonymous = client.get("/manage/catalog")
         login = client.post("/api/admin/session", json={"token": "test-admin-token"})
         authenticated = client.get("/manage/catalog")
+        script = client.get("/manage/catalog.js")
+        script_head = client.head("/manage/catalog.js")
 
     assert login.status_code == 204
     assert "Вход владельца" in anonymous.text
     assert "Управление витриной" in authenticated.text
+    assert script.status_code == 200
+    assert script_head.status_code == 200
+    assert script.headers["content-type"].startswith("text/javascript")
+    assert "Что добавляем?" in authenticated.text
+    assert "function completionState(item)" in script.text
     assert module.ADMIN_TOKEN not in authenticated.text
+    assert module.ADMIN_TOKEN not in script.text
+
+
+def test_owner_catalog_script_is_not_public(tmp_path, monkeypatch):
+    client, _ = app_client(tmp_path, monkeypatch)
+    with client:
+        anonymous = client.get("/manage/catalog.js")
+        anonymous_head = client.head("/manage/catalog.js")
+
+    assert anonymous.status_code == 404
+    assert anonymous_head.status_code == 404
 
 
 def test_owner_guides_use_existing_admin_session_and_explain_safe_boundaries(tmp_path, monkeypatch):
@@ -302,6 +320,44 @@ def test_catalog_allows_missing_secondary_languages_and_falls_back_for_product_p
     assert created.status_code == 201
     assert english_page.status_code == 200
     assert "Товар без перевода" in english_page.text
+
+
+def test_catalog_allows_published_teaware_with_only_a_name_and_price(tmp_path, monkeypatch):
+    """Owner can publish a draft now and complete photos, copy and translations later."""
+    client, _ = app_client(tmp_path, monkeypatch)
+    with client:
+        initial = client.get("/api/admin/catalog", headers=AUTH).json()
+        item = dict(initial["teas"][0])
+        item.update({
+            "id": "unfinished-owner-teapot",
+            "type": "teaware-teapots",
+            "price": 2500,
+            "unit": "pc",
+            "published": True,
+            "img": "logo-mark",
+            "image": {"kind": "seed", "name": "logo-mark"},
+            "images": [{"kind": "seed", "name": "logo-mark"}],
+        })
+        fields = (
+            "name", "orig", "desc", "composition", "manufacturer",
+            "shelf_life", "storage",
+        )
+        item["translations"] = {
+            language: {field: "" for field in fields}
+            for language in ("ru", "en", "zh")
+        }
+        item["translations"]["en"]["name"] = "Work-in-progress teapot"
+        created = client.post(
+            "/api/admin/catalog/items", headers=AUTH,
+            json={"revision": initial["revision"], "item": item},
+        )
+
+    assert created.status_code == 201
+    public = client.get("/api/catalog").json()["teas"]
+    published = next(row for row in public if row["id"] == item["id"])
+    assert published["unit"] == "pc"
+    assert published["translations"]["ru"]["name"] == ""
+    assert published["translations"]["en"]["name"] == "Work-in-progress teapot"
 
 
 def test_catalog_supports_multiple_images_and_primary_selection(tmp_path, monkeypatch):

@@ -133,10 +133,11 @@ http://127.0.0.1:8078 {
 
 	redir /index.html / 308
 	redir /shop/ /shop 308
+	redir /teaware/ /teaware 308
 	redir /business/ /business 308
 	redir /booking/ /booking 308
 
-	@publicApp path / /shop /business /booking
+	@publicApp path / /shop /teaware /business /booking
 	handle @publicApp {
 		import chainya_public_headers
 		header Cache-Control "no-cache"

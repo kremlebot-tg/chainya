@@ -222,6 +222,8 @@ def test_maintenance_is_chainya_only_and_returns_503() -> None:
     assert "@sitemap path /sitemap.xml" in internal
     assert "redir @productSlash /{re.productSlash.1} 308" in internal
     assert "(en/|zh/)?(tea|teaware)/" in internal
+    assert "redir /teaware/ /teaware 308" in internal
+    assert "@publicApp path / /shop /teaware /business /booking" in internal
     nginx = (ROOT / "ops/nginx-chainya.ru").read_text(encoding="utf-8")
     assert "location = /manage/guides" in nginx
     assert 'location ~ "^/(?:en/|zh/)?(?:tea|teaware)/' in nginx

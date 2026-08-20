@@ -93,10 +93,10 @@ def main() -> None:
     require("/manage/*" in caddy, "private owner subroutes must reach the origin")
     require("@productPage path_regexp" in caddy, "product pages must reach the origin")
     require("(tea|teaware)" in caddy, "tea and teaware product pages must reach the origin")
-    require("redir /teaware/ /teaware 308" in caddy, "teaware slash redirect is missing")
+    require("redir /teaware/" not in caddy, "teaware slash redirect can loop from browser cache")
     require(
-        "@publicApp path / /shop /teaware /business /booking" in caddy,
-        "teaware base route must be served as the public app",
+        "@publicApp path / /shop /teaware /teaware/ /business /booking" in caddy,
+        "both teaware base routes must be served as the public app",
     )
     require("@sitemap path /sitemap.xml" in caddy, "dynamic sitemap must reach the origin")
     require(

@@ -133,11 +133,12 @@ http://127.0.0.1:8078 {
 
 	redir /index.html / 308
 	redir /shop/ /shop 308
-	redir /teaware/ /teaware 308
 	redir /business/ /business 308
 	redir /booking/ /booking 308
 
-	@publicApp path / /shop /teaware /business /booking
+	# Both teaware forms must stay directly available: an earlier permanent
+	# redirect to /teaware/ can still be cached in visitors' browsers.
+	@publicApp path / /shop /teaware /teaware/ /business /booking
 	handle @publicApp {
 		import chainya_public_headers
 		header Cache-Control "no-cache"

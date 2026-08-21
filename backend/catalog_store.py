@@ -21,6 +21,10 @@ PARTNER_LOGO_RE = re.compile(r"^/img/partner-[a-z0-9-]{1,80}\.webp$")
 LANGUAGES = ("ru", "en", "zh")
 MAX_PRODUCT_IMAGES = 8
 MAX_PARTNERS = 30
+LEGACY_PARTNER_LOGOS = {
+    "/img/partner-rolf.webp": "/img/partner-rolf-wordmark.webp",
+    "/img/partner-relikta.webp": "/img/partner-relikta-emblem.webp",
+}
 CATALOG_TYPE_DEFAULTS = (
     ("white", "tea", "Белый чай", "White tea", "白茶"),
     ("green", "tea", "Зелёный чай", "Green tea", "绿茶"),
@@ -51,7 +55,7 @@ DEFAULT_PARTNERS = (
     {
         "id": "rolf",
         "published": True,
-        "logo": "/img/partner-rolf.webp",
+        "logo": "/img/partner-rolf-wordmark.webp",
         "translations": {
             "ru": {"name": "РОЛЬФ", "type": "Крупнейший автодилер"},
             "en": {"name": "ROLF", "type": "Russia's largest automotive retailer"},
@@ -61,7 +65,7 @@ DEFAULT_PARTNERS = (
     {
         "id": "relikta",
         "published": True,
-        "logo": "/img/partner-relikta.webp",
+        "logo": "/img/partner-relikta-emblem.webp",
         "translations": {
             "ru": {"name": "Реликта", "type": "Винодельня"},
             "en": {"name": "Relikta", "type": "Winery"},
@@ -290,6 +294,7 @@ def normalize_partner(raw: dict[str, Any], *, existing_id: str | None = None) ->
         "",
     )
     logo = _text(raw.get("logo", default_logo), "logo", 160)
+    logo = LEGACY_PARTNER_LOGOS.get(logo, logo)
     if logo and not PARTNER_LOGO_RE.fullmatch(logo):
         raise CatalogError("Некорректный путь к логотипу партнёра")
     return {

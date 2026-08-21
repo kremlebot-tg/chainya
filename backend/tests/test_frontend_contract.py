@@ -318,11 +318,11 @@ def test_business_partners_use_approved_local_brand_assets():
     assert partners.count('<li class="b2b-partner">') == 2
     assert 'data-i18n="partner_rolf_name">РОЛЬФ<' in partners
     assert 'data-i18n="partner_relikta_name">Реликта<' in partners
-    assert 'src="{{img:partner-rolf}}"' in partners
-    assert 'src="{{img:partner-relikta}}"' in partners
+    assert 'src="{{img:partner-rolf-wordmark}}"' in partners
+    assert 'src="{{img:partner-relikta-emblem}}"' in partners
     assert "Крупнейший автодилер" in partners
-    assert (ROOT_PATH / "img/partner-rolf.webp").read_bytes().startswith(b"RIFF")
-    assert (ROOT_PATH / "img/partner-relikta.webp").read_bytes().startswith(b"RIFF")
+    assert (ROOT_PATH / "img/partner-rolf-wordmark.webp").read_bytes().startswith(b"RIFF")
+    assert (ROOT_PATH / "img/partner-relikta-emblem.webp").read_bytes().startswith(b"RIFF")
     assert 'class="b2b-partner__n num"' not in partners
     assert "partners_p" not in SOURCE
     for translation in (

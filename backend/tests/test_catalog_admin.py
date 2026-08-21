@@ -2,6 +2,7 @@ from io import BytesIO
 
 from PIL import Image
 
+from backend.catalog_store import normalize_partner
 from backend.tests.test_orders import app_client
 
 AUTH = {
@@ -12,6 +13,21 @@ SITE_AUTH = {
     "Authorization": "Bearer test-admin-token",
     "X-Chainya-Admin": "site",
 }
+
+
+def test_legacy_partner_logo_paths_are_migrated_without_cache_collision():
+    legacy = {
+        "id": "rolf",
+        "published": True,
+        "logo": "/img/partner-rolf.webp",
+        "translations": {
+            "ru": {"name": "РОЛЬФ", "type": "Крупнейший автодилер"},
+            "en": {"name": "ROLF", "type": "Russia's largest automotive retailer"},
+            "zh": {"name": "ROLF", "type": "俄罗斯最大的汽车经销商"},
+        },
+    }
+
+    assert normalize_partner(legacy)["logo"] == "/img/partner-rolf-wordmark.webp"
 
 
 def test_owner_catalog_page_uses_existing_admin_session(tmp_path, monkeypatch):
@@ -122,9 +138,9 @@ def test_partner_editor_create_publish_hide_reorder_and_history(tmp_path, monkey
     assert initial.status_code == 200
     assert [item["id"] for item in initial.json()["partners"]] == ["rolf", "relikta"]
     rolf = initial.json()["partners"][0]
-    assert rolf["logo"] == "/img/partner-rolf.webp"
+    assert rolf["logo"] == "/img/partner-rolf-wordmark.webp"
     assert rolf["translations"]["ru"]["type"] == "Крупнейший автодилер"
-    assert initial.json()["partners"][1]["logo"] == "/img/partner-relikta.webp"
+    assert initial.json()["partners"][1]["logo"] == "/img/partner-relikta-emblem.webp"
     assert missing_marker.status_code == 403
     assert created.status_code == 201
     assert next(item for item in public_after_create if item["id"] == "new-partner")[

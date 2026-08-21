@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 SOURCE_PATH = Path(__file__).resolve().parents[2] / "src.html"
+ROOT_PATH = SOURCE_PATH.parent
 BUILD_PATH = Path(__file__).resolve().parents[2] / "build.py"
 ADMIN_CATALOG_PATH = Path(__file__).resolve().parents[1] / "admin-catalog.html"
 ADMIN_CATALOG_JS_PATH = Path(__file__).resolve().parents[1] / "admin-catalog.js"
@@ -306,7 +307,7 @@ def test_business_offer_headings_follow_the_page_heading():
     assert '<h2 data-i18n="b2b_offer2_h">' in SOURCE
 
 
-def test_business_partners_are_present_without_unapproved_brand_assets():
+def test_business_partners_use_approved_local_brand_assets():
     section_start = SOURCE.index('<section class="b2b-collab" id="b2b-partners"')
     section_end = SOURCE.index("</section>", section_start)
     partners = SOURCE[section_start:section_end]
@@ -317,7 +318,11 @@ def test_business_partners_are_present_without_unapproved_brand_assets():
     assert partners.count('<li class="b2b-partner">') == 2
     assert 'data-i18n="partner_rolf_name">РОЛЬФ<' in partners
     assert 'data-i18n="partner_relikta_name">Реликта<' in partners
-    assert "<img" not in partners
+    assert 'src="{{img:partner-rolf}}"' in partners
+    assert 'src="{{img:partner-relikta}}"' in partners
+    assert "Крупнейший автодилер" in partners
+    assert (ROOT_PATH / "img/partner-rolf.webp").read_bytes().startswith(b"RIFF")
+    assert (ROOT_PATH / "img/partner-relikta.webp").read_bytes().startswith(b"RIFF")
     assert 'class="b2b-partner__n num"' not in partners
     assert "partners_p" not in SOURCE
     for translation in (

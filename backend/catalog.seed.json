@@ -5,24 +5,26 @@
     {
       "id": "rolf",
       "published": true,
+      "logo": "/img/partner-rolf.webp",
       "translations": {
         "ru": {
           "name": "РОЛЬФ",
-          "type": "Автомобильная группа"
+          "type": "Крупнейший автодилер"
         },
         "en": {
           "name": "ROLF",
-          "type": "Automotive group"
+          "type": "Russia's largest automotive retailer"
         },
         "zh": {
           "name": "ROLF",
-          "type": "汽车集团"
+          "type": "俄罗斯最大的汽车经销商"
         }
       }
     },
     {
       "id": "relikta",
       "published": true,
+      "logo": "/img/partner-relikta.webp",
       "translations": {
         "ru": {
           "name": "Реликта",

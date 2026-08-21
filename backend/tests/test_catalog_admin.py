@@ -121,6 +121,10 @@ def test_partner_editor_create_publish_hide_reorder_and_history(tmp_path, monkey
 
     assert initial.status_code == 200
     assert [item["id"] for item in initial.json()["partners"]] == ["rolf", "relikta"]
+    rolf = initial.json()["partners"][0]
+    assert rolf["logo"] == "/img/partner-rolf.webp"
+    assert rolf["translations"]["ru"]["type"] == "Крупнейший автодилер"
+    assert initial.json()["partners"][1]["logo"] == "/img/partner-relikta.webp"
     assert missing_marker.status_code == 403
     assert created.status_code == 201
     assert next(item for item in public_after_create if item["id"] == "new-partner")[

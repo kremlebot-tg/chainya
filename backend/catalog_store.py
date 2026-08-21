@@ -17,6 +17,7 @@ ITEM_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,79}$")
 TYPE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
 SEED_IMAGE_RE = re.compile(r"^[A-Za-z0-9_-]{1,120}$")
 MEDIA_FILE_RE = re.compile(r"^[a-f0-9]{32}\.webp$")
+PARTNER_LOGO_RE = re.compile(r"^/img/partner-[a-z0-9-]{1,80}\.webp$")
 LANGUAGES = ("ru", "en", "zh")
 MAX_PRODUCT_IMAGES = 8
 MAX_PARTNERS = 30
@@ -50,15 +51,17 @@ DEFAULT_PARTNERS = (
     {
         "id": "rolf",
         "published": True,
+        "logo": "/img/partner-rolf.webp",
         "translations": {
-            "ru": {"name": "РОЛЬФ", "type": "Автомобильная группа"},
-            "en": {"name": "ROLF", "type": "Automotive group"},
-            "zh": {"name": "ROLF", "type": "汽车集团"},
+            "ru": {"name": "РОЛЬФ", "type": "Крупнейший автодилер"},
+            "en": {"name": "ROLF", "type": "Russia's largest automotive retailer"},
+            "zh": {"name": "ROLF", "type": "俄罗斯最大的汽车经销商"},
         },
     },
     {
         "id": "relikta",
         "published": True,
+        "logo": "/img/partner-relikta.webp",
         "translations": {
             "ru": {"name": "Реликта", "type": "Винодельня"},
             "en": {"name": "Relikta", "type": "Winery"},
@@ -271,11 +274,28 @@ def normalize_partner(raw: dict[str, Any], *, existing_id: str | None = None) ->
             "name": _text(source.get("name", ""), f"{language}.name", 160),
             "type": _text(source.get("type", ""), f"{language}.type", 240),
         }
+    if partner_id == "rolf":
+        legacy_types = {
+            "ru": ("Автомобильная группа", "Крупнейший автодилер"),
+            "en": ("Automotive group", "Russia's largest automotive retailer"),
+            "zh": ("汽车集团", "俄罗斯最大的汽车经销商"),
+        }
+        for language, (legacy, current) in legacy_types.items():
+            if translations[language]["type"] == legacy:
+                translations[language]["type"] = current
     if not any(value["name"] for value in translations.values()):
         raise CatalogError("Укажите название партнёра хотя бы на одном языке")
+    default_logo = next(
+        (partner.get("logo", "") for partner in DEFAULT_PARTNERS if partner["id"] == partner_id),
+        "",
+    )
+    logo = _text(raw.get("logo", default_logo), "logo", 160)
+    if logo and not PARTNER_LOGO_RE.fullmatch(logo):
+        raise CatalogError("Некорректный путь к логотипу партнёра")
     return {
         "id": partner_id,
         "published": bool(raw.get("published", False)),
+        "logo": logo,
         "translations": translations,
     }
 

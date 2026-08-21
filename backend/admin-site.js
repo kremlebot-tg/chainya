@@ -14,7 +14,7 @@ let activeLanguage = 'ru';
 let saving = false;
 
 function blankPartner() {
-  return {id: '', published: false, translations: Object.fromEntries(LANGUAGES.map(([code]) => [code, {name: '', type: ''}]))};
+  return {id: '', published: false, logo: '', translations: Object.fromEntries(LANGUAGES.map(([code]) => [code, {name: '', type: ''}]))};
 }
 
 function clone(value) { return JSON.parse(JSON.stringify(value)); }
@@ -70,7 +70,10 @@ function renderList() {
     const tags = document.createElement('span'); tags.className = 'tags';
     const state = document.createElement('span'); state.className = `tag ${item.published ? 'on' : ''}`; state.textContent = item.published ? 'На сайте' : 'Скрыт'; tags.append(state);
     if (completion(item).length) { const warning = document.createElement('span'); warning.className = 'tag warn'; warning.textContent = 'Можно дополнить'; tags.append(warning); }
-    open.append(name, type, tags); open.onclick = () => selectPartner(item.id);
+    const identity = document.createElement('span'); identity.className = 'partner-row__identity' + (item.logo ? '' : ' no-logo');
+    if (item.logo) { const logo = document.createElement('span'); logo.className = 'partner-row__logo' + (item.id === 'relikta' ? ' is-relikta' : ''); const image = document.createElement('img'); image.src = item.logo; image.alt = ''; logo.append(image); identity.append(logo); }
+    const text = document.createElement('span'); text.append(name, type, tags); identity.append(text);
+    open.append(identity); open.onclick = () => selectPartner(item.id);
     const moves = document.createElement('span'); moves.className = 'moves';
     for (const [direction, symbol, label] of [[-1,'↑','Поднять выше'],[1,'↓','Опустить ниже']]) {
       const button = document.createElement('button'); button.type = 'button'; button.className = 'move'; button.textContent = symbol; button.title = label; button.setAttribute('aria-label', `${label}: ${copy.name}`); button.disabled = saving || index + direction < 0 || index + direction >= partners.length; button.onclick = () => movePartner(item.id, direction); moves.append(button);
@@ -107,6 +110,9 @@ function renderEditor() {
 }
 function syncPreview() {
   const copy = displayTranslation(draft, activeLanguage);
+  const logo = $('#preview-logo'), image = $('img', logo);
+  logo.hidden = !draft.logo; logo.classList.toggle('is-relikta', draft.id === 'relikta');
+  if (draft.logo) image.src = draft.logo; else image.removeAttribute('src');
   $('#preview-name').textContent = copy.name || 'Название партнёра';
   $('#preview-type').textContent = copy.type || 'Сфера сотрудничества';
   $('#editor-title').textContent = displayTranslation(draft).name || 'Новый партнёр';

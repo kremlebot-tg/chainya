@@ -4132,6 +4132,7 @@ def public_catalog():
         "partners": [
             {
                 "id": partner["id"],
+                "logo": partner.get("logo", ""),
                 "translations": partner["translations"],
             }
             for partner in document["partners"]

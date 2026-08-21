@@ -272,8 +272,7 @@ h1, h2, h3, p{ text-wrap:pretty; }
 .b2b-offer .link-arrow{ margin-top:16px; }
 #view-b2b .book > div > .label{ display:block; margin-bottom:18px; }
 
-/* Партнёры — компактное доказательство сразу после обещания страницы.
-   Названия набраны текстом: логотипы публикуем только с разрешения брендов. */
+/* Партнёры — компактное доказательство сразу после обещания страницы. */
 .b2b-collab{
   display:grid; grid-template-columns:minmax(230px,.72fr) minmax(0,1.28fr);
   gap:clamp(28px,5vw,76px); align-items:center;
@@ -292,6 +291,21 @@ h1, h2, h3, p{ text-wrap:pretty; }
 }
 .b2b-partner{
   min-width:0; padding:8px 0;
+  display:grid; grid-template-rows:56px auto; align-content:start; gap:14px;
+}
+.b2b-partner__logo{
+  display:flex; align-items:center; min-width:0; height:56px;
+}
+.b2b-partner__logo img{
+  display:block; width:auto; max-width:min(100%,220px); height:auto; max-height:50px;
+  object-fit:contain; object-position:left center;
+}
+.b2b-partner__logo--relikta img{
+  max-width:52px; max-height:56px; filter:invert(1); opacity:.9;
+}
+.b2b-partner__logo[hidden]{ display:none; }
+.b2b-partner__copy{
+  min-width:0;
 }
 .b2b-partner__name{
   margin:0; font-family:'Prata',Georgia,serif; font-size:clamp(1.45rem,2.4vw,2rem);
@@ -1254,12 +1268,18 @@ select.input{
         </div>
         <ul class="b2b-collab__list" role="list">
           <li class="b2b-partner">
-            <p class="b2b-partner__name" data-i18n="partner_rolf_name">РОЛЬФ</p>
-            <p class="b2b-partner__type" data-i18n="partner_rolf_type">Автомобильная группа</p>
+            <div class="b2b-partner__logo"><img src="{{img:partner-rolf}}" alt="" width="444" height="120" loading="lazy" decoding="async"></div>
+            <div class="b2b-partner__copy">
+              <p class="b2b-partner__name" data-i18n="partner_rolf_name">РОЛЬФ</p>
+              <p class="b2b-partner__type" data-i18n="partner_rolf_type">Крупнейший автодилер</p>
+            </div>
           </li>
           <li class="b2b-partner">
-            <p class="b2b-partner__name" data-i18n="partner_relikta_name">Реликта</p>
-            <p class="b2b-partner__type" data-i18n="partner_relikta_type">Винодельня</p>
+            <div class="b2b-partner__logo b2b-partner__logo--relikta"><img src="{{img:partner-relikta}}" alt="" width="202" height="240" loading="lazy" decoding="async"></div>
+            <div class="b2b-partner__copy">
+              <p class="b2b-partner__name" data-i18n="partner_relikta_name">Реликта</p>
+              <p class="b2b-partner__type" data-i18n="partner_relikta_type">Винодельня</p>
+            </div>
           </li>
         </ul>
       </section>
@@ -1850,7 +1870,7 @@ select.input{
     b2b_offer2_h:'Выездные чайные церемонии', b2b_offer2_p:'Мастер приезжает с чаем и посудой на корпоратив, презентацию, свадьбу или частную встречу. Сценарий, продолжительность и число гостей согласуем заранее.',
     b2b_offer2_cta:'Обсудить мероприятие', b2b_event_prefill:'Интересует выездная чайная церемония. Расскажите о формате и стоимости.',
     partners_label:'Партнёры', partners_h:'С кем работает Чайня',
-    partner_rolf_name:'РОЛЬФ', partner_rolf_type:'Автомобильная группа',
+    partner_rolf_name:'РОЛЬФ', partner_rolf_type:'Крупнейший автодилер',
     partner_relikta_name:'Реликта', partner_relikta_type:'Винодельня',
     supply_label:'Как устроены поставки',
     brange_label:'Что возим', brange_note:'Белый и зелёный чай, габа, улуны, красные чаи, пуэр и прессовки. Если нужной позиции сейчас нет, уточним возможность поставки и согласуем конкретную партию до заказа.',
@@ -2036,7 +2056,7 @@ select.input{
     b2b_offer2_h:'Off-site tea ceremonies', b2b_offer2_p:'A master brings the tea and teaware to a company event, presentation, wedding or private gathering. We agree the programme, duration and guest count in advance.',
     b2b_offer2_cta:'Discuss an event', b2b_event_prefill:'I am interested in an off-site tea ceremony. Please tell me about formats and pricing.',
     partners_label:'Partners', partners_h:'Who Chaynya works with',
-    partner_rolf_name:'ROLF', partner_rolf_type:'Automotive group',
+    partner_rolf_name:'ROLF', partner_rolf_type:"Russia's largest automotive retailer",
     partner_relikta_name:'Relikta', partner_relikta_type:'Winery',
     supply_label:'How supply works',
     brange_label:'What we ship', brange_note:'White and green tea, GABA, oolongs, black tea, pu-erh and pressed tea. If an item is not currently available, we will check the supply and agree the exact batch before the order.',
@@ -2222,7 +2242,7 @@ select.input{
     b2b_offer2_h:'外出茶会', b2b_offer2_p:'茶艺师带茶与茶具前往企业活动、发布会、婚礼或私人聚会。流程、时长和宾客人数提前商定。',
     b2b_offer2_cta:'洽谈活动', b2b_event_prefill:'我想了解外出茶会的形式与费用。',
     partners_label:'合作伙伴', partners_h:'Chaynya 的合作伙伴',
-    partner_rolf_name:'ROLF', partner_rolf_type:'汽车集团',
+    partner_rolf_name:'ROLF', partner_rolf_type:'俄罗斯最大的汽车经销商',
     partner_relikta_name:'Relikta', partner_relikta_type:'酒庄',
     supply_label:'供货流程',
     brange_label:'供什么', brange_note:'白茶、绿茶、佳叶龙茶、乌龙、红茶、普洱和紧压茶。若某款暂时无货，我们会先确认供货情况，并在下单前与您确认具体批次。',
@@ -2879,10 +2899,18 @@ select.input{
       const value = field => sources.find(source=>typeof source?.[field]==='string'&&source[field].trim())?.[field].trim() || '';
       const name = value('name'); if (!name) continue;
       const item = document.createElement('li'); item.className = 'b2b-partner';
+      const logoPath = validCatalogImage(partner.logo) ? partner.logo : '';
+      if (logoPath){
+        const logo = document.createElement('div'); logo.className = 'b2b-partner__logo' + (partner.id === 'relikta' ? ' b2b-partner__logo--relikta' : '');
+        const image = document.createElement('img'); image.src = logoPath; image.alt = ''; image.loading = 'lazy'; image.decoding = 'async';
+        logo.append(image); item.append(logo);
+      }
+      const copy = document.createElement('div'); copy.className = 'b2b-partner__copy';
       const title = document.createElement('p'); title.className = 'b2b-partner__name'; title.textContent = name;
-      item.append(title);
+      copy.append(title);
       const type = value('type');
-      if (type){ const note = document.createElement('p'); note.className = 'b2b-partner__type'; note.textContent = type; item.append(note); }
+      if (type){ const note = document.createElement('p'); note.className = 'b2b-partner__type'; note.textContent = type; copy.append(note); }
+      item.append(copy);
       list.append(item);
     }
     section.hidden = !list.children.length;
@@ -2927,7 +2955,8 @@ select.input{
           });
           if (!languages.some(language=>translations[language].name.trim())) throw new Error('catalog_partner_name');
           partnerIds.add(partner.id);
-          return {id:partner.id,translations};
+          const logo = typeof partner.logo === 'string' && validCatalogImage(partner.logo) ? partner.logo : '';
+          return {id:partner.id,logo,translations};
         });
         for (const item of data.teas){
           if (!item || !/^[a-z0-9][a-z0-9-]{0,79}$/.test(item.id) || seen.has(item.id)) throw new Error('catalog_item');

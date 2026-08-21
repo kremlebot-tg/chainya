@@ -4128,7 +4128,15 @@ def public_catalog():
             }
             for item in document["teas"]
             if item.get("published", True)
-        ]
+        ],
+        "partners": [
+            {
+                "id": partner["id"],
+                "translations": partner["translations"],
+            }
+            for partner in document["partners"]
+            if partner.get("published", False)
+        ],
     }
 
 
@@ -4678,6 +4686,16 @@ def require_catalog_write_request(request: Request) -> None:
         raise HTTPException(403, "Недопустимый источник запроса")
 
 
+def require_site_write_request(request: Request) -> None:
+    """Protect editable site content with an explicit same-origin request marker."""
+    if request.headers.get("x-chainya-admin") != "site":
+        raise HTTPException(403, "Требуется подтверждение запроса админ-панели")
+    origin = request.headers.get("origin", "").rstrip("/")
+    expected = f"{request.url.scheme}://{request.headers.get('host', '')}"
+    if origin and origin != expected:
+        raise HTTPException(403, "Недопустимый источник запроса")
+
+
 def catalog_error_response(exc: Exception) -> HTTPException:
     if isinstance(exc, CatalogConflict):
         return HTTPException(409, str(exc))
@@ -4692,6 +4710,22 @@ def audit_catalog(action: str, item_id: str, revision: int) -> None:
             "INSERT INTO catalog_audit (created_at, action, item_id, revision) VALUES (?, ?, ?, ?)",
             (now_iso(), action, item_id, revision),
         )
+
+
+def admin_site_response(document: dict) -> dict:
+    return {
+        "revision": document["revision"],
+        "updated_at": document["updated_at"],
+        "partners": document["partners"],
+    }
+
+
+def site_error_response(exc: Exception) -> HTTPException:
+    if isinstance(exc, CatalogConflict):
+        return HTTPException(409, str(exc))
+    if isinstance(exc, KeyError):
+        return HTTPException(404, "Партнёр не найден")
+    return HTTPException(422, str(exc))
 
 
 def validate_catalog_saby_candidate(raw: dict, *, existing_id: str | None = None) -> None:
@@ -4726,6 +4760,7 @@ def admin_catalog_history(
             """
             SELECT created_at, action, item_id, revision
             FROM catalog_audit
+            WHERE action NOT LIKE 'partner_%'
             ORDER BY id DESC
             LIMIT ?
             """,
@@ -4743,6 +4778,107 @@ def admin_catalog_history(
             for row in rows
         ]
     }
+
+
+@app.get("/api/admin/site/partners")
+def admin_site_partners(authorization: str = Header(default="")):
+    require_admin(authorization)
+    return admin_site_response(get_catalog_store().get())
+
+
+@app.get("/api/admin/site/history")
+def admin_site_history(
+    limit: int = Query(default=30, ge=1, le=100),
+    authorization: str = Header(default=""),
+):
+    require_admin(authorization)
+    document = get_catalog_store().get()
+    names = {
+        partner["id"]: next(
+            (
+                translation["name"]
+                for translation in partner["translations"].values()
+                if translation["name"]
+            ),
+            partner["id"],
+        )
+        for partner in document["partners"]
+    }
+    with db() as con:
+        rows = con.execute(
+            """
+            SELECT created_at, action, item_id, revision
+            FROM catalog_audit
+            WHERE action LIKE 'partner_%'
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+    return {
+        "history": [
+            {
+                "created_at": row["created_at"],
+                "action": row["action"],
+                "item_id": row["item_id"],
+                "item_name": names.get(row["item_id"], ""),
+                "revision": row["revision"],
+            }
+            for row in rows
+        ]
+    }
+
+
+@app.post("/api/admin/site/partners", status_code=201)
+def admin_create_site_partner(
+    payload: CatalogMutation,
+    request: Request,
+    authorization: str = Header(default=""),
+):
+    require_admin(authorization)
+    require_site_write_request(request)
+    try:
+        document = get_catalog_store().create_partner(payload.item, payload.revision)
+    except (CatalogError, KeyError) as exc:
+        raise site_error_response(exc) from exc
+    partner_id = payload.item.get("id", "")
+    audit_catalog("partner_create", partner_id, document["revision"])
+    return admin_site_response(document)
+
+
+@app.put("/api/admin/site/partners/{partner_id}")
+def admin_update_site_partner(
+    partner_id: str,
+    payload: CatalogMutation,
+    request: Request,
+    authorization: str = Header(default=""),
+):
+    require_admin(authorization)
+    require_site_write_request(request)
+    try:
+        document = get_catalog_store().update_partner(
+            partner_id, payload.item, payload.revision
+        )
+    except (CatalogError, KeyError) as exc:
+        raise site_error_response(exc) from exc
+    audit_catalog("partner_update", partner_id, document["revision"])
+    return admin_site_response(document)
+
+
+@app.put("/api/admin/site/partner-order")
+def admin_reorder_site_partners(
+    payload: CatalogReorder,
+    request: Request,
+    authorization: str = Header(default=""),
+):
+    require_admin(authorization)
+    require_site_write_request(request)
+    try:
+        document = get_catalog_store().reorder_partners(payload.ids, payload.revision)
+    except (CatalogError, KeyError) as exc:
+        raise site_error_response(exc) from exc
+    audit_catalog("partner_reorder", "", document["revision"])
+    return admin_site_response(document)
 
 
 @app.post("/api/admin/catalog/items", status_code=201)
@@ -7197,6 +7333,42 @@ def management_catalog_script_head(request: Request):
     )
 
 
+@app.get("/manage/site")
+def management_site_page(request: Request):
+    """Editable site content protected by the owner session."""
+    return owner_page(request, "admin-site.html")
+
+
+@app.get("/manage/site.js", include_in_schema=False)
+def management_site_script(request: Request):
+    """Serve owner-only site editor logic outside the public site mount."""
+    if not valid_admin_session(request.cookies.get(ADMIN_SESSION_COOKIE, "")):
+        raise HTTPException(404, "Страница не найдена")
+    return FileResponse(
+        ROOT / "backend" / "admin-site.js",
+        media_type="text/javascript",
+        headers={
+            "Cache-Control": "no-store",
+            "Referrer-Policy": "no-referrer",
+            "X-Robots-Tag": "noindex, nofollow",
+        },
+    )
+
+
+@app.head("/manage/site.js", include_in_schema=False)
+def management_site_script_head(request: Request):
+    if not valid_admin_session(request.cookies.get(ADMIN_SESSION_COOKIE, "")):
+        raise HTTPException(404, "Страница не найдена")
+    return Response(
+        media_type="text/javascript",
+        headers={
+            "Cache-Control": "no-store",
+            "Referrer-Policy": "no-referrer",
+            "X-Robots-Tag": "noindex, nofollow",
+        },
+    )
+
+
 @app.get("/manage/guides")
 def management_guides_page(request: Request):
     """Owner knowledge base protected by the same server-side session."""
@@ -7207,6 +7379,7 @@ def management_guides_page(request: Request):
 @app.head("/manage/")
 @app.head("/manage")
 @app.head("/manage/catalog")
+@app.head("/manage/site")
 @app.head("/manage/guides")
 def management_page_head():
     return Response(

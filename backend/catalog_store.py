@@ -19,6 +19,7 @@ SEED_IMAGE_RE = re.compile(r"^[A-Za-z0-9_-]{1,120}$")
 MEDIA_FILE_RE = re.compile(r"^[a-f0-9]{32}\.webp$")
 LANGUAGES = ("ru", "en", "zh")
 MAX_PRODUCT_IMAGES = 8
+MAX_PARTNERS = 30
 CATALOG_TYPE_DEFAULTS = (
     ("white", "tea", "Белый чай", "White tea", "白茶"),
     ("green", "tea", "Зелёный чай", "Green tea", "绿茶"),
@@ -44,6 +45,26 @@ CATALOG_TYPE_DEFAULTS = (
 TASTE_AXES = (
     "floral", "fruity", "driedfruit", "honey", "nutty",
     "roasted", "spicy", "woody", "herbal",
+)
+DEFAULT_PARTNERS = (
+    {
+        "id": "rolf",
+        "published": True,
+        "translations": {
+            "ru": {"name": "РОЛЬФ", "type": "Автомобильная группа"},
+            "en": {"name": "ROLF", "type": "Automotive group"},
+            "zh": {"name": "ROLF", "type": "汽车集团"},
+        },
+    },
+    {
+        "id": "relikta",
+        "published": True,
+        "translations": {
+            "ru": {"name": "Реликта", "type": "Винодельня"},
+            "en": {"name": "Relikta", "type": "Winery"},
+            "zh": {"name": "Relikta", "type": "酒庄"},
+        },
+    },
 )
 
 
@@ -226,6 +247,39 @@ def normalize_item(raw: dict[str, Any], *, existing_id: str | None = None) -> di
     return item
 
 
+def normalize_partner(raw: dict[str, Any], *, existing_id: str | None = None) -> dict[str, Any]:
+    """Validate an editable public partner without making translations blocking."""
+    if not isinstance(raw, dict):
+        raise CatalogError("Партнёр должен быть объектом")
+    partner_id = _text(raw.get("id", existing_id or ""), "id", 80, required=True).lower()
+    if existing_id and partner_id != existing_id:
+        raise CatalogError("Идентификатор существующего партнёра менять нельзя")
+    if not ITEM_ID_RE.fullmatch(partner_id):
+        raise CatalogError("ID: латиница в нижнем регистре, цифры и дефисы")
+
+    translations_raw = raw.get("translations")
+    if not isinstance(translations_raw, dict):
+        translations_raw = {
+            "ru": {"name": raw.get("name", ""), "type": raw.get("type", "")}
+        }
+    translations: dict[str, dict[str, str]] = {}
+    for language in LANGUAGES:
+        source = translations_raw.get(language) or {}
+        if not isinstance(source, dict):
+            raise CatalogError(f"Некорректный перевод {language}")
+        translations[language] = {
+            "name": _text(source.get("name", ""), f"{language}.name", 160),
+            "type": _text(source.get("type", ""), f"{language}.type", 240),
+        }
+    if not any(value["name"] for value in translations.values()):
+        raise CatalogError("Укажите название партнёра хотя бы на одном языке")
+    return {
+        "id": partner_id,
+        "published": bool(raw.get("published", False)),
+        "translations": translations,
+    }
+
+
 def normalize_document(raw: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(raw, dict) or not isinstance(raw.get("teas"), list):
         raise CatalogError("В каталоге отсутствует список teas")
@@ -285,17 +339,29 @@ def normalize_document(raw: dict[str, Any]) -> dict[str, Any]:
     missing = sorted({item["type"] for item in teas} - known_types)
     if missing:
         raise CatalogError("Неизвестные категории: " + ", ".join(missing))
+    partners_raw = raw.get(
+        "partners", [copy.deepcopy(partner) for partner in DEFAULT_PARTNERS]
+    )
+    if not isinstance(partners_raw, list):
+        raise CatalogError("Некорректный список партнёров")
+    if len(partners_raw) > MAX_PARTNERS:
+        raise CatalogError(f"Можно добавить не более {MAX_PARTNERS} партнёров")
+    partners = [normalize_partner(partner) for partner in partners_raw]
+    partner_ids = [partner["id"] for partner in partners]
+    if len(partner_ids) != len(set(partner_ids)):
+        raise CatalogError("ID партнёров не должны повторяться")
     revision = raw.get("revision", 1)
     if not isinstance(revision, int) or revision < 1:
         revision = 1
     return {
-        "schema_version": 4,
+        "schema_version": 5,
         "revision": revision,
         "updated_at": str(raw.get("updated_at") or utc_now()),
         "types": clean_types,
         "axes": copy.deepcopy(raw.get("axes", [])),
         "packs": copy.deepcopy(raw.get("packs", [10, 25, 50, 100])),
         "teas": teas,
+        "partners": partners,
     }
 
 
@@ -478,6 +544,42 @@ class CatalogStore:
             if len(item_ids) != len(set(item_ids)) or set(item_ids) != set(current):
                 raise CatalogError("Порядок должен содержать каждый товар ровно один раз")
             document["teas"] = [current[item_id] for item_id in item_ids]
+            return self._finish(document)
+
+    def create_partner(self, raw: dict[str, Any], revision: int) -> dict[str, Any]:
+        with self._lock:
+            document = self.get()
+            self._require_revision(document, revision)
+            partner = normalize_partner(raw)
+            if any(current["id"] == partner["id"] for current in document["partners"]):
+                raise CatalogError("Партнёр с таким ID уже существует")
+            if len(document["partners"]) >= MAX_PARTNERS:
+                raise CatalogError(f"Можно добавить не более {MAX_PARTNERS} партнёров")
+            document["partners"].append(partner)
+            return self._finish(document)
+
+    def update_partner(
+        self, partner_id: str, raw: dict[str, Any], revision: int
+    ) -> dict[str, Any]:
+        with self._lock:
+            document = self.get()
+            self._require_revision(document, revision)
+            for index, current in enumerate(document["partners"]):
+                if current["id"] == partner_id:
+                    document["partners"][index] = normalize_partner(
+                        raw, existing_id=partner_id
+                    )
+                    return self._finish(document)
+            raise KeyError(partner_id)
+
+    def reorder_partners(self, partner_ids: list[str], revision: int) -> dict[str, Any]:
+        with self._lock:
+            document = self.get()
+            self._require_revision(document, revision)
+            current = {partner["id"]: partner for partner in document["partners"]}
+            if len(partner_ids) != len(set(partner_ids)) or set(partner_ids) != set(current):
+                raise CatalogError("Порядок должен содержать каждого партнёра ровно один раз")
+            document["partners"] = [current[partner_id] for partner_id in partner_ids]
             return self._finish(document)
 
 

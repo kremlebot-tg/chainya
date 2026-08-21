@@ -6,6 +6,8 @@ SOURCE_PATH = Path(__file__).resolve().parents[2] / "src.html"
 BUILD_PATH = Path(__file__).resolve().parents[2] / "build.py"
 ADMIN_CATALOG_PATH = Path(__file__).resolve().parents[1] / "admin-catalog.html"
 ADMIN_CATALOG_JS_PATH = Path(__file__).resolve().parents[1] / "admin-catalog.js"
+ADMIN_SITE_PATH = Path(__file__).resolve().parents[1] / "admin-site.html"
+ADMIN_SITE_JS_PATH = Path(__file__).resolve().parents[1] / "admin-site.js"
 ADMIN_PATH = Path(__file__).resolve().parents[1] / "admin.html"
 ADMIN_GUIDES_PATH = Path(__file__).resolve().parents[1] / "admin-guides.html"
 ACCOUNT_PATH = Path(__file__).resolve().parents[1] / "account.html"
@@ -18,6 +20,8 @@ SOURCE = SOURCE_PATH.read_text(encoding="utf-8") if SOURCE_PATH.exists() else ""
 BUILD_SOURCE = BUILD_PATH.read_text(encoding="utf-8") if BUILD_PATH.exists() else ""
 ADMIN_CATALOG = ADMIN_CATALOG_PATH.read_text(encoding="utf-8")
 ADMIN_CATALOG_JS = ADMIN_CATALOG_JS_PATH.read_text(encoding="utf-8")
+ADMIN_SITE = ADMIN_SITE_PATH.read_text(encoding="utf-8")
+ADMIN_SITE_JS = ADMIN_SITE_JS_PATH.read_text(encoding="utf-8")
 ADMIN_SOURCE = ADMIN_PATH.read_text(encoding="utf-8")
 ADMIN_GUIDES = ADMIN_GUIDES_PATH.read_text(encoding="utf-8")
 ACCOUNT_SOURCE = ACCOUNT_PATH.read_text(encoding="utf-8")
@@ -128,6 +132,20 @@ def test_teaware_has_a_separate_public_navigation_route():
     assert "nav_shop:'Tea'" in SOURCE
     assert "nav_shop:'茶'" in SOURCE
     assert 'data-i18n="nav_shop">Купить чай</a>' not in SOURCE
+
+
+def test_partners_are_managed_content_with_safe_public_fallback():
+    assert "let PARTNERS = null" in SOURCE
+    assert "function renderPartners()" in SOURCE
+    assert "PARTNERS = nextPartners" in SOURCE
+    assert "section.hidden = !list.children.length" in SOURCE
+    assert "partner.translations[LANG]" in SOURCE
+    assert 'href="/manage/site" aria-current="page">Сайт</a>' in ADMIN_SITE
+    assert "Показывать на сайте" in ADMIN_SITE
+    assert "Это не блокирует сохранение или публикацию" in ADMIN_SITE_JS
+    assert "window.addEventListener('beforeunload'" in ADMIN_SITE_JS
+    assert "/api/admin/site/partner-order" in ADMIN_SITE_JS
+    assert "removePartner" not in ADMIN_SITE_JS
 
 
 def test_catalog_cards_expose_indexable_product_links_and_keep_modal_navigation():

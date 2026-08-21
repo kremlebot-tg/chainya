@@ -287,15 +287,11 @@ h1, h2, h3, p{ text-wrap:pretty; }
   font-weight:400; line-height:1.12; letter-spacing:-.02em;
 }
 .b2b-collab__list{
-  display:grid; grid-template-columns:repeat(2,minmax(0,1fr));
-  margin:0; padding:0; list-style:none;
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:clamp(20px,3vw,44px); margin:0; padding:0; list-style:none;
 }
 .b2b-partner{
   min-width:0; padding:8px 0;
-}
-.b2b-partner:first-child{ padding-right:clamp(20px,3vw,44px); }
-.b2b-partner + .b2b-partner{
-  padding-left:clamp(20px,3vw,44px); border-left:1px solid var(--line-soft);
 }
 .b2b-partner__name{
   margin:0; font-family:'Prata',Georgia,serif; font-size:clamp(1.45rem,2.4vw,2rem);
@@ -2816,6 +2812,7 @@ select.input{
      обновлением рисуем актуальный каталог. */
   let catalogRefreshPending = null;
   let catalogReady = false;
+  let PARTNERS = null;
   function renderCatalogLoading(){
     const hero = $('#hero-img');
     hero.removeAttribute('src');
@@ -2872,6 +2869,24 @@ select.input{
   function validCatalogImage(value){
     return typeof value === 'string' && (/^\/img\/[A-Za-z0-9_-]+\.webp$/.test(value) || /^\/catalog-media\/[a-f0-9]{32}\.webp$/.test(value));
   }
+  function renderPartners(){
+    if (!Array.isArray(PARTNERS)) return;
+    const section = $('#b2b-partners'), list = $('.b2b-collab__list', section);
+    list.replaceChildren();
+    const languages = ['ru','en','zh'];
+    for (const partner of PARTNERS){
+      const sources = [partner.translations[LANG],partner.translations.ru,...languages.filter(code=>code!==LANG&&code!=='ru').map(code=>partner.translations[code])];
+      const value = field => sources.find(source=>typeof source?.[field]==='string'&&source[field].trim())?.[field].trim() || '';
+      const name = value('name'); if (!name) continue;
+      const item = document.createElement('li'); item.className = 'b2b-partner';
+      const title = document.createElement('p'); title.className = 'b2b-partner__name'; title.textContent = name;
+      item.append(title);
+      const type = value('type');
+      if (type){ const note = document.createElement('p'); note.className = 'b2b-partner__type'; note.textContent = type; item.append(note); }
+      list.append(item);
+    }
+    section.hidden = !list.children.length;
+  }
   function refreshCatalog(){
     if (catalogRefreshPending) return catalogRefreshPending;
     catalogRefreshPending = (async () => {
@@ -2900,6 +2915,20 @@ select.input{
         });
         CATALOG_TYPES = nextTypes;
         TYPE_IDS = ['all',...nextTypes.map(type=>type.id)];
+        if (!Array.isArray(data.partners) || data.partners.length > 30) throw new Error('catalog_partners');
+        const partnerIds = new Set();
+        const nextPartners = data.partners.map(partner => {
+          if (!partner || !/^[a-z0-9][a-z0-9-]{0,79}$/.test(partner.id) || partnerIds.has(partner.id) || !partner.translations) throw new Error('catalog_partner');
+          const translations = {};
+          languages.forEach(language => {
+            const value = partner.translations[language];
+            if (!value || typeof value.name !== 'string' || typeof value.type !== 'string') throw new Error('catalog_partner_translation');
+            translations[language] = {name:value.name, type:value.type};
+          });
+          if (!languages.some(language=>translations[language].name.trim())) throw new Error('catalog_partner_name');
+          partnerIds.add(partner.id);
+          return {id:partner.id,translations};
+        });
         for (const item of data.teas){
           if (!item || !/^[a-z0-9][a-z0-9-]{0,79}$/.test(item.id) || seen.has(item.id)) throw new Error('catalog_item');
           if (!TYPE_IDS.includes(item.type) || !Number.isInteger(item.price) || item.price < 0 || !['g','pc'].includes(item.unit)) throw new Error('catalog_item');
@@ -2932,6 +2961,8 @@ select.input{
         for (const language of languages){
           for (const id of Object.keys(I18N[language].teas)) if (!seen.has(id)) delete I18N[language].teas[id];
         }
+        PARTNERS = nextPartners;
+        renderPartners();
         const firstResolution = !catalogReady;
         catalogReady = true;
         renderResolvedCatalog();
@@ -4216,6 +4247,7 @@ select.input{
     $$('a[href^="/legal.html"]').forEach(a => { a.href = `/legal.html?lang=${LANG}`; });
     $('#account-open').href = `/account?lang=${LANG}`;
     buildFilters();
+    renderPartners();
     buildShopTools();
     if (catalogReady){
       selectHeroImage();

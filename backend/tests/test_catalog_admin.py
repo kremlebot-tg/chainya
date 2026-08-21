@@ -8,6 +8,10 @@ AUTH = {
     "Authorization": "Bearer test-admin-token",
     "X-Chainya-Admin": "catalog",
 }
+SITE_AUTH = {
+    "Authorization": "Bearer test-admin-token",
+    "X-Chainya-Admin": "site",
+}
 
 
 def test_owner_catalog_page_uses_existing_admin_session(tmp_path, monkeypatch):
@@ -39,6 +43,130 @@ def test_owner_catalog_script_is_not_public(tmp_path, monkeypatch):
 
     assert anonymous.status_code == 404
     assert anonymous_head.status_code == 404
+
+
+def test_owner_site_editor_uses_existing_session_and_keeps_script_private(
+    tmp_path, monkeypatch
+):
+    client, module = app_client(tmp_path, monkeypatch)
+    with client:
+        anonymous_page = client.get("/manage/site")
+        anonymous_script = client.get("/manage/site.js")
+        login = client.post("/api/admin/session", json={"token": "test-admin-token"})
+        page = client.get("/manage/site")
+        script = client.get("/manage/site.js")
+        script_head = client.head("/manage/site.js")
+
+    assert login.status_code == 204
+    assert "Вход владельца" in anonymous_page.text
+    assert anonymous_script.status_code == 404
+    assert page.status_code == 200
+    assert "Страницы без разработчика" in page.text
+    assert "Добавить партнёра" in page.text
+    assert "Ничего не удаляется безвозвратно" in page.text
+    assert script.status_code == 200
+    assert script_head.status_code == 200
+    assert "async function savePartner()" in script.text
+    assert module.ADMIN_TOKEN not in page.text
+    assert module.ADMIN_TOKEN not in script.text
+
+
+def test_partner_editor_create_publish_hide_reorder_and_history(tmp_path, monkeypatch):
+    client, _ = app_client(tmp_path, monkeypatch)
+    new_partner = {
+        "id": "new-partner",
+        "published": True,
+        "translations": {
+            "ru": {"name": "Новый партнёр", "type": "Гостеприимство"},
+            "en": {"name": "", "type": ""},
+            "zh": {"name": "", "type": ""},
+        },
+    }
+    with client:
+        initial = client.get("/api/admin/site/partners", headers=SITE_AUTH)
+        missing_marker = client.post(
+            "/api/admin/site/partners",
+            headers={"Authorization": SITE_AUTH["Authorization"]},
+            json={"revision": initial.json()["revision"], "item": new_partner},
+        )
+        created = client.post(
+            "/api/admin/site/partners",
+            headers=SITE_AUTH,
+            json={"revision": initial.json()["revision"], "item": new_partner},
+        )
+        public_after_create = client.get("/api/catalog").json()["partners"]
+        stale = client.put(
+            "/api/admin/site/partners/new-partner",
+            headers=SITE_AUTH,
+            json={"revision": initial.json()["revision"], "item": new_partner},
+        )
+        hidden_partner = next(
+            item for item in created.json()["partners"] if item["id"] == "new-partner"
+        )
+        hidden_partner["published"] = False
+        hidden = client.put(
+            "/api/admin/site/partners/new-partner",
+            headers=SITE_AUTH,
+            json={"revision": created.json()["revision"], "item": hidden_partner},
+        )
+        ids = [item["id"] for item in hidden.json()["partners"]]
+        ids.insert(0, ids.pop(ids.index("new-partner")))
+        reordered = client.put(
+            "/api/admin/site/partner-order",
+            headers=SITE_AUTH,
+            json={"revision": hidden.json()["revision"], "ids": ids},
+        )
+        site_history = client.get("/api/admin/site/history", headers=SITE_AUTH)
+        catalog_history = client.get("/api/admin/catalog/history", headers=AUTH)
+
+    assert initial.status_code == 200
+    assert [item["id"] for item in initial.json()["partners"]] == ["rolf", "relikta"]
+    assert missing_marker.status_code == 403
+    assert created.status_code == 201
+    assert next(item for item in public_after_create if item["id"] == "new-partner")[
+        "translations"
+    ]["en"]["name"] == ""
+    assert stale.status_code == 409
+    assert hidden.status_code == 200
+    assert all(
+        item["id"] != "new-partner" for item in client.get("/api/catalog").json()["partners"]
+    )
+    assert reordered.status_code == 200
+    assert reordered.json()["partners"][0]["id"] == "new-partner"
+    assert [item["action"] for item in site_history.json()["history"][:3]] == [
+        "partner_reorder", "partner_update", "partner_create",
+    ]
+    assert site_history.json()["history"][1]["item_name"] == "Новый партнёр"
+    assert all(not item["action"].startswith("partner_") for item in catalog_history.json()["history"])
+
+
+def test_partner_editor_rejects_duplicate_ids_and_all_blank_names(tmp_path, monkeypatch):
+    client, _ = app_client(tmp_path, monkeypatch)
+    with client:
+        initial = client.get("/api/admin/site/partners", headers=SITE_AUTH).json()
+        duplicate = client.post(
+            "/api/admin/site/partners",
+            headers=SITE_AUTH,
+            json={"revision": initial["revision"], "item": initial["partners"][0]},
+        )
+        blank = {
+            "id": "blank-partner",
+            "published": False,
+            "translations": {
+                language: {"name": "", "type": ""}
+                for language in ("ru", "en", "zh")
+            },
+        }
+        blank_response = client.post(
+            "/api/admin/site/partners",
+            headers=SITE_AUTH,
+            json={"revision": initial["revision"], "item": blank},
+        )
+
+    assert duplicate.status_code == 422
+    assert "уже существует" in duplicate.json()["detail"]
+    assert blank_response.status_code == 422
+    assert "хотя бы на одном языке" in blank_response.json()["detail"]
 
 
 def test_owner_guides_use_existing_admin_session_and_explain_safe_boundaries(tmp_path, monkeypatch):

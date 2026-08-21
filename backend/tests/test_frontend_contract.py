@@ -288,6 +288,25 @@ def test_business_offer_headings_follow_the_page_heading():
     assert '<h2 data-i18n="b2b_offer2_h">' in SOURCE
 
 
+def test_business_partners_are_present_without_unapproved_brand_assets():
+    section_start = SOURCE.index('<section class="b2b-collab" id="b2b-partners"')
+    section_end = SOURCE.index("</section>", section_start)
+    partners = SOURCE[section_start:section_end]
+
+    assert SOURCE.index('class="b2b-offers"') < section_start
+    assert section_end < SOURCE.index('<div class="book">', section_end)
+    assert 'data-i18n="partner_rolf_name">РОЛЬФ<' in partners
+    assert 'data-i18n="partner_relikta_name">Реликта<' in partners
+    assert "<img" not in partners
+    for translation in (
+        "partners_label:'С кем мы уже работаем'",
+        "partner_rolf_name:'ROLF'",
+        "partner_relikta_name:'Relikta'",
+        "partners_label:'合作伙伴'",
+    ):
+        assert translation in SOURCE
+
+
 def test_language_switch_updates_all_document_metadata():
     assert "function syncDocumentMetadata(view)" in SOURCE
     assert "meta[name=\"description\"]" in SOURCE

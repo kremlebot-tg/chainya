@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from backend.catalog_store import CATALOG_TYPE_DEFAULTS
+from backend.catalog_store import CATALOG_TYPE_DEFAULTS, DEFAULT_PARTNERS
 
 SOURCE = ROOT / "src.html"
 BOT_CATALOG = ROOT / "telegram-bot" / "teas.json"
@@ -108,8 +108,9 @@ def main() -> None:
             "translations": localized,
         })
     result = {
-        "schema_version": 4,
+        "schema_version": 5,
         "revision": 1,
+        "partners": list(DEFAULT_PARTNERS),
         "types": [
             {
                 "id": type_id,

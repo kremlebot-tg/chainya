@@ -6,18 +6,36 @@
       "id": "rolf",
       "published": true,
       "translations": {
-        "ru": {"name": "РОЛЬФ", "type": "Автомобильная группа"},
-        "en": {"name": "ROLF", "type": "Automotive group"},
-        "zh": {"name": "ROLF", "type": "汽车集团"}
+        "ru": {
+          "name": "РОЛЬФ",
+          "type": "Автомобильная группа"
+        },
+        "en": {
+          "name": "ROLF",
+          "type": "Automotive group"
+        },
+        "zh": {
+          "name": "ROLF",
+          "type": "汽车集团"
+        }
       }
     },
     {
       "id": "relikta",
       "published": true,
       "translations": {
-        "ru": {"name": "Реликта", "type": "Винодельня"},
-        "en": {"name": "Relikta", "type": "Winery"},
-        "zh": {"name": "Relikta", "type": "酒庄"}
+        "ru": {
+          "name": "Реликта",
+          "type": "Винодельня"
+        },
+        "en": {
+          "name": "Relikta",
+          "type": "Winery"
+        },
+        "zh": {
+          "name": "Relikta",
+          "type": "酒庄"
+        }
       }
     }
   ],

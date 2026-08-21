@@ -272,41 +272,39 @@ h1, h2, h3, p{ text-wrap:pretty; }
 .b2b-offer .link-arrow{ margin-top:16px; }
 #view-b2b .book > div > .label{ display:block; margin-bottom:18px; }
 
-/* Партнёры — редакционный список, а не рекламная карусель с чужими логотипами. */
+/* Партнёры — компактное доказательство сразу после обещания страницы.
+   Названия набраны текстом: логотипы публикуем только с разрешения брендов. */
 .b2b-collab{
-  margin-bottom:clamp(48px,7vw,88px); padding-block:clamp(28px,4vw,44px);
-  border-block:1px solid var(--line-soft);
+  display:grid; grid-template-columns:minmax(230px,.72fr) minmax(0,1.28fr);
+  gap:clamp(28px,5vw,76px); align-items:center;
+  margin-bottom:clamp(42px,6vw,72px); padding-block:clamp(24px,3vw,34px);
+  border-block:1px solid var(--line);
 }
-.b2b-collab__head{
-  display:grid; grid-template-columns:minmax(0,.72fr) minmax(0,1fr);
-  gap:clamp(20px,5vw,72px); align-items:end;
-}
+.b2b-collab__head{ min-width:0; }
 .b2b-collab__head h2{
-  margin:12px 0 0; max-width:16ch;
-  font-family:'Prata',Georgia,serif; font-size:clamp(1.65rem,3vw,2.5rem);
+  margin:10px 0 0; max-width:15ch;
+  font-family:'Prata',Georgia,serif; font-size:clamp(1.5rem,2.5vw,2rem);
   font-weight:400; line-height:1.12; letter-spacing:-.02em;
-}
-.b2b-collab__head > p{
-  margin:0; max-width:55ch; color:var(--text-2); font-size:15px; line-height:1.65;
 }
 .b2b-collab__list{
   display:grid; grid-template-columns:repeat(2,minmax(0,1fr));
-  margin-top:clamp(26px,3.5vw,42px); border-top:1px solid var(--line);
+  margin:0; padding:0; list-style:none;
 }
 .b2b-partner{
-  display:grid; grid-template-columns:auto minmax(0,1fr); gap:16px;
-  align-items:baseline; padding:clamp(20px,2.4vw,30px) 0;
+  min-width:0; padding:8px 0;
 }
 .b2b-partner:first-child{ padding-right:clamp(20px,3vw,44px); }
 .b2b-partner + .b2b-partner{
   padding-left:clamp(20px,3vw,44px); border-left:1px solid var(--line-soft);
 }
-.b2b-partner__n{ color:var(--accent); font-size:12px; letter-spacing:.12em; }
 .b2b-partner__name{
   margin:0; font-family:'Prata',Georgia,serif; font-size:clamp(1.45rem,2.4vw,2rem);
   font-weight:400; line-height:1.15;
 }
-.b2b-partner__type{ margin:7px 0 0; color:var(--text-3); font-size:13px; }
+.b2b-partner__type{
+  margin:8px 0 0; color:var(--text-3); font-size:12px;
+  line-height:1.4; letter-spacing:.08em; text-transform:uppercase;
+}
 
 /* ── Философия ── */
 .credo{
@@ -874,7 +872,7 @@ select.input{
   .brange__strip{ grid-template-columns:repeat(4,minmax(0,1fr)); }
   .bsteps{ grid-template-columns:1fr; }
   .svcs, .b2b-offers{ grid-template-columns:1fr; }
-  .b2b-collab__head{ grid-template-columns:1fr; align-items:start; }
+  .b2b-collab{ grid-template-columns:1fr; align-items:start; gap:26px; }
   .b2b-collab__head h2{ max-width:18ch; }
   .b2b-collab__list{ grid-template-columns:1fr; }
   .b2b-partner:first-child{ padding-right:0; }
@@ -1253,6 +1251,23 @@ select.input{
         <p class="lead" data-i18n="b2b_lead"></p>
       </div>
 
+      <section class="b2b-collab" id="b2b-partners" aria-labelledby="b2b-partners-heading">
+        <div class="b2b-collab__head">
+          <p class="label" data-i18n="partners_label">Партнёры</p>
+          <h2 id="b2b-partners-heading" data-i18n="partners_h">С кем работает Чайня</h2>
+        </div>
+        <ul class="b2b-collab__list" role="list">
+          <li class="b2b-partner">
+            <p class="b2b-partner__name" data-i18n="partner_rolf_name">РОЛЬФ</p>
+            <p class="b2b-partner__type" data-i18n="partner_rolf_type">Автомобильная группа</p>
+          </li>
+          <li class="b2b-partner">
+            <p class="b2b-partner__name" data-i18n="partner_relikta_name">Реликта</p>
+            <p class="b2b-partner__type" data-i18n="partner_relikta_type">Винодельня</p>
+          </li>
+        </ul>
+      </section>
+
       <div class="b2b-offers">
         <article class="b2b-offer">
           <div class="b2b-offer__art"><img src="{{img:hall-shelf}}" alt="" data-i18n-alt="alt_shelf" loading="lazy" width="1300" height="865"></div>
@@ -1267,32 +1282,6 @@ select.input{
           <button class="link-arrow b2b-intent" type="button" data-intent="event"><span data-i18n="b2b_offer2_cta">Обсудить мероприятие</span> <span aria-hidden="true">→</span></button>
         </article>
       </div>
-
-      <section class="b2b-collab" id="b2b-partners" aria-labelledby="b2b-partners-heading">
-        <div class="b2b-collab__head">
-          <div>
-            <p class="label" data-i18n="partners_label">С кем мы уже работаем</p>
-            <h2 id="b2b-partners-heading" data-i18n="partners_h">Партнёрства из разных сфер</h2>
-          </div>
-          <p data-i18n="partners_p">Формат сотрудничества подбираем под задачи компании: от регулярных поставок до чайного сопровождения мероприятий.</p>
-        </div>
-        <div class="b2b-collab__list">
-          <article class="b2b-partner">
-            <span class="b2b-partner__n num" aria-hidden="true">01</span>
-            <div>
-              <h3 class="b2b-partner__name" data-i18n="partner_rolf_name">РОЛЬФ</h3>
-              <p class="b2b-partner__type" data-i18n="partner_rolf_type">Автомобильная группа</p>
-            </div>
-          </article>
-          <article class="b2b-partner">
-            <span class="b2b-partner__n num" aria-hidden="true">02</span>
-            <div>
-              <h3 class="b2b-partner__name" data-i18n="partner_relikta_name">Реликта</h3>
-              <p class="b2b-partner__type" data-i18n="partner_relikta_type">Винодельня</p>
-            </div>
-          </article>
-        </div>
-      </section>
 
       <div class="book">
         <div>
@@ -1864,8 +1853,7 @@ select.input{
     b2b_offer1_cta:'Обсудить поставку', b2b_supply_prefill:'Интересует поставка чая для заведения или офиса.',
     b2b_offer2_h:'Выездные чайные церемонии', b2b_offer2_p:'Мастер приезжает с чаем и посудой на корпоратив, презентацию, свадьбу или частную встречу. Сценарий, продолжительность и число гостей согласуем заранее.',
     b2b_offer2_cta:'Обсудить мероприятие', b2b_event_prefill:'Интересует выездная чайная церемония. Расскажите о формате и стоимости.',
-    partners_label:'С кем мы уже работаем', partners_h:'Партнёрства из разных сфер',
-    partners_p:'Формат сотрудничества подбираем под задачи компании: от регулярных поставок до чайного сопровождения мероприятий.',
+    partners_label:'Партнёры', partners_h:'С кем работает Чайня',
     partner_rolf_name:'РОЛЬФ', partner_rolf_type:'Автомобильная группа',
     partner_relikta_name:'Реликта', partner_relikta_type:'Винодельня',
     supply_label:'Как устроены поставки',
@@ -2051,8 +2039,7 @@ select.input{
     b2b_offer1_cta:'Discuss supply', b2b_supply_prefill:'I am interested in tea supply for a venue or office.',
     b2b_offer2_h:'Off-site tea ceremonies', b2b_offer2_p:'A master brings the tea and teaware to a company event, presentation, wedding or private gathering. We agree the programme, duration and guest count in advance.',
     b2b_offer2_cta:'Discuss an event', b2b_event_prefill:'I am interested in an off-site tea ceremony. Please tell me about formats and pricing.',
-    partners_label:'Who we work with', partners_h:'Partnerships across industries',
-    partners_p:'We tailor each collaboration to the company, from regular tea supply to tea service for events.',
+    partners_label:'Partners', partners_h:'Who Chaynya works with',
     partner_rolf_name:'ROLF', partner_rolf_type:'Automotive group',
     partner_relikta_name:'Relikta', partner_relikta_type:'Winery',
     supply_label:'How supply works',
@@ -2238,8 +2225,7 @@ select.input{
     b2b_offer1_cta:'洽谈供货', b2b_supply_prefill:'我想了解为餐饮场所或办公室供茶。',
     b2b_offer2_h:'外出茶会', b2b_offer2_p:'茶艺师带茶与茶具前往企业活动、发布会、婚礼或私人聚会。流程、时长和宾客人数提前商定。',
     b2b_offer2_cta:'洽谈活动', b2b_event_prefill:'我想了解外出茶会的形式与费用。',
-    partners_label:'合作伙伴', partners_h:'来自不同行业的合作',
-    partners_p:'我们根据企业需求设计合作方式，包括定期供茶和活动茶席服务。',
+    partners_label:'合作伙伴', partners_h:'Chaynya 的合作伙伴',
     partner_rolf_name:'ROLF', partner_rolf_type:'汽车集团',
     partner_relikta_name:'Relikta', partner_relikta_type:'酒庄',
     supply_label:'供货流程',

@@ -293,16 +293,20 @@ def test_business_partners_are_present_without_unapproved_brand_assets():
     section_end = SOURCE.index("</section>", section_start)
     partners = SOURCE[section_start:section_end]
 
-    assert SOURCE.index('class="b2b-offers"') < section_start
-    assert section_end < SOURCE.index('<div class="book">', section_end)
+    assert SOURCE.index('class="sec__head"') < section_start
+    assert section_end < SOURCE.index('class="b2b-offers"', section_end)
+    assert '<ul class="b2b-collab__list" role="list">' in partners
+    assert partners.count('<li class="b2b-partner">') == 2
     assert 'data-i18n="partner_rolf_name">РОЛЬФ<' in partners
     assert 'data-i18n="partner_relikta_name">Реликта<' in partners
     assert "<img" not in partners
+    assert 'class="b2b-partner__n num"' not in partners
+    assert "partners_p" not in SOURCE
     for translation in (
-        "partners_label:'С кем мы уже работаем'",
+        "partners_h:'С кем работает Чайня'",
         "partner_rolf_name:'ROLF'",
         "partner_relikta_name:'Relikta'",
-        "partners_label:'合作伙伴'",
+        "partners_h:'Chaynya 的合作伙伴'",
     ):
         assert translation in SOURCE
 

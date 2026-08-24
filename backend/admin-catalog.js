@@ -408,6 +408,7 @@ function makeInput(label, name, value, type = 'text', wide = false) {
   title.textContent = label;
   const field = document.createElement('input');
   field.className = 'input';
+  field.id = `catalog-field-${name.replace(/[^a-z0-9]+/gi, '-')}`;
   field.type = type;
   field.name = name;
   field.value = value ?? '';
@@ -424,11 +425,45 @@ function makeTextarea(label, name, value) {
   title.textContent = label;
   const field = document.createElement('textarea');
   field.className = 'textarea';
+  field.id = `catalog-field-${name.replace(/[^a-z0-9]+/gi, '-')}`;
   field.name = name;
   field.value = value ?? '';
   field.maxLength = 5000;
   wrap.append(title, field);
   return wrap;
+}
+
+function clearFormErrors() {
+  const box = $('#form-errors');
+  if (!box) return;
+  $$('#catalog-form [aria-invalid="true"]').forEach(field => field.removeAttribute('aria-invalid'));
+  box.hidden = true;
+  box.replaceChildren();
+}
+
+function showFormErrors(form, errors) {
+  const box = $('#form-errors');
+  if (!box) return;
+  box.replaceChildren();
+  const title = document.createElement('strong');
+  title.textContent = 'Проверьте карточку';
+  const list = document.createElement('ul');
+  errors.forEach(({message, name, language}) => {
+    const field = form.elements.namedItem(name);
+    field?.setAttribute('aria-invalid', 'true');
+    const row = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = message;
+    button.onclick = () => {
+      if (language) switchLanguage(language);
+      field?.focus();
+    };
+    row.append(button); list.append(row);
+  });
+  box.append(title, list);
+  box.hidden = false;
+  box.focus();
 }
 
 function setDirty(value = true) {
@@ -609,6 +644,7 @@ function renderEditor() {
   const copy = groupCopy(draft);
   const form = document.createElement('form');
   form.id = 'catalog-form';
+  form.noValidate = true;
   form.addEventListener('submit', saveItem);
 
   if (innerWidth <= 900) {
@@ -676,6 +712,14 @@ function renderEditor() {
   }
   head.append(photoStack, title, links);
   form.append(head);
+
+  const errors = document.createElement('div');
+  errors.id = 'form-errors';
+  errors.className = 'form-errors';
+  errors.setAttribute('role', 'alert');
+  errors.tabIndex = -1;
+  errors.hidden = true;
+  form.append(errors);
 
   if (draft.saby?.image_pending) {
     const warning = document.createElement('div');
@@ -880,6 +924,7 @@ function renderEditor() {
     $('#price-field > span').textContent = event.target.value === 'pc' ? 'Цена за штуку, ₽' : 'Цена за 10 г, ₽';
   });
   form.addEventListener('input', () => {
+    clearFormErrors();
     setDirty(true);
     updateEditorFeedback(form);
   });
@@ -1013,14 +1058,21 @@ async function saveItem(event) {
   const form = event.currentTarget;
   const button = $('#save');
   const item = formItem(form);
+  const errors = [];
   if (!Object.values(item.translations).some(translation => visibleText(translation.name))) {
-    toast('Укажите название хотя бы на одном языке.');
-    return;
+    errors.push({message: 'Укажите название хотя бы на одном языке', name: 'ru.name', language: 'ru'});
+  }
+  if (!selectedId && !/^[a-z0-9][a-z0-9-]{0,79}$/.test(item.id)) {
+    errors.push({message: 'Укажите адрес карточки латиницей, цифрами или дефисами', name: 'id'});
   }
   if (item.published && item.price <= 0) {
-    toast('Для публикации укажите цену больше нуля.');
+    errors.push({message: 'Для публикации укажите цену больше нуля', name: 'price'});
+  }
+  if (errors.length) {
+    showFormErrors(form, errors);
     return;
   }
+  clearFormErrors();
   button.disabled = true;
   button.textContent = 'Сохраняем карточку…';
   const creating = !selectedId;

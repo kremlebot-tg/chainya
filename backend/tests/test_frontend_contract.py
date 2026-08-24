@@ -489,6 +489,14 @@ def test_admin_catalog_prioritizes_daily_work_and_keeps_optional_fields_non_bloc
     assert ".mobile-back{display:inline-flex;align-items:center;justify-content:center;min-height:44px" in ADMIN_CATALOG
     assert ".photo-thumbs{grid-template-columns:repeat(2,1fr)}" in ADMIN_CATALOG
     assert ".editor-link{min-height:44px}" in ADMIN_CATALOG
+    assert "function showFormErrors(form, errors)" in ADMIN_CATALOG_JS
+    assert "form.noValidate = true" in ADMIN_CATALOG_JS
+    assert "errors.setAttribute('role', 'alert')" in ADMIN_CATALOG_JS
+    assert "field?.setAttribute('aria-invalid', 'true')" in ADMIN_CATALOG_JS
+    assert "field?.focus()" in ADMIN_CATALOG_JS
+    assert ".form-errors button{min-height:44px" in ADMIN_CATALOG
+    assert "errors.push({message: 'Укажите название хотя бы на одном языке'" in ADMIN_CATALOG_JS
+    assert "errors.push({message: 'Для публикации укажите цену больше нуля'" in ADMIN_CATALOG_JS
     assert "form.requestSubmit()" in ADMIN_CATALOG_JS
 
 

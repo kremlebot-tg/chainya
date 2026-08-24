@@ -153,7 +153,14 @@ async function savePartner() {
   const idInput = $('#partner-id').value.trim().toLocaleLowerCase('ru');
   if (!selectedId) draft.id = idInput || slug(displayTranslation(draft).name);
   if (!draft.id || !/^[a-z0-9][a-z0-9-]{0,79}$/.test(draft.id)) { toast('Укажите ID латиницей: буквы, цифры и дефисы'); $('#partner-id').focus(); return; }
-  if (!Object.values(draft.translations).some(value => value.name.trim())) { toast('Укажите название хотя бы на одном языке'); return; }
+  if (!Object.values(draft.translations).some(value => value.name.trim())) {
+    activeLanguage = 'ru';
+    $$('.lang').forEach(button => button.setAttribute('aria-selected', String(button.dataset.lang === 'ru')));
+    $$('.language-panel').forEach(panel => panel.classList.toggle('is-active', panel.dataset.lang === 'ru'));
+    toast('Укажите название хотя бы на одном языке');
+    $('[data-lang="ru"][data-field="name"]')?.focus();
+    return;
+  }
   saving = true; syncEditor();
   try {
     const isNew = !selectedId;

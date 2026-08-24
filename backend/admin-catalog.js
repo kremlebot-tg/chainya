@@ -628,7 +628,7 @@ function renderEditor() {
   heading.textContent = draft.name || 'Без названия';
   const note = document.createElement('p');
   note.textContent = selectedId
-    ? `Постоянный ID: ${draft.id}`
+    ? `Адрес карточки: /${itemGroup(draft) === 'teaware' ? 'teaware' : 'tea'}/${draft.id}`
     : 'Название создаст безопасную ссылку автоматически. Технический ID можно не открывать.';
   const saveState = document.createElement('span');
   saveState.className = 'save-state';

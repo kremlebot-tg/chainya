@@ -144,6 +144,8 @@ def test_partners_are_managed_content_with_safe_public_fallback():
     assert 'href="/manage/site" aria-current="page">Сайт</a>' in ADMIN_SITE
     assert "Показывать на сайте" in ADMIN_SITE
     assert "Это не блокирует сохранение или публикацию" in ADMIN_SITE_JS
+    assert "Например, винодельня или крупнейший автодилер" in ADMIN_SITE_JS
+    assert "автомобильная группа" not in ADMIN_SITE_JS
     assert "window.addEventListener('beforeunload'" in ADMIN_SITE_JS
     assert "/api/admin/site/partner-order" in ADMIN_SITE_JS
     assert "removePartner" not in ADMIN_SITE_JS
@@ -465,11 +467,19 @@ def test_admin_catalog_mobile_summary_wraps_without_a_clipped_horizontal_strip()
     assert "@media(max-width:900px){.items{max-height:none;overflow:visible}" in ADMIN_CATALOG
 
 
+def test_compact_mobile_navigation_keeps_every_primary_route_visible():
+    assert "@media (max-width:360px)" in SOURCE
+    assert ".nav--mob{ gap:10px; padding-inline:10px; justify-content:space-between; }" in SOURCE
+    assert ".nav--mob .nav__link{ font-size:13px; }" in SOURCE
+
+
 def test_admin_catalog_prioritizes_daily_work_and_keeps_optional_fields_non_blocking():
     assert ADMIN_CATALOG.index('class="layout"') < ADMIN_CATALOG.index('aria-label="Сервисные инструменты"')
     assert 'data-stat-filter="incomplete"' in ADMIN_CATALOG
     assert "optional.className = 'optional-fields'" in ADMIN_CATALOG_JS
     assert "Публикация не заблокирована" in ADMIN_CATALOG_JS
+    assert "Адрес карточки: /${itemGroup(draft) === 'teaware' ? 'teaware' : 'tea'}/${draft.id}" in ADMIN_CATALOG_JS
+    assert "Постоянный ID:" not in ADMIN_CATALOG_JS
     assert "form.requestSubmit()" in ADMIN_CATALOG_JS
 
 

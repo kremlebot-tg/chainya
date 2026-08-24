@@ -915,6 +915,12 @@ select.input{
   .nav--mob .nav__link[aria-current="page"]{ color:var(--text); }
   .nav--mob .nav__link[aria-current="page"]::after{ transform:scaleX(1); }
 }
+@media (max-width:360px){
+  /* На компактных iPhone все пять основных разделов должны быть видны сразу:
+     скрытая за горизонтальным свайпом «Бронь» выглядела как отсутствующий пункт. */
+  .nav--mob{ gap:10px; padding-inline:10px; justify-content:space-between; }
+  .nav--mob .nav__link{ font-size:13px; }
+}
 @media (max-width:700px){
   .hero{ min-height:0; display:flex; flex-direction:column; align-items:stretch; }
   .hero::after{ display:none; }

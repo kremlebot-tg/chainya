@@ -85,7 +85,7 @@ function createLanguagePanels(root) {
   root.replaceChildren();
   for (const [code, label] of LANGUAGES) {
     const panel = document.createElement('div'); panel.className = 'language-panel' + (code === activeLanguage ? ' is-active' : ''); panel.dataset.lang = code; panel.setAttribute('role', 'tabpanel');
-    for (const [field, title, placeholder] of [['name','Название партнёра',label === 'Русский' ? 'Например, Реликта' : 'Название на этом языке'],['type','Короткая подпись','Например, винодельня или автомобильная группа']]) {
+    for (const [field, title, placeholder] of [['name','Название партнёра',label === 'Русский' ? 'Например, Реликта' : 'Название на этом языке'],['type','Короткая подпись','Например, винодельня или крупнейший автодилер']]) {
       const wrapper = document.createElement('label'); wrapper.className = 'field';
       const caption = document.createElement('span'); caption.textContent = title;
       const input = document.createElement('input'); input.className = 'input'; input.maxLength = field === 'name' ? 160 : 240; input.placeholder = placeholder; input.value = draft.translations[code][field] || ''; input.dataset.lang = code; input.dataset.field = field; input.oninput = () => { draft.translations[code][field] = input.value; if (!draft.id && field === 'name') $('#partner-id').value = slug(input.value); syncEditor(); };

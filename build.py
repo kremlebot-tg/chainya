@@ -35,6 +35,38 @@ assert "/*@FONTS@*/" in src, "маркер /*@FONTS@*/ пропал из src.htm
 TITLE = "Чайня · китайский чай с доставкой"
 DESC = ("Китайский чай с доставкой по Москве и России: белый, зелёный, "
         "улуны, красный чай, пуэр и авторские сборы. Чайная на Острякова, 3.")
+PUBLIC_PAGE_META = {
+    "ru": {
+        "html_lang": "ru", "schema_lang": "ru-RU", "hreflang": "ru", "og_locale": "ru_RU",
+        "brand": "Чайня", "home_label": "Главная",
+        "home": (TITLE, DESC, "Главная"),
+        "shop": ("Купить китайский чай · Чайня", "Китайский чай в пакетах 10, 25, 50 и 100 г с доставкой СДЭК по Москве и России.", "Чай"),
+        "teaware": ("Чайная посуда · Чайня", "Чайники, гайвани, пиалы, чахаи, чахэ, чайные фигурки, инструменты и наборы в каталоге Чайни.", "Посуда"),
+        "business": ("Чай для бизнеса и мероприятий · Чайня", "Поставки китайского чая для бизнеса и выездные чайные церемонии в Москве.", "Для бизнеса"),
+        "booking": ("Бронь чайной церемонии · Чайня", "Забронируйте чайную церемонию с мастером или самостоятельное чаепитие на Острякова, 3.", "Бронь"),
+        "image_alt": "Китайский чай и чайная «Чайня» в Москве",
+    },
+    "en": {
+        "html_lang": "en", "schema_lang": "en", "hreflang": "en", "og_locale": "en_US",
+        "brand": "Chaynya", "home_label": "Home",
+        "home": ("Chaynya · Chinese tea delivered", "Chinese tea delivered across Moscow and Russia: white, green, oolong, black tea, pu-erh and house herbal blends. Tea room at 3 Ostryakova Street.", "Home"),
+        "shop": ("Buy Chinese tea · Chaynya", "Chinese tea in 10, 25, 50 and 100 g packs, delivered by CDEK across Moscow and Russia.", "Tea"),
+        "teaware": ("Chinese teaware · Chaynya", "Teapots, gaiwans, tea cups, chahai, chahe, tea pets, tools and teaware sets from Chaynya.", "Teaware"),
+        "business": ("Tea for business and events · Chaynya", "Wholesale Chinese tea for businesses and off-site tea ceremonies in Moscow.", "For business"),
+        "booking": ("Book a tea ceremony · Chaynya", "Book a hosted tea ceremony or a private self-service tea session at 3 Ostryakova Street.", "Booking"),
+        "image_alt": "Chinese tea and the Chaynya tea room in Moscow",
+    },
+    "zh": {
+        "html_lang": "zh-CN", "schema_lang": "zh-CN", "hreflang": "zh-CN", "og_locale": "zh_CN",
+        "brand": "茶饮屋", "home_label": "首页",
+        "home": ("Chaynya · 中国茶配送", "中国茶配送至莫斯科及俄罗斯各地：白茶、绿茶、乌龙茶、红茶、普洱茶和自制草本拼配。茶室位于奥斯特里亚科娃街3号。", "首页"),
+        "shop": ("购买中国茶 · Chaynya", "中国茶提供10克、25克、50克和100克包装，由CDEK配送至莫斯科及俄罗斯各地。", "茶"),
+        "teaware": ("茶具 · Chaynya", "Chaynya茶具目录：茶壶、盖碗、茶杯、公道杯、茶荷、茶宠、茶道工具和茶具套装。", "茶具"),
+        "business": ("企业与活动用茶 · Chaynya", "为企业提供中国茶批发，并在莫斯科承办外出茶会。", "企业合作"),
+        "booking": ("预约茶会 · Chaynya", "预约茶艺师主持的茶会，或在奥斯特里亚科娃街3号自行泡茶。", "预约"),
+        "image_alt": "莫斯科Chaynya茶室与中国茶",
+    },
+}
 SELLER_NAME = "ИНДИВИДУАЛЬНЫЙ ПРЕДПРИНИМАТЕЛЬ ДАВТЯН АРМАН КАРАПЕТОВИЧ"
 SELLER_INN = "772606053199"
 SELLER_OGRNIP = "326774600295390"
@@ -49,6 +81,14 @@ SELLER_REGISTERED_ADDRESS = (
 SITE = "https://chainya.ru/"
 SECURITY_CONTACT = "https://t.me/chainyabot"
 SECURITY_EMAIL = "mailto:chainya@bk.ru"
+
+
+def public_page_url(route: str, language: str) -> str:
+    """Return the one canonical URL for a localized public application route."""
+    prefix = "" if language == "ru" else f"/{language}"
+    if route == "home":
+        return SITE if language == "ru" else f"{SITE.rstrip('/')}{prefix}/"
+    return f"{SITE.rstrip('/')}{prefix}/{route}"
 
 # Телеграм кэширует саму картинку по её URL и по тому же адресу за новой не ходит:
 # @WebpageBot перечитывает разметку страницы, но подменённый файл оставляет старый.
@@ -67,6 +107,8 @@ def seo_head(
     page_desc: str = DESC,
     page_url: str = SITE,
     page_label: str = "Главная",
+    route: str = "home",
+    language: str = "ru",
     preload_hero: bool = True,
 ) -> str:
     """Статическое SEO для конкретного публичного URL.
@@ -74,6 +116,11 @@ def seo_head(
     Контент переключается в браузере, но поисковому роботу сразу отдаём
     самостоятельную страницу с собственными метаданными и JSON-LD.
     """
+    locale = PUBLIC_PAGE_META[language]
+    alternates = {
+        code: public_page_url(route, code)
+        for code in PUBLIC_PAGE_META
+    }
     graph = [
         {
             "@type": "Organization",
@@ -140,7 +187,7 @@ def seo_head(
             "url": SITE,
             "name": "Чайня",
             "alternateName": "Chainya",
-            "inLanguage": "ru-RU",
+            "inLanguage": ["ru-RU", "en", "zh-CN"],
             "publisher": {"@id": SITE + "#seller"},
         },
         {
@@ -149,7 +196,7 @@ def seo_head(
             "url": page_url,
             "name": page_title,
             "description": page_desc,
-            "inLanguage": "ru-RU",
+            "inLanguage": locale["schema_lang"],
             "isPartOf": {"@id": SITE + "#website"},
             "about": {"@id": SITE + "#store"},
             "primaryImageOfPage": {
@@ -160,7 +207,7 @@ def seo_head(
             },
         },
     ]
-    if page_url != SITE:
+    if route != "home":
         graph.append({
             "@type": "BreadcrumbList",
             "@id": page_url + "#breadcrumb",
@@ -168,7 +215,7 @@ def seo_head(
                 {
                     "@type": "ListItem",
                     "position": 1,
-                    "name": "Главная",
+                    "name": locale["home_label"],
                     "item": SITE,
                 },
                 {
@@ -184,15 +231,26 @@ def seo_head(
         ensure_ascii=False,
     ).join(('<script type="application/ld+json">', '</script>'))
     preload = HERO_PRELOAD if preload_hero else ""
-    image_alt = "Китайский чай и чайная «Чайня» в Москве"
+    image_alt = locale["image_alt"]
+    alternate_links = "\n".join(
+        f'<link rel="alternate" hreflang="{PUBLIC_PAGE_META[code]["hreflang"]}" href="{url}">'
+        for code, url in alternates.items()
+    )
+    alternate_links += f'\n<link rel="alternate" hreflang="x-default" href="{alternates["ru"]}">'
+    og_alternates = "\n".join(
+        f'<meta property="og:locale:alternate" content="{details["og_locale"]}">'
+        for code, details in PUBLIC_PAGE_META.items()
+        if code != language
+    )
     return f"""<meta name="description" content="{page_desc}">
 <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
 <meta name="theme-color" content="#141110">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="Чайня">
+<meta property="og:site_name" content="{locale['brand']}">
 <meta property="og:title" content="{page_title}">
 <meta property="og:description" content="{page_desc}">
-<meta property="og:locale" content="ru_RU">
+<meta property="og:locale" content="{locale['og_locale']}">
+{og_alternates}
 <meta property="og:url" content="{page_url}">
 <meta property="og:image" content="{SITE}{OG_NAME}">
 <meta property="og:image:width" content="1200">
@@ -204,6 +262,7 @@ def seo_head(
 <meta name="twitter:image" content="{SITE}{OG_NAME}">
 <meta name="twitter:image:alt" content="{image_alt}">
 <link rel="canonical" href="{page_url}">
+{alternate_links}
 <link rel="icon" href="{asset_root}favicon.png" type="image/png">
 <link rel="apple-touch-icon" href="{asset_root}favicon.png">
 {preload}
@@ -260,6 +319,7 @@ def document(
     *,
     telegram_sdk: bool = True,
     title: str = TITLE,
+    html_lang: str = "ru",
 ) -> str:
     # В исходнике CSS хранится первым блоком, чтобы проект оставался одним
     # редактируемым файлом. В готовом HTML переносим его в <head>: браузер
@@ -284,7 +344,7 @@ document.head.appendChild(script);
         if telegram_sdk else ""
     )
     return (
-        '<!doctype html>\n<html lang="ru">\n<head>\n'
+        f'<!doctype html>\n<html lang="{html_lang}">\n<head>\n'
         '<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
         f"<title>{title}</title>\n"
@@ -433,66 +493,90 @@ if web:
         f"Sitemap: {SITE}sitemap.xml\n",
         encoding="utf-8",
     )
+    sitemap_rows = []
+    for route, frequency, priority in (
+        ("home", "weekly", "1.0"),
+        ("shop", "weekly", "0.9"),
+        ("teaware", "weekly", "0.8"),
+        ("business", "monthly", "0.7"),
+        ("booking", "monthly", "0.7"),
+    ):
+        localized = {code: public_page_url(route, code) for code in PUBLIC_PAGE_META}
+        links = "".join(
+            f'<xhtml:link rel="alternate" hreflang="{PUBLIC_PAGE_META[code]["hreflang"]}" href="{url}"/>'
+            for code, url in localized.items()
+        )
+        links += f'<xhtml:link rel="alternate" hreflang="x-default" href="{localized["ru"]}"/>'
+        for url in localized.values():
+            sitemap_rows.append(
+                f"  <url><loc>{url}</loc>{links}<changefreq>{frequency}</changefreq><priority>{priority}</priority></url>"
+            )
+    sitemap_rows.extend((
+        f"  <url><loc>{SITE}legal.html</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>",
+        f"  <url><loc>{SITE}privacy.html</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>",
+    ))
     (dist / "sitemap.xml").write_text(
         '<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
-        f"  <url><loc>{SITE}</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>\n"
-        f"  <url><loc>{SITE}shop</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>\n"
-        f"  <url><loc>{SITE}teaware</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>\n"
-        f"  <url><loc>{SITE}business</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>\n"
-        f"  <url><loc>{SITE}booking</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>\n"
-        f"  <url><loc>{SITE}legal.html</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>\n"
-        f"  <url><loc>{SITE}privacy.html</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>\n"
-        "</urlset>\n",
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n'
+        + "\n".join(sitemap_rows)
+        + "\n</urlset>\n",
         encoding="utf-8",
     )
     (dist / "index.html").write_text(document(content, HEAD_EXTRA), encoding="utf-8")
 
-    route_meta = {
-        "shop": (
-            "Купить китайский чай · Чайня",
-            "Китайский чай в пакетах 10, 25, 50 и 100 г с доставкой СДЭК по Москве и России.",
-            "Купить чай",
-        ),
-        "teaware": (
-            "Чайная посуда · Чайня",
-            "Чайники, гайвани, пиалы, чахаи, чахэ, чайные фигурки, инструменты и наборы в каталоге Чайни.",
-            "Посуда",
-        ),
-        "business": (
-            "Чай для бизнеса и мероприятий · Чайня",
-            "Поставки китайского чая для бизнеса и выездные чайные церемонии в Москве.",
-            "Для бизнеса",
-        ),
-        "booking": (
-            "Бронь чайной церемонии · Чайня",
-            "Забронируйте чайную церемонию с мастером или самостоятельное чаепитие на Острякова, 3.",
-            "Бронь",
-        ),
-    }
     route_views = {"shop": "shop", "teaware": "shop", "business": "b2b", "booking": "book"}
-    for route, (route_title, route_desc, route_label) in route_meta.items():
-        route_url = f"{SITE}{route}"
-        route_head = seo_head(
-            page_title=route_title,
-            page_desc=route_desc,
-            page_url=route_url,
-            page_label=route_label,
-            preload_hero=False,
-        )
-        route_dir = dist / route
-        route_dir.mkdir()
-        route_content = content.replace(
-            '<section class="view is-active" id="view-home">',
-            '<section class="view" id="view-home">',
-        ).replace(
-            f'<section class="view" id="view-{route_views[route]}">',
-            f'<section class="view is-active" id="view-{route_views[route]}">',
-        )
-        (route_dir / "index.html").write_text(
-            document(route_content, route_head, title=route_title),
-            encoding="utf-8",
-        )
+    for language, locale in PUBLIC_PAGE_META.items():
+        language_root = dist if language == "ru" else dist / language
+        if language != "ru":
+            language_root.mkdir()
+            home_title, home_desc, home_label = locale["home"]
+            home_url = public_page_url("home", language)
+            (language_root / "index.html").write_text(
+                document(
+                    content,
+                    seo_head(
+                        page_title=home_title,
+                        page_desc=home_desc,
+                        page_url=home_url,
+                        page_label=home_label,
+                        route="home",
+                        language=language,
+                    ),
+                    title=home_title,
+                    html_lang=locale["html_lang"],
+                ),
+                encoding="utf-8",
+            )
+        for route, route_view in route_views.items():
+            route_title, route_desc, route_label = locale[route]
+            route_url = public_page_url(route, language)
+            route_head = seo_head(
+                page_title=route_title,
+                page_desc=route_desc,
+                page_url=route_url,
+                page_label=route_label,
+                route=route,
+                language=language,
+                preload_hero=False,
+            )
+            route_dir = language_root / route
+            route_dir.mkdir()
+            route_content = content.replace(
+                '<section class="view is-active" id="view-home">',
+                '<section class="view" id="view-home">',
+            ).replace(
+                f'<section class="view" id="view-{route_view}">',
+                f'<section class="view is-active" id="view-{route_view}">',
+            )
+            (route_dir / "index.html").write_text(
+                document(
+                    route_content,
+                    route_head,
+                    title=route_title,
+                    html_lang=locale["html_lang"],
+                ),
+                encoding="utf-8",
+            )
 
     forbidden = [
         path for path in dist.rglob("*")

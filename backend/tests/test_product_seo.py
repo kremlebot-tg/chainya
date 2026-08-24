@@ -95,12 +95,12 @@ def test_teaware_product_has_its_own_routes_breadcrumbs_and_canonical(tmp_path, 
     assert wrong_head_en.headers["location"] == "/en/teaware/baihao"
     assert '<link rel="canonical" href="https://chainya.ru/teaware/baihao">' in russian.text
     assert "купить чайную посуду" in russian.text
-    assert 'href="/teaware?lang=ru"' in russian.text
+    assert 'href="/teaware#tea-baihao"' in russian.text
     assert '<link rel="canonical" href="https://chainya.ru/en/teaware/baihao">' in english.text
     data = json_ld(russian.text)
     breadcrumb = next(row for row in data["@graph"] if row.get("@type") == "BreadcrumbList")
     assert breadcrumb["itemListElement"][1]["name"] == "Посуда"
-    assert breadcrumb["itemListElement"][1]["item"] == "https://chainya.ru/teaware?lang=ru"
+    assert breadcrumb["itemListElement"][1]["item"] == "https://chainya.ru/teaware"
     assert "Эта вещь уже ушла с полки" in client.get("/teaware/missing-item").text
 
 
@@ -166,6 +166,22 @@ def test_dynamic_sitemap_tracks_only_published_catalog_items(tmp_path, monkeypat
     assert "https://chainya.ru/zh/tea/chongshicha" not in locations
     assert "https://chainya.ru/shop" in locations
     assert "https://chainya.ru/teaware" in locations
+    assert "https://chainya.ru/en/" in locations
+    assert "https://chainya.ru/en/shop" in locations
+    assert "https://chainya.ru/zh/teaware" in locations
+    english_shop = next(
+        node
+        for node in root.findall("sm:url", namespace)
+        if node.findtext("sm:loc", namespaces=namespace) == "https://chainya.ru/en/shop"
+    )
+    shop_alternates = {
+        (node.attrib["hreflang"], node.attrib["href"])
+        for node in english_shop.findall("xhtml:link", namespace)
+    }
+    assert ("ru", "https://chainya.ru/shop") in shop_alternates
+    assert ("en", "https://chainya.ru/en/shop") in shop_alternates
+    assert ("zh-CN", "https://chainya.ru/zh/shop") in shop_alternates
+    assert ("x-default", "https://chainya.ru/shop") in shop_alternates
     baihao = next(
         node
         for node in root.findall("sm:url", namespace)

@@ -2503,6 +2503,15 @@ select.input{
   const VIEW_PATHS = { home:'/', shop:'/shop', teaware:'/teaware', b2b:'/business', book:'/booking' };
   const PATH_VIEWS = Object.fromEntries(Object.entries(VIEW_PATHS).map(([view,path]) => [path,view]));
   const CATALOG_VIEWS = new Set(['shop','teaware']);
+  function viewPath(view, language=LANG){
+    const prefix = language === 'ru' ? '' : `/${language}`;
+    const path = VIEW_PATHS[view] || '/';
+    return path === '/' ? `${prefix}/` || '/' : `${prefix}${path}`;
+  }
+  function routePathname(pathname=location.pathname){
+    return (pathname.replace(/^\/(?:en|zh)(?=\/|$)/, '').replace(/\/$/, '') || '/');
+  }
+  function viewFromLocation(){ return PATH_VIEWS[routePathname()] || 'home'; }
   function productRoute(id, language=LANG){
     const prefix = language === 'ru' ? '' : `/${language}`;
     const product = TEA_META.find(item => item.id === id);
@@ -2512,7 +2521,7 @@ select.input{
   function syncDocumentMetadata(view){
     const title = T().route_titles?.[view] || T().title;
     const description = T().route_descriptions?.[view] || T().route_descriptions?.home || '';
-    const routeUrl = new URL(VIEW_PATHS[view], location.origin).href;
+    const routeUrl = new URL(viewPath(view), location.origin).href;
     document.title = title;
     const setMeta = (selector, value) => {
       const node = document.querySelector(selector);
@@ -2586,8 +2595,8 @@ select.input{
     $('#b2b-form-wrap').hidden = false; $('#b2b-done').hidden = true;
     resetRequestForms();
     closeTea(false);
-    if (updateHistory && (location.pathname !== VIEW_PATHS[view] || location.hash))
-      history.pushState({ view }, '', VIEW_PATHS[view]);
+    if (updateHistory && (location.pathname !== viewPath(view) || location.hash))
+      history.pushState({ view }, '', viewPath(view));
     if (changingView || changingRoute) scrollTo({ top:0, behavior:'instant' });
     if (CATALOG_VIEWS.has(view)) activateCatalogImages();
     tgSyncBack();
@@ -2627,7 +2636,7 @@ select.input{
       else go(routeView, false);
       return;
     }
-    go(PATH_VIEWS[location.pathname.replace(/\/$/,'') || '/'] || 'home', false);
+    go(viewFromLocation(), false);
   }
   addEventListener('hashchange', goFromLocation);
   addEventListener('popstate', goFromLocation);
@@ -3263,7 +3272,7 @@ select.input{
       if (history.state && history.state.tea) history.back();
       else {
         const view = curTea && typeGroup(curTea.t) === 'teaware' ? 'teaware' : 'shop';
-        history.replaceState({ view }, '', VIEW_PATHS[view]);
+        history.replaceState({ view }, '', viewPath(view));
         syncDocumentMetadata(view);
       }
     }
@@ -4270,7 +4279,7 @@ select.input{
 
   function applyLang(){
     document.documentElement.lang = LANG;
-    const currentRoute = PATH_VIEWS[location.pathname.replace(/\/$/,'') || '/'] || 'home';
+    const currentRoute = viewFromLocation();
     syncDocumentMetadata(currentRoute);
     $$('.lang button').forEach(b => b.setAttribute('aria-pressed', b.dataset.lang === LANG));
     $$('[data-i18n]').forEach(n => { const v = T()[n.dataset.i18n]; if (v != null) n.innerHTML = v; });
@@ -4307,6 +4316,10 @@ select.input{
   $$('.lang button').forEach(b => b.addEventListener('click', () => {
     if (b.dataset.lang === LANG) return;
     LANG = b.dataset.lang;
+    const nextView = sheet.classList.contains('on') && curTea
+      ? (typeGroup(curTea.t) === 'teaware' ? 'teaware' : 'shop')
+      : viewFromLocation();
+    history.replaceState({ view:nextView }, '', viewPath(nextView));
     applyLang();
   }));
 

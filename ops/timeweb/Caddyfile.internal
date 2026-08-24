@@ -135,6 +135,27 @@ http://127.0.0.1:8078 {
 	redir /shop/ /shop 308
 	redir /business/ /business 308
 	redir /booking/ /booking 308
+	redir /en /en/ 308
+	redir /zh /zh/ 308
+
+	@localizedSlash path_regexp localizedSlash ^/((?:en|zh)/(?:shop|teaware|business|booking))/$
+	redir @localizedSlash /{re.localizedSlash.1} 308
+
+	@localizedHome path /en/ /zh/
+	handle @localizedHome {
+		import chainya_public_headers
+		header Cache-Control "no-cache"
+		try_files {path}index.html
+		file_server
+	}
+
+	@localizedApp path_regexp localizedApp ^/(?:en|zh)/(?:shop|teaware|business|booking)$
+	handle @localizedApp {
+		import chainya_public_headers
+		header Cache-Control "no-cache"
+		try_files {path}/index.html
+		file_server
+	}
 
 	# Both teaware forms must stay directly available: an earlier permanent
 	# redirect to /teaware/ can still be cached in visitors' browsers.

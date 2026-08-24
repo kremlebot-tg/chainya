@@ -135,6 +135,20 @@ def test_teaware_has_a_separate_public_navigation_route():
     assert 'data-i18n="nav_shop">Купить чай</a>' not in SOURCE
 
 
+def test_public_sections_have_stable_localized_urls_for_search_engines():
+    assert "function viewPath(view, language=LANG)" in SOURCE
+    assert "function routePathname(pathname=location.pathname)" in SOURCE
+    assert "function viewFromLocation()" in SOURCE
+    assert "new URL(viewPath(view), location.origin).href" in SOURCE
+    assert "history.pushState({ view }, '', viewPath(view))" in SOURCE
+    assert "history.replaceState({ view:nextView }, '', viewPath(nextView))" in SOURCE
+    assert '"en": {' in BUILD_SOURCE
+    assert '"zh": {' in BUILD_SOURCE
+    assert 'language_root = dist if language == "ru" else dist / language' in BUILD_SOURCE
+    assert 'route="home"' in BUILD_SOURCE
+    assert '<link rel="alternate" hreflang=' in BUILD_SOURCE
+
+
 def test_partners_are_managed_content_with_safe_public_fallback():
     assert "let PARTNERS = null" in SOURCE
     assert "function renderPartners()" in SOURCE

@@ -4243,6 +4243,20 @@ def _product_url(item_id: str, language: str, group: str = "tea") -> str:
     return f"{PUBLIC_SITE}{PRODUCT_LOCALES[language]['prefix']}/{section}/{item_id}"
 
 
+def _localized_page_url(path: str, language: str) -> str:
+    prefix = PRODUCT_LOCALES[language]["prefix"]
+    if path == "/":
+        return f"{PUBLIC_SITE}{prefix}/"
+    return f"{PUBLIC_SITE}{prefix}{path}"
+
+
+def _page_alternates(path: str) -> dict[str, str]:
+    return {
+        language: _localized_page_url(path, language)
+        for language in PRODUCT_LOCALES
+    }
+
+
 def _product_alternates(item_id: str, group: str = "tea") -> dict[str, str]:
     return {
         language: _product_url(item_id, language, group)
@@ -4396,10 +4410,8 @@ def _product_page_html(document: dict, item: dict, language: str = "ru") -> str:
                         "@type": "ListItem",
                         "position": 2,
                         "name": locale["teaware"] if product_group == "teaware" else locale["shop"],
-                        "item": PUBLIC_SITE + (
-                            f"/teaware?lang={language}"
-                            if product_group == "teaware"
-                            else f"/shop?lang={language}"
+                        "item": PUBLIC_SITE + PRODUCT_LOCALES[language]["prefix"] + (
+                            "/teaware" if product_group == "teaware" else "/shop"
                         ),
                     },
                     {
@@ -4436,7 +4448,7 @@ def _product_page_html(document: dict, item: dict, language: str = "ru") -> str:
     )
     section_path = "/teaware" if product_group == "teaware" else "/shop"
     section_label = locale["all_teaware"] if product_group == "teaware" else locale["all_teas"]
-    shop_href = f"{section_path}?lang={language}#tea-{item['id']}"
+    shop_href = f"{locale['prefix']}{section_path}#tea-{item['id']}"
     return f"""<!doctype html>
 <html lang="{locale['html_lang']}">
 <head>
@@ -4633,13 +4645,23 @@ def dynamic_sitemap():
         ("/teaware", "weekly", "0.8"),
         ("/business", "monthly", "0.7"),
         ("/booking", "monthly", "0.7"),
-        ("/legal.html", "monthly", "0.4"),
-        ("/privacy.html", "monthly", "0.4"),
     )
-    rows = [
-        f"  <url><loc>{PUBLIC_SITE}{path}</loc><changefreq>{frequency}</changefreq><priority>{priority}</priority></url>"
-        for path, frequency, priority in base_urls
-    ]
+    rows = []
+    for path, frequency, priority in base_urls:
+        alternates = _page_alternates(path)
+        alternate_xml = "".join(
+            f'<xhtml:link rel="alternate" hreflang="{PRODUCT_LOCALES[code]["hreflang"]}" href="{url}"/>'
+            for code, url in alternates.items()
+        )
+        alternate_xml += f'<xhtml:link rel="alternate" hreflang="x-default" href="{alternates["ru"]}"/>'
+        for url in alternates.values():
+            rows.append(
+                f"  <url><loc>{url}</loc>{alternate_xml}<changefreq>{frequency}</changefreq><priority>{priority}</priority></url>"
+            )
+    rows.extend(
+        f"  <url><loc>{PUBLIC_SITE}{path}</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>"
+        for path in ("/legal.html", "/privacy.html")
+    )
     for item in document["teas"]:
         if not item.get("published", True):
             continue

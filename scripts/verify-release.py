@@ -42,8 +42,14 @@ SENSITIVE_PATHS = (
 )
 PUBLIC_PATHS = (
     ("/", "text/html"),
+    ("/en/", "text/html"),
+    ("/zh/", "text/html"),
     ("/shop", "text/html"),
+    ("/en/shop", "text/html"),
+    ("/zh/shop", "text/html"),
     ("/teaware", "text/html"),
+    ("/en/teaware", "text/html"),
+    ("/zh/teaware", "text/html"),
     ("/business", "text/html"),
     ("/booking", "text/html"),
     ("/account", "text/html"),
@@ -95,10 +101,20 @@ def check_dist(root: pathlib.Path) -> list[str]:
     errors: list[str] = []
     required = {
         "index.html",
+        "en/index.html",
+        "zh/index.html",
         "shop/index.html",
+        "en/shop/index.html",
+        "zh/shop/index.html",
         "teaware/index.html",
+        "en/teaware/index.html",
+        "zh/teaware/index.html",
         "business/index.html",
+        "en/business/index.html",
+        "zh/business/index.html",
         "booking/index.html",
+        "en/booking/index.html",
+        "zh/booking/index.html",
         "404.html",
         "50x.html",
         "favicon.ico",
@@ -126,8 +142,12 @@ def check_dist(root: pathlib.Path) -> list[str]:
             errors.append(f"{name}: нет noindex,nofollow")
         if "<script" in text.lower():
             errors.append(f"{name}: служебная страница не должна выполнять JavaScript")
-    for name in (
-        "index.html", "shop/index.html", "teaware/index.html", "business/index.html", "booking/index.html",
+    public_app_files = tuple(
+        (f"{language}/" if language else "") + (f"{route}/" if route else "") + "index.html"
+        for language in ("", "en", "zh")
+        for route in ("", "shop", "teaware", "business", "booking")
+    )
+    for name in public_app_files + (
         "privacy.html", "legal.html",
     ):
         path = root / name
@@ -137,7 +157,7 @@ def check_dist(root: pathlib.Path) -> list[str]:
         for detail in SELLER_DETAILS:
             if detail not in text:
                 errors.append(f"{name}: отсутствуют подтверждённые реквизиты {detail!r}")
-        if name in {"index.html", "shop/index.html", "teaware/index.html", "business/index.html", "booking/index.html"}:
+        if name in public_app_files:
             for detail in REGISTERED_ADDRESS_PARTS:
                 if detail not in text:
                     errors.append(
@@ -157,28 +177,31 @@ def check_dist(root: pathlib.Path) -> list[str]:
                 errors.append(
                     f"{name}: отсутствует предупреждение об одном чеке полного расчёта"
                 )
-    route_canonicals = {
-        "index.html": "https://chainya.ru/",
-        "shop/index.html": "https://chainya.ru/shop",
-        "teaware/index.html": "https://chainya.ru/teaware",
-        "business/index.html": "https://chainya.ru/business",
-        "booking/index.html": "https://chainya.ru/booking",
-    }
-    route_views = {
-        "shop/index.html": "shop",
-        "teaware/index.html": "shop",
-        "business/index.html": "b2b",
-        "booking/index.html": "book",
-    }
+    route_canonicals = {}
+    route_views = {}
+    for language in ("", "en", "zh"):
+        prefix = f"/{language}" if language else ""
+        file_prefix = f"{language}/" if language else ""
+        route_canonicals[file_prefix + "index.html"] = (
+            f"https://chainya.ru{prefix}/" if language else "https://chainya.ru/"
+        )
+        for route, view in (
+            ("shop", "shop"), ("teaware", "shop"),
+            ("business", "b2b"), ("booking", "book"),
+        ):
+            name = f"{file_prefix}{route}/index.html"
+            route_canonicals[name] = f"https://chainya.ru{prefix}/{route}"
+            route_views[name] = view
     for name, canonical in route_canonicals.items():
         text = (root / name).read_text(encoding="utf-8")
         if f'<link rel="canonical" href="{canonical}">' not in text:
             errors.append(f"{name}: неверный canonical")
         if f'<meta property="og:url" content="{canonical}">' not in text:
             errors.append(f"{name}: неверный og:url")
+        expected_site_name = "Chaynya" if name.startswith("en/") else ("茶饮屋" if name.startswith("zh/") else "Чайня")
         for marker in (
             '<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">',
-            '<meta property="og:site_name" content="Чайня">',
+            f'<meta property="og:site_name" content="{expected_site_name}">',
             '<meta property="og:image:alt"',
             '<meta name="twitter:image"',
             '<meta name="twitter:image:alt"',
@@ -214,8 +237,29 @@ def check_dist(root: pathlib.Path) -> list[str]:
                 if len(pages) != 1 or pages[0].get("url") != canonical:
                     errors.append(f"{name}: JSON-LD WebPage указывает не на canonical")
                 has_breadcrumbs = "BreadcrumbList" in types
-                if (name != "index.html") != has_breadcrumbs:
+                is_home = name in {"index.html", "en/index.html", "zh/index.html"}
+                if (not is_home) != has_breadcrumbs:
                     errors.append(f"{name}: неверное наличие BreadcrumbList")
+        route = next(
+            (part for part in ("shop", "teaware", "business", "booking") if f"/{part}/" in f"/{name}"),
+            "",
+        )
+        alternate_path = f"/{route}" if route else "/"
+        alternate_urls = {
+            "ru": f"https://chainya.ru{alternate_path}",
+            "en": f"https://chainya.ru/en{alternate_path}",
+            "zh-CN": f"https://chainya.ru/zh{alternate_path}",
+        }
+        if not route:
+            alternate_urls = {
+                "ru": "https://chainya.ru/",
+                "en": "https://chainya.ru/en/",
+                "zh-CN": "https://chainya.ru/zh/",
+            }
+        for hreflang, href in {**alternate_urls, "x-default": alternate_urls["ru"]}.items():
+            marker = f'<link rel="alternate" hreflang="{hreflang}" href="{href}">'
+            if marker not in text:
+                errors.append(f"{name}: отсутствует {hreflang} alternate")
         if name in route_views:
             view = route_views[name]
             if f'<section class="view is-active" id="view-{view}">' not in text:

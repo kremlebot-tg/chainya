@@ -148,6 +148,8 @@ def test_partners_are_managed_content_with_safe_public_fallback():
     assert "автомобильная группа" not in ADMIN_SITE_JS
     assert "window.addEventListener('beforeunload'" in ADMIN_SITE_JS
     assert "/api/admin/site/partner-order" in ADMIN_SITE_JS
+    assert "if (selectedId === item.id)" in ADMIN_SITE_JS
+    assert ".move{width:44px;height:44px" in ADMIN_SITE
     assert "removePartner" not in ADMIN_SITE_JS
 
 
@@ -480,6 +482,13 @@ def test_admin_catalog_prioritizes_daily_work_and_keeps_optional_fields_non_bloc
     assert "Публикация не заблокирована" in ADMIN_CATALOG_JS
     assert "Адрес карточки: /${itemGroup(draft) === 'teaware' ? 'teaware' : 'tea'}/${draft.id}" in ADMIN_CATALOG_JS
     assert "Постоянный ID:" not in ADMIN_CATALOG_JS
+    assert "if (item.id === selectedId)" in ADMIN_CATALOG_JS
+    assert "Связано со СБИС · фотографию можно добавить позже" in ADMIN_CATALOG_JS
+    assert "${draft.saby?.image_pending ? 'disabled' : ''}" not in ADMIN_CATALOG_JS
+    assert "Карточку можно сохранить и опубликовать сейчас" in ADMIN_CATALOG_JS
+    assert ".mobile-back{display:inline-flex;align-items:center;justify-content:center;min-height:44px" in ADMIN_CATALOG
+    assert ".photo-thumbs{grid-template-columns:repeat(2,1fr)}" in ADMIN_CATALOG
+    assert ".editor-link{min-height:44px}" in ADMIN_CATALOG
     assert "form.requestSubmit()" in ADMIN_CATALOG_JS
 
 

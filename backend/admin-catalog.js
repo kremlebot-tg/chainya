@@ -236,19 +236,24 @@ function renderList() {
     }
     copy.append(name, meta, badges);
     open.append(image, copy);
-    const order = document.createElement('span');
-    order.className = 'row-order';
-    [['↑', -1], ['↓', 1]].forEach(([label, direction]) => {
-      const move = document.createElement('button');
-      move.type = 'button';
-      move.className = 'move';
-      move.textContent = label;
-      move.setAttribute('aria-label', `${direction < 0 ? 'Поднять' : 'Опустить'} ${item.name}`);
-      move.disabled = visibleIndex + direction < 0 || visibleIndex + direction >= rows.length;
-      move.onclick = () => moveItem(item.id, direction);
-      order.append(move);
-    });
-    row.append(open, order);
+    row.append(open);
+    // Стрелки нужны только у выбранной карточки. Так список из десятков товаров
+    // остаётся спокойным, а случайно изменить порядок на телефоне сложнее.
+    if (item.id === selectedId) {
+      const order = document.createElement('span');
+      order.className = 'row-order';
+      [['↑', -1], ['↓', 1]].forEach(([label, direction]) => {
+        const move = document.createElement('button');
+        move.type = 'button';
+        move.className = 'move';
+        move.textContent = label;
+        move.setAttribute('aria-label', `${direction < 0 ? 'Поднять' : 'Опустить'} ${item.name}`);
+        move.disabled = visibleIndex + direction < 0 || visibleIndex + direction >= rows.length;
+        move.onclick = () => moveItem(item.id, direction);
+        order.append(move);
+      });
+      row.append(order);
+    }
     box.append(row);
   });
 }
@@ -665,7 +670,7 @@ function renderEditor() {
     const link = document.createElement('span');
     link.className = 'saby-link' + (draft.saby.image_pending ? ' saby-photo-pending' : '');
     link.textContent = draft.saby.image_pending
-      ? 'Связано со СБИС · для публикации добавьте настоящее фото'
+      ? 'Связано со СБИС · фотографию можно добавить позже'
       : 'Связано со СБИС';
     title.append(link);
   }
@@ -675,7 +680,7 @@ function renderEditor() {
   if (draft.saby?.image_pending) {
     const warning = document.createElement('div');
     warning.className = 'saby-warning';
-    warning.textContent = 'Черновик из СБИС. Проверьте, чай это или посуда, затем категорию, единицу, цену и фото. Тексты можно дополнить позже.';
+    warning.textContent = 'Черновик из СБИС. Проверьте тип товара, категорию, единицу и цену. Карточку можно сохранить и опубликовать сейчас, а фото и тексты добавить позже.';
     form.append(warning);
   }
 
@@ -718,7 +723,7 @@ function renderEditor() {
   $('select', unitField).value = draft.unit;
   const checks = document.createElement('div');
   checks.className = 'checks field--wide';
-  checks.innerHTML = `<label class="check"><input type="checkbox" name="stock" ${draft.stock ? 'checked' : ''}><span>В наличии<small>Покупатель может добавить товар в корзину</small></span></label><label class="check"><input type="checkbox" name="published" ${draft.published ? 'checked' : ''} ${draft.saby?.image_pending ? 'disabled' : ''}><span>Показывать на сайте<small>${draft.saby?.image_pending ? 'Сначала добавьте настоящее фото' : 'Скрытая карточка остаётся в панели'}</small></span></label>`;
+  checks.innerHTML = `<label class="check"><input type="checkbox" name="stock" ${draft.stock ? 'checked' : ''}><span>В наличии<small>Покупатель может добавить товар в корзину</small></span></label><label class="check"><input type="checkbox" name="published" ${draft.published ? 'checked' : ''}><span>Показывать на сайте<small>${draft.saby?.image_pending ? 'Пока без фото будет показана нейтральная заглушка' : 'Скрытая карточка остаётся в панели'}</small></span></label>`;
   baseGrid.append(typeField, priceField, unitField, checks);
   base.append(baseGrid);
   const technical = document.createElement('details');

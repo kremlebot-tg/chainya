@@ -74,11 +74,15 @@ function renderList() {
     if (item.logo) { const logo = document.createElement('span'); logo.className = 'partner-row__logo' + (item.id === 'relikta' ? ' is-relikta' : ''); const image = document.createElement('img'); image.src = item.logo; image.alt = ''; logo.append(image); identity.append(logo); }
     const text = document.createElement('span'); text.append(name, type, tags); identity.append(text);
     open.append(identity); open.onclick = () => selectPartner(item.id);
-    const moves = document.createElement('span'); moves.className = 'moves';
-    for (const [direction, symbol, label] of [[-1,'↑','Поднять выше'],[1,'↓','Опустить ниже']]) {
-      const button = document.createElement('button'); button.type = 'button'; button.className = 'move'; button.textContent = symbol; button.title = label; button.setAttribute('aria-label', `${label}: ${copy.name}`); button.disabled = saving || index + direction < 0 || index + direction >= partners.length; button.onclick = () => movePartner(item.id, direction); moves.append(button);
+    row.append(open);
+    if (selectedId === item.id) {
+      const moves = document.createElement('span'); moves.className = 'moves';
+      for (const [direction, symbol, label] of [[-1,'↑','Поднять выше'],[1,'↓','Опустить ниже']]) {
+        const button = document.createElement('button'); button.type = 'button'; button.className = 'move'; button.textContent = symbol; button.title = label; button.setAttribute('aria-label', `${label}: ${copy.name}`); button.disabled = saving || index + direction < 0 || index + direction >= partners.length; button.onclick = () => movePartner(item.id, direction); moves.append(button);
+      }
+      row.append(moves);
     }
-    row.append(open, moves); box.append(row);
+    box.append(row);
   });
 }
 function createLanguagePanels(root) {

@@ -135,7 +135,7 @@ switched=1
 test "$(readlink -f "$active")" = "$release"
 test "$(docker inspect chainya-edge-edge-1 --format '{{.State.Health.Status}}')" = healthy
 curl -fsS http://127.0.0.1:8078/__chainya_edge_health >/dev/null
-grep -Fq 'Рекомендуем начать свой чайный путь с этих позиций:' "$release/index.html"
+grep -Fq 'Рекомендуем начать свой чайный путь с этих позиций:' "$release/assets/site.js"
 ! grep -Eq 'id="ts-taste"|renderRadar' "$release/index.html"
 if [ "$maintenance" = 1 ]; then
   test -f /var/www/chainya-maintenance.enabled
@@ -156,8 +156,10 @@ if [ "$MAINTENANCE_MODE" = 1 ]; then
   exit 0
 fi
 curl -fsS https://chainya.ru/shop -o "$TMP/public-shop.html"
-grep -Fq 'Рекомендуем начать свой чайный путь с этих позиций:' "$TMP/public-shop.html"
+grep -Fq '<script src="/assets/site.js" defer></script>' "$TMP/public-shop.html"
 ! grep -Eq 'id="ts-taste"|renderRadar' "$TMP/public-shop.html"
+curl -fsS https://chainya.ru/assets/site.js -o "$TMP/public-site.js"
+grep -Fq 'Рекомендуем начать свой чайный путь с этих позиций:' "$TMP/public-site.js"
 curl -fsS https://chainya.ru/business -o "$TMP/public-business.html"
 grep -Fq 'Можно начать с небольшой партии и проверить спрос.' "$TMP/public-business.html"
 curl -fsS https://chainya.ru/api/health -o "$TMP/public-health.json"

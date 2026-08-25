@@ -317,7 +317,6 @@ def document(
     body: str,
     extra_head: str = "",
     *,
-    telegram_sdk: bool = True,
     title: str = TITLE,
     html_lang: str = "ru",
 ) -> str:
@@ -329,33 +328,27 @@ def document(
     if style_match:
         style_block = style_match.group(1)
         body = body[style_match.end():]
-    sdk = (
-        """<script>
-(()=>{const source=location.search+location.hash;
-if(!/(?:^|[?&#])tgWebApp(?:Data|Version|Platform)=/i.test(source))return;
-const script=document.createElement('script');
-script.src='https://telegram.org/js/telegram-web-app.js';
-script.async=true;
-script.onload=()=>dispatchEvent(new Event('chainya:telegram-ready'));
-document.head.appendChild(script);
-})();
-</script>
-"""
-        if telegram_sdk else ""
-    )
     return (
         f'<!doctype html>\n<html lang="{html_lang}">\n<head>\n'
         '<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
         f"<title>{title}</title>\n"
-        # Telegram Mini App SDK нужен только основному приложению. Служебная
-        # 404-страница не должна выполнять внешний JavaScript.
-        f"{sdk}"
         f"{extra_head}\n"
         f"{style_block}\n"
         "<style>*{margin:0}</style>\n"
         "</head>\n<body>\n" + body + "\n</body>\n</html>\n"
     )
+
+
+def extract_inline_script(document_source: str, asset_path: str) -> tuple[str, str]:
+    """Move the one executable inline script into a same-origin build asset."""
+
+    match = re.search(r"<script>(.*?)</script>", document_source, flags=re.DOTALL)
+    if not match:
+        raise SystemExit(f"НЕТ INLINE SCRIPT ДЛЯ {asset_path}")
+    external = f'<script src="{asset_path}" defer></script>'
+    html_source = document_source[: match.start()] + external + document_source[match.end() :]
+    return html_source, match.group(1).strip() + "\n"
 
 
 ERROR_STYLE = """
@@ -430,7 +423,6 @@ def error_document(
 </main>
 """,
         '<meta name="robots" content="noindex,nofollow">',
-        telegram_sdk=False,
         title=f"{code} · Чайня",
     )
 
@@ -440,6 +432,7 @@ if web:
     shutil.rmtree(dist, ignore_errors=True)
     (dist / "img").mkdir(parents=True)
     (dist / "fonts").mkdir()
+    (dist / "assets").mkdir()
     for name in sorted(used):
         shutil.copy(root / "img" / f"{name}.webp", dist / "img" / f"{name}.webp")
     for f in ("prata-cyr", "prata-lat", "golos-cyr", "golos-lat"):
@@ -449,8 +442,15 @@ if web:
     # PNG корректно распознаётся по сигнатуре даже при историческом расширении.
     shutil.copy(root / "src-assets" / "favicon.png", dist / "favicon.ico")
     shutil.copy(OG_SRC, dist / OG_NAME)
-    shutil.copy(root / "privacy.html", dist / "privacy.html")
-    shutil.copy(root / "legal.html", dist / "legal.html")
+    public_content, public_script = extract_inline_script(content, "/assets/site.js")
+    (dist / "assets" / "site.js").write_text(public_script, encoding="utf-8")
+    for page_name in ("privacy", "legal"):
+        page_html, page_script = extract_inline_script(
+            (root / f"{page_name}.html").read_text(encoding="utf-8"),
+            f"/assets/{page_name}.js",
+        )
+        (dist / f"{page_name}.html").write_text(page_html, encoding="utf-8")
+        (dist / "assets" / f"{page_name}.js").write_text(page_script, encoding="utf-8")
     shutil.copy(root / "legal.css", dist / "legal.css")
     well_known = dist / ".well-known"
     well_known.mkdir()
@@ -522,7 +522,10 @@ if web:
         + "\n</urlset>\n",
         encoding="utf-8",
     )
-    (dist / "index.html").write_text(document(content, HEAD_EXTRA), encoding="utf-8")
+    (dist / "index.html").write_text(
+        document(public_content, HEAD_EXTRA),
+        encoding="utf-8",
+    )
 
     route_views = {"shop": "shop", "teaware": "shop", "business": "b2b", "booking": "book"}
     for language, locale in PUBLIC_PAGE_META.items():
@@ -533,7 +536,7 @@ if web:
             home_url = public_page_url("home", language)
             (language_root / "index.html").write_text(
                 document(
-                    content,
+                    public_content,
                     seo_head(
                         page_title=home_title,
                         page_desc=home_desc,
@@ -561,7 +564,7 @@ if web:
             )
             route_dir = language_root / route
             route_dir.mkdir()
-            route_content = content.replace(
+            route_content = public_content.replace(
                 '<section class="view is-active" id="view-home">',
                 '<section class="view" id="view-home">',
             ).replace(

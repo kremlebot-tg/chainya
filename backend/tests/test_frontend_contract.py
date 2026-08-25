@@ -105,6 +105,17 @@ def test_public_pages_use_quiet_account_probe_and_eager_hero_image():
     assert "preload_hero=False" in BUILD_SOURCE
 
 
+def test_public_build_uses_only_same_origin_executable_javascript():
+    assert "extract_inline_script" in BUILD_SOURCE
+    assert 'public_content, public_script = extract_inline_script(content, "/assets/site.js")' in BUILD_SOURCE
+    assert "external = f'<script src=\"{asset_path}\" defer></script>'" in BUILD_SOURCE
+    assert "telegram.org/js/telegram-web-app.js" not in SOURCE
+    assert "window.Telegram" not in SOURCE
+    assert "connectTelegram" not in SOURCE
+    assert "chainya:telegram-ready" not in SOURCE
+    assert "const BOT_URL = 'https://t.me/chainyabot';" in SOURCE
+
+
 def test_catalog_keeps_a_semantic_heading_without_restoring_visual_clutter():
     assert '<h1 class="shop-heading" id="shop-heading" data-i18n="shop_heading">' in SOURCE
     assert "shop_heading:'Каталог китайского чая'" in SOURCE

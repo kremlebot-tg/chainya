@@ -239,6 +239,22 @@ def test_maintenance_is_chainya_only_and_returns_503() -> None:
     assert "try_files /$1/$2/index.html =404;" in nginx
     assert "return 308 /$1;" in nginx
     assert "location = /sitemap.xml" in nginx
+    assert "location ^~ /assets/" in nginx
+
+
+def test_public_edge_rejects_third_party_scripts_and_clickjacking() -> None:
+    internal = (ROOT / "ops/timeweb/Caddyfile.internal").read_text(encoding="utf-8")
+    nginx = (ROOT / "ops/nginx-chainya.ru").read_text(encoding="utf-8")
+    for config in (internal, nginx):
+        assert "https://telegram.org" not in config
+        assert "script-src 'self'; script-src-attr 'none'" in config
+        assert 'X-Frame-Options "DENY"' in config
+        assert 'Cross-Origin-Opener-Policy "same-origin"' in config
+        assert 'X-Permitted-Cross-Domain-Policies "none"' in config
+    public_headers = internal.split("(chainya_public_headers) {", 1)[1].split("\n}", 1)[0]
+    assert "script-src 'self' 'unsafe-inline'" not in public_headers
+    assert "@appScripts path /assets/*.js" in internal
+    assert 'header Cache-Control "no-cache"' in internal
 
 
 def test_edge_config_change_is_validated_and_rolls_back_only_chainya_edge() -> None:

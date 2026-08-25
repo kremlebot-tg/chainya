@@ -2454,50 +2454,10 @@ select.input{
     });
   });
 
-  /* ─────────────  TELEGRAM MINI APP  ─────────────
-     Тот же сайт, открытый ботом внутри телеграма. Если мы там — фиксируем
-     фирменный фон, разворачиваем на весь экран и ведём нативную кнопку «назад».
-     Бронь всегда проходит через единый серверный календарь. В обычном браузере
-     window.Telegram.WebApp тоже есть, но platform='unknown' — тогда всё это
-     выключено и сайт работает как обычно. */
-  let TG = null, IN_TG = false, telegramBackBound = false;
-  // @chainyamsk — это КАНАЛ (писать нельзя). Живой контакт из браузера — наш бот.
+  /* Telegram Mini App временно отключён до снятия ошибочного предупреждения
+     Safari. Публичная витрина не загружает внешний SDK и работает как обычный
+     сайт даже внутри браузера Telegram. */
   const BOT_URL = 'https://t.me/chainyabot';
-  // Нативная «назад»: видна, когда мы не на главной или открыт паспорт чая
-  function tgSyncBack(){
-    if (!IN_TG) return;
-    const sub = ($('.view.is-active') || {}).id !== 'view-home'
-      || $('#tea-sheet').classList.contains('on') || $('#cart-sheet').classList.contains('on');
-    sub ? TG.BackButton.show() : TG.BackButton.hide();
-  }
-  function connectTelegram(){
-    const candidate = window.Telegram && window.Telegram.WebApp;
-    if (!candidate || !candidate.platform || candidate.platform === 'unknown') return false;
-    TG = candidate;
-    IN_TG = true;
-    try{
-      TG.ready();
-      TG.expand();
-      TG.setHeaderColor('#141110');
-      TG.setBackgroundColor('#141110');
-      if (!telegramBackBound){
-        TG.BackButton.onClick(() => {
-          if ($('#cart-sheet').classList.contains('on')) closeCart();
-          else if ($('#tea-sheet').classList.contains('on')) closeTea();
-          else if (($('.view.is-active') || {}).id !== 'view-home') go('home');
-          else TG.close();
-        });
-        telegramBackBound = true;
-      }
-      tgSyncBack();
-      return true;
-    }catch(e){
-      TG = null;
-      IN_TG = false;
-      return false;
-    }
-  }
-  addEventListener('chainya:telegram-ready', connectTelegram);
 
   /* ─────────────  НАВИГАЦИЯ  ───────────── */
   const VIEW_PATHS = { home:'/', shop:'/shop', teaware:'/teaware', b2b:'/business', book:'/booking' };
@@ -2599,7 +2559,6 @@ select.input{
       history.pushState({ view }, '', viewPath(view));
     if (changingView || changingRoute) scrollTo({ top:0, behavior:'instant' });
     if (CATALOG_VIEWS.has(view)) activateCatalogImages();
-    tgSyncBack();
     trackOnce('section_view', view);
     if (view === 'book') trackOnce('booking_start', 'book');
   }
@@ -3259,7 +3218,6 @@ select.input{
     if (updateHistory && location.pathname !== productRoute(m.id))
       history.pushState({ tea:m.id }, '', productRoute(m.id));
     syncProductMetadata(m, txt);
-    tgSyncBack();
   }
   function closeTea(updateHistory=true){
     if (!sheet.classList.contains('on')) return;
@@ -3276,7 +3234,6 @@ select.input{
         syncDocumentMetadata(view);
       }
     }
-    tgSyncBack();
   }
   $('#ts-close').addEventListener('click', closeTea);
   $('#ts-fav').addEventListener('click', () => { const id = $('#ts-fav').dataset.id; if (id) toggleFav(id); });
@@ -3714,7 +3671,7 @@ select.input{
     closeTea();
     renderCart();
     cartSheet.classList.add('on'); $('#scrim').classList.add('on');
-    lockScroll(); bgInert(true); focusPanel(cartSheet, $('#cart-close')); tgSyncBack();
+    lockScroll(); bgInert(true); focusPanel(cartSheet, $('#cart-close'));
     track('cart_open','cart');
   }
   function closeCart(){
@@ -3722,7 +3679,6 @@ select.input{
     cartSheet.classList.remove('on'); $('#scrim').classList.remove('on');
     unlockScroll(); bgInert(false);
     if (lastCartTrigger){ lastCartTrigger.focus({ preventScroll:true }); lastCartTrigger = null; }
-    tgSyncBack();
   }
 
   function orderMsg(){
@@ -3798,8 +3754,8 @@ select.input{
       return;
     }
     status.textContent = '';
-    // компактный payload: id/pack/qty. Названия, цены и итог бот считает из своей
-    // же базы — меньше байт для sendData (лимит 4096) и цена не зависит от клиента.
+    // Передаём только id/pack/qty: названия, цены и итог сервер повторно считает
+    // по актуальному каталогу, поэтому клиент не может подменить сумму заказа.
     const payload = {
       type:'order',
       items: c.map(it => ({ id:it.id, pack:it.pack, qty:it.qty })),
@@ -3891,7 +3847,6 @@ select.input{
         return;
       }
     }
-    if (IN_TG){ try { TG.sendData(JSON.stringify(payload)); clearCart(); return; } catch(e){} }
     // обычный браузер: канал не чат — отправляем в бота, там заказ оформляется нативно
     window.open(BOT_URL, '_blank', 'noopener');
     clearCart();
@@ -4357,8 +4312,5 @@ select.input{
   compactNav();
   trackOnce('section_view', initialAnalyticsSection);
 
-  // Если SDK уже успел загрузиться — подключаемся сразу; иначе сработает
-  // chainya:telegram-ready. Обычный браузер не ждёт telegram.org.
-  connectTelegram();
 })();
 </script>

@@ -20,6 +20,9 @@
 		header_down -Referrer-Policy
 		header_down -Permissions-Policy
 		header_down -Content-Security-Policy
+		header_down -X-Frame-Options
+		header_down -Cross-Origin-Opener-Policy
+		header_down -X-Permitted-Cross-Domain-Policies
 		header_down -X-Robots-Tag
 	}
 }
@@ -27,7 +30,7 @@
 (chainya_public_headers) {
 	header {
 		Referrer-Policy "strict-origin-when-cross-origin"
-		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src https://yandex.ru; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'"
+		Content-Security-Policy "default-src 'self'; script-src 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src https://yandex.ru; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'"
 	}
 }
 
@@ -38,6 +41,9 @@ http://127.0.0.1:8078 {
 	header {
 		Strict-Transport-Security "max-age=31536000"
 		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Cross-Origin-Opener-Policy "same-origin"
+		X-Permitted-Cross-Domain-Policies "none"
 		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
 		-Server
 	}
@@ -84,7 +90,7 @@ http://127.0.0.1:8078 {
 			Cache-Control "no-store"
 			Referrer-Policy "no-referrer"
 			X-Robots-Tag "noindex, nofollow"
-			Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'"
+			Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'"
 		}
 		import chainya_origin
 	}
@@ -96,7 +102,7 @@ http://127.0.0.1:8078 {
 			Cache-Control "no-store"
 			Referrer-Policy "no-referrer"
 			X-Robots-Tag "noindex, nofollow"
-			Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'"
+			Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'"
 		}
 		import chainya_origin
 	}
@@ -167,10 +173,20 @@ http://127.0.0.1:8078 {
 		file_server
 	}
 
+	# Исполняемый JavaScript меняется вместе с HTML. Без хеша в имени браузер
+	# обязан перепроверять его на каждом открытии, иначе новый HTML может получить
+	# код от предыдущего релиза.
+	@appScripts path /assets/*.js
+	handle @appScripts {
+		import chainya_public_headers
+		header Cache-Control "no-cache"
+		file_server
+	}
+
 	# Статические изображения и шрифты редко меняются, но их URL пока не
 	# версионированы. Часовой cache с обязательной перепроверкой ускоряет
 	# повторные открытия и не оставляет старые файлы у клиента надолго.
-	@staticAssets path /img/* /fonts/* /favicon* /og.*
+	@staticAssets path /assets/* /img/* /fonts/* /favicon* /og.*
 	handle @staticAssets {
 		import chainya_public_headers
 		header Cache-Control "public, max-age=3600, must-revalidate"

@@ -120,6 +120,9 @@ def check_dist(root: pathlib.Path) -> list[str]:
         "favicon.ico",
         "privacy.html",
         "legal.html",
+        "assets/site.js",
+        "assets/privacy.js",
+        "assets/legal.js",
         "robots.txt",
         "sitemap.xml",
         ".well-known/security.txt",
@@ -158,12 +161,27 @@ def check_dist(root: pathlib.Path) -> list[str]:
             if detail not in text:
                 errors.append(f"{name}: отсутствуют подтверждённые реквизиты {detail!r}")
         if name in public_app_files:
+            if '<script src="/assets/site.js" defer></script>' not in text:
+                errors.append(f"{name}: основной JavaScript не вынесен в same-origin asset")
             for detail in REGISTERED_ADDRESS_PARTS:
                 if detail not in text:
                     errors.append(
                         f"{name}: неполный структурированный адрес продавца {detail!r}"
                     )
-        elif REGISTERED_ADDRESS not in text:
+        else:
+            asset_name = name.removesuffix(".html")
+            if f'<script src="/assets/{asset_name}.js" defer></script>' not in text:
+                errors.append(f"{name}: inline JavaScript не вынесен в same-origin asset")
+        executable_inline = re.search(
+            r'<script(?![^>]*type="application/ld\+json")[^>]*>(?!\s*</script>)',
+            text,
+            flags=re.IGNORECASE,
+        )
+        if executable_inline:
+            errors.append(f"{name}: остался executable inline JavaScript")
+        if "telegram.org/js/telegram-web-app.js" in text:
+            errors.append(f"{name}: публичная страница загружает отключённый Telegram SDK")
+        if name not in public_app_files and REGISTERED_ADDRESS not in text:
             errors.append(
                 f"{name}: отсутствует подтверждённый адрес {REGISTERED_ADDRESS!r}"
             )
@@ -172,11 +190,23 @@ def check_dist(root: pathlib.Path) -> list[str]:
                 errors.append(f"{name}: найдена юридическая заглушка {placeholder.pattern!r}")
         if any(pattern.search(text) for pattern in PRIVATE_BANK_PATTERNS):
             errors.append(f"{name}: обнаружены лишние банковские реквизиты")
-        if name in {"index.html", "shop/index.html", "teaware/index.html", "legal.html"}:
-            if FULL_SETTLEMENT_NOTICE not in text:
-                errors.append(
-                    f"{name}: отсутствует предупреждение об одном чеке полного расчёта"
-                )
+        if (
+            name in {"index.html", "shop/index.html", "teaware/index.html", "legal.html"}
+            and FULL_SETTLEMENT_NOTICE not in text
+        ):
+            errors.append(
+                f"{name}: отсутствует предупреждение об одном чеке полного расчёта"
+            )
+    site_script = root / "assets/site.js"
+    if site_script.is_file():
+        source = site_script.read_text(encoding="utf-8")
+        for marker in (
+            "telegram.org/js/telegram-web-app.js",
+            "window.Telegram",
+            "createElement('script')",
+        ):
+            if marker in source:
+                errors.append(f"assets/site.js: остался внешний загрузчик {marker!r}")
     route_canonicals = {}
     route_views = {}
     for language in ("", "en", "zh"):
@@ -398,6 +428,9 @@ def check_live(base_url: str) -> list[str]:
         expected_headers = {
             "strict-transport-security": "max-age=",
             "x-content-type-options": "nosniff",
+            "x-frame-options": "deny",
+            "cross-origin-opener-policy": "same-origin",
+            "x-permitted-cross-domain-policies": "none",
             "cache-control": "no-cache",
         }
         for name, marker in expected_headers.items():
@@ -405,9 +438,19 @@ def check_live(base_url: str) -> list[str]:
             if marker.lower() not in value.lower():
                 errors.append(f"/: заголовок {name} не содержит {marker!r}")
         csp = combined_header(root_headers, "content-security-policy")
-        for directive in ("default-src 'self'", "object-src 'none'", "form-action 'self'"):
+        for directive in (
+            "default-src 'self'",
+            "script-src 'self'",
+            "script-src-attr 'none'",
+            "object-src 'none'",
+            "form-action 'self'",
+        ):
             if directive not in csp:
                 errors.append(f"/: CSP не содержит {directive!r}")
+        if "'unsafe-inline'" in csp.split("style-src", 1)[0]:
+            errors.append("/: CSP всё ещё разрешает inline JavaScript")
+        if "telegram.org" in csp:
+            errors.append("/: CSP всё ещё разрешает отключённый Telegram SDK")
     for path, expected_type in PUBLIC_PATHS:
         code, content_type = status(base + path)
         if code != 200 or content_type != expected_type:

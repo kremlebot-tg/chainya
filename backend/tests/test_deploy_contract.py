@@ -265,6 +265,8 @@ def test_edge_config_change_is_validated_and_rolls_back_only_chainya_edge() -> N
     assert 'cp -p "$edge_config" "$stage/Caddyfile.previous"' in deploy
     assert 'mv -Tf "${edge_config}.rollback" "$edge_config"' in deploy
     assert "docker compose -f \"$edge_compose\" up -d --no-deps --force-recreate edge" in deploy
+    assert 'trap \'rollback "$?" "$LINENO"\' ERR' in deploy
+    assert "edge release failed at remote line" in deploy
     assert "systemctl" not in deploy
 
 

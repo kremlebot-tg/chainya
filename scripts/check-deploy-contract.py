@@ -93,7 +93,11 @@ def main() -> None:
     require("transaction/state" in remote, "consistent state snapshot is missing")
     require("rollback_core" in remote, "automatic rollback is missing")
     require("previous=$(readlink -f \"$active\")" in edge_deploy, "edge rollback target is missing")
-    require("trap rollback ERR" in edge_deploy, "edge automatic rollback is missing")
+    require(
+        "trap rollback ERR" in edge_deploy
+        or "trap 'rollback \"$?\" \"$LINENO\"' ERR" in edge_deploy,
+        "edge automatic rollback is missing",
+    )
     require(
         "caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile" in edge_deploy,
         "changed Chainya edge config must be validated",

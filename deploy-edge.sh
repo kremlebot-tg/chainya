@@ -83,7 +83,10 @@ wait_for_edge() {
 }
 
 rollback() {
-  local code=$?
+  local code=${1:-1}
+  local failed_line=${2:-unknown}
+  trap - ERR
+  echo "✗ edge release failed at remote line $failed_line (exit $code)" >&2
   if [ "$switched" = 1 ] && [ -n "$previous" ] && [ -d "$previous" ]; then
     ln -sfnT "$previous" "${active}.rollback"
     mv -Tf "${active}.rollback" "$active"
@@ -97,7 +100,7 @@ rollback() {
   rm -rf -- "$stage"
   exit "$code"
 }
-trap rollback ERR
+trap 'rollback "$?" "$LINENO"' ERR
 
 test -f "$edge_config"
 test -f "$edge_compose"

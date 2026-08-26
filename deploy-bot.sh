@@ -27,8 +27,11 @@ test -z "$(git -C "$ROOT" status --porcelain)" || {
 
 echo "→ локальная проверка Telegram-бота"
 python3 -m venv "$TMP/test-venv"
-"$TMP/test-venv/bin/pip" install -q \
-  -r "$BOT_ROOT/requirements.lock.txt" 'pytest==9.0.3'
+"$TMP/test-venv/bin/pip" install -q -r "$BOT_ROOT/requirements.lock.txt"
+# requirements.lock.txt deliberately enables pip's hash-checking mode.  Install
+# the test runner separately so its unhashed dev-only dependency cannot weaken
+# verification of the bot's production dependency set.
+"$TMP/test-venv/bin/pip" install -q 'pytest==9.0.3'
 (
   cd "$BOT_ROOT"
   BOT_TOKEN=test-token "$TMP/test-venv/bin/python" -m pytest -q test_bot_booking.py

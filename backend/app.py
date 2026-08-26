@@ -4900,7 +4900,11 @@ def require_promo_write_request(request: Request) -> None:
         raise HTTPException(403, "Недопустимый источник запроса")
 
 
-def public_promo(row: sqlite3.Row, redemptions: int = 0) -> dict:
+def public_promo(
+    row: sqlite3.Row,
+    redemptions: int = 0,
+    discount_total: int = 0,
+) -> dict:
     return {
         "code": row["code"],
         "discount_percent": row["discount_percent"],
@@ -4911,6 +4915,7 @@ def public_promo(row: sqlite3.Row, redemptions: int = 0) -> dict:
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
         "paid_redemptions": redemptions,
+        "paid_discount_total": discount_total,
     }
 
 
@@ -4919,12 +4924,22 @@ def admin_promos(authorization: str = Header(default="")):
     require_admin(authorization)
     with db() as con:
         rows = con.execute(
-            """SELECT p.*, COUNT(o.id) AS paid_redemptions
+            """SELECT p.*, COUNT(o.id) AS paid_redemptions,
+                      COALESCE(SUM(o.discount_amount), 0) AS paid_discount_total
                FROM promo_codes p LEFT JOIN orders o
                  ON o.promo_code = p.code AND o.paid_at IS NOT NULL
                GROUP BY p.code ORDER BY p.created_at DESC"""
         ).fetchall()
-    return {"promos": [public_promo(row, int(row["paid_redemptions"])) for row in rows]}
+    return {
+        "promos": [
+            public_promo(
+                row,
+                int(row["paid_redemptions"]),
+                int(row["paid_discount_total"]),
+            )
+            for row in rows
+        ]
+    }
 
 
 @app.post("/api/admin/promos", status_code=201)

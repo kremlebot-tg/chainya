@@ -118,8 +118,29 @@ def test_promo_and_cancellation_controls_are_present_in_owner_and_customer_ui(
     assert "admin-login.html" not in promos_login.text
     assert session.status_code == 204
     assert "Промокоды" in promos.text
+    assert "Сейчас работают" in promos.text
+    assert "Скидка покупателям" in promos.text
     assert "Отменить бронь" in admin.text
-    assert "Это время сразу станет доступно для новой брони" in admin.text
+    assert "это время сразу станет доступно другим гостям" in admin.text
+    assert "confirmBookingCancellation" in admin.text
+
+
+def test_promo_admin_reports_paid_usage_and_discount_total(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    with client:
+        assert create_promo(client).status_code == 201
+        order = client.post("/api/orders", json=payload(promo_code="WELCOME10")).json()[
+            "order"
+        ]
+        with module.db() as con:
+            con.execute(
+                "UPDATE orders SET paid_at = ?, payment_state = 'paid' WHERE id = ?",
+                (module.now_iso(), order["id"]),
+            )
+        rows = client.get("/api/admin/promos", headers=ADMIN).json()["promos"]
+
+    assert rows[0]["paid_redemptions"] == 1
+    assert rows[0]["paid_discount_total"] == order["discount_amount"]
 
 
 def test_admin_cancellation_records_source_and_releases_slot(tmp_path, monkeypatch):

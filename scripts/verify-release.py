@@ -130,6 +130,15 @@ def check_dist(root: pathlib.Path) -> list[str]:
     missing = sorted(name for name in required if not (root / name).is_file())
     if missing:
         errors.append("нет обязательных файлов: " + ", ".join(missing))
+    storefront_script = root / "assets/site.js"
+    if storefront_script.is_file():
+        script_text = storefront_script.read_text(encoding="utf-8")
+        for marker, label in (
+            ('c-promo', "поле промокода"),
+            ('booking-cancel', "отмена брони"),
+        ):
+            if marker not in script_text:
+                errors.append(f"assets/site.js: потеряна функция {label}")
     error_page_markers = {
         "404.html": "Лист сбился с пути",
         "50x.html": "Чайнику нужна минута",

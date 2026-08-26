@@ -107,7 +107,6 @@ def test_promo_and_cancellation_controls_are_present_in_owner_and_customer_ui(
 ):
     client, _ = app_client(tmp_path, monkeypatch)
     with client:
-        storefront = client.get("/")
         account = client.get("/account")
         promos_login = client.get("/manage/promos")
         session = client.post(
@@ -115,9 +114,6 @@ def test_promo_and_cancellation_controls_are_present_in_owner_and_customer_ui(
         )
         promos = client.get("/manage/promos")
         admin = client.get("/manage")
-    assert storefront.status_code == 200
-    assert 'id="c-promo"' in storefront.text
-    assert 'id="booking-cancel"' in storefront.text
     assert "/api/account/bookings/" in account.text
     assert "admin-login.html" not in promos_login.text
     assert session.status_code == 204

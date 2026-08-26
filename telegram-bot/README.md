@@ -112,7 +112,8 @@ WantedBy=multi-user.target
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install -r requirements.lock.txt 'pytest==9.0.3'
+.venv/bin/pip install -r requirements.lock.txt
+.venv/bin/pip install 'pytest==9.0.3'
 .venv/bin/python -m pytest -q
 ```
 

@@ -107,8 +107,9 @@ telegram-bot/.venv/bin/python -m pytest -q telegram-bot/test_bot_booking.py
 
 Файлы `requirements*.txt` верхнего уровня зависимостей используются как
 читаемая спецификация, а deploy и CI устанавливают проверенные lock-файлы для
-Python 3.12. Обновлять lock-файлы нужно осознанно через `uv pip compile` и только
-вместе с полным тестовым прогоном.
+минимального production Python 3.10; те же lock-файлы совместимы с Python 3.12.
+Обновлять их нужно осознанно через `uv pip compile` и только вместе с полным
+тестовым прогоном.
 
 Перед рекламой, реальным платёжным тестом или внешними записями пройти
 [`ops/PRELAUNCH_CHECKLIST.md`](ops/PRELAUNCH_CHECKLIST.md). Проверка сайта сама

@@ -509,6 +509,15 @@ class CreateOrder(BaseModel):
     privacy_accepted: Literal[True]
     language: Literal["ru", "en", "zh"] = "ru"
     analytics_session: str | None = Field(default=None, min_length=16, max_length=80, pattern=r"^[A-Za-z0-9_-]+$")
+    promo_code: str = Field(default="", max_length=32)
+
+    @field_validator("promo_code")
+    @classmethod
+    def valid_promo_code(cls, value: str) -> str:
+        value = value.strip().upper()
+        if value and not re.fullmatch(r"[A-Z0-9-]{3,32}", value):
+            raise ValueError("промокод содержит недопустимые символы")
+        return value
 
     @field_validator("name")
     @classmethod
@@ -614,6 +623,45 @@ class UpdateLeadStatus(BaseModel):
 
 class UpdateBookingStatus(BaseModel):
     status: Literal["new", "confirmed", "completed", "cancelled"]
+
+
+class CancelBooking(BaseModel):
+    token: str = Field(min_length=24, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
+
+
+class PromoPreview(BaseModel):
+    items: list[OrderItem] = Field(min_length=1, max_length=50)
+    promo_code: str = Field(min_length=3, max_length=32)
+
+    @field_validator("promo_code")
+    @classmethod
+    def valid_code(cls, value: str) -> str:
+        value = value.strip().upper()
+        if not re.fullmatch(r"[A-Z0-9-]{3,32}", value):
+            raise ValueError("промокод содержит недопустимые символы")
+        return value
+
+
+class AdminPromo(BaseModel):
+    code: str = Field(min_length=3, max_length=32)
+    discount_percent: int = Field(ge=1, le=90)
+    min_subtotal: int = Field(default=0, ge=0, le=10_000_000)
+    expires_at: datetime | None = None
+    active: bool = True
+    note: str = Field(default="", max_length=240)
+
+    @field_validator("code")
+    @classmethod
+    def valid_code(cls, value: str) -> str:
+        value = value.strip().upper()
+        if not re.fullmatch(r"[A-Z0-9-]{3,32}", value):
+            raise ValueError("используйте латинские буквы, цифры и дефис")
+        return value
+
+    @field_validator("note")
+    @classmethod
+    def strip_note(cls, value: str) -> str:
+        return value.strip()
 
 
 class SabyShadowAcknowledgement(BaseModel):
@@ -906,6 +954,10 @@ def init_db() -> None:
             # suddenly resend historical notifications after this migration.
             # New orders explicitly store 0 in create_order().
             "paid_effects_enqueued": "INTEGER NOT NULL DEFAULT 1",
+            "original_subtotal": "INTEGER NOT NULL DEFAULT 0",
+            "promo_code": "TEXT NOT NULL DEFAULT ''",
+            "discount_percent": "INTEGER NOT NULL DEFAULT 0",
+            "discount_amount": "INTEGER NOT NULL DEFAULT 0",
         }
         for column, declaration in order_migrations.items():
             if column not in columns:
@@ -917,6 +969,10 @@ def init_db() -> None:
                 """UPDATE orders SET paid_effects_enqueued = 0
                    WHERE paid_at IS NULL AND status = 'pending_payment'"""
             )
+        con.execute(
+            "UPDATE orders SET original_subtotal = subtotal "
+            "WHERE original_subtotal = 0 AND subtotal > 0"
+        )
         con.execute(
             """UPDATE orders
                SET payment_state = CASE
@@ -1090,6 +1146,9 @@ def init_db() -> None:
             "idempotency_key_hash": "TEXT",
             "request_hash": "TEXT",
             "customer_account_id": "TEXT",
+            "cancel_token_hash": "TEXT",
+            "cancelled_at": "TEXT",
+            "cancellation_source": "TEXT NOT NULL DEFAULT ''",
         }
         for column, declaration in booking_migrations.items():
             if column not in booking_columns:
@@ -1123,6 +1182,22 @@ def init_db() -> None:
         con.execute(
             "CREATE INDEX IF NOT EXISTS idx_booking_blocks_slot "
             "ON booking_blocks(booking_date, start_time, end_time)"
+        )
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS promo_codes (
+                code TEXT PRIMARY KEY,
+                discount_percent INTEGER NOT NULL,
+                min_subtotal INTEGER NOT NULL DEFAULT 0,
+                expires_at TEXT,
+                active INTEGER NOT NULL DEFAULT 1,
+                note TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_promo_codes_active "
+            "ON promo_codes(active, expires_at)"
         )
         con.execute("""
             CREATE TABLE IF NOT EXISTS analytics_events (
@@ -1238,6 +1313,58 @@ def price_order(payload: CreateOrder) -> tuple[list[dict], int]:
             ),
         })
     return lines, subtotal
+
+
+def active_promo(code: str, subtotal: int) -> sqlite3.Row:
+    normalized = code.strip().upper()
+    with db() as con:
+        row = con.execute(
+            "SELECT * FROM promo_codes WHERE code = ?", (normalized,)
+        ).fetchone()
+    if not row or not bool(row["active"]):
+        raise HTTPException(422, "Промокод не найден или выключен")
+    if row["expires_at"]:
+        try:
+            expires = datetime.fromisoformat(str(row["expires_at"]))
+            if expires.tzinfo is None:
+                expires = expires.replace(tzinfo=MOSCOW_TZ)
+            if expires <= datetime.now(timezone.utc):
+                raise HTTPException(422, "Срок действия промокода закончился")
+        except ValueError:
+            raise HTTPException(422, "Промокод временно недоступен") from None
+    if subtotal < int(row["min_subtotal"]):
+        raise HTTPException(
+            422,
+            f"Промокод действует от {int(row['min_subtotal'])} ₽",
+        )
+    return row
+
+
+def apply_promo(lines: list[dict], subtotal: int, code: str) -> tuple[list[dict], dict]:
+    """Discount authoritative unit prices so bank, receipt and Saby totals agree."""
+    if not code:
+        return lines, {
+            "code": "", "discount_percent": 0, "discount_amount": 0,
+            "original_subtotal": subtotal, "subtotal": subtotal,
+        }
+    promo = active_promo(code, subtotal)
+    percent = int(promo["discount_percent"])
+    discounted_lines: list[dict] = []
+    discounted_subtotal = 0
+    for line in lines:
+        unit_price = max(1, int(Decimal(line["unit_price"]) * (100 - percent) / 100 + Decimal("0.5")))
+        discounted = {**line, "original_unit_price": line["unit_price"]}
+        discounted["unit_price"] = unit_price
+        discounted["total"] = unit_price * int(line["qty"])
+        discounted_subtotal += discounted["total"]
+        discounted_lines.append(discounted)
+    return discounted_lines, {
+        "code": str(promo["code"]),
+        "discount_percent": percent,
+        "discount_amount": subtotal - discounted_subtotal,
+        "original_subtotal": subtotal,
+        "subtotal": discounted_subtotal,
+    }
 
 
 def stock_guard_enabled() -> bool:
@@ -1463,6 +1590,10 @@ def public_order(row: sqlite3.Row) -> dict:
         "delivery": row["delivery"], "items": json.loads(row["items_json"]),
         "paid_at": row["paid_at"] if "paid_at" in row.keys() else None,
         "payment_state": row["payment_state"] if "payment_state" in row.keys() else "not_started",
+        "original_subtotal": row["original_subtotal"],
+        "promo_code": row["promo_code"],
+        "discount_percent": row["discount_percent"],
+        "discount_amount": row["discount_amount"],
     }
     if "cdek_quote_json" in row.keys() and row["cdek_quote_json"]:
         quote = json.loads(row["cdek_quote_json"])
@@ -1492,6 +1623,19 @@ def booking_request_hash(payload: CreateBooking) -> str:
         separators=(",", ":"),
     ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def booking_cancel_token(booking_id: str) -> str:
+    """Derive a stable opaque token so idempotent booking replays stay useful."""
+    secret = ADMIN_TOKEN or BOOKING_BOT_SECRET
+    if not secret:
+        # Test/development fallback is process-local and never accepted after a restart.
+        secret = f"chainya-test-{id(app)}"
+    return hmac.new(
+        secret.encode("utf-8"),
+        f"cancel-booking:{booking_id}".encode("ascii"),
+        hashlib.sha256,
+    ).hexdigest()[:24]
 
 
 def booking_time_minutes(value: str | datetime_time) -> int:
@@ -2751,6 +2895,11 @@ def customer_order(row: sqlite3.Row) -> dict:
 
 
 def customer_booking(row: sqlite3.Row) -> dict:
+    scheduled = datetime.combine(
+        datetime_date.fromisoformat(row["booking_date"]),
+        datetime_time.fromisoformat(row["booking_time"]),
+        tzinfo=MOSCOW_TZ,
+    )
     return {
         "id": row["id"],
         "created_at": row["created_at"],
@@ -2760,6 +2909,8 @@ def customer_booking(row: sqlite3.Row) -> dict:
         "guests": row["guests"],
         "note": row["note"],
         "status": row["status"],
+        "can_cancel": row["status"] in BOOKING_BLOCKING_STATUSES and scheduled > moscow_now(),
+        "cancelled_at": row["cancelled_at"],
     }
 
 
@@ -2944,6 +3095,8 @@ def admin_booking(row: sqlite3.Row) -> dict:
         "note": row["note"],
         "status": row["status"],
         "source": row["source"],
+        "cancelled_at": row["cancelled_at"],
+        "cancellation_source": row["cancellation_source"],
     }
 
 
@@ -2965,7 +3118,12 @@ def paid_notification(row: sqlite3.Row) -> str:
             for item in items
         ],
         "",
-        f"Товары: {row['subtotal']} ₽",
+        *(
+            [f"Товары до скидки: {row['original_subtotal']} ₽",
+             f"Промокод {row['promo_code']}: −{row['discount_amount']} ₽"]
+            if row["discount_amount"]
+            else [f"Товары: {row['subtotal']} ₽"]
+        ),
         f"Доставка: {DELIVERY_LABELS.get(row['delivery'], row['delivery'])} — {row['delivery_price']} ₽",
         f"Итого: {row['total']} ₽",
         f"Оплата: {'СБП' if row['payment_method'] == 'sbp' else 'банковская карта'}",
@@ -3043,6 +3201,20 @@ def notify_booking(booking: dict) -> None:
         f"Пожелания: {booking['note']}" if booking["note"] else "",
     ]))
     send_to_owners(text, "бронь")
+
+
+def notify_booking_cancelled(booking: dict, source: str) -> None:
+    source_label = {"account": "личного кабинета", "telegram": "Telegram-бота", "link": "сайта"}.get(source, source)
+    send_to_owners(
+        "\n".join([
+            "❌ Бронь отменена клиентом",
+            f"№ {booking['id']}",
+            f"Дата и время: {booking['booking_date']} · {booking['booking_time']}",
+            f"Источник: {source_label}",
+            "Время снова доступно для бронирования.",
+        ]),
+        "отмену брони",
+    )
 
 
 def enqueue_paid_order_effects(
@@ -4719,6 +4891,94 @@ def require_site_write_request(request: Request) -> None:
         raise HTTPException(403, "Недопустимый источник запроса")
 
 
+def require_promo_write_request(request: Request) -> None:
+    if request.headers.get("x-chainya-admin") != "promos":
+        raise HTTPException(403, "Требуется подтверждение запроса админ-панели")
+    origin = request.headers.get("origin", "").rstrip("/")
+    expected = f"{request.url.scheme}://{request.headers.get('host', '')}"
+    if origin and origin != expected:
+        raise HTTPException(403, "Недопустимый источник запроса")
+
+
+def public_promo(row: sqlite3.Row, redemptions: int = 0) -> dict:
+    return {
+        "code": row["code"],
+        "discount_percent": row["discount_percent"],
+        "min_subtotal": row["min_subtotal"],
+        "expires_at": row["expires_at"],
+        "active": bool(row["active"]),
+        "note": row["note"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+        "paid_redemptions": redemptions,
+    }
+
+
+@app.get("/api/admin/promos")
+def admin_promos(authorization: str = Header(default="")):
+    require_admin(authorization)
+    with db() as con:
+        rows = con.execute(
+            """SELECT p.*, COUNT(o.id) AS paid_redemptions
+               FROM promo_codes p LEFT JOIN orders o
+                 ON o.promo_code = p.code AND o.paid_at IS NOT NULL
+               GROUP BY p.code ORDER BY p.created_at DESC"""
+        ).fetchall()
+    return {"promos": [public_promo(row, int(row["paid_redemptions"])) for row in rows]}
+
+
+@app.post("/api/admin/promos", status_code=201)
+def admin_create_promo(
+    payload: AdminPromo,
+    request: Request,
+    authorization: str = Header(default=""),
+):
+    require_admin(authorization)
+    require_promo_write_request(request)
+    created = now_iso()
+    expires = payload.expires_at.isoformat() if payload.expires_at else None
+    with db() as con:
+        try:
+            con.execute(
+                """INSERT INTO promo_codes
+                   (code, discount_percent, min_subtotal, expires_at, active,
+                    note, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (payload.code, payload.discount_percent, payload.min_subtotal,
+                 expires, int(payload.active), payload.note, created, created),
+            )
+        except sqlite3.IntegrityError:
+            raise HTTPException(409, "Такой промокод уже существует") from None
+        row = con.execute("SELECT * FROM promo_codes WHERE code = ?", (payload.code,)).fetchone()
+    return public_promo(row)
+
+
+@app.put("/api/admin/promos/{code}")
+def admin_update_promo(
+    code: str,
+    payload: AdminPromo,
+    request: Request,
+    authorization: str = Header(default=""),
+):
+    require_admin(authorization)
+    require_promo_write_request(request)
+    normalized = code.strip().upper()
+    if payload.code != normalized:
+        raise HTTPException(422, "Код существующего промокода нельзя переименовать")
+    expires = payload.expires_at.isoformat() if payload.expires_at else None
+    with db() as con:
+        changed = con.execute(
+            """UPDATE promo_codes SET discount_percent = ?, min_subtotal = ?,
+               expires_at = ?, active = ?, note = ?, updated_at = ? WHERE code = ?""",
+            (payload.discount_percent, payload.min_subtotal, expires,
+             int(payload.active), payload.note, now_iso(), normalized),
+        )
+        if changed.rowcount != 1:
+            raise HTTPException(404, "Промокод не найден")
+        row = con.execute("SELECT * FROM promo_codes WHERE code = ?", (normalized,)).fetchone()
+    return public_promo(row)
+
+
 def catalog_error_response(exc: Exception) -> HTTPException:
     if isinstance(exc, CatalogConflict):
         return HTTPException(409, str(exc))
@@ -5682,10 +5942,24 @@ def admin_update_booking(
                 exclude_booking_id=booking_id,
             ):
                 raise HTTPException(409, "Время уже занято другой бронью или закрыто владельцем")
-        con.execute(
-            "UPDATE bookings SET status = ?, updated_at = ? WHERE id = ?",
-            (payload.status, now_iso(), booking_id),
-        )
+        updated = now_iso()
+        if payload.status == "cancelled":
+            con.execute(
+                """UPDATE bookings SET status = ?, updated_at = ?,
+                   cancelled_at = COALESCE(cancelled_at, ?),
+                   cancellation_source = CASE
+                       WHEN status = 'cancelled' THEN cancellation_source
+                       ELSE 'admin'
+                   END
+                   WHERE id = ?""",
+                (payload.status, updated, updated, booking_id),
+            )
+        else:
+            con.execute(
+                """UPDATE bookings SET status = ?, updated_at = ?,
+                   cancelled_at = NULL, cancellation_source = '' WHERE id = ?""",
+                (payload.status, updated, booking_id),
+            )
         row = con.execute(
             "SELECT * FROM bookings WHERE id = ?", (booking_id,)
         ).fetchone()
@@ -6450,6 +6724,74 @@ def customer_bookings(request: Request, response: Response):
     return {"bookings": [customer_booking(row) for row in rows], "total": len(rows)}
 
 
+def cancel_booking_row(
+    con: sqlite3.Connection, row: sqlite3.Row, source: str
+) -> tuple[sqlite3.Row, bool]:
+    if row["status"] == "cancelled":
+        return row, False
+    if row["status"] not in BOOKING_BLOCKING_STATUSES:
+        raise HTTPException(409, "Эту бронь уже нельзя отменить")
+    scheduled = datetime.combine(
+        datetime_date.fromisoformat(row["booking_date"]),
+        datetime_time.fromisoformat(row["booking_time"]),
+        tzinfo=MOSCOW_TZ,
+    )
+    if scheduled <= moscow_now():
+        raise HTTPException(409, "Время этой брони уже наступило")
+    updated = now_iso()
+    con.execute(
+        """UPDATE bookings SET status = 'cancelled', updated_at = ?,
+           cancelled_at = ?, cancellation_source = ? WHERE id = ?""",
+        (updated, updated, source, row["id"]),
+    )
+    return con.execute("SELECT * FROM bookings WHERE id = ?", (row["id"],)).fetchone(), True
+
+
+@app.post("/api/account/bookings/{booking_id}/cancel")
+def cancel_customer_booking(
+    booking_id: str, request: Request, background_tasks: BackgroundTasks
+):
+    account = customer_account_for_request(request)
+    rate_limit(request, "cancel-account-booking", 10, 600)
+    with db() as con:
+        con.execute("BEGIN IMMEDIATE")
+        row = con.execute(
+            "SELECT * FROM bookings WHERE id = ? AND customer_account_id = ?",
+            (booking_id.upper(), account["id"]),
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "Бронь не найдена")
+        row, changed = cancel_booking_row(con, row, "account")
+    if changed:
+        background_tasks.add_task(notify_booking_cancelled, dict(row), "account")
+    return {"booking": customer_booking(row), "cancelled": True}
+
+
+@app.post("/api/bookings/{booking_id}/cancel")
+def cancel_booking_by_token(
+    booking_id: str,
+    payload: CancelBooking,
+    request: Request,
+    background_tasks: BackgroundTasks,
+):
+    rate_limit(request, "cancel-booking-link", 10, 600)
+    token_hash = hashlib.sha256(payload.token.encode("utf-8")).hexdigest()
+    with db() as con:
+        con.execute("BEGIN IMMEDIATE")
+        row = con.execute(
+            "SELECT * FROM bookings WHERE id = ?", (booking_id.upper(),)
+        ).fetchone()
+        if not row or not row["cancel_token_hash"] or not hmac.compare_digest(
+            str(row["cancel_token_hash"]), token_hash
+        ):
+            raise HTTPException(404, "Ссылка отмены недействительна")
+        source = "telegram" if row["source"] == "telegram" else "link"
+        row, changed = cancel_booking_row(con, row, source)
+    if changed:
+        background_tasks.add_task(notify_booking_cancelled, dict(row), source)
+    return {"id": row["id"], "status": "cancelled", "cancelled": True}
+
+
 @app.post("/api/account/orders/claim")
 def claim_customer_order(payload: CustomerOrderClaim, request: Request):
     account = customer_account_for_request(request)
@@ -6472,6 +6814,24 @@ def claim_customer_order(payload: CustomerOrderClaim, request: Request):
             )
         row = con.execute("SELECT * FROM orders WHERE id = ?", (row["id"],)).fetchone()
     return {"order": customer_order(row)}
+
+
+@app.post("/api/promos/preview")
+def promo_preview(payload: PromoPreview, request: Request, response: Response):
+    rate_limit(request, "promo-preview", 20, 600)
+    temporary = CreateOrder(
+        items=payload.items,
+        delivery="pickup",
+        payment_method="bank_card",
+        name="Проверка",
+        phone="+79990000000",
+        privacy_accepted=True,
+        promo_code=payload.promo_code,
+    )
+    lines, subtotal = price_order(temporary)
+    _lines, promo = apply_promo(lines, subtotal, payload.promo_code)
+    response.headers["Cache-Control"] = "no-store"
+    return promo
 
 
 @app.post("/api/orders", status_code=201)
@@ -6506,7 +6866,9 @@ def create_order(
     # идемпотентный replay — нормальная часть восстановления мобильной сети.
     rate_limit(request, "create-order", 12, 600)
 
-    lines, subtotal = price_order(payload)
+    lines, original_subtotal = price_order(payload)
+    lines, promo = apply_promo(lines, original_subtotal, payload.promo_code)
+    subtotal = int(promo["subtotal"])
     stock_requirements = (
         verified_stock_requirements(lines) if stock_guard_enabled() else []
     )
@@ -6530,7 +6892,7 @@ def create_order(
     order_id = uuid.uuid4().hex[:12].upper()
     created = now_iso()
     customer = payload.model_dump(
-        exclude={"items", "payment_method", "delivery", "language", "analytics_session"}
+        exclude={"items", "payment_method", "delivery", "language", "analytics_session", "promo_code"}
     )
     analytics_session_hash = hash_session(payload.analytics_session) if payload.analytics_session else None
     payment_token = uuid.uuid4().hex
@@ -6553,14 +6915,17 @@ def create_order(
                     payment_method, delivery, customer_json, items_json, provider_payment_id, payment_token,
                     payment_provider, payment_state, payment_updated_at,
                     cdek_quote_json, idempotency_key_hash, request_hash,
-                    paid_effects_enqueued, customer_account_id)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    paid_effects_enqueued, customer_account_id, original_subtotal,
+                    promo_code, discount_percent, discount_amount)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (order_id, "pending_payment", created, created, subtotal, delivery_price,
                  subtotal + delivery_price, payload.payment_method, payload.delivery,
                  json.dumps(customer, ensure_ascii=False), json.dumps(lines, ensure_ascii=False), None,
                  payment_token, payment_provider, payment_state, created,
                  json.dumps(cdek_quote, ensure_ascii=False), key_hash,
-                 request_fingerprint, 0, customer_account_id),
+                 request_fingerprint, 0, customer_account_id,
+                 promo["original_subtotal"], promo["code"],
+                 promo["discount_percent"], promo["discount_amount"]),
             )
             if stock_guard_enabled():
                 reserve_verified_stock(
@@ -6704,7 +7069,8 @@ def create_booking(
                 raise HTTPException(
                     409, "Idempotency-Key уже использован для другой брони"
                 )
-            return {"id": existing["id"], "accepted": True}
+            token = booking_cancel_token(existing["id"])
+            return {"id": existing["id"], "accepted": True, "cancel_token": token}
 
     # Повтор уже принятой идемпотентной заявки не является новой попыткой:
     # мобильная сеть может запросить тот же ответ много раз после таймаута.
@@ -6721,6 +7087,8 @@ def create_booking(
         "created_at": now_iso(),
         **payload.model_dump(mode="json", exclude={"privacy_accepted"}),
     }
+    cancel_token = booking_cancel_token(booking["id"])
+    cancel_token_hash = hashlib.sha256(cancel_token.encode("utf-8")).hexdigest()
     reused_row = None
     with db() as con:
         con.execute("BEGIN IMMEDIATE")
@@ -6749,20 +7117,22 @@ def create_booking(
                 """INSERT INTO bookings
                    (id, created_at, booking_date, booking_time, format, guests,
                     name, phone, note, status, source, updated_at,
-                    idempotency_key_hash, request_hash, customer_account_id)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?, ?, ?)""",
+                    idempotency_key_hash, request_hash, customer_account_id,
+                    cancel_token_hash)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?, ?, ?, ?)""",
                 (
                     booking["id"], booking["created_at"], booking["date"],
                     booking["time"], booking["format"], booking["guests"],
                     booking["name"], booking["phone"], booking["note"],
                     booking["source"], booking["created_at"], key_hash,
-                    request_fingerprint, customer_account_id,
+                    request_fingerprint, customer_account_id, cancel_token_hash,
                 ),
             )
     if reused_row:
-        return {"id": reused_row["id"], "accepted": True}
+        token = booking_cancel_token(reused_row["id"])
+        return {"id": reused_row["id"], "accepted": True, "cancel_token": token}
     background_tasks.add_task(notify_booking, booking)
-    return {"id": booking["id"], "accepted": True}
+    return {"id": booking["id"], "accepted": True, "cancel_token": cancel_token}
 
 
 @app.get("/api/orders/{order_id}")
@@ -7323,6 +7693,12 @@ def management_page(request: Request):
 def management_catalog_page(request: Request):
     """Catalog editor protected by the same owner session as the dashboard."""
     return owner_page(request, "admin-catalog.html")
+
+
+@app.get("/manage/promos")
+def management_promos_page(request: Request):
+    """Promo-code editor protected by the owner HttpOnly session."""
+    return owner_page(request, "admin-promos.html")
 
 
 @app.get("/manage/catalog.js", include_in_schema=False)

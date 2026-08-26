@@ -567,6 +567,7 @@ h1, h2, h3, p{ text-wrap:pretty; }
 .cart-note{ margin:10px 0 0; font-size:11.5px; color:var(--text-3); line-height:1.5; text-align:center; }
 .cart-note--error{ color:#c66f62; }
 .cart-receipt-note{ margin:12px 0 0; font-size:12px; color:var(--text-2); line-height:1.45; text-align:left; }
+.promo-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}.promo-row .btn{min-height:48px;padding-inline:18px}.promo-status{margin:7px 0 0;font-size:12px;color:var(--text-3)}.promo-status.ok{color:#8fa984}.promo-status.bad{color:#c66f62}.cart-discount{display:flex;justify-content:space-between;gap:14px;margin-top:10px;color:#a9bd9f;font-size:13px}.cart-discount[hidden]{display:none}
 .input[aria-invalid="true"]{ border-color:#b9574b; box-shadow:0 0 0 1px #b9574b; }
 .consent{display:flex;align-items:flex-start;gap:10px;margin:14px 0;color:var(--text-3);font-size:13px;line-height:1.45}.consent input{width:24px;height:24px;margin:0;flex:none;accent-color:var(--accent)}.consent a{color:var(--text-2);border-bottom:1px solid var(--line)}
 .delivery-combobox{ position:relative; }
@@ -1477,6 +1478,8 @@ select.input{
         <div class="done-card__ring"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></div>
         <h2 data-i18n="done_h">Стол за вами</h2>
         <p id="done-text">—</p>
+        <button class="btn btn--ghost" id="booking-cancel" type="button" data-i18n="booking_cancel" style="margin-top:18px">Отменить бронь</button>
+        <p class="cart-note" id="booking-cancel-status" aria-live="polite"></p>
         <div style="margin-top:28px"><button class="btn btn--ghost" data-go="home" data-i18n="done_back">На главную</button></div>
       </div>
     </div>
@@ -1631,10 +1634,16 @@ select.input{
         <label class="label" for="c-note" data-i18n="f_note">Пожелания</label>
         <textarea class="input" id="c-note" data-i18n-ph="cart_note_ph"></textarea>
       </div>
+      <div class="field">
+        <label class="label" for="c-promo" data-i18n="promo_label">Промокод</label>
+        <div class="promo-row"><input class="input" id="c-promo" maxlength="32" autocomplete="off" autocapitalize="characters" data-i18n-ph="promo_placeholder" placeholder="Введите код"><button class="btn" id="promo-apply" type="button" data-i18n="promo_apply">Применить</button></div>
+        <p class="promo-status" id="promo-status" aria-live="polite"></p>
+      </div>
       <label class="consent"><input type="checkbox" id="c-privacy"><span><span data-i18n="privacy_accept">Согласен на обработку данных согласно</span> <a href="/privacy.html" target="_blank" rel="noopener" data-i18n="privacy_link">политике конфиденциальности</a></span></label>
     </div>
   </div>
   <div class="sheet__foot">
+    <div class="cart-discount" id="cart-discount" hidden><span data-i18n="promo_discount">Скидка</span><strong id="cart-discount-value"></strong></div>
     <div class="sheet__sum"><span data-i18n="cart_total">Итого</span><b class="num" id="cart-total">—</b></div>
     <p class="cart-note" id="cart-status" aria-live="polite"></p>
     <p class="cart-receipt-note" data-i18n="payment_receipt_notice">При полной предоплате кассовый чек полного расчёта формируется в момент оплаты. Отдельный чек при выдаче или отправке заказа не формируется.</p>
@@ -1847,9 +1856,11 @@ select.input{
     payment_receipt_notice:'При полной предоплате кассовый чек полного расчёта формируется в момент оплаты. Отдельный чек при выдаче или отправке заказа не формируется.',
     payment_terms_link:'Условия оплаты и возврата', cart_pvz_map_selected:'Пункт выбран', cart_pvz_map_open:'Показать на карте',
     cart_note_ph:'Комментарий к заказу', cart_submit:'Оформить заказ', cart_submit_total:a=>`Оформить заказ · ${a}`, cart_submit_unavailable:'Онлайн-оплата пока недоступна',
+    promo_label:'Промокод',promo_placeholder:'Введите код',promo_apply:'Применить',promo_discount:'Скидка',promo_applied:(p,a)=>`Промокод применён: ${p}% · экономия ${a}`,promo_invalid:'Промокод не применён.',
     cart_decrease:n=>`Уменьшить количество «${n}»`, cart_increase:n=>`Увеличить количество «${n}»`,
     cart_pay:'Стоимость и срок доставки рассчитывает СДЭК перед оплатой.',
     cart_pay_pickup:'Самовывоз с Острякова, 3 — бесплатно. Оплата проходит на защищённой форме Т‑Банка.',
+    booking_cancel:'Отменить бронь',booking_cancelling:'Отменяем…',booking_cancelled:'Бронь отменена. Время снова свободно.',booking_cancel_confirm:'Отменить эту бронь?',
     cart_city_searching:'Ищем город…', cart_city_empty:'Город не найден',
     cart_pvz_searching:'Загружаем пункты…', cart_pvz_empty:'Пункты не найдены',
     cart_quote_city:'Сначала выберите город из подсказок.',
@@ -2033,9 +2044,11 @@ select.input{
     payment_receipt_notice:'With full prepayment, one full-settlement receipt is issued at payment. No separate receipt is issued when the order is handed over or shipped.',
     payment_terms_link:'Payment and return terms', cart_pvz_map_selected:'Pickup point selected', cart_pvz_map_open:'Show on map',
     cart_note_ph:'Order comment', cart_submit:'Place order', cart_submit_total:a=>`Place order · ${a}`, cart_submit_unavailable:'Online payment is unavailable',
+    promo_label:'Promo code',promo_placeholder:'Enter code',promo_apply:'Apply',promo_discount:'Discount',promo_applied:(p,a)=>`Promo code applied: ${p}% · you save ${a}`,promo_invalid:'The promo code was not applied.',
     cart_decrease:n=>`Decrease quantity of ${n}`, cart_increase:n=>`Increase quantity of ${n}`,
     cart_pay:'CDEK calculates the delivery price and time before payment.',
     cart_pay_pickup:'Pickup from 3 Ostryakova Street is free. Payment is completed on T‑Bank’s secure form.',
+    booking_cancel:'Cancel booking',booking_cancelling:'Cancelling…',booking_cancelled:'The booking is cancelled and the time is available again.',booking_cancel_confirm:'Cancel this booking?',
     cart_city_searching:'Searching for the city…', cart_city_empty:'City not found',
     cart_pvz_searching:'Loading pickup points…', cart_pvz_empty:'No pickup points found',
     cart_quote_city:'Choose a city from the suggestions first.',
@@ -2219,9 +2232,11 @@ select.input{
     payment_receipt_notice:'全额预付时，付款时开具一张全额结算收据；取货或发货时不再另行开具收据。',
     payment_terms_link:'支付与退款条款', cart_pvz_map_selected:'已选择自提点', cart_pvz_map_open:'在地图上查看',
     cart_note_ph:'订单备注', cart_submit:'提交订单', cart_submit_total:a=>`提交订单 · ${a}`, cart_submit_unavailable:'在线支付暂不可用',
+    promo_label:'优惠码',promo_placeholder:'输入优惠码',promo_apply:'应用',promo_discount:'优惠',promo_applied:(p,a)=>`优惠码已应用：${p}% · 节省${a}`,promo_invalid:'优惠码未应用。',
     cart_decrease:n=>`减少${n}的数量`, cart_increase:n=>`增加${n}的数量`,
     cart_pay:'付款前由CDEK计算运费和时效。',
     cart_pay_pickup:'奥斯特里亚科娃街3号自取免费。付款将在T‑Bank安全页面完成。',
+    booking_cancel:'取消预订',booking_cancelling:'正在取消…',booking_cancelled:'预订已取消，该时段已重新开放。',booking_cancel_confirm:'取消此预订？',
     cart_city_searching:'正在查找城市…', cart_city_empty:'未找到城市',
     cart_pvz_searching:'正在加载自提点…', cart_pvz_empty:'未找到自提点',
     cart_quote_city:'请先从提示中选择城市。',
@@ -3272,6 +3287,7 @@ select.input{
   const CART_KEY = 'chaynya-cart';
   const CHECKOUT_ATTEMPT_KEY = 'chaynya-checkout-attempt';
   const cartSheet = $('#cart-sheet');
+  let appliedPromo = null;
   const teaById = id => TEA_META.find(m => m.id === id);
   const packLabel = it => it.pack === 'pc' ? T().unit_pc.trim() : `${it.pack} ${T().gram}`;
   const linePrice = it => { const m = teaById(it.id); if (!m) return 0; return it.pack === 'pc' ? m.p : packPrice(m.p, it.pack); };
@@ -3302,7 +3318,11 @@ select.input{
     }catch(e){}
     return clean;
   }
-  function setCart(c){ try{ localStorage.setItem(CART_KEY, JSON.stringify(c)); }catch(e){} updateCartBadge(); }
+  function clearPromo(message=''){
+    appliedPromo=null;$('#cart-discount').hidden=true;$('#cart-discount-value').textContent='';
+    const status=$('#promo-status');status.textContent=message;status.className='promo-status';
+  }
+  function setCart(c){ try{ localStorage.setItem(CART_KEY, JSON.stringify(c)); }catch(e){} clearPromo(); updateCartBadge(); }
   function cartCount(){ return getCart().reduce((s, it) => s + it.qty, 0); }
   function cartTotal(){ return getCart().reduce((s, it) => s + linePrice(it) * it.qty, 0); }
   async function checkoutFingerprint(payload){
@@ -3334,7 +3354,8 @@ select.input{
   let checkoutAvailable = false;
   let deliveryQuote = null;
   let cityTimer = 0, pvzTimer = 0, citySequence = 0, pvzSequence = 0, quoteSequence = 0;
-  function checkoutTotal(){ return cartTotal() + (DLV_PRICE[$('#c-dlv').value] || 0); }
+  function checkoutSubtotal(){return appliedPromo ? appliedPromo.subtotal : cartTotal()}
+  function checkoutTotal(){ return checkoutSubtotal() + (DLV_PRICE[$('#c-dlv').value] || 0); }
   function deliveryReady(){
     const method = $('#c-dlv').value;
     if (method === 'pickup') return true;
@@ -3356,6 +3377,20 @@ select.input{
       ? (method === 'pickup' ? T().cart_pay_pickup : T().cart_pay)
       : T().cart_payment_unavailable;
     updateCheckoutTotal();
+  }
+  async function applyPromoCode(){
+    const input=$('#c-promo'),button=$('#promo-apply'),status=$('#promo-status');
+    const code=input.value.trim().toUpperCase();input.value=code;clearPromo();
+    if(!code){status.textContent=T().promo_invalid;status.classList.add('bad');updateCheckoutTotal();return}
+    button.disabled=true;status.textContent='…';
+    try{
+      const response=await fetch('/api/promos/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({promo_code:code,items:getCart().map(({id,pack,qty})=>({id,pack,qty}))})});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(typeof data.detail==='string'?data.detail:T().promo_invalid);
+      appliedPromo=data;status.textContent=T().promo_applied(data.discount_percent,rub(data.discount_amount));status.classList.add('ok');
+      $('#cart-discount').hidden=false;$('#cart-discount-value').textContent='−'+rub(data.discount_amount);
+    }catch(error){status.textContent=error.message||T().promo_invalid;status.classList.add('bad')}
+    finally{button.disabled=false;updateCheckoutTotal()}
   }
   async function refreshCheckoutStatus(){
     try{
@@ -3700,6 +3735,8 @@ select.input{
   $('#scrim').addEventListener('click', closeCart);
   addEventListener('keydown', e => { if (e.key === 'Escape') closeCart(); });
   $('#c-dlv').addEventListener('change', toggleAddr);
+  $('#promo-apply').addEventListener('click',applyPromoCode);
+  $('#c-promo').addEventListener('input',()=>{if(appliedPromo){clearPromo();updateCheckoutTotal()}});
   $('#ts-add').addEventListener('click', () => {
     if (!curTea || curPack == null || !inStock(curTea)) return;
     if (!cartAdd(curTea.id, curPack)) return;
@@ -3767,6 +3804,7 @@ select.input{
       privacy_accepted: true,
       language: LANG,
       analytics_session: ANALYTICS_OFF ? null : analyticsSession || null,
+      promo_code: appliedPromo ? appliedPromo.code : '',
     };
     const clearCart = () => {
       localStorage.removeItem(CART_KEY); updateCartBadge();
@@ -4132,7 +4170,7 @@ select.input{
     track('booking_sent','book');
     lastBook = {
       id:bookingResult.id, name:$('#f-name').value.trim(), format:B.format,
-      date:B.date, time:B.time, n:+B.guests,
+      date:B.date, time:B.time, n:+B.guests, cancelToken:bookingResult.cancel_token,
     };
     pendingBooking = null;
     renderDone();
@@ -4155,6 +4193,11 @@ select.input{
       id: lastBook.id,
     });
   }
+  $('#booking-cancel').addEventListener('click',async()=>{
+    if(!lastBook?.cancelToken||!confirm(T().booking_cancel_confirm))return;
+    const button=$('#booking-cancel'),status=$('#booking-cancel-status');button.disabled=true;status.textContent=T().booking_cancelling;
+    try{const response=await fetch(`/api/bookings/${encodeURIComponent(lastBook.id)}/cancel`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:lastBook.cancelToken})});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.detail||T().booking_error);status.textContent=T().booking_cancelled;button.hidden=true;await refreshSlots()}catch(error){status.textContent=error.message;button.disabled=false}
+  });
 
   $$('.b2b-intent').forEach(button => button.addEventListener('click', () => {
     const eventIntent = button.dataset.intent === 'event';

@@ -404,8 +404,9 @@ def test_admin_bookings_support_queue_operations(tmp_path, monkeypatch):
     assert booking["name"] == "Анна"
     assert set(booking) == {
         "id", "created_at", "updated_at", "date", "time", "format",
-        "guests", "name", "phone", "note", "status", "source",
-    }
+            "guests", "name", "phone", "note", "status", "source",
+            "cancelled_at", "cancellation_source",
+        }
     assert updated.status_code == 200
     assert updated.json()["status"] == "confirmed"
     assert updated.json()["updated_at"]

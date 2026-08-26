@@ -27,8 +27,8 @@ import logging
 import os
 import random
 import secrets
-import urllib.parse
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import date, timedelta
 
@@ -530,6 +530,14 @@ async def create_shared_booking(c, iso, t, f, g):
     )
 
 
+async def cancel_shared_booking(booking_id, token):
+    return await asyncio.to_thread(
+        _booking_api_json,
+        f"/api/bookings/{urllib.parse.quote(booking_id)}/cancel",
+        payload={"token": token},
+    )
+
+
 def date_days():
     t = date.today()
     return [t + timedelta(days=i) for i in range(7)]
@@ -816,7 +824,7 @@ async def cb_bk_confirm(c: CallbackQuery):
 @router.callback_query(F.data.startswith("bk:ok:"))
 async def cb_bk_ok(c: CallbackQuery):
     _, _, iso, t, f, g = c.data.split(":")
-    fn, price = FMT[f]
+    fn, _price = FMT[f]
     try:
         result = await create_shared_booking(c, iso, t, f, g)
     except BookingApiError as exc:
@@ -839,13 +847,33 @@ async def cb_bk_ok(c: CallbackQuery):
             ]),
         )
         return await c.answer("Сервис временно недоступен", show_alert=True)
-    done_kb = InlineKeyboardMarkup(inline_keyboard=[
-        [btn("🍵 Выбрать чай", "cats"), btn("↩︎ В меню", "menu")]])
+    cancel_token = str(result.get("cancel_token") or "")
+    done_rows = []
+    if cancel_token:
+        done_rows.append([btn("❌ Отменить бронь", f"bk:x:{result.get('id')}:{cancel_token}")])
+    done_rows.append([btn("🍵 Выбрать чай", "cats"), btn("↩︎ В меню", "menu")])
+    done_kb = InlineKeyboardMarkup(inline_keyboard=done_rows)
     await show(c, B_BOOK,
                f"✅ <b>Бронь принята!</b>\n\n№ {esc(result.get('id'))}\n📅 {date_h(iso)}, {hhmm(t)}\n☕ {fn}\n👥 {g}\n\n"
                f"Время зарезервировано. Мы свяжемся и подтвердим бронь. Если планы поменяются — позвоните {PHONE}.", done_kb)
     await c.answer("Готово!")
     BOOKING_FLOWS.pop(c.from_user.id, None)
+
+
+@router.callback_query(F.data.startswith("bk:x:"))
+async def cb_bk_cancel(c: CallbackQuery):
+    try:
+        _, _, booking_id, token = c.data.split(":", 3)
+        await cancel_shared_booking(booking_id, token)
+    except BookingApiError as exc:
+        return await c.answer(str(exc), show_alert=True)
+    await show(
+        c,
+        B_BOOK,
+        f"❌ <b>Бронь № {esc(booking_id)} отменена.</b>\n\nВремя снова доступно другим гостям.",
+        InlineKeyboardMarkup(inline_keyboard=[[btn("↩︎ В меню", "menu")]]),
+    )
+    await c.answer("Бронь отменена")
 
 
 async def notify_owners(bot, note, what="сообщение"):

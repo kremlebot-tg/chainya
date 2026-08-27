@@ -13,40 +13,467 @@
     *{box-sizing:border-box}html{background:var(--bg);scrollbar-gutter:stable}body{margin:0;background:var(--bg);color:var(--text);font:400 16px/1.6 Golos,Arial,sans-serif;-webkit-font-smoothing:antialiased}button,input{font:inherit}a{color:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--paper);outline-offset:2px}
     .topbar{position:sticky;top:0;z-index:20;border-bottom:1px solid var(--line);background:#1c1814f2;backdrop-filter:blur(14px)}.topbar__in{width:min(1240px,calc(100% - 48px));min-height:76px;margin:auto;display:flex;align-items:center;gap:22px}.brand{display:flex;align-items:center;gap:12px;text-decoration:none;padding-right:22px;border-right:1px solid var(--line)}.brand img{width:34px;height:42px;object-fit:contain}.brand strong{display:block;font:20px/1 Prata,serif}.brand small{display:block;margin-top:5px;color:var(--quiet);font-size:10px;letter-spacing:.15em;text-transform:uppercase}.nav{display:flex;align-self:stretch}.nav a{min-width:92px;padding:0 15px;display:grid;place-items:center;color:var(--quiet);font-weight:600;text-align:center;text-decoration:none}.nav a:hover,.nav a[aria-current=page]{background:#28211b;color:var(--text)}.nav a[aria-current=page]{box-shadow:inset 0 -2px var(--red)}.logout{margin-left:auto;min-height:42px;padding:8px 15px;border:1px solid var(--line-2);background:transparent;color:var(--text)}.logout:hover{background:var(--paper);color:var(--ink)}
     main{width:min(1240px,calc(100% - 48px));margin:0 auto 80px}.hero{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(320px,.8fr);border:1px solid var(--line);border-top:0}.hero__copy{padding:44px 42px}.eyebrow{color:#baa283;font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase}.hero h1{margin:12px 0 15px;font:clamp(42px,6vw,72px)/1 Prata,serif}.hero p{max-width:58ch;margin:0;color:var(--muted)}.hero__aside{display:grid;align-content:center;padding:35px;border-left:1px solid var(--line);background:var(--panel)}.hero__aside strong{font:23px/1.3 Prata,serif}.hero__aside p{margin:10px 0 0;color:var(--muted);font-size:14px}
-    .search-wrap{position:sticky;top:76px;z-index:10;padding:18px 0;background:linear-gradient(var(--bg) 75%,transparent)}.search{width:100%;height:56px;padding:0 18px;border:1px solid var(--line-2);border-radius:0;background:var(--panel);color:var(--text);font-size:16px}.search::placeholder{color:var(--quiet)}.layout{display:grid;grid-template-columns:250px minmax(0,1fr);gap:24px}.toc{position:sticky;top:150px;align-self:start;border:1px solid var(--line);padding:18px}.toc strong{display:block;margin-bottom:10px;font-size:12px;letter-spacing:.12em;text-transform:uppercase}.toc a{display:block;padding:8px 0;border-top:1px solid #382f27;color:var(--muted);font-size:14px;text-decoration:none}.toc a:hover{color:var(--text)}.guides{display:grid;gap:14px}.guide{border:1px solid var(--line);background:var(--panel)}.guide[hidden]{display:none}.guide summary{position:relative;display:grid;grid-template-columns:40px minmax(0,1fr) auto;align-items:center;gap:16px;min-height:76px;padding:15px 20px;cursor:pointer;list-style:none}.guide summary::-webkit-details-marker{display:none}.guide summary::after{content:'+';color:var(--amber);font-size:25px;font-weight:300}.guide[open] summary::after{content:'−'}.guide__number{color:#c2a77f;font:19px Prata,serif}.guide__title{display:block;margin:0;font:21px/1.3 Prata,serif}.guide__lead{display:block;margin-top:4px;color:var(--quiet);font-size:13px}.guide__body{padding:0 76px 27px;border-top:1px solid var(--line)}.guide h3{margin:24px 0 8px;font-size:16px}.guide p{margin:9px 0;color:var(--muted)}.guide ul,.guide ol{margin:10px 0;padding-left:22px;color:var(--muted)}.guide li{margin:6px 0}.guide b,.guide strong{color:var(--text)}.note{margin:18px 0;padding:13px 15px;border-left:3px solid var(--amber);background:#251d14}.note.safe{border-left-color:var(--sage);background:#1b2119}.note.danger{border-left-color:var(--red);background:#281a17}.steps{counter-reset:step;list-style:none!important;padding:0!important}.steps li{counter-increment:step;display:grid;grid-template-columns:30px 1fr;gap:10px}.steps li::before{content:counter(step);width:25px;height:25px;display:grid;place-items:center;border:1px solid var(--line-2);color:var(--paper);font-size:12px}.empty{padding:55px 20px;border:1px solid var(--line);text-align:center;color:var(--muted)}
-    @media(max-width:800px){.topbar__in,main{width:100%}.topbar__in{padding:8px 14px 0;flex-wrap:wrap}.brand{border:0;padding:0}.nav{order:3;width:calc(100% + 28px);margin:0 -14px;overflow-x:auto;border-top:1px solid var(--line)}.nav a{min-width:90px;min-height:50px;padding:0 10px}.logout{margin-left:auto}.hero{grid-template-columns:1fr;border-left:0;border-right:0}.hero__copy{padding:32px 18px}.hero__aside{padding:23px 18px;border:0;border-top:1px solid var(--line)}.search-wrap{top:112px;padding:12px 14px}.layout{grid-template-columns:1fr}.toc{display:none}.guides{gap:10px}.guide{border-left:0;border-right:0}.guide summary{grid-template-columns:30px minmax(0,1fr) auto;padding:15px 16px}.guide__title{font-size:19px}.guide__body{padding:0 18px 23px}.hero h1{font-size:45px}}
+    .safety-legend{display:grid;grid-template-columns:repeat(3,1fr);margin:20px 0 0;border:1px solid var(--line);background:var(--panel)}.safety-item{min-height:108px;padding:18px;border-right:1px solid var(--line)}.safety-item:last-child{border-right:0}.safety-item__label{display:flex;align-items:center;gap:8px;font-weight:700}.safety-dot{width:9px;height:9px;border-radius:50%;background:var(--sage)}.safety-item.review .safety-dot{background:var(--amber)}.safety-item.real .safety-dot{background:var(--red)}.safety-item p{margin:7px 0 0;color:var(--muted);font-size:13px;line-height:1.45}.quick-actions{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:10px 0 2px}.quick-card{min-height:118px;padding:17px;border:1px solid var(--line);background:var(--panel);text-decoration:none}.quick-card:hover{border-color:var(--line-2);background:#28211b}.quick-card span{display:block;color:#bea37d;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}.quick-card strong{display:block;margin-top:10px;font:18px/1.25 Prata,serif}.quick-card small{display:block;margin-top:7px;color:var(--quiet);line-height:1.4}.search-wrap{position:sticky;top:76px;z-index:10;padding:18px 0;background:linear-gradient(var(--bg) 75%,transparent)}.search-tools{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}.search{width:100%;height:56px;padding:0 18px;border:1px solid var(--line-2);border-radius:0;background:var(--panel);color:var(--text);font-size:16px}.search::placeholder{color:var(--quiet)}.expand-all{min-height:56px;padding:0 17px;border:1px solid var(--line-2);background:var(--panel);color:var(--text)}.topic-filters{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}.topic-filter{min-height:36px;padding:6px 12px;border:1px solid var(--line);background:transparent;color:var(--muted);font-size:13px}.topic-filter[aria-pressed=true]{border-color:var(--paper);background:var(--paper);color:var(--ink)}.search-meta{display:flex;justify-content:space-between;gap:12px;margin-top:7px;color:var(--quiet);font-size:12px}.layout{display:grid;grid-template-columns:250px minmax(0,1fr);gap:24px}.toc{position:sticky;top:207px;align-self:start;border:1px solid var(--line);padding:18px}.toc strong{display:block;margin-bottom:10px;font-size:12px;letter-spacing:.12em;text-transform:uppercase}.toc a{display:block;padding:8px 0;border-top:1px solid #382f27;color:var(--muted);font-size:14px;text-decoration:none}.toc a:hover{color:var(--text)}.guides{display:grid;gap:14px}.guide{border:1px solid var(--line);background:var(--panel);scroll-margin-top:209px}.guide[hidden]{display:none}.guide summary{position:relative;display:grid;grid-template-columns:40px minmax(0,1fr) auto;align-items:center;gap:16px;min-height:76px;padding:15px 20px;cursor:pointer;list-style:none}.guide summary::-webkit-details-marker{display:none}.guide summary::after{content:'+';color:var(--amber);font-size:25px;font-weight:300}.guide[open] summary::after{content:'−'}.guide__number{color:#c2a77f;font:19px Prata,serif}.guide__title{display:block;margin:0;font:21px/1.3 Prata,serif}.guide__lead{display:block;margin-top:4px;color:var(--quiet);font-size:13px}.guide__body{padding:0 76px 27px;border-top:1px solid var(--line)}.guide h3{margin:24px 0 8px;font-size:16px}.guide p{margin:9px 0;color:var(--muted)}.guide ul,.guide ol{margin:10px 0;padding-left:22px;color:var(--muted)}.guide li{margin:6px 0}.guide b,.guide strong{color:var(--text)}.note{margin:18px 0;padding:13px 15px;border-left:3px solid var(--amber);background:#251d14}.note.safe{border-left-color:var(--sage);background:#1b2119}.note.danger{border-left-color:var(--red);background:#281a17}.steps{counter-reset:step;list-style:none!important;padding:0!important}.steps li{counter-increment:step;display:grid;grid-template-columns:30px 1fr;gap:10px}.steps li::before{content:counter(step);width:25px;height:25px;display:grid;place-items:center;border:1px solid var(--line-2);color:var(--paper);font-size:12px}.flow{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:18px 0}.flow span{position:relative;min-height:78px;padding:13px;border:1px solid var(--line);background:#1a1714;color:var(--muted);font-size:12px}.flow b{display:block;margin-bottom:5px}.done{margin:18px 0;padding:13px 15px;border:1px solid #4e6249;background:#1b2119}.done::before{content:'Готово, когда: ';color:#b8c9ae;font-weight:700}.action-link{display:inline-flex;min-height:44px;align-items:center;margin:8px 8px 0 0;padding:8px 13px;border:1px solid var(--line-2);color:var(--text);font-weight:600;text-decoration:none}.action-link:hover{background:var(--paper);color:var(--ink)}.empty{padding:55px 20px;border:1px solid var(--line);text-align:center;color:var(--muted)}
+    @media(max-width:800px){.topbar__in,main{width:100%}.topbar__in{padding:8px 14px 0;flex-wrap:wrap}.brand{border:0;padding:0}.nav{order:3;width:calc(100% + 28px);margin:0 -14px;overflow-x:auto;border-top:1px solid var(--line)}.nav a{min-width:90px;min-height:50px;padding:0 10px}.logout{margin-left:auto}.hero{grid-template-columns:1fr;border-left:0;border-right:0}.hero__copy{padding:32px 18px}.hero__aside{padding:23px 18px;border:0;border-top:1px solid var(--line)}.safety-legend{grid-template-columns:1fr;margin:14px;border-left:1px solid var(--line);border-right:1px solid var(--line)}.safety-item{min-height:auto;border-right:0;border-bottom:1px solid var(--line)}.safety-item:last-child{border-bottom:0}.quick-actions{grid-template-columns:1fr 1fr;margin:14px}.quick-card{min-height:108px}.search-wrap{top:112px;padding:12px 14px}.search-tools{grid-template-columns:1fr}.expand-all{min-height:46px}.topic-filters{overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px}.topic-filter{flex:0 0 auto}.layout{grid-template-columns:1fr}.toc{display:none}.guides{gap:10px}.guide{border-left:0;border-right:0;scroll-margin-top:315px}.guide summary{grid-template-columns:30px minmax(0,1fr) auto;padding:15px 16px}.guide__title{font-size:19px}.guide__body{padding:0 18px 23px}.hero h1{font-size:45px}.flow{grid-template-columns:1fr 1fr}}
+    @media(max-width:460px){.quick-actions,.flow{grid-template-columns:1fr}.quick-card{min-height:auto}}
     @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important}}
+    code{padding:2px 5px;background:#17130f;color:#dcc29a;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9em}.search-wrap{background:var(--bg)}
   </style>
 </head>
 <body>
-  <header class="topbar"><div class="topbar__in">
-    <a class="brand" href="/manage"><img src="/img/logo-mark.webp" alt=""><span><strong>Чайня</strong><small>база знаний</small></span></a>
-    <nav class="nav" aria-label="Разделы панели"><a href="/manage">Обзор</a><a href="/manage/catalog">Каталог</a><a href="/manage/site">Сайт</a><a href="/manage/guides" aria-current="page">Гайды</a><a href="/" target="_blank" rel="noopener">Магазин</a></nav>
+  <header class="topbar">
+<div class="topbar__in">
+    <a class="brand" href="/manage">
+<img src="/img/logo-mark.webp" alt="">
+<span>
+<strong>Чайня</strong>
+<small>база знаний</small>
+</span>
+</a>
+    <nav class="nav" aria-label="Разделы панели">
+<a href="/manage">Обзор</a>
+<a href="/manage/catalog">Каталог</a>
+<a href="/manage/site">Сайт</a>
+<a href="/manage/guides" aria-current="page">Гайды</a>
+<a href="/" target="_blank" rel="noopener">Магазин</a>
+</nav>
     <button class="logout" id="logout" type="button">Выйти</button>
-  </div></header>
+  </div>
+</header>
   <main>
-    <section class="hero"><div class="hero__copy"><span class="eyebrow">Рабочая инструкция</span><h1>Гайды</h1><p>Как управлять заказами, бронями, каталогом и интеграциями без разработчика — и где остановиться, чтобы не провести реальную операцию дважды.</p></div><aside class="hero__aside"><strong>Главное правило</strong><p>Сначала проверьте статус и сохраните копию. Денежные операции, возвраты и создание отправлений нельзя использовать как тестовые кнопки.</p></aside></section>
-    <div class="search-wrap"><label><span style="position:absolute;clip-path:inset(50%)">Поиск по гайдам</span><input class="search" id="guide-search" type="search" placeholder="Найти: новый товар, возврат, СБИС, бронь…" autocomplete="off"></label></div>
+    <section class="hero">
+<div class="hero__copy">
+<span class="eyebrow">Рабочая инструкция</span>
+<h1>Гайды</h1>
+<p>Как управлять заказами, бронями, каталогом и интеграциями самостоятельно — с понятными шагами, критериями готовности и границами безопасных и реальных операций.</p>
+</div>
+<aside class="hero__aside">
+<strong>Сначала найдите заказ</strong>
+<p>Любая операция с деньгами, чеком или доставкой начинается с карточки конкретного заказа. Не используйте повторное нажатие как способ «проверить, заработало ли».</p>
+</aside>
+</section>
+    <section class="safety-legend" aria-label="Уровни безопасности действий">
+<div class="safety-item">
+<div class="safety-item__label">
+<span class="safety-dot">
+</span>Можно самостоятельно</div>
+<p>Поиск, фильтры, просмотр статуса, сверка каталога и предпросмотр ничего не записывают во внешние системы.</p>
+</div>
+<div class="safety-item review">
+<div class="safety-item__label">
+<span class="safety-dot">
+</span>Проверьте результат</div>
+<p>Публикация, смена статуса и отмена брони меняют сайт. После действия убедитесь, что карточка и витрина обновились.</p>
+</div>
+<div class="safety-item real">
+<div class="safety-item__label">
+<span class="safety-dot">
+</span>Реальная операция</div>
+<p>Возврат денег, чек Saby и отправление СДЭК нельзя повторять при неизвестном результате.</p>
+</div>
+</section>
+    <nav class="quick-actions" aria-label="Популярные действия">
+<a class="quick-card" href="/manage/promos">
+<span>Скидки</span>
+<strong>Создать промокод</strong>
+<small>Настроить процент, срок и минимальную сумму</small>
+</a>
+<a class="quick-card" href="#bookings">
+<span>Брони</span>
+<strong>Отменить бронь</strong>
+<small>Освободить время и сохранить историю</small>
+</a>
+<a class="quick-card" href="/manage/catalog">
+<span>Каталог</span>
+<strong>Добавить товар</strong>
+<small>Чай, посуда, фото и публикация</small>
+</a>
+<a class="quick-card" href="#leads">
+<span>Для бизнеса</span>
+<strong>Обработать заявку</strong>
+<small>Связаться и зафиксировать следующий шаг</small>
+</a>
+<a class="quick-card" href="#emergency">
+<span>Срочно</span>
+<strong>Разобрать ошибку</strong>
+<small>Что сохранить и когда остановиться</small>
+</a>
+</nav>
+    <div class="search-wrap">
+<div class="search-tools">
+<label>
+<span style="position:absolute;clip-path:inset(50%)">Поиск по гайдам</span>
+<input class="search" id="guide-search" type="search" placeholder="Найти: промокод, новый товар, СБИС, бронь…" autocomplete="off">
+</label>
+<button class="expand-all" id="expand-all" type="button">Показать все</button>
+</div>
+<div class="topic-filters" role="group" aria-label="Темы гайдов">
+<button class="topic-filter" type="button" data-topic="all" aria-pressed="true">Все</button>
+<button class="topic-filter" type="button" data-topic="daily" aria-pressed="false">Каждый день</button>
+<button class="topic-filter" type="button" data-topic="sales" aria-pressed="false">Продажи</button>
+<button class="topic-filter" type="button" data-topic="content" aria-pressed="false">Сайт и каталог</button>
+<button class="topic-filter" type="button" data-topic="integrations" aria-pressed="false">Интеграции</button>
+<button class="topic-filter" type="button" data-topic="safety" aria-pressed="false">Ошибки и безопасность</button>
+</div>
+<div class="search-meta">
+<span id="search-result" role="status" aria-live="polite">Все инструкции</span>
+<span>Esc — очистить поиск</span>
+</div>
+</div>
     <div class="layout">
-      <nav class="toc" aria-label="Оглавление"><strong>Оглавление</strong><a href="#daily">Начало дня</a><a href="#orders">Заказы</a><a href="#bookings">Брони</a><a href="#catalog">Каталог</a><a href="#site">Сайт</a><a href="#saby">СБИС</a><a href="#payments">Оплата</a><a href="#cdek">Доставка</a><a href="#backup">Копии</a><a href="#faq">Частые вопросы</a></nav>
+      <nav class="toc" aria-label="Оглавление">
+<strong>Оглавление</strong>
+<a href="#daily">Начало дня</a>
+<a href="#orders">Заказы</a>
+<a href="#bookings">Брони</a>
+<a href="#leads">B2B-заявки</a>
+<a href="#promos">Промокоды</a>
+<a href="#catalog">Каталог</a>
+<a href="#site">Сайт</a>
+<a href="#saby">СБИС</a>
+<a href="#payments">Оплата</a>
+<a href="#cdek">Доставка</a>
+<a href="#backup">Копии</a>
+<a href="#emergency">Если ошибка</a>
+<a href="#faq">Словарь статусов</a>
+</nav>
       <section class="guides" id="guides">
-        <details class="guide" id="daily" open data-search="начало дня проверка обзор очередь система"><summary><span class="guide__number">01</span><span><strong class="guide__title">Начало рабочего дня</strong><small class="guide__lead">Что посмотреть за две минуты</small></span></summary><div class="guide__body"><ol class="steps"><li>Откройте «Обзор» и проверьте очередь: новые заказы, брони и заявки B2B.</li><li>Посмотрите блок состояния систем. Жёлтый статус означает «нужно проверить», красный — «не продолжать операцию вслепую».</li><li>Если есть предупреждение сверки СБИС, откройте его и прочитайте объяснение по конкретному товару.</li><li>Обработайте новые брони и только затем заказы, которые уже получили подтверждённую оплату.</li></ol><div class="note safe"><b>Безопасно:</b> просмотр данных, фильтры, поиск, скачивание копии каталога и сверка СБИС работают без изменения кассы.</div></div></details>
-        <details class="guide" id="orders" data-search="заказы статусы оплата сборка отправка завершен отмена"><summary><span class="guide__number">02</span><span><strong class="guide__title">Заказы</strong><small class="guide__lead">От заявки до выдачи покупателю</small></span></summary><div class="guide__body"><h3>Последовательность</h3><ol class="steps"><li>Откройте заказ и убедитесь, что оплата подтверждена системой, а не только словами покупателя.</li><li>Проверьте состав, вес, способ получения, телефон и комментарий.</li><li>Меняйте статус по факту: «Собирается», «Передан в доставку», «Завершён».</li><li>Если интеграция показывает ошибку, не создавайте вторую операцию вручную до проверки первой.</li></ol><div class="note danger"><b>Важно:</b> возврат — реальная денежная операция. Нажимайте его только для конкретного оплаченного заказа и после решения владельца.</div></div></details>
-        <details class="guide" id="bookings" data-search="брони бронь стол время два часа блокировка гости церемония"><summary><span class="guide__number">03</span><span><strong class="guide__title">Брони и занятость стола</strong><small class="guide__lead">Как не принять две компании на одно время</small></span></summary><div class="guide__body"><p>Одна заявка занимает единственный стол на два часа. После успешной отправки выбранное время и пересекающиеся интервалы становятся недоступны для новых гостей.</p><ul><li>Новая бронь приходит в рабочую панель и в Telegram-уведомление.</li><li>Свяжитесь с гостем и подтвердите заявку.</li><li>Если зал закрыт или время занято вручную, используйте блокировку времени с понятной причиной.</li><li>Отменённый интервал снова освобождается только после корректной смены статуса.</li></ul></div></details>
-        <details class="guide" id="catalog" data-search="каталог товар добавить фото описание цена наличие языки маркировка публикация черновик посуда галерея"><summary><span class="guide__number">04</span><span><strong class="guide__title">Каталог сайта</strong><small class="guide__lead">Создание и публикация карточки</small></span></summary><div class="guide__body"><ol class="steps"><li>Нажмите «Добавить товар» и сразу выберите «Чай» или «Посуда». Черновик из сверки СБИС сначала попросит проверить этот выбор.</li><li>Для чая панель автоматически использует цену за 10 г, маркировку и вкусовой профиль. Для посуды — поштучную цену, материал, размеры, мастерскую и рекомендации по уходу.</li><li>Выберите подраздел. Для чайника уточнение «исинский», «цзяньшуйский», «гуанси», «фарфор» или «керамика» можно указать в подзаголовке.</li><li>Добавьте до восьми фотографий. До сохранения проверьте очередь выбранных файлов; после сохранения можно выбрать главную фотографию и изменить порядок стрелками.</li><li>Проверьте предпросмотр, цену, наличие и переключатель «Показывать на сайте».</li><li>Заполняйте языки и характеристики по мере готовности. Счётчик на языковой вкладке показывает, сколько полей осталось; предупреждения не блокируют публикацию.</li></ol><div class="note"><b>Публикация происходит сразу:</b> достаточны цена выше нуля, постоянный ID и название хотя бы на одном языке. Настоящее фото, описания и переводы настоятельно рекомендуются, но обычная карточка может быть сохранена и дополнена позже. На пустом языке витрина временно покажет доступный перевод. Перед массовой правкой скачайте копию.</div></div></details>
-        <details class="guide" id="saby" data-search="сбис saby касса retail прайс лист основной каталог товары сверка связать импорт офд чек полный расчет"><summary><span class="guide__number">05</span><span><strong class="guide__title">СБИС: каталог и чеки покупок</strong><small class="guide__lead">Один чек, продажа и складской учёт</small></span></summary><div class="guide__body"><h3>Почему числа товаров могут не совпадать</h3><p><b>«В прайс-листе сайта»</b> — позиции, доступные интеграции интернет-магазина. <b>«В основном каталоге»</b> — более широкий справочник СБИС: там могут быть услуги, временно снятые позиции и товары других прайс-листов.</p><p>Сверка читает оба списка, но создать черновик сайта можно только из позиции прайс-листа сайта. Позиция вне него показывается отдельно и не считается поломкой интеграции.</p><ol class="steps"><li>Откройте «Каталог» → «Открыть сверку СБИС».</li><li>Для новой позиции прайс-листа нажмите «Открыть скрытый черновик».</li><li>Если написано «Вне прайс-листа сайта», владелец сначала добавляет нужный товар в прайс-лист сайта внутри СБИС.</li><li>Запустите сверку снова, дополните карточку и опубликуйте вручную.</li></ol><h3>Один чек интернет-заказа</h3><ol class="steps"><li>После подтверждённой оплаты сайт один раз запрашивает в Saby продажу и чек «полный расчёт».</li><li>Успех подтверждается только настоящим фискальным признаком; одного ответа API или доступного каталога недостаточно.</li><li>После подтверждённого чека проверьте, что товар списался со склада.</li><li>Возврат выполняйте только штатной кнопкой полного возврата заказа.</li></ol><div class="note danger"><b>Если написано «нужна проверка», не повторяйте операцию.</b> Сохраните время и номер заказа, проверьте журнал Saby и передайте данные поддержке или разработчику. Новый чек разрешён только после письменного подтверждения результата исходного запроса.</div><h3>Можно ли обойтись без Delivery</h3><p>Да. Текущий маршрут должен передавать подтверждённую Т‑Банком оплату в API кассовой продажи Saby, где ожидаются продажа, фискальный чек и складское списание. Последние контрольные оплаты Saby не подтвердил, поэтому до успешного контрольного чека этот контур нельзя считать полностью проверенным. Эту схему нельзя включать поверх онлайн-чека Т‑Банка.</p><div class="note safe"><b>Текущий аварийный режим:</b> владелец разрешил продолжать принимать оплаты, даже если результат Saby неизвестен. Такой заказ останется видимым для ручной сверки и никогда не будет отправлен повторно автоматически. Владелец должен вручную обработать каждый новый инцидент; число таких заказов система сейчас не ограничивает.</div><div class="note safe"><b>Сверка каталога работает только на чтение:</b> она не меняет цены, остатки или карточки внутри СБИС.</div></div></details>
-        <details class="guide" id="payments" data-search="т банк тбанк оплата платеж возврат частичный чек статус callback webhook восстановить резерв остаток"><summary><span class="guide__number">06</span><span><strong class="guide__title">Оплата через Т-Банк</strong><small class="guide__lead">Что означает подтверждённый платёж</small></span></summary><div class="guide__body"><p>Перед открытием оплаты сайт читает фактический остаток Saby и резервирует нужное количество на 15 минут. Оплата одностадийная: после страницы банка и успешного callback Т‑Банк сразу подтверждает списание. Локальный резерв защищает остаток сайта, но не заменяет последующую регистрацию продажи и списание в Saby.</p><ul><li>«Оплата подтверждена» означает, что Т‑Банк подтвердил списание.</li><li>«Товар зарезервирован» — покупатель ещё оплачивает заказ; этот остаток временно нельзя продать второй раз.</li><li>«Резерв до списания Saby» — деньги уже получены, но склад Saby ещё не показал уменьшение остатка.</li><li>«Остаток Saby обновлён» — склад отразил продажу, дополнительный локальный резерв больше не нужен.</li><li>«Резерв истёк» или «Резерв освобождён» — товар снова доступен; покупателю нужно начать оформление заново.</li><li>«Резерв: нужна проверка» — строки одного заказа находятся в разных состояниях; не исправляйте остаток вручную до сверки.</li><li>После оплаты отдельно проверьте состояние чека и продажи Saby.</li><li>Не меняйте неоплаченный заказ на «Оплачен» ради теста.</li><li>Если показано «нужна проверка», сначала нажмите «Проверить оплату»: это только чтение Т‑Банка.</li><li>Если после проверки появилась кнопка «Восстановить статус», нажмите её повторно только для этого заказа. Она не создаёт новый платёж или возврат, а переносит уже подтверждённый банковский статус в рабочую очередь.</li><li>Подтверждение оплаты не отменяет неопределённый возврат. Такой возврат считается завершённым только при статусе `REFUNDED` от банка.</li><li>«Частичный возврат: нужна сверка» означает, что банк вернул только часть суммы. Сайт не создаёт чек возврата и не меняет склад автоматически, пока владелец не подтвердит точную сумму и состав возвращённых позиций.</li></ul><div class="note danger"><b>Возврат и повторный платёж нельзя тестировать на реальном заказе.</b></div></div></details>
-        <details class="guide" id="cdek" data-search="сдэк cdek доставка пункт выдачи отправление накладная"><summary><span class="guide__number">07</span><span><strong class="guide__title">Доставка СДЭК</strong><small class="guide__lead">Расчёт и создание отправления</small></span></summary><div class="guide__body"><p>Поиск пункта выдачи и расчёт стоимости ничего не создают во внешней системе. Создание отправления — отдельная реальная запись.</p><ul><li>Проверьте город, пункт выдачи, получателя, телефон, вес и состав заказа.</li><li>Создавайте отправление один раз только после оплаты.</li><li>При неясном ответе не повторяйте запрос: сначала проверьте, не появилась ли накладная.</li></ul></div></details>
-        <details class="guide" id="backup" data-search="резервная копия backup откат история восстановить каталог"><summary><span class="guide__number">08</span><span><strong class="guide__title">Резервные копии и откат</strong><small class="guide__lead">Как исправить ошибку без потери данных</small></span></summary><div class="guide__body"><ul><li>Перед большой правкой каталога нажмите «Скачать копию».</li><li>«История изменений» помогает понять, что и когда менялось, но не заменяет резервную копию.</li><li>Серверные копии создаются отдельно; самостоятельно удалять файлы и базы на сервере нельзя.</li><li>Если после сохранения результат неверный, скройте товар, прекратите дальнейшие правки и передайте разработчику время и название позиции.</li></ul></div></details>
-        <details class="guide" id="faq" data-search="частые вопросы faq не видно товар цена отличается нет оплаты слот недоступен ошибка остаток резерв смена pending ofd чек авторизация ккт"><summary><span class="guide__number">09</span><span><strong class="guide__title">Частые вопросы</strong><small class="guide__lead">Короткие ответы на типовые ситуации</small></span></summary><div class="guide__body"><h3>Товар есть в СБИС, но его нет в сверке новых</h3><p>Проверьте строку «в основном каталоге» и пометку «вне прайс-листа». Скорее всего, товар не добавлен в прайс-лист сайта.</p><h3>Цена на сайте отличается</h3><p>Сначала проверьте единицу: цена за 1 г в СБИС сравнивается с ценой за 10 г на сайте. Не исправляйте цену, пока не сверена единица продажи.</p><h3>Товар сохранён, но не виден покупателям</h3><p>Проверьте переключатель публикации, наличие и цену. Пустые языки и маркировка теперь только помечаются предупреждением и не скрывают товар.</p><h3>Оплата есть в банке, но заказ не обновился</h3><p>Не создавайте заказ заново. Сохраните номер заказа и операции, обновите панель и передайте их разработчику.</p><h3>Почему проверка не подтверждает ККТ</h3><p>Сервисный OAuth приложения проверяет Retail API и компанию. Документированный список физических касс относится к отдельному OFD API с другой авторизацией. Поэтому админ-панель честно показывает, что ККТ нужно проверить отдельно, а не выдаёт HTTP 403 за отсутствие прав приложения. Это ограничение диагностики не разрешает повторять продажу по уже оплаченному заказу.</p><h3>Чек Saby принят, но ожидает кассу или ОФД</h3><p>Это не ошибка оплаты: Saby уже выдал идентификатор операции, но фискальный признак ещё не появился. Сайт проверяет только этот идентификатор чтением и не создаёт продажу повторно. Через 24 часа без результата заказ перейдёт в ручную сверку.</p><h3>Почему остаток СБИС не уменьшился сразу после оплаты</h3><p>При чеке «полный расчёт» Saby может отразить складское списание после закрытия кассовой смены. До этого сайт удерживает локальный резерв оплаченного товара и не предлагает его повторно как свободный остаток.</p><h3>Время брони зачёркнуто</h3><p>Оно пересекается с другой бронью, ручной блокировкой или уже прошло.</p><h3>Когда нужен разработчик</h3><p>При повторяющейся ошибке интеграции, неизвестном результате денежной операции, пропаже данных или необходимости отката.</p></div></details>
-        <details class="guide" id="site" data-search="сайт партнёры партнеры для бизнеса добавить скрыть порядок языки"><summary><span class="guide__number">10</span><span><strong class="guide__title">Партнёры на сайте</strong><small class="guide__lead">Редактирование без нового релиза</small></span></summary><div class="guide__body"><ol class="steps"><li>Откройте «Сайт» → «Добавить партнёра». Новая запись сначала скрыта.</li><li>Заполните название хотя бы на одном языке. Короткая подпись объясняет сферу сотрудничества: например, «Винодельня».</li><li>Переключитесь между русским, английским и китайским. Незаполненные поля останутся в напоминаниях, но не заблокируют публикацию.</li><li>Включите «Показывать на сайте» и сохраните. Результат сразу появится в блоке страницы «Для бизнеса».</li><li>Стрелками в списке измените порядок. Если сотрудничество больше не нужно показывать, выключите публикацию вместо удаления.</li></ol><div class="note"><b>Почему нет удаления:</b> скрытая запись не видна посетителям, но остаётся в истории и резервной копии. Это позволяет безопасно вернуть партнёра без повторного ввода данных.</div></div></details>
+        <details class="guide" id="daily" open data-topic="daily safety" data-search="начало дня проверка обзор очередь система">
+<summary>
+<span class="guide__number">01</span>
+<span>
+<strong class="guide__title">Начало рабочего дня</strong>
+<small class="guide__lead">Что посмотреть за две минуты</small>
+</span>
+</summary>
+<div class="guide__body">
+<ol class="steps">
+<li>Откройте «Обзор» и проверьте очередь: новые заказы, брони и заявки B2B.</li>
+<li>Посмотрите блок состояния систем. Жёлтый статус означает «нужно проверить», красный — «не продолжать операцию вслепую».</li>
+<li>Если есть предупреждение сверки СБИС, откройте его и прочитайте объяснение по конкретному товару.</li>
+<li>Обработайте новые брони и только затем заказы, которые уже получили подтверждённую оплату.</li>
+</ol>
+<div class="note safe">
+<b>Безопасно:</b> просмотр данных, фильтры, поиск, скачивание копии каталога и сверка СБИС работают без изменения кассы.</div>
+<div class="done">в очереди не осталось непросмотренных новых обращений, а красные предупреждения либо разобраны, либо переданы ответственному без повторной операции.</div>
+<a class="action-link" href="/manage?view=overview">Открыть обзор</a>
+</div>
+</details>
+        <details class="guide" id="orders" data-topic="daily sales" data-search="заказы статусы оплата сборка отправка завершен отмена">
+<summary>
+<span class="guide__number">02</span>
+<span>
+<strong class="guide__title">Заказы</strong>
+<small class="guide__lead">От заявки до выдачи покупателю</small>
+</span>
+</summary>
+<div class="guide__body">
+<h3>Последовательность</h3>
+<ol class="steps">
+<li>Откройте заказ и убедитесь, что оплата подтверждена системой, а не только словами покупателя.</li>
+<li>Проверьте состав, вес, способ получения, телефон и комментарий.</li>
+<li>Меняйте статус по факту: «Собирается», «Передан в доставку», «Завершён».</li>
+<li>Если интеграция показывает ошибку, не создавайте вторую операцию вручную до проверки первой.</li>
+</ol>
+<div class="note danger">
+<b>Важно:</b> возврат — реальная денежная операция. Нажимайте его только для конкретного оплаченного заказа и после решения владельца.</div>
+<div class="done">состав собран, способ получения проверен, а статус карточки совпадает с тем, что фактически произошло.</div>
+<a class="action-link" href="/manage?view=orders">Открыть заказы</a>
+</div>
+</details>
+        <details class="guide" id="bookings" data-topic="daily sales" data-search="брони бронь стол время два часа блокировка гости церемония отменить освободить">
+<summary>
+<span class="guide__number">03</span>
+<span>
+<strong class="guide__title">Брони и занятость стола</strong>
+<small class="guide__lead">Как не принять две компании на одно время</small>
+</span>
+</summary>
+<div class="guide__body">
+<p>Одна новая или подтверждённая заявка занимает единственный стол на два часа. Бронь на 13:00 закрывает пересекающиеся старты до 14:30; следующий свободный старт — 15:00. Сервер повторно проверяет пересечение при сохранении.</p>
+<h3>Подтвердить бронь</h3>
+<ol class="steps">
+<li>Найдите новую бронь по имени, телефону или номеру.</li>
+<li>Свяжитесь с гостем и уточните дату, время, число гостей и формат.</li>
+<li>Выберите статус «Подтверждена» и сохраните.</li>
+<li>После визита установите «Завершена»: этот статус освобождает интервал, но сохраняет запись.</li>
+</ol>
+<h3>Отменить бронь</h3>
+<ol class="steps">
+<li>Откройте именно нужную карточку и нажмите отдельную кнопку «Отменить бронь».</li>
+<li>В подтверждении ещё раз проверьте имя, дату и время.</li>
+<li>После отмены обновите список: карточка должна получить статус «Отменена», а время — сразу вернуться на сайт и в бот.</li>
+</ol>
+<div class="note"><b>Закрыть зал без брони:</b> в разделе «Брони» задайте начало и конец ручной блокировки. Удаление блокировки снова открывает время. Причина видна только владельцу.</div>
+<div class="done">статус карточки соответствует договорённости с гостем, а нужный интервал занят или освобождён на публичном календаре.</div>
+<a class="action-link" href="/manage?view=bookings">Открыть брони</a>
+</div>
+</details>
+        <details class="guide" id="leads" data-topic="daily sales" data-search="b2b лид заявка бизнес опт мероприятие компания связаться партнёрство">
+<summary><span class="guide__number">04</span><span><strong class="guide__title">B2B-заявки</strong><small class="guide__lead">Не потерять обращение от компании</small></span></summary>
+<div class="guide__body">
+<div class="flow" aria-label="Путь B2B-заявки"><span><b>Новая</b>Проверить контакт и задачу</span><span><b>В работе</b>Связаться и договориться о следующем шаге</span><span><b>Завершена</b>Зафиксировать обработанный результат</span><span><b>Отказ</b>Закрыть неактуальное обращение</span></div>
+<ol class="steps">
+<li>Откройте карточку и проверьте компанию, контакт и комментарий.</li>
+<li>Свяжитесь удобным для клиента способом. Не копируйте персональные данные в общие чаты.</li>
+<li>После первого контакта смените статус на «В работе», чтобы заявка не оставалась в новой очереди.</li>
+<li>Когда вопрос решён, выберите итоговый статус. Карточка останется в истории и будет доступна через поиск.</li>
+</ol>
+<div class="done">у заявки есть актуальный статус, ответственный понимает следующий шаг, а контакт не потерян.</div>
+<a class="action-link" href="/manage?view=leads">Открыть B2B-заявки</a>
+</div>
+</details>
+        <details class="guide" id="promos" data-topic="sales" data-search="промокод промокоды скидка процент срок минимальная сумма включить выключить купон">
+<summary>
+<span class="guide__number">04</span>
+<span>
+<strong class="guide__title">Промокоды</strong>
+<small class="guide__lead">Создать скидку и не ошибиться в условиях</small>
+</span>
+</summary>
+<div class="guide__body">
+<div class="flow" aria-label="Путь промокода">
+<span>
+<b>1. Код</b>Введите короткое название или сгенерируйте его</span>
+<span>
+<b>2. Условия</b>Выберите процент, минимум и срок</span>
+<span>
+<b>3. Проверка</b>Прочитайте пример скидки до сохранения</span>
+<span>
+<b>4. Запуск</b>Включите код и отправьте покупателю</span>
+</div>
+<ol class="steps">
+<li>Откройте «Промокоды» и создайте код. Допустимы латинские буквы, цифры и дефис; покупателю регистр вводить необязательно.</li>
+<li>Укажите скидку. Она применяется только к товарам — стоимость доставки не уменьшается.</li>
+<li>Минимальная сумма считается по товарам до скидки. Ноль означает, что ограничения нет.</li>
+<li>Если акция временная, задайте дату окончания по московскому времени. После неё код сохранится в истории со статусом «Истёк».</li>
+<li>Перед сохранением прочитайте блок «Что увидит покупатель». В нём показаны условия и пример расчёта.</li>
+<li>После запуска скопируйте код из списка. При необходимости его можно мгновенно выключить без удаления истории применений.</li>
+</ol>
+<div class="note safe">
+<b>Безопасно:</b> создание промокода не меняет цены каталога и ничего не записывает в Т‑Банк, Saby или CDEK. Скидка рассчитывается сервером при оформлении заказа.</div>
+<div class="note">
+<b>Проверка результата:</b> добавьте товар в корзину, примените код и убедитесь, что видны скидка и новый итог. Реальную оплату для проверки интерфейса проводить не нужно.</div>
+<div class="done">код показан как действующий, условия в предпросмотре верны, а корзина принимает его без оплаты.</div>
+<a class="action-link" href="/manage/promos">Открыть промокоды</a>
+<a class="action-link" href="/shop" target="_blank" rel="noopener">Открыть магазин</a>
+</div>
+</details>
+        <details class="guide" id="catalog" data-topic="content" data-search="каталог товар добавить фото описание цена наличие языки маркировка публикация черновик посуда галерея">
+<summary>
+<span class="guide__number">05</span>
+<span>
+<strong class="guide__title">Каталог сайта</strong>
+<small class="guide__lead">Создание и публикация карточки</small>
+</span>
+</summary>
+<div class="guide__body">
+<ol class="steps">
+<li>Нажмите «Добавить товар» и сразу выберите «Чай» или «Посуда». Черновик из сверки СБИС сначала попросит проверить этот выбор.</li>
+<li>Для чая панель автоматически использует цену за 10 г, маркировку и вкусовой профиль. Для посуды — поштучную цену, материал, размеры, мастерскую и рекомендации по уходу.</li>
+<li>Выберите подраздел. Для чайника уточнение «исинский», «цзяньшуйский», «гуанси», «фарфор» или «керамика» можно указать в подзаголовке.</li>
+<li>Добавьте до восьми фотографий. До сохранения проверьте очередь выбранных файлов; после сохранения можно выбрать главную фотографию и изменить порядок стрелками.</li>
+<li>Проверьте предпросмотр, цену, наличие и переключатель «Показывать на сайте».</li>
+<li>Заполняйте языки и характеристики по мере готовности. Счётчик на языковой вкладке показывает, сколько полей осталось; предупреждения не блокируют публикацию.</li>
+</ol>
+<div class="note">
+<b>Публикация происходит сразу:</b> достаточны цена выше нуля, постоянный ID и название хотя бы на одном языке. Настоящее фото, описания и переводы настоятельно рекомендуются, но обычная карточка может быть сохранена и дополнена позже. На пустом языке витрина временно покажет доступный перевод. Перед массовой правкой скачайте копию.</div>
+<div class="done">карточка сохранена без ошибки, её видимость выбрана осознанно, а опубликованный товар проверен на своей странице и в нужном разделе витрины.</div>
+<a class="action-link" href="/manage/catalog">Открыть каталог</a>
+</div>
+</details>
+        <details class="guide" id="site" data-topic="content" data-search="сайт партнёры партнеры для бизнеса добавить скрыть порядок языки">
+<summary>
+<span class="guide__number">07</span>
+<span>
+<strong class="guide__title">Партнёры на сайте</strong>
+<small class="guide__lead">Редактирование без нового релиза</small>
+</span>
+</summary>
+<div class="guide__body">
+<ol class="steps">
+<li>Откройте «Сайт» → «Добавить партнёра». Новая запись сначала скрыта.</li>
+<li>Заполните название хотя бы на одном языке. Короткая подпись объясняет сферу сотрудничества: например, «Винодельня».</li>
+<li>Переключитесь между русским, английским и китайским. Незаполненные поля останутся в напоминаниях, но не заблокируют публикацию.</li>
+<li>Включите «Показывать на сайте» и сохраните. Результат сразу появится в блоке страницы «Для бизнеса».</li>
+<li>Стрелками в списке измените порядок. Если сотрудничество больше не нужно показывать, выключите публикацию вместо удаления.</li>
+</ol>
+<div class="note"><b>Почему нет удаления:</b> скрытая запись не видна посетителям, но остаётся в истории и резервной копии. Это позволяет безопасно вернуть партнёра без повторного ввода данных.</div>
+<div class="done">название и подпись проверены на опубликованных языках, логотип читается на тёмном фоне, а порядок совпадает с задачей бизнеса.</div>
+<a class="action-link" href="/manage/site">Открыть управление сайтом</a>
+</div>
+</details>
+        <details class="guide" id="saby" data-topic="integrations safety" data-search="сбис saby касса retail прайс лист основной каталог товары сверка связать импорт офд чек полный расчет">
+<summary>
+<span class="guide__number">05</span>
+<span>
+<strong class="guide__title">СБИС: каталог и чеки покупок</strong>
+<small class="guide__lead">Один чек, продажа и складской учёт</small>
+</span>
+</summary>
+<div class="guide__body">
+<h3>Почему числа товаров могут не совпадать</h3>
+<p>
+<b>«В прайс-листе сайта»</b> — позиции, доступные интеграции интернет-магазина. <b>«В основном каталоге»</b> — более широкий справочник СБИС: там могут быть услуги, временно снятые позиции и товары других прайс-листов.</p>
+<p>Сверка читает оба списка, но создать черновик сайта можно только из позиции прайс-листа сайта. Позиция вне него показывается отдельно и не считается поломкой интеграции.</p>
+<ol class="steps">
+<li>Откройте «Каталог» → «Открыть сверку СБИС».</li>
+<li>Для новой позиции прайс-листа нажмите «Открыть скрытый черновик».</li>
+<li>Если написано «Вне прайс-листа сайта», владелец сначала добавляет нужный товар в прайс-лист сайта внутри СБИС.</li>
+<li>Запустите сверку снова, дополните карточку и опубликуйте вручную.</li>
+</ol>
+<h3>Один чек интернет-заказа</h3>
+<ol class="steps">
+<li>После подтверждённой оплаты сайт один раз запрашивает в Saby продажу и чек «полный расчёт».</li>
+<li>Успех подтверждается только настоящим фискальным признаком; одного ответа API или доступного каталога недостаточно.</li>
+<li>После подтверждённого чека проверьте, что товар списался со склада.</li>
+<li>Возврат выполняйте только штатной кнопкой полного возврата заказа.</li>
+</ol>
+<div class="note danger">
+<b>Если написано «нужна проверка», не повторяйте операцию.</b> Сохраните время и номер заказа, проверьте журнал Saby и передайте данные поддержке или разработчику. Новый чек разрешён только после письменного подтверждения результата исходного запроса.</div>
+<h3>Можно ли обойтись без Delivery</h3>
+<p>Технически возможны разные маршруты, но рабочий маршрут определяется конфигурацией сервера. Не выбирайте его по памяти из гайда: смотрите живой статус интеграций в «Обзоре». Фискальный маршрут Saby нельзя одновременно включать с онлайн-чеком Т‑Банка, иначе одна оплата рискует получить два чека.</p>
+<div class="note">
+<b>Статус важнее инструкции:</b> зелёная доступность каталога подтверждает только чтение Saby. Готовность физической кассы, право записи и успешный фискальный чек подтверждаются отдельно. Пока живой статус не подтверждает контрольный чек, контур нельзя считать полностью проверенным. Если панель пишет «не проверено» или «нужна сверка», это не зелёный статус.</div>
+<div class="note danger">
+<b>Не повторяйте неопределённую продажу.</b> Заказ со статусом `ambiguous` штатно заблокирован от повторной отправки. Решение принимается только после сверки по времени и сумме в Saby.</div>
+<div class="note safe">
+<b>Сверка каталога работает только на чтение:</b> она не меняет цены, остатки или карточки внутри СБИС.</div>
+<div class="done">сверка объяснена по каждой позиции, а у оплаченного заказа отдельно подтверждены банк, чек и склад — либо явно назначена ручная сверка.</div>
+<a class="action-link" href="/manage?view=overview">Открыть состояние Saby</a>
+</div>
+</details>
+        <details class="guide" id="payments" data-topic="sales integrations safety" data-search="т банк тбанк оплата платеж возврат частичный чек статус callback webhook восстановить резерв остаток">
+<summary>
+<span class="guide__number">06</span>
+<span>
+<strong class="guide__title">Оплата через Т-Банк</strong>
+<small class="guide__lead">Что означает подтверждённый платёж</small>
+</span>
+</summary>
+<div class="guide__body">
+<p>Когда в «Обзоре» включён боевой фискальный маршрут и контроль остатка готов, сайт перед созданием платежа читает физический остаток Saby и резервирует нужное количество на 15 минут. Оплата одностадийная: после страницы банка и подписанного callback Т‑Банк подтверждает списание. Локальный резерв защищает доступное количество сайта, но не заменяет чек и складское списание Saby.</p>
+<ul>
+<li>«Оплата подтверждена» означает, что Т‑Банк подтвердил списание.</li>
+<li>«Товар зарезервирован» — покупатель ещё оплачивает заказ; этот остаток временно нельзя продать второй раз.</li>
+<li>«Резерв до списания Saby» — деньги уже получены, но склад Saby ещё не показал уменьшение остатка.</li>
+<li>«Остаток Saby обновлён» — склад отразил продажу, дополнительный локальный резерв больше не нужен.</li>
+<li>«Резерв истёк» или «Резерв освобождён» — товар снова доступен; покупателю нужно начать оформление заново.</li>
+<li>«Резерв: нужна проверка» — строки одного заказа находятся в разных состояниях; не исправляйте остаток вручную до сверки.</li>
+<li>После оплаты отдельно проверьте состояние чека и продажи Saby.</li>
+<li>Не меняйте неоплаченный заказ на «Оплачен» ради теста.</li>
+<li>Если показано «нужна проверка», сначала нажмите «Проверить оплату»: это только чтение Т‑Банка.</li>
+<li>Если после проверки появилась кнопка «Восстановить статус», нажмите её повторно только для этого заказа. Она не создаёт новый платёж или возврат, а переносит уже подтверждённый банковский статус в рабочую очередь.</li>
+<li>Подтверждение оплаты не отменяет неопределённый возврат. Такой возврат считается завершённым только при статусе `REFUNDED` от банка.</li>
+<li>«Частичный возврат: нужна сверка» означает, что банк вернул только часть суммы. Сайт не создаёт чек возврата и не меняет склад автоматически, пока владелец не подтвердит точную сумму и состав возвращённых позиций.</li>
+</ul>
+<div class="note danger">
+<b>Возврат и повторный платёж нельзя тестировать на реальном заказе.</b>
+</div>
+<div class="done">банк и локальный заказ показывают согласованный статус, а состояние чека и резерва разобрано отдельно.</div>
+<a class="action-link" href="/manage?view=orders">Открыть заказы</a>
+</div>
+</details>
+        <details class="guide" id="cdek" data-topic="sales integrations safety" data-search="сдэк cdek доставка пункт выдачи отправление накладная">
+<summary>
+<span class="guide__number">07</span>
+<span>
+<strong class="guide__title">Доставка СДЭК</strong>
+<small class="guide__lead">Расчёт и создание отправления</small>
+</span>
+</summary>
+<div class="guide__body">
+<p>Поиск пункта выдачи и расчёт стоимости ничего не создают во внешней системе. Создание отправления — отдельная реальная запись.</p>
+<ul>
+<li>Проверьте город, пункт выдачи, получателя, телефон, вес и состав заказа.</li>
+<li>Создавайте отправление один раз только после оплаты.</li>
+<li>При неясном ответе не повторяйте запрос: сначала проверьте, не появилась ли накладная.</li>
+</ul>
+<div class="done">у оплаченного заказа создано не более одного отправления, а номер и пункт выдачи совпадают с карточкой.</div>
+<a class="action-link" href="/manage?view=orders">Открыть заказы с доставкой</a>
+</div>
+</details>
+        <details class="guide" id="backup" data-topic="content safety" data-search="резервная копия backup откат история восстановить каталог">
+<summary>
+<span class="guide__number">08</span>
+<span>
+<strong class="guide__title">Резервные копии и откат</strong>
+<small class="guide__lead">Как исправить ошибку без потери данных</small>
+</span>
+</summary>
+<div class="guide__body">
+<ul>
+<li>Перед большой правкой каталога нажмите «Скачать копию».</li>
+<li>«История изменений» помогает понять, что и когда менялось, но не заменяет резервную копию.</li>
+<li>Серверные копии создаются отдельно; самостоятельно удалять файлы и базы на сервере нельзя.</li>
+<li>Если после сохранения результат неверный, скройте товар, прекратите дальнейшие правки и передайте разработчику время и название позиции.</li>
+</ul>
+<div class="done">копия скачана до большой правки, а при ошибке дальнейшие изменения остановлены до выбора точки восстановления.</div>
+<a class="action-link" href="/manage/catalog">Открыть копии и историю</a>
+</div>
+</details>
+        <details class="guide" id="emergency" data-topic="safety integrations" data-search="ошибка срочно авария неизвестно ambiguous 500 не повторять оплата чек доставка откат">
+<summary><span class="guide__number">12</span><span><strong class="guide__title">Если что-то пошло не так</strong><small class="guide__lead">Короткий алгоритм без опасных повторов</small></span></summary>
+<div class="guide__body">
+<div class="flow" aria-label="Алгоритм при ошибке"><span><b>1. Стоп</b>Не нажимайте действие повторно</span><span><b>2. Факты</b>Запишите номер, время и видимый статус</span><span><b>3. Проверка</b>Используйте только read-only кнопку</span><span><b>4. Передача</b>Отправьте факты без данных клиента</span></div>
+<h3>Деньги списались, а заказ не обновился</h3>
+<p>Найдите исходный заказ и используйте «Проверить оплату». Это чтение статуса банка. Если затем панель предложит «Восстановить статус», действие обновит существующий заказ и не создаст новый платёж.</p>
+<h3>Saby вернул 500, `ambiguous` или «нужна сверка»</h3>
+<p>Не запускайте продажу повторно и не создавайте второй чек вручную до сверки исходной операции. Сохраните номер заказа, московское время, сумму и безопасный correlation ID из панели.</p>
+<h3>СДЭК не подтвердил отправление</h3>
+<p>Не нажимайте «Создать» повторно. Сначала проверьте, не появилась ли накладная по заказу во внешнем кабинете.</p>
+<h3>После правки пропала или испортилась карточка</h3>
+<p>Скройте только затронутый товар, не продолжайте массовую правку и сохраните время изменения. История помогает найти событие, а скачанная копия — восстановить данные.</p>
+<div class="note danger"><b>Никогда не отправляйте в поддержку:</b> пароль панели, токены, ключи API, полные данные карты или содержимое серверного env. Для диагностики достаточно номера заказа, времени, суммы, безопасного статуса и correlation ID.</div>
+<div class="done">исходная операция не продублирована, факты сохранены, а дальнейшее действие назначено конкретному ответственному.</div>
+</div>
+</details>
+        <details class="guide" id="faq" data-topic="safety daily" data-search="частые вопросы faq словарь статусы не видно товар цена отличается нет оплаты слот недоступен ошибка остаток резерв смена pending ofd чек авторизация ккт">
+<summary>
+<span class="guide__number">09</span>
+<span>
+<strong class="guide__title">Частые вопросы и словарь статусов</strong>
+<small class="guide__lead">Что означает надпись и что делать дальше</small>
+</span>
+</summary>
+<div class="guide__body">
+<h3>Товар есть в СБИС, но его нет в сверке новых</h3>
+<p>Проверьте строку «в основном каталоге» и пометку «вне прайс-листа». Скорее всего, товар не добавлен в прайс-лист сайта.</p>
+<h3>Цена на сайте отличается</h3>
+<p>Сначала проверьте единицу: цена за 1 г в СБИС сравнивается с ценой за 10 г на сайте. Не исправляйте цену, пока не сверена единица продажи.</p>
+<h3>Товар сохранён, но не виден покупателям</h3>
+<p>Проверьте переключатель публикации, наличие и цену. Пустые языки и маркировка теперь только помечаются предупреждением и не скрывают товар.</p>
+<h3>Оплата есть в банке, но заказ не обновился</h3>
+<p>Не создавайте заказ заново. Сохраните номер заказа и операции, обновите панель и передайте их разработчику.</p>
+<h3>Почему проверка не подтверждает ККТ</h3>
+<p>Сервисный OAuth приложения проверяет Retail API и компанию. Документированный список физических касс относится к отдельному OFD API с другой авторизацией. Поэтому админ-панель честно показывает, что ККТ нужно проверить отдельно, а не выдаёт HTTP 403 за отсутствие прав приложения. Это ограничение диагностики не разрешает повторять продажу по уже оплаченному заказу.</p>
+<h3>Чек Saby принят, но ожидает кассу или ОФД</h3>
+<p>Это не ошибка оплаты: Saby уже выдал идентификатор операции, но фискальный признак ещё не появился. Сайт проверяет только этот идентификатор чтением и не создаёт продажу повторно. Через 24 часа без результата заказ перейдёт в ручную сверку.</p>
+<h3><code>pending_ofd</code></h3>
+<p>Продажа получила известный идентификатор чека, но фискальный признак ещё не подтверждён. Разрешена только проверка уже известного чека; новый запрос продажи не нужен.</p>
+<h3><code>ambiguous</code></h3>
+<p>Внешняя система могла принять операцию, но безопасного доказательства результата нет. Автоматический повтор заблокирован; требуется ручная сверка.</p>
+<h3>«Сверка скрыта»</h3>
+<p>Предупреждение признано неактуальным для текущей работы. Оно остаётся в истории и появится снова, если фактические данные изменятся.</p>
+<h3>Почему остаток СБИС не уменьшился сразу после оплаты</h3>
+<p>При чеке «полный расчёт» Saby может отразить складское списание после закрытия кассовой смены. До этого сайт удерживает локальный резерв оплаченного товара и не предлагает его повторно как свободный остаток.</p>
+<h3>Время брони зачёркнуто</h3>
+<p>Оно пересекается с другой бронью, ручной блокировкой или уже прошло.</p>
+<h3>Когда нужен разработчик</h3>
+<p>При повторяющейся ошибке интеграции, неизвестном результате денежной операции, пропаже данных или необходимости отката.</p>
+</div>
+</details>
         <div class="empty" id="empty" hidden>Ничего не найдено. Попробуйте более короткий запрос.</div>
       </section>
     </div>
   </main>
   <script>
-    const search=document.querySelector('#guide-search'),guides=[...document.querySelectorAll('.guide')],empty=document.querySelector('#empty');
-    search.addEventListener('input',()=>{const query=search.value.trim().toLocaleLowerCase('ru');let visible=0;guides.forEach(guide=>{const match=!query||(guide.dataset.search+' '+guide.textContent).toLocaleLowerCase('ru').includes(query);guide.hidden=!match;if(match)visible++});empty.hidden=visible!==0});
+    const search=document.querySelector('#guide-search'),guides=[...document.querySelectorAll('.guide')],empty=document.querySelector('#empty'),result=document.querySelector('#search-result'),expand=document.querySelector('#expand-all'),topicButtons=[...document.querySelectorAll('.topic-filter')];let activeTopic='all';guides.forEach((guide,index)=>guide.querySelector('.guide__number').textContent=String(index+1).padStart(2,'0'));
+    function updateExpand(){const visible=guides.filter(guide=>!guide.hidden),allOpen=visible.length>0&&visible.every(guide=>guide.open);expand.textContent=allOpen?'Свернуть все':'Показать все';expand.setAttribute('aria-expanded',String(allOpen))}
+    function filterGuides(){const query=search.value.trim().toLocaleLowerCase('ru');let visible=0;guides.forEach(guide=>{const textMatch=!query||(guide.dataset.search+' '+guide.textContent).toLocaleLowerCase('ru').includes(query),topicMatch=activeTopic==='all'||guide.dataset.topic.split(' ').includes(activeTopic),match=textMatch&&topicMatch;guide.hidden=!match;if(match){visible++;if(query.length>=2)guide.open=true}});empty.hidden=visible!==0;const topicLabel=topicButtons.find(button=>button.dataset.topic===activeTopic)?.textContent||'Все';result.textContent=query?`Найдено: ${visible} · ${topicLabel}`:activeTopic==='all'?'Все инструкции':`${topicLabel} · ${visible}`;updateExpand()}
+    function setTopic(topic){activeTopic=topic;topicButtons.forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.topic===topic)));filterGuides()}
+    function revealHash(){const target=location.hash&&document.querySelector(location.hash);if(target?.classList.contains('guide')){if(target.hidden)setTopic('all');target.hidden=false;target.open=true;requestAnimationFrame(()=>target.scrollIntoView({block:'start'}));updateExpand()}}
+    search.addEventListener('input',filterGuides);search.addEventListener('keydown',event=>{if(event.key==='Escape'){search.value='';filterGuides();search.blur()}});topicButtons.forEach(button=>button.addEventListener('click',()=>setTopic(button.dataset.topic)));expand.addEventListener('click',()=>{const visible=guides.filter(guide=>!guide.hidden),open=!visible.every(guide=>guide.open);visible.forEach(guide=>guide.open=open);updateExpand()});guides.forEach(guide=>guide.addEventListener('toggle',updateExpand));window.addEventListener('hashchange',revealHash);filterGuides();revealHash();
     document.querySelector('#logout').addEventListener('click',async()=>{await fetch('/api/admin/session',{method:'DELETE'});location.replace('/manage')});
   </script>
 </body>

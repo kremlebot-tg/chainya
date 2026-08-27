@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import pytest
@@ -248,21 +249,76 @@ def test_catalog_admin_links_to_the_correct_public_product_section():
 def test_owner_guides_are_searchable_private_help_without_dangerous_actions():
     assert '<meta name="robots" content="noindex,nofollow">' in ADMIN_GUIDES
     assert 'id="guide-search"' in ADMIN_GUIDES
+    assert 'id="expand-all"' in ADMIN_GUIDES
+    assert 'data-topic="daily"' in ADMIN_GUIDES
+    assert 'data-topic="integrations"' in ADMIN_GUIDES
+    assert 'id="leads"' in ADMIN_GUIDES
+    assert 'id="emergency"' in ADMIN_GUIDES
+    assert "Можно самостоятельно" in ADMIN_GUIDES
+    assert "Реальная операция" in ADMIN_GUIDES
+    assert "Готово, когда:" in ADMIN_GUIDES
+    assert 'id="promos"' in ADMIN_GUIDES
+    assert "Что увидит покупатель" in ADMIN_GUIDES
+    assert "Реальную оплату для проверки интерфейса проводить не нужно" in ADMIN_GUIDES
     assert "СБИС: каталог и чеки покупок" in ADMIN_GUIDES
     assert "Один чек интернет-заказа" in ADMIN_GUIDES
     assert "Один чек, продажа и складской учёт" in ADMIN_GUIDES
     assert "Успех подтверждается только настоящим фискальным признаком" in ADMIN_GUIDES
     assert "После подтверждённого чека проверьте, что товар списался" in ADMIN_GUIDES
     assert "Сверка каталога работает только на чтение" in ADMIN_GUIDES
-    assert "нельзя включать поверх онлайн-чека Т‑Банка" in ADMIN_GUIDES
+    assert "нельзя одновременно включать с онлайн-чеком Т‑Банка" in ADMIN_GUIDES
     assert "Создание отправления — отдельная реальная запись" in ADMIN_GUIDES
     assert "Оплата одностадийная" in ADMIN_GUIDES
-    assert "число таких заказов система сейчас не ограничивает" in ADMIN_GUIDES
+    assert "Текущий аварийный режим" not in ADMIN_GUIDES
+    assert "Статус важнее инструкции" in ADMIN_GUIDES
+    assert "Не повторяйте неопределённую продажу" in ADMIN_GUIDES
     assert "Банк сначала блокирует сумму" not in ADMIN_GUIDES
     assert "автоматически закрывает приём новых платежей" not in ADMIN_GUIDES
     assert "method:'DELETE'" in ADMIN_GUIDES
     assert "api/admin/refund" not in ADMIN_GUIDES
     assert "api/admin/cdek" not in ADMIN_GUIDES
+
+
+def test_owner_guides_link_to_precise_workspaces_and_explain_completion():
+    assert 'href="/manage?view=orders"' in ADMIN_GUIDES
+    assert 'href="/manage?view=bookings"' in ADMIN_GUIDES
+    assert 'href="/manage?view=leads"' in ADMIN_GUIDES
+    assert 'href="/manage/catalog"' in ADMIN_GUIDES
+    assert 'href="/manage/site"' in ADMIN_GUIDES
+    assert "Отменить бронь" in ADMIN_GUIDES
+    assert "время — сразу вернуться на сайт и в бот" in ADMIN_GUIDES
+    assert "короткий алгоритм без опасных повторов".capitalize() in ADMIN_GUIDES
+    assert "пароль панели, токены, ключи API" in ADMIN_GUIDES
+
+
+def test_admin_supports_direct_links_to_owner_workspaces():
+    assert "new URLSearchParams(location.search).get('view')" in ADMIN_SOURCE
+    assert "const allowed=['overview','orders','bookings','leads']" in ADMIN_SOURCE
+    assert "showView(requestedView||'overview',{updateUrl:false})" in ADMIN_SOURCE
+    assert "`/manage?view=${encodeURIComponent(view)}`" in ADMIN_SOURCE
+
+
+def test_owner_guides_have_complete_unique_navigation_and_topics():
+    guide_ids = re.findall(r'<details class="guide" id="([^"]+)"', ADMIN_GUIDES)
+    assert len(guide_ids) == len(set(guide_ids)) >= 13
+    toc_targets = re.findall(r'<a href="#([^"]+)">', ADMIN_GUIDES)
+    assert set(toc_targets) == set(guide_ids)
+    guide_tags = re.findall(r'<details class="guide"[^>]+>', ADMIN_GUIDES)
+    assert all('data-topic="' in tag and 'data-search="' in tag for tag in guide_tags)
+    topics = set(re.findall(r'data-topic="([a-z]+)" aria-pressed=', ADMIN_GUIDES))
+    assert topics == {"all", "daily", "sales", "content", "integrations", "safety"}
+    assert "topicButtons.forEach(button=>button.addEventListener('click'" in ADMIN_GUIDES
+
+
+def test_promo_admin_explains_effect_before_save_and_filters_history():
+    promo_admin = (ADMIN_PATH.parent / "admin-promos.html").read_text(encoding="utf-8")
+    assert 'id="preview-title"' in promo_admin
+    assert 'id="preview-example"' in promo_admin
+    assert 'id="generate"' in promo_admin
+    assert 'data-filter="working"' in promo_admin
+    assert 'data-filter="expired"' in promo_admin
+    assert "Доставка оплачивается отдельно" in promo_admin
+    assert 'href="/manage/guides#promos"' in promo_admin
 
 
 def test_admin_surfaces_saby_order_readiness_on_every_view():

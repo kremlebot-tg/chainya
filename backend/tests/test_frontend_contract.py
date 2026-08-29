@@ -319,6 +319,16 @@ def test_promo_admin_explains_effect_before_save_and_filters_history():
     assert 'data-filter="expired"' in promo_admin
     assert "Доставка оплачивается отдельно" in promo_admin
     assert 'href="/manage/guides#promos"' in promo_admin
+    assert 'href="/manage/promos" aria-current="page"' in promo_admin
+    assert 'id="logout"' in promo_admin
+    assert "function confirmPromoDiscard()" in promo_admin
+    assert "addEventListener('beforeunload'" in promo_admin
+
+
+def test_admin_secondary_pages_share_promo_navigation():
+    for source in (ADMIN_CATALOG, ADMIN_SITE, ADMIN_GUIDES):
+        assert 'href="/manage/promos"' in source
+    assert "if (!confirmDiscard()) return;" in ADMIN_CATALOG_JS
 
 
 def test_admin_surfaces_saby_order_readiness_on_every_view():
@@ -335,7 +345,9 @@ def test_admin_surfaces_saby_order_readiness_on_every_view():
     assert "Передача покупки в Saby безопасно заблокирована" in ADMIN_SOURCE
     assert "Заказы не передаются в Saby" in ADMIN_SOURCE
     assert "X-Chainya-Admin':'saby-readiness'" in ADMIN_SOURCE
-    assert "loadSabyReadiness(true)" in ADMIN_SOURCE
+    assert "loadSabyReadiness(true)" not in ADMIN_SOURCE
+    assert "Live-проверка Saby не запускалась" in ADMIN_SOURCE
+    assert "button.onclick=()=>loadSabyReadiness(false,button)" in ADMIN_SOURCE
     assert "sabyReadiness?.fiscal_probe" in ADMIN_SOURCE
     assert "Кассовый контур Saby требует настройки" in ADMIN_SOURCE
     assert "company_not_found" in ADMIN_SOURCE

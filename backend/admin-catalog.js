@@ -1621,7 +1621,11 @@ for (const dialog of $$('dialog')) {
   dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
 }
 $('#reload').onclick = () => { if (confirmDiscard()) { loadCatalog(true); loadSabyStat(); } };
-$('#logout').onclick = async () => { await fetch('/api/admin/session', {method: 'DELETE'}); location.replace('/manage'); };
+$('#logout').onclick = async () => {
+  if (!confirmDiscard()) return;
+  await fetch('/api/admin/session', {method: 'DELETE'});
+  location.replace('/manage');
+};
 addEventListener('beforeunload', event => {
   if (dirty) { event.preventDefault(); event.returnValue = ''; }
 });

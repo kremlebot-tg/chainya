@@ -14,6 +14,8 @@ const HISTORY_ACTIONS = {
   create: 'Добавлен товар', update: 'Изменена карточка', reorder: 'Изменён порядок',
   image: 'Обновлено фото', image_add: 'Добавлено фото',
   image_primary: 'Выбрано главное фото', image_remove: 'Фото убрано из карточки',
+  category_create: 'Добавлена категория', category_update: 'Изменена категория',
+  category_delete: 'Удалена категория', category_reorder: 'Изменён порядок категорий',
 };
 const CYRILLIC_SLUG = {
   а:'a',б:'b',в:'v',г:'g',д:'d',е:'e',ё:'e',ж:'zh',з:'z',и:'i',й:'i',к:'k',л:'l',
@@ -62,6 +64,7 @@ let pendingImages = [];
 let pendingImageUrls = [];
 let sabyReview = null;
 let pendingSabyItem = null;
+let editingCategoryId = '';
 
 function toast(message) {
   const box = $('#toast');
@@ -289,6 +292,20 @@ function suggestedId(value) {
     if (!used.has(candidate)) return candidate;
   }
   return `${base.slice(0, 65)}-${Date.now().toString(36)}`;
+}
+
+function suggestedCategoryId(value) {
+  const base = [...String(value).trim().toLocaleLowerCase('ru')]
+    .map(char => CYRILLIC_SLUG[char] ?? char).join('')
+    .normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 36) || 'new-category';
+  const used = new Set(catalog.types.map(item => item.id));
+  if (!used.has(base)) return base;
+  for (let number = 2; number < 1000; number += 1) {
+    const candidate = `${base.slice(0, 36 - String(number).length)}-${number}`;
+    if (!used.has(candidate)) return candidate;
+  }
+  return `${base.slice(0, 28)}-${Date.now().toString(36)}`;
 }
 
 function confirmDiscard() {
@@ -1236,6 +1253,7 @@ function downloadCatalog() {
   if (!catalog) return;
   const snapshot = clone(catalog);
   snapshot.teas.forEach(item => { delete item.image_url; delete item.image_urls; });
+  snapshot.types.forEach(item => { delete item.system; });
   const blob = new Blob([JSON.stringify(snapshot, null, 2) + '\n'], {type: 'application/json'});
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -1247,6 +1265,192 @@ function downloadCatalog() {
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 0);
   toast('Копия каталога скачана.');
+}
+
+function categoryProductCount(typeId) {
+  return catalog.teas.filter(item => item.type === typeId).length;
+}
+
+function applyCategoryCatalog(next, message) {
+  catalog = next;
+  if (selectedId) {
+    const current = catalog.teas.find(item => item.id === selectedId);
+    draft = current ? clone(current) : null;
+    if (!current) selectedId = '';
+  }
+  updateState();
+  renderList();
+  renderEditor();
+  renderCategoryList();
+  if (message) toast(message);
+}
+
+function renderCategoryList() {
+  const root = $('#category-list');
+  if (!catalog) return;
+  root.replaceChildren();
+  for (const [group, heading] of [['tea', 'Чай'], ['teaware', 'Посуда']]) {
+    const categories = catalog.types.filter(item => item.group === group);
+    const section = document.createElement('section');
+    section.className = 'category-group';
+    const title = document.createElement('h3');
+    title.className = 'category-group__title';
+    title.textContent = `${heading} · ${categories.length}`;
+    section.append(title);
+    categories.forEach((category, index) => {
+      const count = categoryProductCount(category.id);
+      const row = document.createElement('div');
+      row.className = 'category-row';
+      const copy = document.createElement('div');
+      const name = document.createElement('span');
+      name.className = 'category-row__name';
+      name.textContent = category.names?.ru || category.name;
+      const meta = document.createElement('span');
+      meta.className = 'category-row__meta';
+      const translations = [category.names?.en, category.names?.zh].filter(Boolean).join(' · ');
+      meta.textContent = `${count} ${count === 1 ? 'товар' : count > 1 && count < 5 ? 'товара' : 'товаров'}${translations ? ` · ${translations}` : ''}`;
+      copy.append(name, meta);
+      const actions = document.createElement('div');
+      actions.className = 'category-row__actions';
+      const order = document.createElement('span');
+      order.className = 'category-order';
+      [['↑', -1], ['↓', 1]].forEach(([label, direction]) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'move';
+        button.textContent = label;
+        button.setAttribute('aria-label', `${direction < 0 ? 'Поднять' : 'Опустить'} категорию ${name.textContent}`);
+        button.disabled = index + direction < 0 || index + direction >= categories.length;
+        button.onclick = () => moveCategory(category.id, direction);
+        order.append(button);
+      });
+      const edit = document.createElement('button');
+      edit.type = 'button';
+      edit.className = 'btn';
+      edit.textContent = 'Изменить';
+      edit.setAttribute('aria-label', `Изменить категорию ${name.textContent}`);
+      edit.onclick = () => editCategory(category.id);
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'btn';
+      remove.textContent = 'Удалить';
+      remove.setAttribute('aria-label', `Удалить категорию ${name.textContent}`);
+      remove.disabled = category.system || count > 0;
+      remove.title = category.system
+        ? 'Базовую категорию можно переименовать, но нельзя удалить'
+        : count > 0 ? 'Сначала перенесите товары в другую категорию' : '';
+      remove.onclick = () => deleteCategory(category.id);
+      actions.append(order, edit, remove);
+      row.append(copy, actions);
+      section.append(row);
+    });
+    root.append(section);
+  }
+}
+
+function showCategories() {
+  if (dirty) {
+    toast('Сначала сохраните или отмените изменения в открытой карточке товара.');
+    return;
+  }
+  editingCategoryId = '';
+  $('#category-form').hidden = true;
+  $('#category-error').hidden = true;
+  renderCategoryList();
+  $('#categories-dialog').showModal();
+}
+
+function editCategory(typeId = '') {
+  editingCategoryId = typeId;
+  const category = typeId ? typeInfo(typeId) : null;
+  const form = $('#category-form');
+  form.reset();
+  $('#category-form-title').textContent = category ? 'Изменить категорию' : 'Новая категория';
+  form.elements.group.value = category?.group || 'tea';
+  form.elements.group.disabled = Boolean(category && categoryProductCount(category.id) > 0);
+  form.elements.group.title = form.elements.group.disabled
+    ? 'Сначала перенесите товары в другую категорию' : '';
+  form.elements.ru.value = category?.names?.ru || category?.name || '';
+  form.elements.en.value = category?.names?.en || '';
+  form.elements.zh.value = category?.names?.zh || '';
+  form.elements.id.value = category?.id || '';
+  form.elements.id.disabled = Boolean(category);
+  form.elements.id.dataset.auto = category ? 'false' : 'true';
+  $('#category-error').hidden = true;
+  form.hidden = false;
+  requestAnimationFrame(() => form.elements.ru.focus());
+}
+
+async function saveCategory(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const ru = form.elements.ru.value.trim();
+  const categoryId = form.elements.id.value.trim() || suggestedCategoryId(ru);
+  const item = {
+    id: categoryId,
+    group: form.elements.group.value,
+    name: ru,
+    names: {
+      ru,
+      en: form.elements.en.value.trim(),
+      zh: form.elements.zh.value.trim(),
+    },
+  };
+  const submit = form.querySelector('[type="submit"]');
+  const error = $('#category-error');
+  submit.disabled = true;
+  error.hidden = true;
+  try {
+    const response = await fetch(
+      editingCategoryId
+        ? `/api/admin/catalog/types/${encodeURIComponent(editingCategoryId)}`
+        : '/api/admin/catalog/types',
+      {
+        method: editingCategoryId ? 'PUT' : 'POST',
+        headers: headers(),
+        body: JSON.stringify({revision: catalog.revision, item}),
+      },
+    );
+    const next = await parseResponse(response);
+    editingCategoryId = item.id;
+    form.hidden = true;
+    applyCategoryCatalog(next, response.status === 201 ? 'Категория добавлена.' : 'Категория обновлена.');
+  } catch (failure) {
+    error.textContent = failure.message;
+    error.hidden = false;
+  } finally {
+    submit.disabled = false;
+  }
+}
+
+async function moveCategory(typeId, direction) {
+  const group = typeInfo(typeId)?.group;
+  const groupIds = catalog.types.filter(item => item.group === group).map(item => item.id);
+  const position = groupIds.indexOf(typeId);
+  const otherId = groupIds[position + direction];
+  if (!otherId) return;
+  const ids = catalog.types.map(item => item.id);
+  const first = ids.indexOf(typeId);
+  const second = ids.indexOf(otherId);
+  [ids[first], ids[second]] = [ids[second], ids[first]];
+  try {
+    const response = await fetch('/api/admin/catalog/type-order', {
+      method: 'PUT', headers: headers(), body: JSON.stringify({revision: catalog.revision, ids}),
+    });
+    applyCategoryCatalog(await parseResponse(response), 'Порядок категорий сохранён.');
+  } catch (error) { toast(error.message); }
+}
+
+async function deleteCategory(typeId) {
+  const category = typeInfo(typeId);
+  if (!category || !confirm(`Удалить пустую категорию «${category.name}»?`)) return;
+  try {
+    const response = await fetch(
+      `/api/admin/catalog/types/${encodeURIComponent(typeId)}?revision=${catalog.revision}`,
+      {method: 'DELETE', headers: headers(false)},
+    );
+    applyCategoryCatalog(await parseResponse(response), 'Пустая категория удалена.');
+  } catch (error) { toast(error.message); }
 }
 
 async function showHistory() {
@@ -1401,6 +1605,18 @@ $('#close-saby').onclick = () => $('#saby-dialog').close();
 $('#export-catalog').onclick = downloadCatalog;
 $('#show-history').onclick = showHistory;
 $('#close-history').onclick = () => $('#history-dialog').close();
+$('#manage-categories').onclick = showCategories;
+$('#close-categories').onclick = () => $('#categories-dialog').close();
+$('#add-category').onclick = () => editCategory();
+$('#cancel-category').onclick = () => { editingCategoryId = ''; $('#category-form').hidden = true; };
+$('#category-form').onsubmit = saveCategory;
+$('#category-form').elements.ru.addEventListener('input', event => {
+  const id = $('#category-form').elements.id;
+  if (id.dataset.auto === 'true') id.value = suggestedCategoryId(event.target.value);
+});
+$('#category-form').elements.id.addEventListener('input', event => {
+  event.target.dataset.auto = 'false';
+});
 for (const dialog of $$('dialog')) {
   dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
 }

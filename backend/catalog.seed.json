@@ -63,6 +63,16 @@
       }
     },
     {
+      "id": "yellow",
+      "name": "Жёлтый чай",
+      "group": "tea",
+      "names": {
+        "ru": "Жёлтый чай",
+        "en": "Yellow tea",
+        "zh": "黄茶"
+      }
+    },
+    {
       "id": "gaba",
       "name": "Габа",
       "group": "tea",
@@ -70,6 +80,16 @@
         "ru": "Габа",
         "en": "GABA",
         "zh": "佳叶龙茶"
+      }
+    },
+    {
+      "id": "taiwan",
+      "name": "Тайваньские улуны",
+      "group": "tea",
+      "names": {
+        "ru": "Тайваньские улуны",
+        "en": "Taiwanese oolong",
+        "zh": "台湾乌龙"
       }
     },
     {

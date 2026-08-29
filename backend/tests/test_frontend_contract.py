@@ -509,6 +509,35 @@ def test_catalog_supports_teaware_sections_and_multiple_product_photos():
     assert "foodTitle.dataset.i18n = infoTitleKey" in SOURCE
 
 
+def test_catalog_supports_owner_requested_tea_categories_without_empty_filters():
+    for category, ru, en, zh in (
+        ("yellow", "Жёлтый чай", "Yellow tea", "黄茶"),
+        ("taiwan", "Тайваньские улуны", "Taiwanese oolong", "台湾乌龙"),
+    ):
+        assert f"['{category}','tea','{ru}','{en}','{zh}']" in SOURCE
+        assert f"{category}:" in SOURCE
+    assert "type.group === catalogGroup && TEA_META.some(item => item.t === type.id)" in SOURCE
+    assert "catalog.types.forEach(type =>" in ADMIN_CATALOG_JS
+    assert "(groups[type.group] || groups.tea).append(option)" in ADMIN_CATALOG_JS
+
+
+def test_owner_can_manage_catalog_categories_from_admin_panel():
+    assert 'id="manage-categories"' in ADMIN_CATALOG
+    assert 'id="categories-dialog"' in ADMIN_CATALOG
+    assert 'id="category-form"' in ADMIN_CATALOG
+    assert 'id="add-category"' in ADMIN_CATALOG
+    assert "function renderCategoryList()" in ADMIN_CATALOG_JS
+    assert "async function saveCategory(event)" in ADMIN_CATALOG_JS
+    assert "async function moveCategory(typeId, direction)" in ADMIN_CATALOG_JS
+    assert "async function deleteCategory(typeId)" in ADMIN_CATALOG_JS
+    assert "'/api/admin/catalog/types'" in ADMIN_CATALOG_JS
+    assert "'/api/admin/catalog/type-order'" in ADMIN_CATALOG_JS
+    assert "remove.disabled = category.system || count > 0" in ADMIN_CATALOG_JS
+    assert "Сначала сохраните или отмените изменения" in ADMIN_CATALOG_JS
+    assert "snapshot.types.forEach(item => { delete item.system; })" in ADMIN_CATALOG_JS
+    assert "Если нужного подраздела нет" in ADMIN_GUIDES
+
+
 def test_admin_catalog_has_owner_safe_creation_filters_preview_and_photo_queue():
     assert 'id="group-filter"' in ADMIN_CATALOG
     assert 'id="kind-dialog"' in ADMIN_CATALOG

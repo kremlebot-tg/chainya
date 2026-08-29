@@ -2,7 +2,11 @@ from io import BytesIO
 
 from PIL import Image
 
-from backend.catalog_store import normalize_partner
+from backend.catalog_store import (
+    CATALOG_TYPE_DEFAULTS,
+    normalize_document,
+    normalize_partner,
+)
 from backend.tests.test_orders import app_client
 
 AUTH = {
@@ -13,6 +17,19 @@ SITE_AUTH = {
     "Authorization": "Bearer test-admin-token",
     "X-Chainya-Admin": "site",
 }
+
+
+def test_owner_requested_tea_categories_are_added_to_legacy_catalogs():
+    normalized = normalize_document({"types": [], "teas": []})
+    by_id = {item[0]: item for item in CATALOG_TYPE_DEFAULTS}
+    public_by_id = {item["id"]: item for item in normalized["types"]}
+
+    assert by_id["yellow"] == ("yellow", "tea", "Жёлтый чай", "Yellow tea", "黄茶")
+    assert by_id["taiwan"] == (
+        "taiwan", "tea", "Тайваньские улуны", "Taiwanese oolong", "台湾乌龙",
+    )
+    assert public_by_id["yellow"]["names"]["ru"] == "Жёлтый чай"
+    assert public_by_id["taiwan"]["names"]["en"] == "Taiwanese oolong"
 
 
 def test_legacy_partner_logo_paths_are_migrated_without_cache_collision():
@@ -214,6 +231,7 @@ def test_catalog_admin_create_update_reorder_and_conflict(tmp_path, monkeypatch)
         initial = initial_response.json()
         item = dict(initial["teas"][0])
         item["id"] = "new-safe-tea"
+        item["type"] = "yellow"
         item["published"] = True
         item["stock"] = True
         item["translations"] = {
@@ -270,6 +288,7 @@ def test_catalog_admin_create_update_reorder_and_conflict(tmp_path, monkeypatch)
     assert missing_csrf.status_code == 403
     assert created_response.status_code == 201
     public_item = next(tea for tea in public["teas"] if tea["id"] == "new-safe-tea")
+    assert public_item["type"] == "yellow"
     assert public_item["translations"]["ru"]["composition"] == "Чайный лист"
     assert public_item["translations"]["ru"]["manufacturer"] == "ИП Давтян А. К."
     assert public_item["translations"]["ru"]["shelf_life"] == "24 месяца"
@@ -288,6 +307,117 @@ def test_catalog_admin_create_update_reorder_and_conflict(tmp_path, monkeypatch)
     ]
     assert history.json()["history"][1]["item_name"] == "Новый чай"
     assert all("token" not in row for row in history.json()["history"])
+
+
+def test_owner_can_create_edit_reorder_and_delete_empty_category(tmp_path, monkeypatch):
+    client, _ = app_client(tmp_path, monkeypatch)
+    category = {
+        "id": "author-tea",
+        "group": "tea",
+        "name": "Авторский чай",
+        "names": {"ru": "Авторский чай", "en": "Signature tea", "zh": "特色茶"},
+    }
+    with client:
+        initial = client.get("/api/admin/catalog", headers=AUTH).json()
+        missing_marker = client.post(
+            "/api/admin/catalog/types",
+            headers={"Authorization": AUTH["Authorization"]},
+            json={"revision": initial["revision"], "item": category},
+        )
+        created_response = client.post(
+            "/api/admin/catalog/types",
+            headers=AUTH,
+            json={"revision": initial["revision"], "item": category},
+        )
+        created = created_response.json()
+        public = client.get("/api/catalog").json()
+        editable = next(item for item in created["types"] if item["id"] == "author-tea")
+        editable["names"]["ru"] = "Авторская коллекция"
+        editable["name"] = "Авторская коллекция"
+        updated_response = client.put(
+            "/api/admin/catalog/types/author-tea",
+            headers=AUTH,
+            json={"revision": created["revision"], "item": editable},
+        )
+        updated = updated_response.json()
+        ids = [item["id"] for item in updated["types"]]
+        ids.insert(0, ids.pop(ids.index("author-tea")))
+        reordered_response = client.put(
+            "/api/admin/catalog/type-order",
+            headers=AUTH,
+            json={"revision": updated["revision"], "ids": ids},
+        )
+        reordered = reordered_response.json()
+        builtin_delete = client.delete(
+            f"/api/admin/catalog/types/white?revision={reordered['revision']}",
+            headers=AUTH,
+        )
+        deleted_response = client.delete(
+            f"/api/admin/catalog/types/author-tea?revision={reordered['revision']}",
+            headers=AUTH,
+        )
+        history = client.get(
+            "/api/admin/catalog/history", params={"limit": 4}, headers=AUTH
+        ).json()["history"]
+
+    assert missing_marker.status_code == 403
+    assert created_response.status_code == 201
+    admin_category = next(item for item in created["types"] if item["id"] == "author-tea")
+    assert admin_category["system"] is False
+    public_category = next(item for item in public["types"] if item["id"] == "author-tea")
+    assert "system" not in public_category
+    assert public_category["names"]["zh"] == "特色茶"
+    assert updated_response.status_code == 200
+    assert next(item for item in updated["types"] if item["id"] == "author-tea")["name"] == "Авторская коллекция"
+    assert reordered_response.status_code == 200
+    assert reordered["types"][0]["id"] == "author-tea"
+    assert builtin_delete.status_code == 422
+    assert deleted_response.status_code == 200
+    assert all(item["id"] != "author-tea" for item in deleted_response.json()["types"])
+    assert [item["action"] for item in history] == [
+        "category_delete", "category_reorder", "category_update", "category_create",
+    ]
+
+
+def test_category_with_products_cannot_be_deleted_or_change_group(tmp_path, monkeypatch):
+    client, _ = app_client(tmp_path, monkeypatch)
+    category = {
+        "id": "limited-tea",
+        "group": "tea",
+        "name": "Лимитированный чай",
+        "names": {"ru": "Лимитированный чай", "en": "Limited tea", "zh": "限量茶"},
+    }
+    with client:
+        initial = client.get("/api/admin/catalog", headers=AUTH).json()
+        created = client.post(
+            "/api/admin/catalog/types",
+            headers=AUTH,
+            json={"revision": initial["revision"], "item": category},
+        ).json()
+        product = dict(created["teas"][0])
+        product["id"] = "limited-product"
+        product["type"] = "limited-tea"
+        product.pop("saby", None)
+        product_created = client.post(
+            "/api/admin/catalog/items",
+            headers=AUTH,
+            json={"revision": created["revision"], "item": product},
+        ).json()
+        category["group"] = "teaware"
+        changed_group = client.put(
+            "/api/admin/catalog/types/limited-tea",
+            headers=AUTH,
+            json={"revision": product_created["revision"], "item": category},
+        )
+        deleted = client.delete(
+            f"/api/admin/catalog/types/limited-tea?revision={product_created['revision']}",
+            headers=AUTH,
+        )
+
+    assert changed_group.status_code == 422
+    assert "перенесите товары" in changed_group.json()["detail"]
+    assert deleted.status_code == 422
+    assert "перенесите товары" in deleted.json()["detail"]
 
 
 def test_catalog_image_is_reencoded_and_served_immutably(tmp_path, monkeypatch):

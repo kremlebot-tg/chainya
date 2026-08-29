@@ -21,6 +21,7 @@ PARTNER_LOGO_RE = re.compile(r"^/img/partner-[a-z0-9-]{1,80}\.webp$")
 LANGUAGES = ("ru", "en", "zh")
 MAX_PRODUCT_IMAGES = 8
 MAX_PARTNERS = 30
+MAX_CATALOG_TYPES = 60
 LEGACY_PARTNER_LOGOS = {
     "/img/partner-rolf.webp": "/img/partner-rolf-wordmark.webp",
     "/img/partner-relikta.webp": "/img/partner-relikta-emblem.webp",
@@ -28,7 +29,9 @@ LEGACY_PARTNER_LOGOS = {
 CATALOG_TYPE_DEFAULTS = (
     ("white", "tea", "Белый чай", "White tea", "白茶"),
     ("green", "tea", "Зелёный чай", "Green tea", "绿茶"),
+    ("yellow", "tea", "Жёлтый чай", "Yellow tea", "黄茶"),
     ("gaba", "tea", "Габа", "GABA", "佳叶龙茶"),
+    ("taiwan", "tea", "Тайваньские улуны", "Taiwanese oolong", "台湾乌龙"),
     ("fujian", "tea", "Улуны Южной Фуцзяни", "Fujian oolong", "闽南乌龙"),
     ("dancong", "tea", "Улуны Гуандуна", "Guangdong oolong", "广东乌龙"),
     ("wuyi", "tea", "Улуны Уишаня", "Wuyi oolong", "武夷岩茶"),
@@ -47,6 +50,7 @@ CATALOG_TYPE_DEFAULTS = (
     ("teaware-tools", "teaware", "Инструменты", "Tea tools", "茶道工具"),
     ("teaware-sets", "teaware", "Наборы посуды", "Teaware sets", "茶具套装"),
 )
+BUILTIN_CATALOG_TYPE_IDS = frozenset(row[0] for row in CATALOG_TYPE_DEFAULTS)
 TASTE_AXES = (
     "floral", "fruity", "driedfruit", "honey", "nutty",
     "roasted", "spicy", "woody", "herbal",
@@ -305,6 +309,52 @@ def normalize_partner(raw: dict[str, Any], *, existing_id: str | None = None) ->
     }
 
 
+def normalize_catalog_type(
+    raw: dict[str, Any], *, existing_id: str | None = None
+) -> dict[str, Any]:
+    """Validate a category while keeping every public locale non-empty."""
+    if not isinstance(raw, dict):
+        raise CatalogError("Категория должна быть объектом")
+    type_id = _text(raw.get("id", existing_id or ""), "type.id", 40, required=True).lower()
+    if existing_id and type_id != existing_id:
+        raise CatalogError("Идентификатор существующей категории менять нельзя")
+    if not TYPE_ID_RE.fullmatch(type_id):
+        raise CatalogError("ID категории: латиница в нижнем регистре, цифры и дефисы")
+    defaults = {
+        default_id: {
+            "name": ru,
+            "group": group,
+            "names": {"ru": ru, "en": en, "zh": zh},
+        }
+        for default_id, group, ru, en, zh in CATALOG_TYPE_DEFAULTS
+    }
+    default = defaults.get(type_id, {})
+    group = _text(
+        raw.get("group", default.get("group", "tea")),
+        "type.group",
+        20,
+        required=True,
+    )
+    if group not in {"tea", "teaware"}:
+        raise CatalogError("Категория должна относиться к чаю или посуде")
+    names_raw = raw.get("names") if isinstance(raw.get("names"), dict) else {}
+    name = _text(
+        raw.get("name", names_raw.get("ru", default.get("name", ""))),
+        "type.name",
+        120,
+        required=True,
+    )
+    names = {}
+    for language in LANGUAGES:
+        candidate = names_raw.get(language, default.get("names", {}).get(language, name))
+        if not isinstance(candidate, str) or not candidate.strip():
+            candidate = default.get("names", {}).get(language, name)
+        names[language] = _text(
+            candidate, f"type.names.{language}", 120, required=True
+        )
+    return {"id": type_id, "name": names["ru"], "group": group, "names": names}
+
+
 def normalize_document(raw: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(raw, dict) or not isinstance(raw.get("teas"), list):
         raise CatalogError("В каталоге отсутствует список teas")
@@ -320,46 +370,24 @@ def normalize_document(raw: dict[str, Any]) -> dict[str, Any]:
     types = raw.get("types", [])
     if not isinstance(types, list):
         raise CatalogError("Некорректный список категорий")
+    if len(types) > MAX_CATALOG_TYPES:
+        raise CatalogError(f"Можно создать не более {MAX_CATALOG_TYPES} категорий")
     defaults = {
-        type_id: {
-            "id": type_id,
-            "name": ru,
-            "group": group,
-            "names": {"ru": ru, "en": en, "zh": zh},
-        }
-        for type_id, group, ru, en, zh in CATALOG_TYPE_DEFAULTS
+        type_id: normalize_catalog_type({"id": type_id})
+        for type_id, *_rest in CATALOG_TYPE_DEFAULTS
     }
-    clean_types = []
-    for entry in types:
-        if not isinstance(entry, dict):
-            raise CatalogError("Некорректная категория")
-        type_id = _text(entry.get("id", ""), "type.id", 40, required=True).lower()
-        if not TYPE_ID_RE.fullmatch(type_id):
-            raise CatalogError("Некорректный ID категории")
-        default = defaults.get(type_id, {})
-        group = _text(entry.get("group", default.get("group", "tea")), "type.group", 20, required=True)
-        if group not in {"tea", "teaware"}:
-            raise CatalogError("Некорректная группа категории")
-        names_raw = entry.get("names") if isinstance(entry.get("names"), dict) else {}
-        name = _text(entry.get("name", default.get("name", "")), "type.name", 120, required=True)
-        clean_types.append({
-            "id": type_id,
-            "name": name,
-            "group": group,
-            "names": {
-                language: _text(
-                    names_raw.get(language, default.get("names", {}).get(language, name)),
-                    f"type.names.{language}", 120, required=True,
-                )
-                for language in LANGUAGES
-            },
-        })
+    clean_types = [normalize_catalog_type(entry) for entry in types]
+    clean_type_ids = [entry["id"] for entry in clean_types]
+    if len(clean_type_ids) != len(set(clean_type_ids)):
+        raise CatalogError("ID категорий не должны повторяться")
     present_types = {entry["id"] for entry in clean_types}
     clean_types.extend(
         copy.deepcopy(defaults[type_id])
         for type_id, *_rest in CATALOG_TYPE_DEFAULTS
         if type_id not in present_types
     )
+    if len(clean_types) > MAX_CATALOG_TYPES:
+        raise CatalogError(f"Можно создать не более {MAX_CATALOG_TYPES} категорий")
     known_types = {entry["id"] for entry in clean_types}
     missing = sorted({item["type"] for item in teas} - known_types)
     if missing:
@@ -569,6 +597,63 @@ class CatalogStore:
             if len(item_ids) != len(set(item_ids)) or set(item_ids) != set(current):
                 raise CatalogError("Порядок должен содержать каждый товар ровно один раз")
             document["teas"] = [current[item_id] for item_id in item_ids]
+            return self._finish(document)
+
+    def create_type(self, raw: dict[str, Any], revision: int) -> dict[str, Any]:
+        with self._lock:
+            document = self.get()
+            self._require_revision(document, revision)
+            category = normalize_catalog_type(raw)
+            if any(current["id"] == category["id"] for current in document["types"]):
+                raise CatalogError("Категория с таким ID уже существует")
+            if len(document["types"]) >= MAX_CATALOG_TYPES:
+                raise CatalogError(f"Можно создать не более {MAX_CATALOG_TYPES} категорий")
+            document["types"].append(category)
+            return self._finish(document)
+
+    def update_type(
+        self, type_id: str, raw: dict[str, Any], revision: int
+    ) -> dict[str, Any]:
+        with self._lock:
+            document = self.get()
+            self._require_revision(document, revision)
+            for index, current in enumerate(document["types"]):
+                if current["id"] != type_id:
+                    continue
+                category = normalize_catalog_type(raw, existing_id=type_id)
+                if category["group"] != current["group"] and any(
+                    item["type"] == type_id for item in document["teas"]
+                ):
+                    raise CatalogError(
+                        "Сначала перенесите товары в другую категорию, затем меняйте группу"
+                    )
+                document["types"][index] = category
+                return self._finish(document)
+            raise KeyError(type_id)
+
+    def remove_type(self, type_id: str, revision: int) -> dict[str, Any]:
+        with self._lock:
+            document = self.get()
+            self._require_revision(document, revision)
+            if type_id in BUILTIN_CATALOG_TYPE_IDS:
+                raise CatalogError("Базовую категорию нельзя удалить; её можно переименовать")
+            if any(item["type"] == type_id for item in document["teas"]):
+                raise CatalogError("Сначала перенесите товары в другую категорию")
+            if not any(current["id"] == type_id for current in document["types"]):
+                raise KeyError(type_id)
+            document["types"] = [
+                current for current in document["types"] if current["id"] != type_id
+            ]
+            return self._finish(document)
+
+    def reorder_types(self, type_ids: list[str], revision: int) -> dict[str, Any]:
+        with self._lock:
+            document = self.get()
+            self._require_revision(document, revision)
+            current = {category["id"]: category for category in document["types"]}
+            if len(type_ids) != len(set(type_ids)) or set(type_ids) != set(current):
+                raise CatalogError("Порядок должен содержать каждую категорию ровно один раз")
+            document["types"] = [current[type_id] for type_id in type_ids]
             return self._finish(document)
 
     def create_partner(self, raw: dict[str, Any], revision: int) -> dict[str, Any]:

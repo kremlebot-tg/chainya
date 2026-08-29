@@ -55,6 +55,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .catalog_store import (
+    BUILTIN_CATALOG_TYPE_IDS,
     MEDIA_FILE_RE,
     CatalogConflict,
     CatalogError,
@@ -4860,6 +4861,10 @@ def dynamic_sitemap():
 
 def admin_catalog_response(document: dict) -> dict:
     result = dict(document)
+    result["types"] = [
+        {**category, "system": category["id"] in BUILTIN_CATALOG_TYPE_IDS}
+        for category in document["types"]
+    ]
     result["teas"] = [
         {
             **item,
@@ -5002,6 +5007,14 @@ def catalog_error_response(exc: Exception) -> HTTPException:
     return HTTPException(422, str(exc))
 
 
+def catalog_type_error_response(exc: Exception) -> HTTPException:
+    if isinstance(exc, CatalogConflict):
+        return HTTPException(409, str(exc))
+    if isinstance(exc, KeyError):
+        return HTTPException(404, "Категория не найдена")
+    return HTTPException(422, str(exc))
+
+
 def audit_catalog(action: str, item_id: str, revision: int) -> None:
     with db() as con:
         con.execute(
@@ -5053,6 +5066,7 @@ def admin_catalog_history(
     require_admin(authorization)
     document = get_catalog_store().get()
     names = {item["id"]: item["name"] for item in document["teas"]}
+    category_names = {item["id"]: item["name"] for item in document["types"]}
     with db() as con:
         rows = con.execute(
             """
@@ -5070,7 +5084,11 @@ def admin_catalog_history(
                 "created_at": row["created_at"],
                 "action": row["action"],
                 "item_id": row["item_id"],
-                "item_name": names.get(row["item_id"], ""),
+                "item_name": (
+                    category_names.get(row["item_id"], "")
+                    if row["action"].startswith("category_")
+                    else names.get(row["item_id"], "")
+                ),
                 "revision": row["revision"],
             }
             for row in rows
@@ -5194,6 +5212,75 @@ def admin_create_catalog_item(
         raise catalog_error_response(exc) from exc
     item_id = payload.item.get("id", "")
     audit_catalog("create", item_id, document["revision"])
+    return admin_catalog_response(document)
+
+
+@app.post("/api/admin/catalog/types", status_code=201)
+def admin_create_catalog_type(
+    payload: CatalogMutation,
+    request: Request,
+    authorization: str = Header(default=""),
+):
+    require_admin(authorization)
+    require_catalog_write_request(request)
+    try:
+        document = get_catalog_store().create_type(payload.item, payload.revision)
+    except (CatalogError, KeyError) as exc:
+        raise catalog_type_error_response(exc) from exc
+    type_id = payload.item.get("id", "")
+    audit_catalog("category_create", type_id, document["revision"])
+    return admin_catalog_response(document)
+
+
+@app.put("/api/admin/catalog/types/{type_id}")
+def admin_update_catalog_type(
+    type_id: str,
+    payload: CatalogMutation,
+    request: Request,
+    authorization: str = Header(default=""),
+):
+    require_admin(authorization)
+    require_catalog_write_request(request)
+    try:
+        document = get_catalog_store().update_type(
+            type_id, payload.item, payload.revision
+        )
+    except (CatalogError, KeyError) as exc:
+        raise catalog_type_error_response(exc) from exc
+    audit_catalog("category_update", type_id, document["revision"])
+    return admin_catalog_response(document)
+
+
+@app.delete("/api/admin/catalog/types/{type_id}")
+def admin_delete_catalog_type(
+    type_id: str,
+    request: Request,
+    revision: int = Query(ge=1),
+    authorization: str = Header(default=""),
+):
+    require_admin(authorization)
+    require_catalog_write_request(request)
+    try:
+        document = get_catalog_store().remove_type(type_id, revision)
+    except (CatalogError, KeyError) as exc:
+        raise catalog_type_error_response(exc) from exc
+    audit_catalog("category_delete", type_id, document["revision"])
+    return admin_catalog_response(document)
+
+
+@app.put("/api/admin/catalog/type-order")
+def admin_reorder_catalog_types(
+    payload: CatalogReorder,
+    request: Request,
+    authorization: str = Header(default=""),
+):
+    require_admin(authorization)
+    require_catalog_write_request(request)
+    try:
+        document = get_catalog_store().reorder_types(payload.ids, payload.revision)
+    except (CatalogError, KeyError) as exc:
+        raise catalog_type_error_response(exc) from exc
+    audit_catalog("category_reorder", "", document["revision"])
     return admin_catalog_response(document)
 
 

@@ -534,7 +534,7 @@ def check_live(base_url: str) -> list[str]:
         redirect_headers, "location"
     ) not in {"/", base + "/"}:
         errors.append("/index.html: нет канонического redirect на /")
-    for path in ("/manage", "/manage/catalog", "/manage/site", "/manage/guides", "/admin/orders", "/account", "/payment/success"):
+    for path in ("/manage", "/manage/catalog", "/manage/site", "/manage/guides", "/manage/promos", "/admin/orders", "/account", "/payment/success"):
         code, content_type, headers = raw_response_metadata(base + path, method="HEAD")
         # HEAD deliberately has an empty body; Starlette labels that empty
         # response text/plain even though the corresponding GET is HTML.

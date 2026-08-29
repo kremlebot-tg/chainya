@@ -7882,6 +7882,7 @@ def management_guides_page(request: Request):
 @app.head("/manage/catalog")
 @app.head("/manage/site")
 @app.head("/manage/guides")
+@app.head("/manage/promos")
 def management_page_head():
     return Response(
         headers={

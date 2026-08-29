@@ -274,7 +274,7 @@ def test_invalid_ambiguous_checkout_policy_fails_closed(tmp_path, monkeypatch):
 def test_service_pages_support_head_without_exposing_content(tmp_path, monkeypatch):
     client, _ = app_client(tmp_path, monkeypatch)
     with client:
-        for path in ("/manage", "/manage/", "/manage/catalog", "/manage/site", "/admin/orders", "/account", "/account/", "/payment/success", "/payment/fail"):
+        for path in ("/manage", "/manage/", "/manage/catalog", "/manage/site", "/manage/guides", "/manage/promos", "/admin/orders", "/account", "/account/", "/payment/success", "/payment/fail"):
             response = client.head(path)
             assert response.status_code == 200
             assert response.content == b""
@@ -3428,7 +3428,7 @@ def test_revenue_uses_payment_time_and_queue_is_not_period_limited(tmp_path, mon
 def test_management_pages_are_served_without_exposing_token(tmp_path, monkeypatch):
     client, _ = app_client(tmp_path, monkeypatch)
     with client:
-        for path in ("/manage", "/manage/", "/manage/catalog", "/manage/site", "/manage/guides", "/admin/orders"):
+        for path in ("/manage", "/manage/", "/manage/catalog", "/manage/site", "/manage/guides", "/manage/promos", "/admin/orders"):
             response = client.get(path)
             assert response.status_code == 200
             assert "Вход владельца" in response.text

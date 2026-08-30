@@ -173,7 +173,10 @@ def check_dist(root: pathlib.Path) -> list[str]:
             if detail not in text:
                 errors.append(f"{name}: отсутствуют подтверждённые реквизиты {detail!r}")
         if name in public_app_files:
-            if '<script src="/assets/site.js" defer></script>' not in text:
+            if not re.search(
+                r'<script src="/assets/site\.js\?v=[0-9a-f]{12}" defer></script>',
+                text,
+            ):
                 errors.append(f"{name}: основной JavaScript не вынесен в same-origin asset")
             for detail in REGISTERED_ADDRESS_PARTS:
                 if detail not in text:

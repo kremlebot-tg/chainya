@@ -271,7 +271,7 @@ def test_edge_config_change_is_validated_and_rolls_back_only_chainya_edge() -> N
     assert "edge release failed at remote line" in deploy
     assert '"$release/assets/site.js"' in deploy
     assert 'https://chainya.ru/assets/site.js' in deploy
-    assert '<script src=\"/assets/site.js\" defer></script>' in deploy
+    assert 'site\\.js\\?v=[0-9a-f]{12}' in deploy
     assert "systemctl" not in deploy
 
 

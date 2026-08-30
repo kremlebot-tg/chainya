@@ -156,7 +156,7 @@ if [ "$MAINTENANCE_MODE" = 1 ]; then
   exit 0
 fi
 curl -fsS https://chainya.ru/shop -o "$TMP/public-shop.html"
-grep -Fq '<script src="/assets/site.js" defer></script>' "$TMP/public-shop.html"
+grep -Eq '<script src="/assets/site\.js\?v=[0-9a-f]{12}" defer></script>' "$TMP/public-shop.html"
 ! grep -Eq 'id="ts-taste"|renderRadar' "$TMP/public-shop.html"
 curl -fsS https://chainya.ru/assets/site.js -o "$TMP/public-site.js"
 grep -Fq 'Рекомендуем начать свой чайный путь с этих позиций:' "$TMP/public-site.js"

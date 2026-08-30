@@ -305,6 +305,19 @@ def test_server_prices_order_and_mock_payment(tmp_path, monkeypatch):
         assert sent == [order["id"]]
         assert client.post(f"/api/orders/{order['id']}/test-pay", params={"token": payment_token}).status_code == 200
         assert sent == [order["id"]]
+        with module.db() as con:
+            consent = con.execute(
+                "SELECT * FROM personal_data_consents WHERE record_id = ?",
+                (order["id"],),
+            ).fetchone()
+            stored_order = con.execute(
+                "SELECT customer_json FROM orders WHERE id = ?", (order["id"],)
+            ).fetchone()
+        assert consent["record_type"] == "order"
+        assert consent["purpose"] == "order_checkout"
+        assert consent["consent_version"] == module.PERSONAL_DATA_CONSENT_VERSION
+        assert consent["source"] == "website"
+        assert "privacy_accepted" not in json.loads(stored_order["customer_json"])
 
 
 def test_order_accepts_10_gram_pack_at_base_price(tmp_path, monkeypatch):
@@ -489,7 +502,14 @@ def test_business_lead_is_saved_and_notified(tmp_path, monkeypatch):
         assert sent[0]["contact"] == "@anna"
         with module.db() as con:
             stored = con.execute("SELECT * FROM business_leads").fetchone()
+            consent = con.execute(
+                "SELECT * FROM personal_data_consents WHERE record_id = ?",
+                (stored["id"],),
+            ).fetchone()
         assert stored["company"] == "Кофейня Утро"
+        assert consent["record_type"] == "business_lead"
+        assert consent["purpose"] == "business_enquiry"
+        assert consent["consent_version"] == module.PERSONAL_DATA_CONSENT_VERSION
 
 
 def test_business_lead_is_idempotent_before_rate_limit(tmp_path, monkeypatch):
@@ -1346,7 +1366,9 @@ def test_admin_uses_refined_responsive_header(tmp_path, monkeypatch):
     _, module = app_client(tmp_path, monkeypatch)
     html = (module.ROOT / "backend" / "admin.html").read_text(encoding="utf-8")
     assert '<header class="topbar topbar--refined">' in html
-    assert "grid-template-columns:repeat(6,minmax(76px,1fr))" in html
+    assert ".topbar--refined .nav{grid-column:1/-1" in html
+    assert "display:flex;gap:0;overflow-x:auto" in html
+    assert "flex:0 0 78px" in html
     assert 'href="/manage/guides">Гайды</a>' in html
     assert ".topbar--refined .nav__count{display:none}" in html
     assert ".topbar--refined .nav__button[aria-selected=true]" in html
@@ -3237,6 +3259,10 @@ def test_anonymous_analytics_feed_dashboard(tmp_path, monkeypatch):
         for event, section in (
             ("page_view", "home"),
             ("section_view", "shop"),
+            ("section_view", "teaware"),
+            ("repair_opened", "teaware"),
+            ("repair_sent", "teaware"),
+            ("cart_add", "shop"),
             ("cart_open", "cart"),
             ("checkout_start", "cart"),
         ):

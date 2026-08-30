@@ -34,6 +34,10 @@ def test_booking_is_validated_saved_and_notified(tmp_path, monkeypatch):
         response = client.post("/api/bookings", json=booking_payload())
         with module.db() as con:
             stored = con.execute("SELECT * FROM bookings").fetchone()
+            consent = con.execute(
+                "SELECT * FROM personal_data_consents WHERE record_id = ?",
+                (stored["id"],),
+            ).fetchone()
 
     assert response.status_code == 201
     assert response.json()["accepted"] is True
@@ -45,6 +49,10 @@ def test_booking_is_validated_saved_and_notified(tmp_path, monkeypatch):
     assert stored["phone"] == "+7 999 123-45-67"
     assert stored["status"] == "new"
     assert sent[0]["id"] == stored["id"]
+    assert consent["record_type"] == "booking"
+    assert consent["purpose"] == "table_booking"
+    assert consent["consent_version"] == module.PERSONAL_DATA_CONSENT_VERSION
+    assert consent["source"] == "website"
 
 
 def test_booking_rejects_invalid_or_past_moscow_slot(tmp_path, monkeypatch):

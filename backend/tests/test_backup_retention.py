@@ -35,6 +35,18 @@ def create_schema(connection: sqlite3.Connection) -> None:
             note TEXT NOT NULL,
             status TEXT NOT NULL
         );
+        CREATE TABLE repair_requests (
+            id TEXT PRIMARY KEY,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            name TEXT NOT NULL,
+            phone TEXT NOT NULL,
+            description TEXT NOT NULL,
+            image_name TEXT,
+            upload_token_hash TEXT,
+            idempotency_key_hash TEXT,
+            request_hash TEXT
+        );
         CREATE TABLE bookings (
             id TEXT PRIMARY KEY,
             created_at TEXT NOT NULL,
@@ -131,6 +143,13 @@ def test_retention_anonymizes_only_expired_personal_data(tmp_path):
                     "",
                     "contacted",
                 ),
+            ],
+        )
+        connection.executemany(
+            """INSERT INTO repair_requests VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            [
+                ("repair-old", stale_contact, stale_contact, "Анна", "+79990000003", "Скол", "old.webp", "upload", "idem", "request"),
+                ("repair-new", recent, recent, "Борис", "+79990000004", "Трещина", "new.webp", "upload", "idem2", "request2"),
             ],
         )
         connection.executemany(
@@ -240,6 +259,7 @@ def test_retention_anonymizes_only_expired_personal_data(tmp_path):
         assert counts == {
             "analytics_deleted": 1,
             "business_leads_anonymized": 1,
+            "repair_requests_anonymized": 1,
             "bookings_anonymized": 1,
             "orders_anonymized": 1,
             "customer_sessions_deleted": 1,
@@ -259,6 +279,14 @@ def test_retention_anonymizes_only_expired_personal_data(tmp_path):
         assert connection.execute(
             "SELECT contact FROM business_leads WHERE id = 'lead-recent-update'"
         ).fetchone()[0] == "vera@example.test"
+        old_repair = connection.execute(
+            "SELECT * FROM repair_requests WHERE id = 'repair-old'"
+        ).fetchone()
+        assert (old_repair["name"], old_repair["phone"], old_repair["description"]) == ("", "", "")
+        assert old_repair["image_name"] is None
+        assert connection.execute(
+            "SELECT phone FROM repair_requests WHERE id = 'repair-new'"
+        ).fetchone()[0] == "+79990000004"
 
         old_booking = connection.execute(
             "SELECT * FROM bookings WHERE id = 'booking-old'"
@@ -350,6 +378,7 @@ def test_retention_is_safe_for_database_without_optional_tables(tmp_path):
         ) == {
             "analytics_deleted": 0,
             "business_leads_anonymized": 0,
+            "repair_requests_anonymized": 0,
             "bookings_anonymized": 0,
             "orders_anonymized": 0,
             "customer_sessions_deleted": 0,
@@ -362,16 +391,20 @@ def test_main_backs_up_persistent_catalog_and_uploaded_media(tmp_path, monkeypat
     destination = tmp_path / "backups"
     catalog_path = tmp_path / "catalog.json"
     media_dir = tmp_path / "catalog-media"
+    repair_media_dir = tmp_path / "repair-media"
     media_dir.mkdir()
+    repair_media_dir.mkdir()
     catalog_path.write_text(
         json.dumps({"teas": [{"id": "baihao"}]}, ensure_ascii=False),
         encoding="utf-8",
     )
     (media_dir / ("a" * 32 + ".webp")).write_bytes(b"webp-image")
+    (repair_media_dir / ("b" * 32 + ".webp")).write_bytes(b"repair-image")
     with sqlite3.connect(source_path) as connection:
         create_schema(connection)
     monkeypatch.setattr(backup_retention, "CATALOG_SOURCE", catalog_path)
     monkeypatch.setattr(backup_retention, "CATALOG_MEDIA_SOURCE", media_dir)
+    monkeypatch.setattr(backup_retention, "REPAIR_MEDIA_SOURCE", repair_media_dir)
 
     backup_retention.main(source_path, destination, now=now)
 
@@ -382,6 +415,7 @@ def test_main_backs_up_persistent_catalog_and_uploaded_media(tmp_path, monkeypat
         assert archive.getnames() == [
             "catalog.json",
             "catalog-media/" + "a" * 32 + ".webp",
+            "repair-media/" + "b" * 32 + ".webp",
         ]
         archived_catalog = json.load(archive.extractfile("catalog.json"))
         assert archived_catalog["teas"][0]["id"] == "baihao"

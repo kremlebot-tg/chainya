@@ -109,6 +109,8 @@ def test_public_pages_use_quiet_account_probe_and_eager_hero_image():
 def test_public_build_uses_only_same_origin_executable_javascript():
     assert "extract_inline_script" in BUILD_SOURCE
     assert 'public_content, public_script = extract_inline_script(content, "/assets/site.js")' in BUILD_SOURCE
+    assert "site_script_version = hashlib.sha256" in BUILD_SOURCE
+    assert "site.js?v={site_script_version}" in BUILD_SOURCE
     assert "external = f'<script src=\"{asset_path}\" defer></script>'" in BUILD_SOURCE
     assert "telegram.org/js/telegram-web-app.js" not in SOURCE
     assert "window.Telegram" not in SOURCE
@@ -145,6 +147,20 @@ def test_teaware_has_a_separate_public_navigation_route():
     assert "nav_shop:'Tea'" in SOURCE
     assert "nav_shop:'茶'" in SOURCE
     assert 'data-i18n="nav_shop">Купить чай</a>' not in SOURCE
+
+
+def test_teaware_repair_request_is_public_and_manageable_by_owner():
+    heading = SOURCE.index('id="shop-heading"')
+    repair = SOURCE.index('id="repair-service"')
+    products = SOURCE.index('id="menu-teas"')
+    assert heading < repair < products
+    assert "$('#repair-service').hidden = view !== 'teaware'" in SOURCE
+    assert 'id="r-image" name="image" type="file" accept="image/jpeg,image/png,image/webp"' in SOURCE
+    assert "fetch('/api/repair-requests'" in SOURCE
+    assert "X-Repair-Upload-Token" in SOURCE
+    assert 'data-view="repairs"' in ADMIN_SOURCE
+    assert 'id="repairs-content"' in ADMIN_SOURCE
+    assert "/api/admin/repair-requests" in ADMIN_SOURCE
 
 
 def test_public_sections_have_stable_localized_urls_for_search_engines():
@@ -205,6 +221,8 @@ def test_footer_links_keep_minimum_touch_targets():
 def test_consent_checkboxes_meet_minimum_touch_target_size():
     assert ".consent input{width:24px;height:24px;" in SOURCE
     assert ".check input{width:24px;height:24px;" in ACCOUNT_SOURCE
+    assert SOURCE.count('href="/consent-personal-data.html"') >= 4
+    assert 'href="/consent-personal-data.html"' in ACCOUNT_SOURCE
 
 
 def test_account_text_inputs_do_not_trigger_ios_focus_zoom():
@@ -293,7 +311,7 @@ def test_owner_guides_link_to_precise_workspaces_and_explain_completion():
 
 def test_admin_supports_direct_links_to_owner_workspaces():
     assert "new URLSearchParams(location.search).get('view')" in ADMIN_SOURCE
-    assert "const allowed=['overview','orders','bookings','leads']" in ADMIN_SOURCE
+    assert "const allowed=['overview','orders','bookings','leads','repairs']" in ADMIN_SOURCE
     assert "showView(requestedView||'overview',{updateUrl:false})" in ADMIN_SOURCE
     assert "`/manage?view=${encodeURIComponent(view)}`" in ADMIN_SOURCE
 

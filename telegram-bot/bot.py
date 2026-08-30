@@ -815,8 +815,8 @@ async def cb_bk_confirm(c: CallbackQuery):
     text = ("<b>Проверьте бронь</b>\n\n"
             f"📅 {date_h(iso)}\n🕛 {hhmm(t)}\n☕ {fn} ({price} ₽ с гостя)\n👥 {g}\n\n"
             "Сессия длится 2 часа. Оплата сейчас не нужна.\n"
-            "Нажимая «Подтвердить бронь», вы соглашаетесь с "
-            '<a href="https://chainya.ru/privacy.html">политикой конфиденциальности</a>.' )
+            "Нажимая «Подтвердить бронь», вы даёте отдельное "
+            '<a href="https://chainya.ru/consent-personal-data.html">согласие на обработку персональных данных</a>.' )
     await show(c, B_BOOK, text, confirm_kb(iso, t, f, g))
     await c.answer()
 

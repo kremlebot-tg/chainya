@@ -427,6 +427,12 @@ h1, h2, h3, p{ text-wrap:pretty; }
   font-family:'Prata',Georgia,serif; font-size:clamp(2.35rem,4.4vw,4.25rem);
   font-weight:400; line-height:1.05; letter-spacing:-.035em;
 }
+.repair-service{margin:-8px 0 30px;border:1px solid var(--line);background:linear-gradient(135deg,var(--bg-2),var(--bg-3));border-radius:var(--r);overflow:hidden}
+.repair-service[hidden]{display:none}.repair-service__intro{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:center;padding:24px clamp(20px,3vw,36px)}
+.repair-service__eyebrow{margin:0 0 8px;color:var(--accent);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}.repair-service h2{margin:0;font-family:'Prata',Georgia,serif;font-size:clamp(1.5rem,2.6vw,2.25rem);font-weight:400}.repair-service__lead{max-width:64ch;margin:10px 0 0;color:var(--text-2);font-size:14px;line-height:1.6}.repair-service__toggle{min-width:190px}
+.repair-service__body{border-top:1px solid var(--line);padding:clamp(22px,3vw,36px)}.repair-service__grid{display:grid;grid-template-columns:minmax(0,.8fr) minmax(320px,1fr);gap:clamp(28px,5vw,70px);align-items:start}.repair-service__conditions{margin:0;padding:0;list-style:none}.repair-service__conditions li{padding:13px 0;border-top:1px solid var(--line-soft);color:var(--text-2);font-size:13.5px;line-height:1.55}.repair-service__conditions li:first-child{border-top:0;padding-top:0}.repair-service__conditions li::before{content:'—';margin-right:10px;color:var(--accent)}
+.repair-form .field{margin-bottom:16px}.repair-form .summary__note{min-height:18px}.repair-upload{display:block;padding:16px;border:1px dashed var(--line-control);border-radius:3px;background:var(--bg);cursor:pointer}.repair-upload:hover{border-color:var(--accent)}.repair-upload input{display:block;width:100%;margin-top:9px;color:var(--text-2);font-size:13px}.repair-upload__name{display:block;margin-top:7px;color:var(--text-3);font-size:12px;overflow-wrap:anywhere}.repair-service__done{padding:36px;text-align:center}.repair-service__done h3{margin:0 0 9px;font-family:'Prata',Georgia,serif;font-size:1.7rem;font-weight:400}.repair-service__done p{margin:0;color:var(--text-2);line-height:1.55}
+@media(max-width:760px){.repair-service__intro,.repair-service__grid{grid-template-columns:1fr}.repair-service__toggle{width:100%}}
 .shop-toolbar{ margin-bottom:28px; }
 .shop-tools{ display:grid; grid-template-columns:minmax(220px,1fr) minmax(190px,.35fr); gap:10px; margin-top:14px; }
 .shop-tools[hidden],.shop-count[hidden],.scroll-shell[hidden],.shop-note[hidden]{ display:none; }
@@ -1233,6 +1239,14 @@ select.input{
 <section class="view" id="view-shop">
   <div class="sec wrap">
     <h1 class="shop-heading" id="shop-heading" data-i18n="shop_heading">Каталог китайского чая</h1>
+    <section class="repair-service" id="repair-service" hidden aria-labelledby="repair-heading">
+      <div class="repair-service__intro"><div><p class="repair-service__eyebrow" data-i18n="repair_eyebrow">Продлеваем жизнь любимым вещам</p><h2 id="repair-heading" data-i18n="repair_h">Кинцуги / ремонт посуды</h2><p class="repair-service__lead" data-i18n="repair_lead">Пришлите фотографию и коротко расскажите, что случилось. Мы оценим, возможен ли ремонт, и отдельно согласуем стоимость, срок и передачу посуды.</p></div><button class="btn btn--solid repair-service__toggle" id="repair-toggle" type="button" aria-expanded="false" aria-controls="repair-body" data-i18n="repair_cta">Оценить ремонт</button></div>
+      <div class="repair-service__body" id="repair-body" hidden>
+        <div class="repair-service__grid" id="repair-form-wrap"><div><p class="label" data-i18n="repair_terms_label">Как это работает</p><ul class="repair-service__conditions"><li data-i18n="repair_term_1">Заявка и предварительная оценка по фотографии — бесплатно.</li><li data-i18n="repair_term_2">Не каждую трещину можно восстановить безопасно: решение принимаем после осмотра.</li><li data-i18n="repair_term_3">Цена и срок зависят от материала, повреждения и выбранного способа ремонта.</li><li data-i18n="repair_term_4">После заявки свяжемся с вами и договоримся, как передать посуду.</li></ul></div>
+          <form class="repair-form" id="repair-form" novalidate><div class="row2"><div class="field"><label class="label" for="r-name" data-i18n="repair_name">Как вас зовут</label><input class="input" id="r-name" name="name" type="text" autocomplete="name" required maxlength="120"></div><div class="field"><label class="label" for="r-phone" data-i18n="repair_phone">Телефон</label><input class="input" id="r-phone" name="phone" type="tel" autocomplete="tel" required aria-describedby="repair-status"></div></div><div class="field"><label class="label" for="r-description" data-i18n="repair_description">Что нужно отремонтировать</label><textarea class="input" id="r-description" name="description" required minlength="3" maxlength="1500" data-i18n-ph="repair_description_ph" placeholder="Какая это посуда, из чего она сделана и что произошло"></textarea></div><label class="repair-upload" for="r-image"><span data-i18n="repair_photo">Фотография повреждения — по желанию</span><input id="r-image" name="image" type="file" accept="image/jpeg,image/png,image/webp"><span class="repair-upload__name" id="r-image-name" data-i18n="repair_photo_hint">JPG, PNG или WebP · до 8 МБ</span></label><label class="consent"><input type="checkbox" id="r-privacy" name="privacy_accepted" value="yes"><span><span data-i18n="privacy_accept">Даю отдельное</span> <a href="/consent-personal-data.html" target="_blank" rel="noopener" data-i18n="privacy_link">согласие на обработку персональных данных</a></span></label><button class="btn btn--solid btn--wide" id="repair-submit" type="submit" data-i18n="repair_send">Отправить на оценку</button><p class="summary__note" id="repair-status" role="status" aria-live="polite" data-i18n="repair_note">Ответим по указанному телефону. Отправка заявки не обязывает вас заказывать ремонт.</p></form>
+        </div><div class="repair-service__done" id="repair-done" hidden><h3 data-i18n="repair_done_h">Заявка получена</h3><p data-i18n="repair_done_p">Посмотрим фотографию и свяжемся с вами, чтобы обсудить возможность ремонта.</p></div>
+      </div>
+    </section>
     <div class="shop-toolbar">
       <div class="scroll-shell scroll-shell--chips" id="filters-shell"><div class="chips" id="filters" role="group" data-i18n-aria="filters_label" aria-label="Фильтры каталога"></div></div>
       <div class="scroll-shell scroll-shell--chips" id="subfilters-shell"><div class="chips" id="subfilters" role="group" aria-label="Подразделы каталога"></div></div>
@@ -1376,7 +1390,7 @@ select.input{
             <label class="label" for="b-note" data-i18n="b_note">Ваш запрос</label>
             <textarea class="input" id="b-note" name="note" data-i18n-ph="b_note_ph"></textarea>
           </div>
-          <label class="consent"><input type="checkbox" id="b-privacy" name="privacy_accepted" value="yes"><span><span data-i18n="privacy_accept">Согласен на обработку данных согласно</span> <a href="/privacy.html" target="_blank" rel="noopener" data-i18n="privacy_link">политике конфиденциальности</a></span></label>
+          <label class="consent"><input type="checkbox" id="b-privacy" name="privacy_accepted" value="yes"><span><span data-i18n="privacy_accept">Даю отдельное</span> <a href="/consent-personal-data.html" target="_blank" rel="noopener" data-i18n="privacy_link">согласие на обработку персональных данных</a></span></label>
           <button class="btn btn--solid btn--wide" id="b2b-submit" type="submit" data-i18n="b2b_send">Отправить</button>
           <p class="summary__note" id="b2b-status" role="status" aria-live="polite" data-i18n="b2b_form_note"></p>
         </form>
@@ -1451,7 +1465,7 @@ select.input{
             <label class="label" for="f-note" data-i18n="f_note">Пожелания</label>
             <textarea class="input" id="f-note" data-i18n-ph="f_note_ph"></textarea>
           </div>
-          <label class="consent"><input type="checkbox" id="f-privacy" required><span><span data-i18n="privacy_accept">Согласен на обработку данных согласно</span> <a href="/privacy.html" target="_blank" rel="noopener" data-i18n="privacy_link">политике конфиденциальности</a></span></label>
+          <label class="consent"><input type="checkbox" id="f-privacy" required><span><span data-i18n="privacy_accept">Даю отдельное</span> <a href="/consent-personal-data.html" target="_blank" rel="noopener" data-i18n="privacy_link">согласие на обработку персональных данных</a></span></label>
           <p class="cart-note cart-note--error" id="f-status" role="status" aria-live="polite"></p>
         </div>
 
@@ -1538,6 +1552,7 @@ select.input{
     <div class="foot__bot">
       <span data-i18n="foot_c">© 2026 Чайня</span>
       <a href="/privacy.html" data-i18n="privacy_link_footer">Политика конфиденциальности</a>
+      <a href="/consent-personal-data.html" data-i18n="consent_link_footer">Согласие на обработку данных</a>
       <a href="/legal.html" data-i18n="legal_link">Реквизиты и условия</a>
       <span class="foot__by"><a href="https://rednd.ru" target="_blank" rel="noopener">rednd.ru</a></span>
     </div>
@@ -1656,7 +1671,7 @@ select.input{
           <p class="promo-status" id="promo-status" aria-live="polite"></p>
         </div>
       </details>
-      <label class="consent"><input type="checkbox" id="c-privacy"><span><span data-i18n="privacy_accept">Согласен на обработку данных согласно</span> <a href="/privacy.html" target="_blank" rel="noopener" data-i18n="privacy_link">политике конфиденциальности</a></span></label>
+      <label class="consent"><input type="checkbox" id="c-privacy"><span><span data-i18n="privacy_accept">Даю отдельное</span> <a href="/consent-personal-data.html" target="_blank" rel="noopener" data-i18n="privacy_link">согласие на обработку персональных данных</a></span></label>
     </div>
   </div>
   <div class="sheet__foot">
@@ -1857,6 +1872,7 @@ select.input{
     visit_metro_label:'Метро', visit_metro:'Аэропорт', visit_hours_label:'Открыты', visit_hours:'<span class="visit__hours-line">Ежедневно</span><span class="visit__hours-line num">12:00–22:00</span>',
     visit_route:'Построить маршрут', visit_open:'Открыть карточку в Яндекс Картах', visit_map_title:'Чайня на карте Москвы',
     shop_heading:'Каталог китайского чая', teaware_heading:'Каталог чайной посуды', shop_note_h:'Фасовка и прессованный чай', shop_note_p:'Вес выбирается в карточке чая. Мандарин и квадратик продаём поштучно, блины — по запросу.', shop_count:'В подборке',
+    repair_eyebrow:'Продлеваем жизнь любимым вещам',repair_h:'Кинцуги / ремонт посуды',repair_lead:'Пришлите фотографию и коротко расскажите, что случилось. Мы оценим, возможен ли ремонт, и отдельно согласуем стоимость, срок и передачу посуды.',repair_cta:'Оценить ремонт',repair_close:'Свернуть',repair_terms_label:'Как это работает',repair_term_1:'Заявка и предварительная оценка по фотографии — бесплатно.',repair_term_2:'Не каждую трещину можно восстановить безопасно: решение принимаем после осмотра.',repair_term_3:'Цена и срок зависят от материала, повреждения и выбранного способа ремонта.',repair_term_4:'После заявки свяжемся с вами и договоримся, как передать посуду.',repair_name:'Как вас зовут',repair_phone:'Телефон',repair_description:'Что нужно отремонтировать',repair_description_ph:'Какая это посуда, из чего она сделана и что произошло',repair_photo:'Фотография повреждения — по желанию',repair_photo_hint:'JPG, PNG или WebP · до 8 МБ',repair_send:'Отправить на оценку',repair_sending:'Отправляем…',repair_note:'Ответим по указанному телефону. Отправка заявки не обязывает вас заказывать ремонт.',repair_required:'Заполните имя, телефон и описание повреждения.',repair_photo_error:'Выберите JPG, PNG или WebP размером до 8 МБ.',repair_error:'Не удалось отправить заявку. Попробуйте ещё раз.',repair_done_h:'Заявка получена',repair_done_p:'Посмотрим фотографию и свяжемся с вами, чтобы обсудить возможность ремонта.',
     shop_search_label:'Поиск по каталогу', shop_search_ph:'Название, регион или вкус', teaware_search_ph:'Название или материал', shop_sort_label:'Сортировка', shop_empty:'По этому запросу ничего не найдено. Попробуйте другое название или сбросьте фильтр.', catalog_empty:'В этом разделе пока нет опубликованных товаров.',
     shop_sort_default:'Сначала рекомендованные', shop_sort_price_asc:'Сначала дешевле', shop_sort_price_desc:'Сначала дороже', shop_sort_name:'По названию',
     types:['Все','Белый','Зелёный','Габа','Улуны Фуцзяни','Улуны Гуандуна','Улуны Уишаня','Красный','Шэн Пуэр','Шу Пуэр','Хэй Ча','Травы и добавки'],
@@ -1887,7 +1903,7 @@ select.input{
     cart_quote_loading:'СДЭК рассчитывает стоимость…',
     cart_quote_ready:(a,min,max)=>`СДЭК · ${a} · ${min===max?min:`${min}–${max}`} дн.`,
     cart_quote_error:'Не удалось рассчитать доставку. Проверьте город или попробуйте ещё раз.',
-    privacy_accept:'Согласен на обработку данных согласно', privacy_link:'политике конфиденциальности', privacy_link_footer:'Политика конфиденциальности', legal_link:'Реквизиты и условия', privacy_required:'Подтвердите согласие на обработку данных',
+    privacy_accept:'Даю отдельное', privacy_link:'согласие на обработку персональных данных', privacy_link_footer:'Политика конфиденциальности', consent_link_footer:'Согласие на обработку данных', legal_link:'Реквизиты и условия', privacy_required:'Подтвердите согласие на обработку данных',
     cart_name_required:'Укажите имя, чтобы мы могли оформить чек.', cart_phone_required:'Укажите полный номер телефона, чтобы мы могли подтвердить заказ.', cart_city_required:'Укажите город доставки.',
     cart_pvz_required:'Выберите пункт из подсказок СДЭК.', cart_addr_required:'Укажите адрес доставки.',
     cart_catalog_checking:'Проверяем цены и наличие…',
@@ -2045,6 +2061,7 @@ select.input{
     visit_metro_label:'Metro', visit_metro:'Aeroport', visit_hours_label:'Hours', visit_hours:'<span class="visit__hours-line">Daily</span><span class="visit__hours-line num">12:00–22:00</span>',
     visit_route:'Get directions', visit_open:'Open in Yandex Maps', visit_map_title:'Chainya on the Moscow map',
     shop_heading:'Chinese tea catalogue', teaware_heading:'Chinese teaware catalogue', shop_note_h:'Pack sizes and pressed tea', shop_note_p:'Choose the weight in each tea card. Mandarin and mini bricks are sold by the piece; cakes are available on request.', shop_count:'In this selection',
+    repair_eyebrow:'Giving meaningful objects a longer life',repair_h:'Kintsugi / teaware repair',repair_lead:'Send a photo and tell us what happened. We will assess whether repair is possible, then agree the price, timing and handover separately.',repair_cta:'Request an assessment',repair_close:'Collapse',repair_terms_label:'How it works',repair_term_1:'The request and preliminary photo assessment are free.',repair_term_2:'Not every crack can be repaired safely; the final decision follows an inspection.',repair_term_3:'Price and timing depend on the material, damage and repair method.',repair_term_4:'We will contact you and agree how to hand over the piece.',repair_name:'Your name',repair_phone:'Phone',repair_description:'What needs repairing',repair_description_ph:'What the item is, what it is made of and what happened',repair_photo:'Damage photo — optional',repair_photo_hint:'JPG, PNG or WebP · up to 8 MB',repair_send:'Send for assessment',repair_sending:'Sending…',repair_note:'We will reply by phone. Sending a request does not commit you to a repair.',repair_required:'Enter your name, phone number and a description.',repair_photo_error:'Choose a JPG, PNG or WebP file up to 8 MB.',repair_error:'The request could not be sent. Please try again.',repair_done_h:'Request received',repair_done_p:'We will review the photo and contact you to discuss whether repair is possible.',
     shop_search_label:'Search the catalogue', shop_search_ph:'Name, origin or flavour', teaware_search_ph:'Name or material', shop_sort_label:'Sort', shop_empty:'Nothing matches this search. Try another name or reset the filter.', catalog_empty:'There are no published products in this section yet.',
     shop_sort_default:'Recommended first', shop_sort_price_asc:'Lowest price first', shop_sort_price_desc:'Highest price first', shop_sort_name:'By name',
     types:['All','White','Green','GABA','Fujian oolong','Guangdong oolong','Wuyi oolong','Black','Sheng pu-erh','Shou pu-erh','Hei cha','Herbs & extras'],
@@ -2075,7 +2092,7 @@ select.input{
     cart_quote_loading:'CDEK is calculating delivery…',
     cart_quote_ready:(a,min,max)=>`CDEK · ${a} · ${min===max?min:`${min}–${max}`} days`,
     cart_quote_error:'Could not calculate delivery. Check the city or try again.',
-    privacy_accept:'I consent to data processing under the', privacy_link:'privacy policy', privacy_link_footer:'Privacy policy', legal_link:'Seller details and terms', privacy_required:'Please accept the data processing terms',
+    privacy_accept:'I give separate', privacy_link:'consent to personal data processing', privacy_link_footer:'Privacy policy', consent_link_footer:'Personal data consent', legal_link:'Seller details and terms', privacy_required:'Please accept the data processing terms',
     cart_name_required:'Enter your name so we can issue the receipt.', cart_phone_required:'Enter a complete phone number so we can confirm the order.', cart_city_required:'Enter the delivery city.',
     cart_pvz_required:'Choose a CDEK point from the suggestions.', cart_addr_required:'Enter the delivery address.',
     cart_catalog_checking:'Checking prices and availability…',
@@ -2233,6 +2250,7 @@ select.input{
     visit_metro_label:'地铁', visit_metro:'机场站', visit_hours_label:'营业时间', visit_hours:'<span class="visit__hours-line">每天</span><span class="visit__hours-line num">12:00–22:00</span>',
     visit_route:'规划路线', visit_open:'在Yandex地图中打开', visit_map_title:'莫斯科茶室地图',
     shop_heading:'中国茶目录', teaware_heading:'茶具目录', shop_note_h:'分装与紧压茶', shop_note_p:'请在茶品详情中选择重量。小青柑和小金砖按个出售，茶饼可另询。', shop_count:'当前选择',
+    repair_eyebrow:'让珍爱的器物继续陪伴',repair_h:'金缮 / 茶具修复',repair_lead:'请发送照片并简单说明损坏情况。我们会先判断是否可修复，再单独确认费用、时间和交接方式。',repair_cta:'申请评估',repair_close:'收起',repair_terms_label:'流程说明',repair_term_1:'提交申请和根据照片进行初步评估均免费。',repair_term_2:'并非所有裂纹都能安全修复，最终需实物检查后决定。',repair_term_3:'费用和时间取决于材质、损坏程度和修复方式。',repair_term_4:'提交后我们会联系您并商定茶具交接方式。',repair_name:'您的姓名',repair_phone:'电话',repair_description:'需要修复什么',repair_description_ph:'请说明器物、材质和损坏情况',repair_photo:'损坏照片（可选）',repair_photo_hint:'JPG、PNG或WebP，不超过8 MB',repair_send:'提交评估',repair_sending:'正在发送…',repair_note:'我们会通过电话联系您。提交申请并不代表必须进行修复。',repair_required:'请填写姓名、电话和损坏说明。',repair_photo_error:'请选择不超过8 MB的JPG、PNG或WebP文件。',repair_error:'提交失败，请重试。',repair_done_h:'申请已收到',repair_done_p:'我们会查看照片并联系您，讨论是否可以修复。',
     shop_search_label:'搜索茶叶目录', shop_search_ph:'名称、产地或风味', teaware_search_ph:'名称或材质', shop_sort_label:'排序', shop_empty:'没有找到符合条件的商品。请尝试其他名称或重置筛选。', catalog_empty:'此栏目暂时没有已发布的商品。',
     shop_sort_default:'推荐优先', shop_sort_price_asc:'价格从低到高', shop_sort_price_desc:'价格从高到低', shop_sort_name:'按名称',
     types:['全部','白茶','绿茶','佳叶龙茶','闽南乌龙','广东乌龙','武夷岩茶','红茶','生普洱','熟普洱','黑茶','花草与配料'],
@@ -2263,7 +2281,7 @@ select.input{
     cart_quote_loading:'CDEK正在计算运费…',
     cart_quote_ready:(a,min,max)=>`CDEK · ${a} · ${min===max?min:`${min}–${max}`}天`,
     cart_quote_error:'无法计算运费，请检查城市或重试。',
-    privacy_accept:'我同意按照以下条款处理个人数据：', privacy_link:'隐私政策', privacy_link_footer:'隐私政策', legal_link:'商家信息与条款', privacy_required:'请同意个人数据处理条款',
+    privacy_accept:'我单独作出', privacy_link:'个人数据处理同意', privacy_link_footer:'隐私政策', consent_link_footer:'个人数据处理同意书', legal_link:'商家信息与条款', privacy_required:'请同意个人数据处理条款',
     cart_name_required:'请填写姓名，以便我们开具收据。', cart_phone_required:'请填写完整的电话号码，以便我们确认订单。', cart_city_required:'请填写配送城市。',
     cart_pvz_required:'请从提示中选择CDEK自提点。', cart_addr_required:'请填写配送地址。',
     cart_catalog_checking:'正在核对价格和库存…',
@@ -2459,7 +2477,7 @@ select.input{
     if (local.length > 8) value += `-${local.slice(8,10)}`;
     field.value = value;
   }
-  ['#f-phone','#c-phone'].forEach(selector => {
+  ['#f-phone','#c-phone','#r-phone'].forEach(selector => {
     const field = $(selector);
     field.addEventListener('focus', () => {
       if (!field.value.trim()){
@@ -2570,6 +2588,7 @@ select.input{
       search.dataset.i18nPh = view === 'teaware' ? 'teaware_search_ph' : 'shop_search_ph';
       search.placeholder = T()[search.dataset.i18nPh];
       $('#shop-note').hidden = view === 'teaware';
+      $('#repair-service').hidden = view !== 'teaware';
       buildFilters();
       buildShopTools();
       applyFilter();
@@ -4081,7 +4100,7 @@ select.input{
 
   // Аргументы последних подтверждений храним, чтобы перерисовать их на новом языке
   let lastBook = null, lastB2B = null;
-  let pendingBooking = null, pendingB2B = null;
+  let pendingBooking = null, pendingB2B = null, pendingRepair = null;
 
   function requestKey(prefix){
     if (crypto.randomUUID) return `${prefix}-${crypto.randomUUID()}`;
@@ -4292,6 +4311,48 @@ select.input{
     if ($('#b-privacy').checked) $('#b2b-status').textContent = T().b2b_form_note;
   });
 
+  function repairUploadToken(){
+    const bytes = crypto.getRandomValues(new Uint8Array(32));
+    return btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  }
+  function setRepairOpen(open){
+    $('#repair-body').hidden = !open;
+    $('#repair-toggle').setAttribute('aria-expanded', String(open));
+    $('#repair-toggle').textContent = open ? T().repair_close : T().repair_cta;
+  }
+  $('#repair-toggle').addEventListener('click', () => {
+    const open = $('#repair-body').hidden;
+    setRepairOpen(open);
+    if (open){ track('repair_opened','teaware'); requestAnimationFrame(()=>$('#repair-body').scrollIntoView({behavior:'smooth',block:'nearest'})); }
+  });
+  $('#r-image').addEventListener('change', event => {
+    const file = event.target.files[0];
+    $('#r-image-name').textContent = file ? `${file.name} · ${(file.size/1024/1024).toFixed(1)} МБ` : T().repair_photo_hint;
+    $('#repair-status').textContent = T().repair_note;
+  });
+  $('#repair-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    const name=$('#r-name').value.trim(),phone=$('#r-phone').value.trim(),description=$('#r-description').value.trim(),file=$('#r-image').files[0],status=$('#repair-status'),submit=$('#repair-submit');
+    [$('#r-name'),$('#r-phone'),$('#r-description')].forEach(field=>field.removeAttribute('aria-invalid'));
+    if(!name||phone.replace(/\D/g,'').length<10||description.length<3){status.textContent=T().repair_required;const field=!name?$('#r-name'):phone.replace(/\D/g,'').length<10?$('#r-phone'):$('#r-description');field.setAttribute('aria-invalid','true');field.focus();return}
+    if(file&&(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>8*1024*1024)){status.textContent=T().repair_photo_error;$('#r-image').focus();return}
+    if(!$('#r-privacy').checked){status.textContent=T().privacy_required;$('#r-privacy').focus();return}
+    const stable={name,phone,description,has_image:Boolean(file)};
+    const fingerprint=JSON.stringify(stable);
+    if(!pendingRepair||pendingRepair.fingerprint!==fingerprint)pendingRepair={fingerprint,key:requestKey('repair'),uploadToken:file?repairUploadToken():''};
+    const payload={...stable,upload_token:pendingRepair.uploadToken,privacy_accepted:true};
+    submit.disabled=true;submit.textContent=T().repair_sending;status.textContent='';
+    try{
+      const response=await fetch('/api/repair-requests',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':pendingRepair.key},body:JSON.stringify(payload)}),result=await response.json().catch(()=>({}));
+      if(!response.ok||!result.id)throw new Error();
+      if(file&&result.upload_required){
+        const upload=await fetch(`/api/repair-requests/${encodeURIComponent(result.id)}/image`,{method:'POST',headers:{'Content-Type':file.type,'X-Repair-Upload-Token':pendingRepair.uploadToken},body:file});
+        if(!upload.ok)throw new Error();
+      }
+      pendingRepair=null;track('repair_sent','teaware');$('#repair-form').reset();$('#r-image-name').textContent=T().repair_photo_hint;$('#repair-form-wrap').hidden=true;$('#repair-done').hidden=false;
+    }catch(error){status.textContent=T().repair_error;submit.disabled=false;submit.textContent=T().repair_send}
+  });
+
   /* ─────────────  ЯЗЫК  ───────────── */
   let catalogLastSuccess = 0;
   document.addEventListener('visibilitychange', () => {
@@ -4310,7 +4371,9 @@ select.input{
     $$('[data-i18n-aria]').forEach(n => { const v = T()[n.dataset.i18nAria]; if (v != null) n.setAttribute('aria-label', v); });
     $$('[data-i18n-alt]').forEach(n => { const v = T()[n.dataset.i18nAlt]; if (v != null) n.alt = v; });
     $$('[data-i18n-title]').forEach(n => { const v = T()[n.dataset.i18nTitle]; if (v != null) n.title = v; });
+    $('#repair-toggle').textContent = $('#repair-body').hidden ? T().repair_cta : T().repair_close;
     $$('a[href^="/privacy.html"]').forEach(a => { a.href = `/privacy.html?lang=${LANG}`; });
+    $$('a[href^="/consent-personal-data.html"]').forEach(a => { a.href = `/consent-personal-data.html?lang=${LANG}`; });
     $$('a[href^="/legal.html"]').forEach(a => { a.href = `/legal.html?lang=${LANG}`; });
     $('#account-open').href = `/account?lang=${LANG}`;
     buildFilters();
@@ -4353,11 +4416,11 @@ select.input{
       const data = await response.json();
       if (!data.authenticated || !data.account) return;
       const profile = data.account;
-      ['#c-name','#f-name','#b-name'].forEach(selector => {
+      ['#c-name','#f-name','#b-name','#r-name'].forEach(selector => {
         const field = $(selector);
         if (field && !field.value && profile.name) field.value = profile.name;
       });
-      ['#c-phone','#f-phone','#b-phone'].forEach(selector => {
+      ['#c-phone','#f-phone','#b-phone','#r-phone'].forEach(selector => {
         const field = $(selector);
         if (!field || field.value || !profile.phone) return;
         field.value = profile.phone;

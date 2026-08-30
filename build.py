@@ -443,8 +443,15 @@ if web:
     shutil.copy(root / "src-assets" / "favicon.png", dist / "favicon.ico")
     shutil.copy(OG_SRC, dist / OG_NAME)
     public_content, public_script = extract_inline_script(content, "/assets/site.js")
+    # HTML and JavaScript are deployed together. A content version prevents a
+    # browser/service worker from combining fresh markup with an older script.
+    site_script_version = hashlib.sha256(public_script.encode("utf-8")).hexdigest()[:12]
+    public_content = public_content.replace(
+        'src="/assets/site.js"',
+        f'src="/assets/site.js?v={site_script_version}"',
+    )
     (dist / "assets" / "site.js").write_text(public_script, encoding="utf-8")
-    for page_name in ("privacy", "legal"):
+    for page_name in ("privacy", "legal", "consent-personal-data"):
         page_html, page_script = extract_inline_script(
             (root / f"{page_name}.html").read_text(encoding="utf-8"),
             f"/assets/{page_name}.js",
@@ -514,6 +521,7 @@ if web:
     sitemap_rows.extend((
         f"  <url><loc>{SITE}legal.html</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>",
         f"  <url><loc>{SITE}privacy.html</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>",
+        f"  <url><loc>{SITE}consent-personal-data.html</loc><changefreq>monthly</changefreq><priority>0.3</priority></url>",
     ))
     (dist / "sitemap.xml").write_text(
         '<?xml version="1.0" encoding="UTF-8"?>\n'

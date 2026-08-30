@@ -38,10 +38,17 @@ def test_customer_registration_uses_hashed_credentials_and_http_only_session(tmp
         with module.db() as con:
             account = con.execute("SELECT * FROM customer_accounts").fetchone()
             session = con.execute("SELECT * FROM customer_sessions").fetchone()
+            consent = con.execute(
+                "SELECT * FROM personal_data_consents WHERE record_id = ?",
+                (account["id"],),
+            ).fetchone()
         assert account["password_hash"].startswith("pbkdf2_sha256$")
         assert "tea-password-2026" not in account["password_hash"]
         assert len(session["token_hash"]) == 64
         assert session["token_hash"] not in response.headers["set-cookie"]
+        assert consent["record_type"] == "customer_account"
+        assert consent["purpose"] == "customer_account"
+        assert consent["consent_version"] == module.PERSONAL_DATA_CONSENT_VERSION
 
 
 def test_login_profile_password_rotation_and_logout(tmp_path, monkeypatch):

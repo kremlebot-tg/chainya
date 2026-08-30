@@ -54,6 +54,7 @@ PUBLIC_PATHS = (
     ("/booking", "text/html"),
     ("/account", "text/html"),
     ("/privacy.html", "text/html"),
+    ("/consent-personal-data.html", "text/html"),
     ("/legal.html", "text/html"),
     ("/api/catalog", "application/json"),
     ("/sitemap.xml", "application/xml"),
@@ -119,9 +120,11 @@ def check_dist(root: pathlib.Path) -> list[str]:
         "50x.html",
         "favicon.ico",
         "privacy.html",
+        "consent-personal-data.html",
         "legal.html",
         "assets/site.js",
         "assets/privacy.js",
+        "assets/consent-personal-data.js",
         "assets/legal.js",
         "robots.txt",
         "sitemap.xml",
@@ -160,7 +163,7 @@ def check_dist(root: pathlib.Path) -> list[str]:
         for route in ("", "shop", "teaware", "business", "booking")
     )
     for name in public_app_files + (
-        "privacy.html", "legal.html",
+        "privacy.html", "consent-personal-data.html", "legal.html",
     ):
         path = root / name
         if not path.is_file():

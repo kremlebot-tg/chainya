@@ -13,6 +13,7 @@ from pathlib import Path
 SOURCE = Path("/var/lib/chainya-shop/orders.sqlite3")
 CATALOG_SOURCE = Path("/var/lib/chainya-shop/catalog.json")
 CATALOG_MEDIA_SOURCE = Path("/var/lib/chainya-shop/catalog-media")
+REPAIR_MEDIA_SOURCE = Path("/var/lib/chainya-shop/repair-media")
 DESTINATION = Path("/var/backups/chainya-shop")
 KEEP_DAYS = 30
 ANALYTICS_LIVE_DAYS = 360  # с учётом ежедневного удаления — до 32 дней в копиях
@@ -66,6 +67,7 @@ def apply_retention(
     counts = {
         "analytics_deleted": 0,
         "business_leads_anonymized": 0,
+        "repair_requests_anonymized": 0,
         "bookings_anonymized": 0,
         "orders_anonymized": 0,
         "customer_sessions_deleted": 0,
@@ -98,6 +100,36 @@ def apply_retention(
             (contact_cutoff,),
         )
         counts["business_leads_anonymized"] = cursor.rowcount
+
+    if table_exists(connection, "repair_requests"):
+        expired_images = [
+            row[0] for row in connection.execute(
+                f"""SELECT image_name FROM repair_requests
+                     WHERE {activity_expression()} < ? AND image_name IS NOT NULL""",
+                (contact_cutoff,),
+            ).fetchall()
+            if row[0]
+        ]
+        cursor = connection.execute(
+            f"""UPDATE repair_requests
+                   SET name = '', phone = '', description = '', image_name = NULL,
+                       upload_token_hash = NULL, idempotency_key_hash = NULL,
+                       request_hash = NULL
+                 WHERE {activity_expression()} < ?
+                   AND (
+                       name != '' OR phone != '' OR description != '' OR image_name IS NOT NULL
+                       OR upload_token_hash IS NOT NULL OR idempotency_key_hash IS NOT NULL
+                       OR request_hash IS NOT NULL
+                   )""",
+            (contact_cutoff,),
+        )
+        counts["repair_requests_anonymized"] = cursor.rowcount
+        for filename in expired_images:
+            if not isinstance(filename, str) or not filename.endswith(".webp"):
+                continue
+            path = REPAIR_MEDIA_SOURCE / filename
+            if path.is_file() and not path.is_symlink():
+                path.unlink()
 
     if table_exists(connection, "bookings"):
         cursor = connection.execute(
@@ -171,6 +203,10 @@ def main(
                 for image in sorted(CATALOG_MEDIA_SOURCE.glob("*.webp")):
                     if image.is_file() and not image.is_symlink():
                         archive.add(image, arcname=f"catalog-media/{image.name}", recursive=False)
+            if REPAIR_MEDIA_SOURCE.is_dir():
+                for image in sorted(REPAIR_MEDIA_SOURCE.glob("*.webp")):
+                    if image.is_file() and not image.is_symlink():
+                        archive.add(image, arcname=f"repair-media/{image.name}", recursive=False)
         temporary.chmod(0o600)
         temporary.replace(catalog_target)
     cutoff = current - timedelta(days=KEEP_DAYS)

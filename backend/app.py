@@ -132,6 +132,9 @@ CATALOG_SEED_PATH = Path(
 CATALOG_MEDIA_DIR = Path(
     os.getenv("CHAINYA_CATALOG_MEDIA_DIR", DATA_DIR / "catalog-media")
 )
+REPAIR_MEDIA_DIR = Path(
+    os.getenv("CHAINYA_REPAIR_MEDIA_DIR", DATA_DIR / "repair-media")
+)
 CDEK_CITIES_PATH = Path(
     os.getenv("CDEK_CITIES_PATH", DATA_DIR / "cdek-cities-ru.json")
 )
@@ -161,6 +164,7 @@ ADMIN_SESSION_SECONDS = 12 * 60 * 60
 CUSTOMER_SESSION_COOKIE = "chainya_customer_session"
 CUSTOMER_SESSION_SECONDS = 30 * 24 * 60 * 60
 CUSTOMER_PASSWORD_ITERATIONS = 310_000
+PERSONAL_DATA_CONSENT_VERSION = "2026-08-30.2"
 TBANK_INIT_LEASE_SECONDS = 45
 STOCK_RESERVATION_MINUTES = 15
 PAID_EFFECT_LEASE_SECONDS = 90
@@ -558,6 +562,38 @@ class CreateBusinessLead(BaseModel):
         return value
 
 
+class CreateRepairRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    phone: str = Field(min_length=3, max_length=80)
+    description: str = Field(min_length=3, max_length=1500)
+    has_image: bool = False
+    upload_token: str = Field(default="", max_length=128)
+    privacy_accepted: Literal[True]
+
+    @field_validator("name", "description")
+    @classmethod
+    def strip_repair_text(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("phone")
+    @classmethod
+    def valid_repair_phone(cls, value: str) -> str:
+        value = value.strip()
+        if len(re.sub(r"\D", "", value)) < 10:
+            raise ValueError("укажите полный номер телефона")
+        return value
+
+    @model_validator(mode="after")
+    def valid_repair_upload(self):
+        if self.has_image and not re.fullmatch(
+            r"[A-Za-z0-9_-]{32,128}", self.upload_token
+        ):
+            raise ValueError("не удалось подготовить безопасную загрузку фотографии")
+        if not self.has_image:
+            self.upload_token = ""
+        return self
+
+
 def moscow_now() -> datetime:
     return datetime.now(MOSCOW_TZ)
 
@@ -770,10 +806,13 @@ class CatalogReorder(BaseModel):
 class AnalyticsEvent(BaseModel):
     session_id: str = Field(min_length=16, max_length=80, pattern=r"^[A-Za-z0-9_-]+$")
     event: Literal[
-        "page_view", "section_view", "tea_view", "cart_open", "checkout_start",
-        "booking_start", "booking_sent", "booking_handoff", "b2b_sent",
+        "page_view", "section_view", "tea_view", "cart_add", "cart_open",
+        "checkout_start", "booking_start", "booking_sent", "booking_handoff",
+        "b2b_sent", "repair_opened", "repair_sent",
     ]
-    section: Literal["", "home", "shop", "tea", "cart", "book", "b2b", "payment"] = ""
+    section: Literal[
+        "", "home", "shop", "teaware", "tea", "cart", "book", "b2b", "payment"
+    ] = ""
     language: Literal["ru", "en", "zh"] = "ru"
     device: Literal["mobile", "tablet", "desktop"] = "desktop"
     referrer: str = Field(default="direct", max_length=160, pattern=r"^[A-Za-z0-9.:-]+$")
@@ -786,6 +825,36 @@ class AnalyticsEvent(BaseModel):
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def record_personal_data_consent(
+    con: sqlite3.Connection,
+    *,
+    record_type: str,
+    record_id: str,
+    purpose: str,
+    source: str,
+    consented_at: str,
+) -> None:
+    """Keep proof of the exact consent accepted with a new user record.
+
+    No IP address or browser fingerprint is added: the audit row is linked to
+    the already-created business record and stores only the server-controlled
+    consent version, timestamp, purpose and submission channel.
+    """
+    con.execute(
+        """INSERT INTO personal_data_consents
+           (record_type, record_id, purpose, consent_version, consented_at, source)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (
+            record_type,
+            record_id,
+            purpose,
+            PERSONAL_DATA_CONSENT_VERSION,
+            consented_at,
+            source,
+        ),
+    )
 
 
 def normalize_customer_phone(value: str) -> str:
@@ -1121,6 +1190,36 @@ def init_db() -> None:
             "WHERE idempotency_key_hash IS NOT NULL"
         )
         con.execute("""
+            CREATE TABLE IF NOT EXISTS repair_requests (
+                id TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL,
+                name TEXT NOT NULL,
+                phone TEXT NOT NULL,
+                description TEXT NOT NULL,
+                has_image INTEGER NOT NULL DEFAULT 0,
+                image_name TEXT,
+                upload_token_hash TEXT,
+                notification_sent INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'new',
+                updated_at TEXT NOT NULL,
+                idempotency_key_hash TEXT,
+                request_hash TEXT
+            )
+        """)
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_repair_requests_created "
+            "ON repair_requests(created_at)"
+        )
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_repair_requests_status "
+            "ON repair_requests(status)"
+        )
+        con.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_repair_requests_idempotency "
+            "ON repair_requests(idempotency_key_hash) "
+            "WHERE idempotency_key_hash IS NOT NULL"
+        )
+        con.execute("""
             CREATE TABLE IF NOT EXISTS bookings (
                 id TEXT PRIMARY KEY,
                 created_at TEXT NOT NULL,
@@ -1169,6 +1268,22 @@ def init_db() -> None:
         con.execute(
             "CREATE INDEX IF NOT EXISTS idx_bookings_customer_slot "
             "ON bookings(customer_account_id, booking_date, booking_time)"
+        )
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS personal_data_consents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                record_type TEXT NOT NULL,
+                record_id TEXT NOT NULL,
+                purpose TEXT NOT NULL,
+                consent_version TEXT NOT NULL,
+                consented_at TEXT NOT NULL,
+                source TEXT NOT NULL,
+                UNIQUE(record_type, record_id, purpose)
+            )
+        """)
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_personal_data_consents_record "
+            "ON personal_data_consents(record_type, record_id)"
         )
         con.execute("""
             CREATE TABLE IF NOT EXISTS booking_blocks (
@@ -1742,6 +1857,17 @@ def booking_slots(con: sqlite3.Connection, day: datetime_date) -> list[dict]:
 def business_lead_request_hash(payload: CreateBusinessLead) -> str:
     encoded = json.dumps(
         payload.model_dump(mode="json"),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def repair_request_hash(payload: CreateRepairRequest) -> str:
+    semantic = payload.model_dump(mode="json", exclude={"upload_token"})
+    encoded = json.dumps(
+        semantic,
         ensure_ascii=False,
         sort_keys=True,
         separators=(",", ":"),
@@ -3182,6 +3308,71 @@ def notify_business_lead(lead: dict) -> None:
         f"Комментарий: {lead['note']}" if lead["note"] else "",
     ]))
     send_to_owners(text, "B2B-заявку")
+
+
+def send_repair_photo_to_owners(path: Path, request_id: str) -> bool:
+    if not BOT_TOKEN or not OWNER_CHAT_IDS or not path.is_file():
+        return False
+    photo = path.read_bytes()
+    all_sent = True
+    for chat_id in OWNER_CHAT_IDS:
+        boundary = f"chainya-{uuid.uuid4().hex}"
+        body = b"".join((
+            f"--{boundary}\r\nContent-Disposition: form-data; name=\"chat_id\"\r\n\r\n{chat_id}\r\n".encode(),
+            f"--{boundary}\r\nContent-Disposition: form-data; name=\"caption\"\r\n\r\nФото к заявке на ремонт № {request_id}\r\n".encode("utf-8"),
+            f"--{boundary}\r\nContent-Disposition: form-data; name=\"photo\"; filename=\"repair.webp\"\r\nContent-Type: image/webp\r\n\r\n".encode(),
+            photo,
+            f"\r\n--{boundary}--\r\n".encode(),
+        ))
+        request = urllib.request.Request(
+            f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto",
+            data=body,
+            method="POST",
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=8) as response:
+                if response.status != 200:
+                    raise RuntimeError(f"Telegram HTTP {response.status}")
+        except Exception:
+            all_sent = False
+            logging.exception(
+                "Не удалось отправить фото заявки на ремонт %s владельцу %s",
+                request_id,
+                chat_id,
+            )
+    return all_sent
+
+
+def notify_repair_request(request_id: str) -> None:
+    with db() as con:
+        row = con.execute(
+            "SELECT * FROM repair_requests WHERE id = ?", (request_id,)
+        ).fetchone()
+    if not row or row["notification_sent"]:
+        return
+    if row["has_image"] and not row["image_name"]:
+        return
+    text = "\n".join((
+        "🏺 Новая заявка · кинцуги / ремонт посуды",
+        f"№ {row['id']}",
+        f"Имя: {row['name']}",
+        f"Телефон: {row['phone']}",
+        f"Что случилось: {row['description']}",
+        "Фото приложено" if row["image_name"] else "Фото не приложено",
+    ))
+    text_sent = send_to_owners(text, "заявку на ремонт посуды")
+    photo_sent = True
+    if row["image_name"]:
+        photo_sent = send_repair_photo_to_owners(
+            REPAIR_MEDIA_DIR / row["image_name"], row["id"]
+        )
+    if text_sent and photo_sent:
+        with db() as con:
+            con.execute(
+                "UPDATE repair_requests SET notification_sent = 1, updated_at = ? WHERE id = ?",
+                (now_iso(), row["id"]),
+            )
 
 
 def notify_booking(booking: dict) -> None:
@@ -4833,7 +5024,7 @@ def dynamic_sitemap():
             )
     rows.extend(
         f"  <url><loc>{PUBLIC_SITE}{path}</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>"
-        for path in ("/legal.html", "/privacy.html")
+        for path in ("/legal.html", "/privacy.html", "/consent-personal-data.html")
     )
     for item in document["teas"]:
         if not item.get("published", True):
@@ -5381,6 +5572,31 @@ def persist_catalog_image(data: bytes) -> str:
     return filename
 
 
+def persist_repair_image(request_id: str, data: bytes) -> str:
+    digest = hashlib.blake2b(
+        request_id.encode("ascii") + data, digest_size=16
+    ).hexdigest()
+    filename = f"{digest}.webp"
+    REPAIR_MEDIA_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
+    target = REPAIR_MEDIA_DIR / filename
+    if target.exists():
+        return filename
+    descriptor, temporary = tempfile.mkstemp(
+        prefix=".repair-", suffix=".webp", dir=REPAIR_MEDIA_DIR
+    )
+    try:
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(temporary, 0o600)
+        os.replace(temporary, target)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+    return filename
+
+
 @app.post("/api/admin/catalog/items/{item_id}/image")
 async def admin_upload_catalog_image(
     item_id: str,
@@ -5898,6 +6114,94 @@ def admin_update_business_lead(
         )
         row = con.execute("SELECT * FROM business_leads WHERE id = ?", (lead_id,)).fetchone()
     return dict(row)
+
+
+@app.get("/api/admin/repair-requests")
+def admin_repair_requests(
+    authorization: str = Header(default=""),
+    status: str = "",
+    q: str = Query(default="", max_length=160),
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+):
+    require_admin(authorization)
+    if status and status not in {"new", "contacted", "closed"}:
+        raise HTTPException(422, "Неизвестный статус")
+    conditions, params = [], []
+    if status:
+        conditions.append("status = ?")
+        params.append(status)
+    query = q.strip()
+    if query:
+        conditions.append("casefold(id || ' ' || name || ' ' || phone || ' ' || description) LIKE ?")
+        params.append(f"%{query.casefold()}%")
+    where = " WHERE " + " AND ".join(conditions) if conditions else ""
+    with db() as con:
+        con.create_function("casefold", 1, lambda value: (value or "").casefold())
+        total = int(
+            con.execute(f"SELECT COUNT(*) FROM repair_requests{where}", params).fetchone()[0]
+        )
+        rows = con.execute(
+            f"SELECT * FROM repair_requests{where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            (*params, limit, offset),
+        ).fetchall()
+    return {
+        "requests": [
+            {
+                **dict(row),
+                "image_url": f"/api/admin/repair-requests/{row['id']}/image"
+                if row["image_name"] else None,
+            }
+            for row in rows
+        ],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+@app.patch("/api/admin/repair-requests/{request_id}")
+def admin_update_repair_request(
+    request_id: str,
+    payload: UpdateLeadStatus,
+    authorization: str = Header(default=""),
+):
+    require_admin(authorization)
+    with db() as con:
+        exists = con.execute(
+            "SELECT 1 FROM repair_requests WHERE id = ?", (request_id,)
+        ).fetchone()
+        if not exists:
+            raise HTTPException(404, "Заявка не найдена")
+        con.execute(
+            "UPDATE repair_requests SET status = ?, updated_at = ? WHERE id = ?",
+            (payload.status, now_iso(), request_id),
+        )
+        row = con.execute(
+            "SELECT * FROM repair_requests WHERE id = ?", (request_id,)
+        ).fetchone()
+    return dict(row)
+
+
+@app.get("/api/admin/repair-requests/{request_id}/image")
+def admin_repair_request_image(
+    request_id: str, authorization: str = Header(default="")
+):
+    require_admin(authorization)
+    with db() as con:
+        row = con.execute(
+            "SELECT image_name FROM repair_requests WHERE id = ?", (request_id,)
+        ).fetchone()
+    if not row or not row["image_name"] or not MEDIA_FILE_RE.fullmatch(row["image_name"]):
+        raise HTTPException(404, "Фотография не найдена")
+    path = REPAIR_MEDIA_DIR / row["image_name"]
+    if not path.is_file():
+        raise HTTPException(404, "Фотография не найдена")
+    return FileResponse(
+        path,
+        media_type="image/webp",
+        headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
+    )
 
 
 @app.get("/api/admin/bookings")
@@ -6653,6 +6957,14 @@ def register_customer(
                     hash_customer_password(payload.password), created, created,
                 ),
             )
+            record_personal_data_consent(
+                con,
+                record_type="customer_account",
+                record_id=account_id,
+                purpose="customer_account",
+                source="website",
+                consented_at=created,
+            )
     except sqlite3.IntegrityError:
         raise HTTPException(409, "Для этого телефона уже создан личный кабинет") from None
     create_customer_session(response, account_id)
@@ -6994,7 +7306,10 @@ def create_order(
     order_id = uuid.uuid4().hex[:12].upper()
     created = now_iso()
     customer = payload.model_dump(
-        exclude={"items", "payment_method", "delivery", "language", "analytics_session", "promo_code"}
+        exclude={
+            "items", "payment_method", "delivery", "language",
+            "analytics_session", "promo_code", "privacy_accepted",
+        }
     )
     analytics_session_hash = hash_session(payload.analytics_session) if payload.analytics_session else None
     payment_token = uuid.uuid4().hex
@@ -7028,6 +7343,14 @@ def create_order(
                  request_fingerprint, 0, customer_account_id,
                  promo["original_subtotal"], promo["code"],
                  promo["discount_percent"], promo["discount_amount"]),
+            )
+            record_personal_data_consent(
+                con,
+                record_type="order",
+                record_id=order_id,
+                purpose="order_checkout",
+                source="website",
+                consented_at=created,
             )
             if stock_guard_enabled():
                 reserve_verified_stock(
@@ -7116,10 +7439,109 @@ def create_business_lead(
                     lead["created_at"], key_hash, request_fingerprint,
                 ),
             )
+            record_personal_data_consent(
+                con,
+                record_type="business_lead",
+                record_id=lead["id"],
+                purpose="business_enquiry",
+                source="website",
+                consented_at=lead["created_at"],
+            )
     if reused_row:
         return {"id": reused_row["id"], "accepted": True}
     background_tasks.add_task(notify_business_lead, lead)
     return {"id": lead["id"], "accepted": True}
+
+
+@app.post("/api/repair-requests", status_code=202)
+def create_repair_request(
+    payload: CreateRepairRequest,
+    background_tasks: BackgroundTasks,
+    request: Request,
+    idempotency_key: str = Header(default="", alias="Idempotency-Key"),
+):
+    key_hash = idempotency_hash(idempotency_key) if idempotency_key else None
+    fingerprint = repair_request_hash(payload)
+    if key_hash:
+        with db() as con:
+            existing = con.execute(
+                "SELECT * FROM repair_requests WHERE idempotency_key_hash = ?",
+                (key_hash,),
+            ).fetchone()
+        if existing:
+            if existing["request_hash"] != fingerprint:
+                raise HTTPException(409, "Idempotency-Key уже использован для другой заявки")
+            return {
+                "id": existing["id"],
+                "accepted": True,
+                "upload_required": bool(existing["has_image"] and not existing["image_name"]),
+            }
+    rate_limit(request, "repair-request", 5, 600)
+    created = now_iso()
+    repair_id = uuid.uuid4().hex[:12].upper()
+    token_hash = (
+        hashlib.sha256(payload.upload_token.encode("utf-8")).hexdigest()
+        if payload.has_image else None
+    )
+    with db() as con:
+        con.execute(
+            """INSERT INTO repair_requests
+               (id, created_at, name, phone, description, has_image, image_name,
+                upload_token_hash, notification_sent, status, updated_at,
+                idempotency_key_hash, request_hash)
+               VALUES (?, ?, ?, ?, ?, ?, NULL, ?, 0, 'new', ?, ?, ?)""",
+            (
+                repair_id, created, payload.name, payload.phone, payload.description,
+                int(payload.has_image), token_hash, created, key_hash, fingerprint,
+            ),
+        )
+        record_personal_data_consent(
+            con,
+            record_type="repair_request",
+            record_id=repair_id,
+            purpose="teaware_repair_enquiry",
+            source="website",
+            consented_at=created,
+        )
+    if not payload.has_image:
+        background_tasks.add_task(notify_repair_request, repair_id)
+    return {"id": repair_id, "accepted": True, "upload_required": payload.has_image}
+
+
+@app.post("/api/repair-requests/{request_id}/image", status_code=202)
+async def upload_repair_request_image(
+    request_id: str,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    upload_token: str = Header(default="", alias="X-Repair-Upload-Token"),
+):
+    if not re.fullmatch(r"[A-Za-z0-9_-]{32,128}", upload_token):
+        raise HTTPException(403, "Недействительный ключ загрузки")
+    with db() as con:
+        row = con.execute(
+            "SELECT * FROM repair_requests WHERE id = ?", (request_id.upper(),)
+        ).fetchone()
+    supplied_hash = hashlib.sha256(upload_token.encode("utf-8")).hexdigest()
+    if not row or not row["has_image"] or not row["upload_token_hash"] or not secrets.compare_digest(
+        row["upload_token_hash"], supplied_hash
+    ):
+        raise HTTPException(403, "Недействительный ключ загрузки")
+    if request.headers.get("content-type", "").split(";", 1)[0].lower() not in {
+        "image/jpeg", "image/png", "image/webp",
+    }:
+        raise HTTPException(415, "Поддерживаются JPG, PNG и WebP")
+    rate_limit(request, "repair-image", 8, 600)
+    data = prepare_catalog_image(await bounded_request_body(request, 8 * 1024 * 1024))
+    filename = persist_repair_image(row["id"], data)
+    with db() as con:
+        con.execute(
+            """UPDATE repair_requests
+               SET image_name = ?, updated_at = ?
+               WHERE id = ?""",
+            (filename, now_iso(), row["id"]),
+        )
+    background_tasks.add_task(notify_repair_request, row["id"])
+    return {"id": row["id"], "accepted": True, "image_received": True}
 
 
 @app.get("/api/bookings/availability")
@@ -7229,6 +7651,14 @@ def create_booking(
                     booking["source"], booking["created_at"], key_hash,
                     request_fingerprint, customer_account_id, cancel_token_hash,
                 ),
+            )
+            record_personal_data_consent(
+                con,
+                record_type="booking",
+                record_id=booking["id"],
+                purpose="table_booking",
+                source=booking["source"],
+                consented_at=booking["created_at"],
             )
     if reused_row:
         token = booking_cancel_token(reused_row["id"])

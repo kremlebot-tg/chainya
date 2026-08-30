@@ -244,6 +244,19 @@ def test_account_tabs_support_keyboard_navigation_and_semantic_panels():
 def test_account_respects_reduced_motion_preference():
     assert "@media(prefers-reduced-motion:reduce)" in ACCOUNT_SOURCE
     assert "transition-duration:.01ms!important" in ACCOUNT_SOURCE
+    assert "animation-iteration-count:1!important" in ACCOUNT_SOURCE
+
+
+def test_public_and_admin_motion_is_quiet_and_accessible():
+    assert "@keyframes view-enter" in SOURCE
+    assert ".repair-service__body:not([hidden]){animation:view-enter" in SOURCE
+    assert "animation-iteration-count:1 !important" in SOURCE
+    assert "const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)')" in SOURCE
+    assert "behavior:motionBehavior()" in SOURCE
+    assert "typeof mainImage.animate === 'function'" in SOURCE
+    assert "@keyframes admin-view-enter" in ADMIN_SOURCE
+    assert "animation-iteration-count:1!important" in ADMIN_SOURCE
+    assert "motionBehavior=()=>reducedMotion.matches?'instant':'smooth'" in ADMIN_SOURCE
 
 
 def test_catalog_admin_distinguishes_saby_price_list_from_base_catalog():

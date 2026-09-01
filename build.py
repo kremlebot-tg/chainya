@@ -120,7 +120,7 @@ def public_page_url(route: str, language: str) -> str:
 # и ни телеграму, ни CDN нечего отдавать из старого кэша.
 OG_SRC = root / "src-assets" / "og.jpg"
 OG_NAME = f"og.{hashlib.sha256(OG_SRC.read_bytes()).hexdigest()[:8]}.jpg"
-HERO_SOURCE = "/api/catalog/hero-image" if web else f"{asset_root}img/tea-baihao.webp"
+HERO_SOURCE = "/catalog-media/current-hero.webp" if web else f"{asset_root}img/tea-baihao.webp"
 HERO_PRELOAD = (
     f'<link rel="preload" as="image" href="{HERO_SOURCE}" fetchpriority="high">'
     if web else ""
@@ -347,7 +347,7 @@ content = re.sub(r"\{\{img:([a-z0-9\-]+)\}\}", img_ref, content)
 if web:
     content = content.replace(
         'id="hero-img" src="/img/tea-baihao.webp"',
-        'id="hero-img" src="/api/catalog/hero-image"',
+        'id="hero-img" src="/catalog-media/current-hero.webp"',
     )
 
 if missing:

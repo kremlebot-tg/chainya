@@ -5708,34 +5708,8 @@ def admin_remove_catalog_image(
     return admin_catalog_response(document)
 
 
-@app.get("/catalog-media/{filename}")
-@app.head("/catalog-media/{filename}")
-def catalog_media(
-    filename: str,
-    w: int | None = Query(default=None, ge=160, le=1280),
-):
-    if not MEDIA_FILE_RE.fullmatch(filename):
-        raise HTTPException(404, "Изображение не найдено")
-    path = get_catalog_store().media_dir / filename
-    if not path.is_file():
-        raise HTTPException(404, "Изображение не найдено")
-    if w is not None:
-        if w not in {160, 320, 640, 800, 960, 1280}:
-            raise HTTPException(422, "Недоступный размер изображения")
-        return Response(
-            content=catalog_image_variant(str(path), w),
-            media_type="image/webp",
-            headers={"Cache-Control": "public, max-age=31536000, immutable"},
-        )
-    return FileResponse(
-        path,
-        media_type="image/webp",
-        headers={"Cache-Control": "public, max-age=31536000, immutable"},
-    )
-
-
-@app.get("/api/catalog/hero-image")
-@app.head("/api/catalog/hero-image")
+@app.get("/catalog-media/current-hero.webp")
+@app.head("/catalog-media/current-hero.webp")
 def public_catalog_hero_image():
     """Expose the owner's current hero tea photo without delaying HTML discovery."""
     document = get_catalog_store().get()
@@ -5764,6 +5738,32 @@ def public_catalog_hero_image():
         "/img/tea-baihao.webp",
         status_code=307,
         headers={"Cache-Control": "public, max-age=300, stale-while-revalidate=3600"},
+    )
+
+
+@app.get("/catalog-media/{filename}")
+@app.head("/catalog-media/{filename}")
+def catalog_media(
+    filename: str,
+    w: int | None = Query(default=None, ge=160, le=1280),
+):
+    if not MEDIA_FILE_RE.fullmatch(filename):
+        raise HTTPException(404, "Изображение не найдено")
+    path = get_catalog_store().media_dir / filename
+    if not path.is_file():
+        raise HTTPException(404, "Изображение не найдено")
+    if w is not None:
+        if w not in {160, 320, 640, 800, 960, 1280}:
+            raise HTTPException(422, "Недоступный размер изображения")
+        return Response(
+            content=catalog_image_variant(str(path), w),
+            media_type="image/webp",
+            headers={"Cache-Control": "public, max-age=31536000, immutable"},
+        )
+    return FileResponse(
+        path,
+        media_type="image/webp",
+        headers={"Cache-Control": "public, max-age=31536000, immutable"},
     )
 
 

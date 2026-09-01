@@ -445,7 +445,7 @@ def test_catalog_image_is_reencoded_and_served_immutably(tmp_path, monkeypatch):
         served = client.get(image_url)
         variant = client.get(f"{image_url}?w=160")
         invalid_variant = client.get(f"{image_url}?w=200")
-        hero = client.get("/api/catalog/hero-image")
+        hero = client.get("/catalog-media/current-hero.webp")
         head = client.head(image_url)
 
     assert uploaded.status_code == 200

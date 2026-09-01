@@ -101,7 +101,7 @@ def test_public_pages_use_quiet_account_probe_and_eager_hero_image():
     assert "fetch('/api/account/session'" in SOURCE
     assert "fetch('/api/account',{cache:'no-store'})" not in SOURCE
     assert 'asset_root = "/" if web else ""' in BUILD_SOURCE
-    assert 'HERO_SOURCE = "/api/catalog/hero-image" if web else' in BUILD_SOURCE
+    assert 'HERO_SOURCE = "/catalog-media/current-hero.webp" if web else' in BUILD_SOURCE
     assert 'rel="preload" as="image" href="{HERO_SOURCE}"' in BUILD_SOURCE
     assert 'rel="preload" as="font"' in BUILD_SOURCE
     assert 'id="hero-img" src="{{img:tea-baihao}}"' in SOURCE
@@ -520,7 +520,7 @@ def test_initial_catalog_waits_for_live_data_before_showing_product_photos():
     assert "function renderCatalogLoading()" in SOURCE
     assert "hero.removeAttribute('src')" not in SOURCE
     assert 'id="hero-img" src="{{img:tea-baihao}}"' in SOURCE
-    assert 'id="hero-img" src="/api/catalog/hero-image"' in BUILD_SOURCE
+    assert 'id="hero-img" src="/catalog-media/current-hero.webp"' in BUILD_SOURCE
     assert "hero.closest('.hero__media').classList.remove('is-loading')" in SOURCE
     assert "home.replaceChildren(...skeleton(3))" in SOURCE
     assert "menu.replaceChildren(...skeleton(48))" in SOURCE

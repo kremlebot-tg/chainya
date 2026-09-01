@@ -173,7 +173,8 @@ h1, h2, h3, p{ text-wrap:pretty; }
   from{ opacity:0; transform:translateY(7px); }
   to{ opacity:1; transform:none; }
 }
-.view.is-active{ display:block; animation:view-enter var(--motion-base) var(--ease) both; }
+.view.is-active{ display:block; }
+.view.is-active.is-entering{ animation:view-enter var(--motion-base) var(--ease) both; }
 
 /* Значок корзины подпрыгивает при добавлении; кнопка «В корзину» — короткий отклик */
 @keyframes badge-pop{ 0%{ transform:scale(1); } 35%{ transform:scale(1.45); } 100%{ transform:scale(1); } }
@@ -354,6 +355,8 @@ h1, h2, h3, p{ text-wrap:pretty; }
 
 /* ── Карточка чая ── */
 .tea-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(232px,1fr)); gap:clamp(14px,1.6vw,20px); }
+#menu-teas.catalog-pending{ height:max(900px,115svh); overflow:hidden; }
+#subfilters-shell{ min-height:48px; }
 .catalog-skeleton{ min-width:0; }
 .catalog-skeleton__art{ aspect-ratio:1; border-radius:2px; }
 .catalog-skeleton__body{ padding:15px 2px 8px; }
@@ -642,6 +645,7 @@ h1, h2, h3, p{ text-wrap:pretty; }
 /* minmax(0,…), а не 1fr: у элементов грида min-width:auto, и лента дней
    шириной в 1000+ px растянула бы колонку, уведя всю страницу вбок */
 .book{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,.78fr); gap:clamp(28px,4vw,64px); align-items:start; }
+#view-book .sec__head .lead{ min-height:4.9em; }
 #view-b2b .book{ grid-template-columns:minmax(0,1.3fr) minmax(340px,.62fr); }
 .book > *{ min-width:0; }
 .field{ margin-bottom:22px; }
@@ -827,7 +831,7 @@ select.input{
 .foot a{ min-height:24px; display:inline-flex; align-items:center; transition:color .2s var(--ease); }
 .foot a:hover{ color:var(--accent); }
 .foot__logo{ margin-bottom:18px; }
-.foot__logo img{ height:86px; width:auto; display:block; border-radius:2px; }
+.foot__logo img{ width:42px; height:86px; object-fit:contain; display:block; border-radius:2px; }
 .foot__brand{ font-family:'Prata',Georgia,serif; font-size:22px; letter-spacing:.2em; text-transform:uppercase; }
 .foot__bot{
   margin-top:clamp(36px,5vw,56px); padding-top:22px; border-top:1px solid var(--line-soft);
@@ -1006,6 +1010,12 @@ select.input{
   #menu-teas .price{ font-family:'Golos Text',sans-serif; font-size:15px; font-weight:600; }
   #menu-teas .price small{ display:block; margin:2px 0 0; font-size:12px; font-weight:400; }
   #menu-teas .tea__quick{ width:44px; height:44px; }
+  #menu-teas .catalog-skeleton{
+    display:grid; grid-template-columns:minmax(112px,36%) minmax(0,1fr);
+    min-height:152px; padding-top:10px; border-top:1px solid var(--line-soft);
+  }
+  #menu-teas .catalog-skeleton__art{ aspect-ratio:auto; min-height:142px; }
+  #menu-teas .catalog-skeleton__body{ padding:16px 4px 4px 13px; }
 }
 @media (max-width:359px){
   .facts__in{ grid-template-columns:1fr; }
@@ -1122,13 +1132,13 @@ select.input{
 <section class="view is-active" id="view-home">
   <div class="hero">
     <figure class="hero__media">
-      <img id="hero-img" alt="" data-i18n-alt="alt_product" fetchpriority="high" decoding="async" width="800" height="800">
+      <img id="hero-img" src="{{img:tea-baihao}}" alt="" data-i18n-alt="alt_product" fetchpriority="high" decoding="async" width="800" height="800">
     </figure>
     <div class="hero__in">
       <div class="hero__copy">
         <p class="label" data-i18n="hero_label">Китайский чай · доставка по России</p>
         <h1 class="display" data-i18n="hero_h">Чай, <br>к которому <br><em>возвращаются</em></h1>
-        <p class="lead hero__lead" data-i18n="hero_lead"></p>
+        <p class="lead hero__lead" data-i18n="hero_lead">Отбираем китайский чай, который сами пьём и завариваем в Чайне. Можно взять небольшой пакет на пробу, собрать заказ домой или сначала познакомиться с чаем за нашим столом.</p>
         <div class="hero__cta">
           <button class="btn btn--solid" data-go="shop" data-i18n="cta_menu">Купить чай</button>
           <button class="btn btn--ghost" data-go="book" data-i18n="cta_book">Забронировать стол</button>
@@ -1326,7 +1336,7 @@ select.input{
         <p data-i18n="shop_note_p">Вес выбирается в карточке чая. Мандарин и квадратик продаём поштучно, блины — по запросу.</p>
       </details>
     </div>
-    <div class="tea-grid" id="menu-teas"></div>
+    <div class="tea-grid catalog-pending" id="menu-teas"></div>
     <p id="fav-empty" data-i18n="fav_empty" hidden>Здесь появится то, что вы отметите сердечком.</p>
     <p id="shop-empty" data-i18n="shop_empty" hidden>По этому запросу ничего не найдено. Попробуйте другое название или сбросьте фильтр.</p>
   </div>
@@ -1478,7 +1488,7 @@ select.input{
           <p class="label" data-i18n="book_label">Бронь</p>
           <h1 class="display" data-i18n="book_h">Занять стол</h1>
         </div>
-        <p class="lead" data-i18n="book_lead"></p>
+        <p class="lead" data-i18n="book_lead">Выберите формат, дату и свободное время. Каждая заявка занимает единственный стол на два часа.</p>
       </div>
 
       <div class="book">
@@ -1544,7 +1554,7 @@ select.input{
           <a class="btn btn--ghost btn--wide" id="call-link" href="tel:+79055908801" style="margin-top:14px">
             <span data-i18n="book_call">Позвонить: +7 905 590-88-01</span>
           </a>
-          <p class="summary__note" data-i18n="sum_note"></p>
+          <p class="summary__note" data-i18n="sum_note">Платить сейчас не нужно. После отправки время закрепится за вашей заявкой, а владельцы свяжутся с вами и подтвердят бронь.</p>
         </aside>
       </div>
     </form>
@@ -2697,7 +2707,15 @@ select.input{
       buildShopTools();
       applyFilter();
     }
-    $$('.view').forEach(v => v.classList.toggle('is-active', v.id === 'view-' + catalogView));
+    $$('.view').forEach(v => {
+      const active = v.id === 'view-' + catalogView;
+      v.classList.toggle('is-active', active);
+      v.classList.remove('is-entering');
+      if (active && updateHistory && changingView){
+        v.classList.add('is-entering');
+        setTimeout(() => v.classList.remove('is-entering'), motionDelay(700));
+      }
+    });
     $$('.nav__link').forEach(a => {
       if (a.dataset.go === view) a.setAttribute('aria-current','page');
       else a.removeAttribute('aria-current');
@@ -2788,6 +2806,11 @@ select.input{
     ? rub(m.p) + `&nbsp;<small>${T().per_pc}</small>`
     : rub(packPrice(m.p, PACKS[0])) + `&nbsp;<small>${T().per_pack25}</small>`;
 
+  function displayCatalogImage(url, width=800){
+    if (!String(url || '').startsWith('/catalog-media/')) return url;
+    return `${url}?w=${width}`;
+  }
+
   let catalogImagesWired = false, catalogImageFrame = 0;
   function loadCatalogImagesNearViewport(){
     catalogImageFrame = 0;
@@ -2812,12 +2835,13 @@ select.input{
     scheduleCatalogImages();
   }
 
-  function teaCard(m, headingTag='h3', deferImage=false, eagerImage=false){
+  function teaCard(m, headingTag='h3', deferImage=false, eagerImage=false, highPriority=false){
     const txt = T().teas[m.id];
+    const cardImage = displayCatalogImage(m.img, 800);
     const node = el(`
       <article class="tea" data-type="${m.t}" data-id="${m.id}" data-price="${m.unit === 'pc' ? m.p : packPrice(m.p, PACKS[0])}" data-stock="${inStock(m) ? 1 : 0}">
         <div class="tea__art${inStock(m) ? '' : ' tea__art--oos'}">
-          <img ${deferImage ? `data-catalog-src="${m.img}"${eagerImage ? ' data-catalog-eager="1"' : ''}` : `src="${m.img}"`} alt="${escAttr(txt.n)}" loading="lazy" decoding="async"${deferImage ? ' fetchpriority="low"' : ''} width="800" height="800">
+          <img ${deferImage ? `data-catalog-src="${cardImage}"${eagerImage ? ' data-catalog-eager="1"' : ''}` : `src="${cardImage}"`} alt="${escAttr(txt.n)}" loading="${eagerImage ? 'eager' : 'lazy'}" decoding="async"${deferImage ? ` fetchpriority="${highPriority ? 'high' : 'low'}"` : ''} width="800" height="800">
           <span class="tea__dot" style="background:${LQ[m.t] || '#b99b78'}"></span>
           ${inStock(m) ? '' : `<span class="tea__oos">${T().oos}</span>`}
           <button class="tea__fav" data-id="${m.id}" aria-pressed="${isFav(m.id)}" aria-label="${escAttr(T().fav_label)}" title="${escAttr(T().fav_label)}">
@@ -2866,15 +2890,13 @@ select.input{
       if (typeGroup(m.t) !== 'tea') continue;
       if (!pick.includes(m)) pick.push(m);
     }
-    pick.forEach(m => strip.append(el(`<img src="${m.img}" alt="" loading="lazy" width="800" height="800">`)));
+    pick.forEach(m => strip.append(el(`<img src="${displayCatalogImage(m.img, 320)}" alt="" loading="lazy" decoding="async" width="800" height="800">`)));
   }
 
-  const HERO_TEA_ID = 'baihao';
   const HERO_FALLBACK = '{{img:tea-baihao}}';
   function selectHeroImage(){
-    const tea = TEA_META.find(item => item.id === HERO_TEA_ID);
     const img = $('#hero-img');
-    img.src = tea?.img || HERO_FALLBACK;
+    if (!img.getAttribute('src')) img.src = HERO_FALLBACK;
     img.alt = T().alt_product || '';
     img.style.objectPosition = '50% 50%';
     img.closest('.hero__media').classList.remove('is-loading');
@@ -2953,7 +2975,7 @@ select.input{
       if (inStock(m) && !featured.includes(m)) featured.push(m);
     }
     home.append(...featured.slice(0,3).map(m => teaCard(m, 'h3')));
-    menu.append(...stockFirst(TEA_META).map((m,index) => teaCard(m, 'h2', true, index < 8)));
+    menu.append(...stockFirst(TEA_META).map((m,index) => teaCard(m, 'h2', true, index < 8, index === 0)));
     if ($('#view-shop').classList.contains('is-active')) activateCatalogImages();
     applyFilter();
   }
@@ -2967,9 +2989,8 @@ select.input{
   let PARTNERS = null;
   function renderCatalogLoading(){
     const hero = $('#hero-img');
-    hero.removeAttribute('src');
-    hero.alt = '';
-    hero.closest('.hero__media').classList.add('is-loading');
+    hero.alt = T().alt_product || '';
+    hero.closest('.hero__media').classList.remove('is-loading');
     const skeleton = count => Array.from({length:count},()=>el(`
       <div class="catalog-skeleton" aria-hidden="true">
         <div class="catalog-skeleton__art"></div>
@@ -2981,7 +3002,7 @@ select.input{
       </div>`));
     const home = $('#home-teas'), menu = $('#menu-teas');
     home.replaceChildren(...skeleton(3));
-    menu.replaceChildren(...skeleton(8));
+    menu.replaceChildren(...skeleton(48));
     home.setAttribute('aria-busy','true');
     menu.setAttribute('aria-busy','true');
     $('#brange').replaceChildren();
@@ -2993,6 +3014,7 @@ select.input{
   function renderResolvedCatalog(){
     $('#home-teas').removeAttribute('aria-busy');
     $('#menu-teas').removeAttribute('aria-busy');
+    $('#menu-teas').classList.remove('catalog-pending');
     $('#brange').classList.remove('is-loading');
     syncCatalogCounters();
     buildFilters();
@@ -3595,7 +3617,7 @@ select.input{
     c.forEach(it => {
       const m = teaById(it.id); if (!m) return;
       const row = el(`<div class="citem">
-        <img class="citem__img" src="${m.img}" alt="" loading="lazy" width="800" height="800">
+        <img class="citem__img" src="${displayCatalogImage(m.img, 160)}" alt="" loading="lazy" decoding="async" width="800" height="800">
         <div class="citem__info">
           <div class="citem__name">${escHtml(T().teas[it.id].n)}</div>
           <div class="citem__pack">${escHtml(packLabel(it))} · ${escHtml(rub(linePrice(it)))}</div>

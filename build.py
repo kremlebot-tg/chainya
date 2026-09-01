@@ -67,6 +67,30 @@ PUBLIC_PAGE_META = {
         "image_alt": "莫斯科Chaynya茶室与中国茶",
     },
 }
+
+CRITICAL_ROUTE_COPY = {
+    "ru": {
+        "shop_heading": "Каталог китайского чая",
+        "teaware_heading": "Каталог чайной посуды",
+        "hero_lead": "Отбираем китайский чай, который сами пьём и завариваем в Чайне. Можно взять небольшой пакет на пробу, собрать заказ домой или сначала познакомиться с чаем за нашим столом.",
+        "book_lead": "Выберите формат, дату и свободное время. Каждая заявка занимает единственный стол на два часа.",
+        "sum_note": "Платить сейчас не нужно. После отправки время закрепится за вашей заявкой, а владельцы свяжутся с вами и подтвердят бронь.",
+    },
+    "en": {
+        "shop_heading": "Chinese tea catalogue",
+        "teaware_heading": "Chinese teaware catalogue",
+        "hero_lead": "We select the Chinese teas we drink and brew at Chaynya ourselves. Start with a small bag, build an order for home, or get to know the tea at our table first.",
+        "book_lead": "Choose the format, date and an available time. Each request occupies our only table for two hours.",
+        "sum_note": "Nothing to pay now. After you send the request, the time is held for you while the owners contact you and confirm the booking.",
+    },
+    "zh": {
+        "shop_heading": "中国茶目录",
+        "teaware_heading": "茶具目录",
+        "hero_lead": "我们只挑自己会喝、也会在Chaynya亲手冲泡的中国茶。可以买一小包试喝，也可以为家里组合一份订单；还可以先到店里坐下来认识这款茶。",
+        "book_lead": "请选择形式、日期和可用时间。每份申请都会占用店内唯一茶席两小时。",
+        "sum_note": "现在无需付款。提交后该时段将为您的申请保留，店主会联系您并确认预订。",
+    },
+}
 SELLER_NAME = "ИНДИВИДУАЛЬНЫЙ ПРЕДПРИНИМАТЕЛЬ ДАВТЯН АРМАН КАРАПЕТОВИЧ"
 SELLER_INN = "772606053199"
 SELLER_OGRNIP = "326774600295390"
@@ -96,10 +120,19 @@ def public_page_url(route: str, language: str) -> str:
 # и ни телеграму, ни CDN нечего отдавать из старого кэша.
 OG_SRC = root / "src-assets" / "og.jpg"
 OG_NAME = f"og.{hashlib.sha256(OG_SRC.read_bytes()).hexdigest()[:8]}.jpg"
+HERO_SOURCE = "/api/catalog/hero-image" if web else f"{asset_root}img/tea-baihao.webp"
 HERO_PRELOAD = (
-    f'<link rel="preload" as="image" href="{asset_root}img/tea-baihao.webp" '
-    'fetchpriority="high">'
+    f'<link rel="preload" as="image" href="{HERO_SOURCE}" fetchpriority="high">'
+    if web else ""
 )
+FONT_PRELOAD = "\n".join(
+    f'<link rel="preload" as="font" href="/fonts/{name}.woff2" type="font/woff2" crossorigin>'
+    for name in ("prata-cyr", "prata-lat", "golos-cyr", "golos-lat")
+) if web else ""
+
+ROUTE_IMAGE_PRELOADS = {
+    "teaware": '<link rel="preload" as="image" href="/img/kintsugi-work-1.webp" fetchpriority="high">',
+} if web else {}
 
 def seo_head(
     *,
@@ -230,7 +263,11 @@ def seo_head(
         {"@context": "https://schema.org", "@graph": graph},
         ensure_ascii=False,
     ).join(('<script type="application/ld+json">', '</script>'))
-    preload = HERO_PRELOAD if preload_hero else ""
+    preload = "\n".join(part for part in (
+        FONT_PRELOAD,
+        HERO_PRELOAD if preload_hero else "",
+        ROUTE_IMAGE_PRELOADS.get(route, ""),
+    ) if part)
     image_alt = locale["image_alt"]
     alternate_links = "\n".join(
         f'<link rel="alternate" hreflang="{PUBLIC_PAGE_META[code]["hreflang"]}" href="{url}">'
@@ -284,7 +321,10 @@ def font_css(inline: bool) -> str:
     out = parts[0]
     for name, tail in zip(names, parts[1:]):
         out += f"url(/fonts/{name}.woff2)" + tail
-    return out
+    # На медленном мобильном соединении поздняя подмена метрик шрифта заметно
+    # сдвигает каталог и форму бронирования. Если шрифт не успел в короткое
+    # окно, браузер оставляет системный fallback вместо позднего layout shift.
+    return out.replace("font-display:swap", "font-display:optional")
 
 
 used, missing = set(), set()
@@ -304,6 +344,11 @@ def img_ref(m):
 
 content = src.replace("/*@FONTS@*/", font_css(inline=not web))
 content = re.sub(r"\{\{img:([a-z0-9\-]+)\}\}", img_ref, content)
+if web:
+    content = content.replace(
+        'id="hero-img" src="/img/tea-baihao.webp"',
+        'id="hero-img" src="/api/catalog/hero-image"',
+    )
 
 if missing:
     raise SystemExit("НЕТ КАРТИНОК: " + ", ".join(sorted(missing)))
@@ -579,6 +624,41 @@ if web:
                 f'<section class="view" id="view-{route_view}">',
                 f'<section class="view is-active" id="view-{route_view}">',
             )
+            critical = CRITICAL_ROUTE_COPY[language]
+            if route == "home":
+                route_content = re.sub(
+                    r'(<p class="lead hero__lead" data-i18n="hero_lead">).*?(</p>)',
+                    rf'\1{critical["hero_lead"]}\2',
+                    route_content,
+                    count=1,
+                )
+            if route in {"shop", "teaware"}:
+                heading_key = "teaware_heading" if route == "teaware" else "shop_heading"
+                route_content = re.sub(
+                    r'(<h1 class="shop-heading" id="shop-heading" data-i18n="shop_heading">).*?(</h1>)',
+                    rf'\1{critical[heading_key]}\2',
+                    route_content,
+                    count=1,
+                )
+            if route == "teaware":
+                route_content = route_content.replace(
+                    '<section class="repair-service" id="repair-service" hidden',
+                    '<section class="repair-service" id="repair-service"',
+                    1,
+                )
+            if route == "booking":
+                route_content = re.sub(
+                    r'(<p class="lead" data-i18n="book_lead">).*?(</p>)',
+                    rf'\1{critical["book_lead"]}\2',
+                    route_content,
+                    count=1,
+                )
+                route_content = re.sub(
+                    r'(<p class="summary__note" data-i18n="sum_note">).*?(</p>)',
+                    rf'\1{critical["sum_note"]}\2',
+                    route_content,
+                    count=1,
+                )
             (route_dir / "index.html").write_text(
                 document(
                     route_content,

@@ -31,6 +31,7 @@ from datetime import date as datetime_date
 from datetime import datetime, timedelta, timezone
 from datetime import time as datetime_time
 from decimal import Decimal
+from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 from zoneinfo import ZoneInfo
@@ -5557,6 +5558,23 @@ def prepare_catalog_image(source: bytes) -> bytes:
         raise HTTPException(422, "Файл не является поддерживаемым изображением") from exc
 
 
+@lru_cache(maxsize=64)
+def catalog_image_variant(path_value: str, width: int) -> bytes:
+    """Return an immutable, display-sized WebP variant for catalogue surfaces."""
+    path = Path(path_value)
+    try:
+        with Image.open(path) as original:
+            image = ImageOps.exif_transpose(original).convert("RGB")
+            if image.width <= width and image.height <= width:
+                return path.read_bytes()
+            image.thumbnail((width, width), Image.Resampling.LANCZOS)
+            output = io.BytesIO()
+            image.save(output, "WEBP", quality=82, method=6)
+            return output.getvalue()
+    except (UnidentifiedImageError, OSError, ValueError) as exc:
+        raise HTTPException(404, "Изображение не найдено") from exc
+
+
 def persist_catalog_image(data: bytes) -> str:
     filename = hashlib.blake2b(data, digest_size=16).hexdigest() + ".webp"
     store = get_catalog_store()
@@ -5692,16 +5710,60 @@ def admin_remove_catalog_image(
 
 @app.get("/catalog-media/{filename}")
 @app.head("/catalog-media/{filename}")
-def catalog_media(filename: str):
+def catalog_media(
+    filename: str,
+    w: int | None = Query(default=None, ge=160, le=1280),
+):
     if not MEDIA_FILE_RE.fullmatch(filename):
         raise HTTPException(404, "Изображение не найдено")
     path = get_catalog_store().media_dir / filename
     if not path.is_file():
         raise HTTPException(404, "Изображение не найдено")
+    if w is not None:
+        if w not in {160, 320, 640, 800, 960, 1280}:
+            raise HTTPException(422, "Недоступный размер изображения")
+        return Response(
+            content=catalog_image_variant(str(path), w),
+            media_type="image/webp",
+            headers={"Cache-Control": "public, max-age=31536000, immutable"},
+        )
     return FileResponse(
         path,
         media_type="image/webp",
         headers={"Cache-Control": "public, max-age=31536000, immutable"},
+    )
+
+
+@app.get("/api/catalog/hero-image")
+@app.head("/api/catalog/hero-image")
+def public_catalog_hero_image():
+    """Expose the owner's current hero tea photo without delaying HTML discovery."""
+    document = get_catalog_store().get()
+    published = [item for item in document["teas"] if item.get("published", True)]
+    item = next((row for row in published if row["id"] == "baihao"), None)
+    item = item or (published[0] if published else None)
+    if item:
+        image = item.get("image", {})
+        if image.get("kind") == "uploaded" and MEDIA_FILE_RE.fullmatch(image.get("name", "")):
+            path = get_catalog_store().media_dir / image["name"]
+            if path.is_file():
+                return Response(
+                    content=catalog_image_variant(str(path), 960),
+                    media_type="image/webp",
+                    headers={
+                        "Cache-Control": "public, max-age=300, stale-while-revalidate=3600",
+                        "ETag": f'"hero-{document["revision"]}-{image["name"]}"',
+                    },
+                )
+        return RedirectResponse(
+            catalog_image_url(item),
+            status_code=307,
+            headers={"Cache-Control": "public, max-age=300, stale-while-revalidate=3600"},
+        )
+    return RedirectResponse(
+        "/img/tea-baihao.webp",
+        status_code=307,
+        headers={"Cache-Control": "public, max-age=300, stale-while-revalidate=3600"},
     )
 
 

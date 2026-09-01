@@ -428,7 +428,7 @@ def test_catalog_image_is_reencoded_and_served_immutably(tmp_path, monkeypatch):
 
     with client:
         catalog = client.get("/api/admin/catalog", headers=AUTH).json()
-        item_id = catalog["teas"][0]["id"]
+        item_id = "baihao"
         uploaded = client.post(
             f"/api/admin/catalog/items/{item_id}/image?revision={catalog['revision']}",
             headers={**AUTH, "Content-Type": "image/png"},
@@ -443,12 +443,18 @@ def test_catalog_image_is_reencoded_and_served_immutably(tmp_path, monkeypatch):
             tea for tea in uploaded.json()["teas"] if tea["id"] == item_id
         )["image_url"]
         served = client.get(image_url)
+        variant = client.get(f"{image_url}?w=160")
+        invalid_variant = client.get(f"{image_url}?w=200")
+        hero = client.get("/api/catalog/hero-image")
         head = client.head(image_url)
 
     assert uploaded.status_code == 200
     assert image_url.startswith("/catalog-media/")
     assert invalid.status_code == 422
     assert served.status_code == 200
+    assert variant.status_code == 200
+    assert invalid_variant.status_code == 422
+    assert hero.status_code == 200
     assert head.status_code == 200
     assert head.headers["content-type"] == "image/webp"
     assert served.headers["content-type"] == "image/webp"
@@ -456,6 +462,11 @@ def test_catalog_image_is_reencoded_and_served_immutably(tmp_path, monkeypatch):
     with Image.open(BytesIO(served.content)) as stored:
         assert stored.format == "WEBP"
         assert stored.size == (320, 240)
+    with Image.open(BytesIO(variant.content)) as resized:
+        assert resized.format == "WEBP"
+        assert resized.size == (160, 120)
+    assert "max-age=300" in hero.headers["cache-control"]
+    assert hero.headers["etag"].startswith('"hero-')
     assert (module.CATALOG_MEDIA_DIR / image_url.rsplit("/", 1)[1]).is_file()
 
 

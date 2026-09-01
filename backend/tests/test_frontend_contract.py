@@ -101,7 +101,12 @@ def test_public_pages_use_quiet_account_probe_and_eager_hero_image():
     assert "fetch('/api/account/session'" in SOURCE
     assert "fetch('/api/account',{cache:'no-store'})" not in SOURCE
     assert 'asset_root = "/" if web else ""' in BUILD_SOURCE
-    assert 'href="{asset_root}img/tea-baihao.webp"' in BUILD_SOURCE
+    assert 'HERO_SOURCE = "/api/catalog/hero-image" if web else' in BUILD_SOURCE
+    assert 'rel="preload" as="image" href="{HERO_SOURCE}"' in BUILD_SOURCE
+    assert 'rel="preload" as="font"' in BUILD_SOURCE
+    assert 'id="hero-img" src="{{img:tea-baihao}}"' in SOURCE
+    assert "function displayCatalogImage(url, width=800)" in SOURCE
+    assert "`${url}?w=${width}`" in SOURCE
     assert "preload_hero: bool = True" in BUILD_SOURCE
     assert "preload_hero=False" in BUILD_SOURCE
 
@@ -122,7 +127,7 @@ def test_public_build_uses_only_same_origin_executable_javascript():
 def test_catalog_keeps_a_semantic_heading_without_restoring_visual_clutter():
     assert '<h1 class="shop-heading" id="shop-heading" data-i18n="shop_heading">' in SOURCE
     assert "shop_heading:'Каталог китайского чая'" in SOURCE
-    assert "teaCard(m, 'h2', true, index < 8)" in SOURCE
+    assert "teaCard(m, 'h2', true, index < 8, index === 0)" in SOURCE
 
 
 def test_teaware_has_a_separate_public_navigation_route():
@@ -497,9 +502,11 @@ def test_public_catalog_does_not_restore_taste_profile_ui():
 
 def test_shop_defers_images_below_the_initial_catalog_view():
     assert "function activateCatalogImages()" in SOURCE
-    assert "teaCard(m, 'h2', true, index < 8)" in SOURCE
-    assert 'data-catalog-src="${m.img}"' in SOURCE
+    assert "teaCard(m, 'h2', true, index < 8, index === 0)" in SOURCE
+    assert 'data-catalog-src="${cardImage}"' in SOURCE
     assert 'data-catalog-eager="1"' in SOURCE
+    assert 'loading="${eagerImage ? \'eager\' : \'lazy\'}"' in SOURCE
+    assert "highPriority ? 'high' : 'low'" in SOURCE
     assert "rect.top > innerHeight + 600" in SOURCE
     assert "if (CATALOG_VIEWS.has(view)) activateCatalogImages()" in SOURCE
     assert "if ($('#view-shop').classList.contains('is-active')) activateCatalogImages()" in SOURCE
@@ -507,13 +514,16 @@ def test_shop_defers_images_below_the_initial_catalog_view():
 
 
 def test_initial_catalog_waits_for_live_data_before_showing_product_photos():
-    """Stale embedded photos must not flash before the owner-managed catalog loads."""
+    """Product grids wait for live data while the hero is immediately discoverable."""
 
     assert "let catalogReady = false" in SOURCE
     assert "function renderCatalogLoading()" in SOURCE
-    assert "hero.removeAttribute('src')" in SOURCE
+    assert "hero.removeAttribute('src')" not in SOURCE
+    assert 'id="hero-img" src="{{img:tea-baihao}}"' in SOURCE
+    assert 'id="hero-img" src="/api/catalog/hero-image"' in BUILD_SOURCE
+    assert "hero.closest('.hero__media').classList.remove('is-loading')" in SOURCE
     assert "home.replaceChildren(...skeleton(3))" in SOURCE
-    assert "menu.replaceChildren(...skeleton(8))" in SOURCE
+    assert "menu.replaceChildren(...skeleton(48))" in SOURCE
     assert "const firstResolution = !catalogReady" in SOURCE
     assert "if (!catalogReady){ go('shop', false); return; }" in SOURCE
     assert "if (!catalogReady){\n          catalogReady = true;\n          renderResolvedCatalog();" in SOURCE
@@ -525,6 +535,8 @@ def test_web_build_uses_root_relative_assets_for_clean_routes():
     assert 'return f"/img/{name}.webp"' in BUILD_SOURCE
     assert 'url(/fonts/{name}.woff2)' in BUILD_SOURCE
     assert '<link rel="icon" href="{asset_root}favicon.png"' in BUILD_SOURCE
+    assert 'font-display:optional' in BUILD_SOURCE
+    assert '"teaware": \'<link rel="preload" as="image" href="/img/kintsugi-work-1.webp" fetchpriority="high">\'' in BUILD_SOURCE
 
 
 def test_admin_catalog_surfaces_incomplete_food_labelling():

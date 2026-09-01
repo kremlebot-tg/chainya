@@ -254,6 +254,13 @@ def test_account_respects_reduced_motion_preference():
 def test_public_and_admin_motion_is_quiet_and_accessible():
     assert "@keyframes view-enter" in SOURCE
     assert ".repair-service__body:not([hidden]){animation:view-enter" in SOURCE
+    assert "@media (prefers-reduced-motion:no-preference)" in SOURCE
+    assert "function setupRevealMotion()" in SOURCE
+    assert "const observer = new IntersectionObserver" in SOURCE
+    assert "observer.unobserve(entry.target)" in SOURCE
+    assert "node.style.removeProperty('--reveal-delay')" in SOURCE
+    assert "if (reducedMotion.matches) return" in SOURCE
+    assert "@media (hover:hover) and (pointer:fine)" in SOURCE
     assert "animation-iteration-count:1 !important" in SOURCE
     assert "const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)')" in SOURCE
     assert "behavior:motionBehavior()" in SOURCE

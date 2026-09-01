@@ -114,12 +114,19 @@ h1, h2, h3, p{ text-wrap:pretty; }
 .brand sup{ font-family:'Golos Text',sans-serif; font-size:9.5px; font-weight:600; letter-spacing:.1em; color:var(--text-2); top:-.85em; }
 .nav__links{ display:flex; gap:clamp(12px,2vw,30px); }
 .nav__link{
-  display:inline-flex; align-items:center; min-height:44px; padding:6px 0;
+  position:relative; display:inline-flex; align-items:center; min-height:44px; padding:6px 0;
   font-size:15px; font-weight:500; color:var(--text-2);
   transition:color .2s var(--ease); white-space:nowrap;
 }
 .nav__link:hover{ color:var(--text); }
 .nav__link[aria-current="page"]{ color:var(--accent); }
+.nav__link::after{
+  content:''; position:absolute; left:0; right:0; bottom:5px; height:1px;
+  background:var(--accent); transform:scaleX(0); transform-origin:left;
+  transition:transform var(--motion-fast) var(--ease);
+}
+.nav__link:hover::after{ transform:scaleX(.4); }
+.nav__link[aria-current="page"]::after{ transform:scaleX(1); }
 .nav__tools{ display:flex; align-items:center; gap:8px; }
 .lang{ display:flex; gap:2px; padding:2px; border:1px solid var(--line); border-radius:100px; }
 .lang button{
@@ -249,9 +256,13 @@ h1, h2, h3, p{ text-wrap:pretty; }
 .svc{
   border-top:1px solid var(--line); padding-top:14px;
   background:transparent; display:flex; flex-direction:column;
+  transition:transform var(--motion-base) var(--ease);
 }
 .svc__art{ aspect-ratio:16/10; overflow:hidden; background:var(--bg-2); border-radius:var(--r); }
-.svc__art img{ width:100%; height:100%; object-fit:cover; }
+.svc__art img{
+  width:100%; height:100%; object-fit:cover;
+  transition:transform var(--motion-slow) var(--ease), filter var(--motion-base) var(--ease);
+}
 .svc__body{ padding:20px 0 0; display:flex; flex-direction:column; flex:1; }
 .svc h3{ font-size:1.15rem; font-weight:600; margin:0; letter-spacing:-.01em; }
 .svc p{ margin:10px 0 0; font-size:14.5px; color:var(--text-2); line-height:1.6; }
@@ -268,9 +279,15 @@ h1, h2, h3, p{ text-wrap:pretty; }
   display:grid; grid-template-columns:repeat(2,minmax(0,1fr));
   gap:clamp(18px,2.4vw,30px); margin-bottom:clamp(48px,7vw,88px);
 }
-.b2b-offer{ border-top:1px solid var(--line); padding-top:14px; }
+.b2b-offer{
+  border-top:1px solid var(--line); padding-top:14px;
+  transition:transform var(--motion-base) var(--ease);
+}
 .b2b-offer__art{ aspect-ratio:16/9; overflow:hidden; border-radius:var(--r); background:var(--bg-2); }
-.b2b-offer__art img{ width:100%; height:100%; object-fit:cover; }
+.b2b-offer__art img{
+  width:100%; height:100%; object-fit:cover;
+  transition:transform var(--motion-slow) var(--ease), filter var(--motion-base) var(--ease);
+}
 .b2b-offer h2{ margin:18px 0 8px; font-size:1.25rem; font-weight:600; }
 .b2b-offer p{ margin:0; max-width:58ch; color:var(--text-2); font-size:15px; line-height:1.65; }
 .b2b-offer .link-arrow{ margin-top:16px; }
@@ -354,13 +371,17 @@ h1, h2, h3, p{ text-wrap:pretty; }
   position:relative; background:transparent; border:0;
   border-radius:0; overflow:hidden; display:flex; flex-direction:column;
   text-align:left;
+  transition:transform var(--motion-base) var(--ease);
 }
 .tea:hover{ border-color:transparent; }
 .tea:has(.tea__hit:focus-visible){ outline:2px solid var(--accent); outline-offset:3px; }
 .tea__hit{ position:absolute; inset:0; z-index:1; width:100%; border-radius:var(--r); }
 .tea__hit:focus-visible{ outline:0; }
 .tea__art{ aspect-ratio:1; overflow:hidden; background:var(--bg-2); position:relative; border-radius:2px; }
-.tea__art img{ width:100%; height:100%; object-fit:cover; }
+.tea__art img{
+  width:100%; height:100%; object-fit:cover;
+  transition:transform var(--motion-slow) var(--ease), filter var(--motion-base) var(--ease);
+}
 /* Точка = тип чая. Та же легенда, что в фильтрах. */
 .tea__dot{
   position:absolute; top:10px; left:10px; width:10px; height:10px; border-radius:50%;
@@ -732,9 +753,13 @@ select.input{
 .bstep{
   background:transparent; border:0; border-top:1px solid var(--line); padding-top:12px;
   display:flex; flex-direction:column;
+  transition:transform var(--motion-base) var(--ease);
 }
 .bstep__art{ aspect-ratio:4/3; overflow:hidden; background:var(--bg-2); border-radius:var(--r); }
-.bstep__art img{ width:100%; height:100%; object-fit:cover; transition:transform .5s var(--ease); }
+.bstep__art img{
+  width:100%; height:100%; object-fit:cover;
+  transition:transform var(--motion-slow) var(--ease), filter var(--motion-base) var(--ease);
+}
 .bstep__body{ padding:18px 0 0; }
 .bstep__body .step__n{ font-size:1.7rem; }
 .bstep h3{ font-size:1.05rem; font-weight:600; margin:10px 0 8px; letter-spacing:-.01em; }
@@ -988,12 +1013,40 @@ select.input{
   .hero__cta .btn{ flex-basis:100%; }
 }
 
+/* На устройствах с точным указателем карточки слегка оживают, не меняя
+   геометрию сетки. На тач-экранах этот слой намеренно не включается. */
+@media (hover:hover) and (pointer:fine){
+  .tea:hover, .svc:hover, .b2b-offer:hover, .bstep:hover{ transform:translateY(-2px); }
+  .tea:hover .tea__art img,
+  .svc:hover .svc__art img,
+  .b2b-offer:hover .b2b-offer__art img,
+  .bstep:hover .bstep__art img{ transform:scale(1.025); filter:brightness(1.035); }
+  .btn--solid:not(:disabled):hover,
+  .btn--ghost:not(:disabled):hover{ transform:translateY(-1px); }
+  .btn:not(:disabled):active{ transform:translateY(0) scale(.985); }
+}
+
+/* Редакционные блоки проявляются один раз при входе в область просмотра.
+   Классы добавляет JS после загрузки: без JS содержимое остаётся видимым. */
+@media (prefers-reduced-motion:no-preference){
+  .reveal-item{
+    opacity:0; transform:translateY(16px);
+    transition:opacity var(--motion-slow) var(--ease), transform var(--motion-slow) var(--ease);
+    transition-delay:var(--reveal-delay,0ms);
+  }
+  .reveal-item--media{ transform:translateY(12px) scale(.992); }
+  .reveal-item.is-revealed{ opacity:1; transform:none; }
+}
+
 /* На тач-экране :hover срабатывает после тапа и залипает, пока не ткнёшь
    в другое место: поднятая карточка так и остаётся поднятой. Сдвиги и
    масштаб отключаем, обратную связь даёт :active. */
 @media (hover:none){
-  .tea:hover, .bstep:hover, .prod:hover{ transform:none; }
-  .tea:hover .tea__art img, .bstep:hover .bstep__art img{ transform:none; }
+  .tea:hover, .svc:hover, .b2b-offer:hover, .bstep:hover, .prod:hover{ transform:none; }
+  .tea:hover .tea__art img,
+  .svc:hover .svc__art img,
+  .b2b-offer:hover .b2b-offer__art img,
+  .bstep:hover .bstep__art img{ transform:none; filter:none; }
   .btn--solid:not(:disabled):hover{ transform:none; background:var(--accent); }
   .btn--ghost:not(:disabled):hover{ background:transparent; border-color:var(--line); }
   .link-arrow:hover{ gap:7px; }
@@ -2459,6 +2512,46 @@ select.input{
   const escAttr = escHtml;
   const $   = (s, r=document) => r.querySelector(s);
   const $$  = (s, r=document) => [...r.querySelectorAll(s)];
+
+  function setupRevealMotion(){
+    if (reducedMotion.matches) return;
+    const selector = [
+      '.sec__head', '.svc', '.credo > *', '.visit__panel',
+      '.b2b-collab > *', '.b2b-offer', '.bstep', '.brange',
+      '.tiers', '.repair-service'
+    ].join(',');
+    const targets = $$(selector);
+    $$('.svcs, .b2b-offers, .bsteps').forEach(group => {
+      [...group.children].forEach((item, index) => {
+        item.style.setProperty('--reveal-delay', `${Math.min(index, 4) * 55}ms`);
+      });
+    });
+    targets.forEach(node => {
+      node.classList.add('reveal-item');
+      if (node.matches('.credo__art, .visit__panel, .b2b-offer, .repair-service')){
+        node.classList.add('reveal-item--media');
+      }
+      const finishReveal = event => {
+        if (event.propertyName !== 'opacity' || !node.classList.contains('is-revealed')) return;
+        node.classList.remove('reveal-item', 'reveal-item--media', 'is-revealed');
+        node.style.removeProperty('--reveal-delay');
+        node.removeEventListener('transitionend', finishReveal);
+      };
+      node.addEventListener('transitionend', finishReveal);
+    });
+    if (!('IntersectionObserver' in window)){
+      targets.forEach(node => node.classList.add('is-revealed'));
+      return;
+    }
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add('is-revealed');
+        observer.unobserve(entry.target);
+      });
+    }, {threshold:.12, rootMargin:'0px 0px -7% 0px'});
+    targets.forEach(node => observer.observe(node));
+  }
 
   /* Телефон по умолчанию российский: подставляем +7 и форматируем без
      отдельного выбора страны. Явный международный код (например, +357)
@@ -4460,6 +4553,7 @@ select.input{
   setInterval(refreshCatalog, 5 * 60 * 1000);
   track('page_view', initialAnalyticsSection);
   goFromLocation();
+  setupRevealMotion();
   compactNav();
   trackOnce('section_view', initialAnalyticsSection);
 

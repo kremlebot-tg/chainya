@@ -161,6 +161,10 @@ def test_teaware_repair_request_is_public_and_manageable_by_owner():
     assert 'data-view="repairs"' in ADMIN_SOURCE
     assert 'id="repairs-content"' in ADMIN_SOURCE
     assert "/api/admin/repair-requests" in ADMIN_SOURCE
+    assert 'data-i18n="repair_cta">Заказать ремонт</button>' in SOURCE
+    assert "Стоимость — от 2 500 ₽" in SOURCE
+    assert "Окончательную цену фиксируем только после живого осмотра" in SOURCE
+    assert SOURCE.count("repair-service__work\"><img src=\"{{img:kintsugi-work-") >= 5
 
 
 def test_public_sections_have_stable_localized_urls_for_search_engines():

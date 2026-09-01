@@ -1203,9 +1203,15 @@ def init_db() -> None:
                 status TEXT NOT NULL DEFAULT 'new',
                 updated_at TEXT NOT NULL,
                 idempotency_key_hash TEXT,
-                request_hash TEXT
+                request_hash TEXT,
+                source TEXT NOT NULL DEFAULT 'website'
             )
         """)
+        repair_columns = {row["name"] for row in con.execute("PRAGMA table_info(repair_requests)")}
+        if "source" not in repair_columns:
+            con.execute(
+                "ALTER TABLE repair_requests ADD COLUMN source TEXT NOT NULL DEFAULT 'website'"
+            )
         con.execute(
             "CREATE INDEX IF NOT EXISTS idx_repair_requests_created "
             "ON repair_requests(created_at)"
@@ -7459,7 +7465,16 @@ def create_repair_request(
     background_tasks: BackgroundTasks,
     request: Request,
     idempotency_key: str = Header(default="", alias="Idempotency-Key"),
+    bot_secret: str = Header(default="", alias="X-Booking-Bot-Secret"),
+    telegram_user_id: str = Header(default="", alias="X-Telegram-User-ID"),
 ):
+    source = (
+        "telegram"
+        if BOOKING_BOT_SECRET
+        and bot_secret
+        and secrets.compare_digest(bot_secret, BOOKING_BOT_SECRET)
+        else "website"
+    )
     key_hash = idempotency_hash(idempotency_key) if idempotency_key else None
     fingerprint = repair_request_hash(payload)
     if key_hash:
@@ -7476,7 +7491,13 @@ def create_repair_request(
                 "accepted": True,
                 "upload_required": bool(existing["has_image"] and not existing["image_name"]),
             }
-    rate_limit(request, "repair-request", 5, 600)
+    if source == "telegram":
+        if not re.fullmatch(r"[1-9][0-9]{0,19}", telegram_user_id):
+            raise HTTPException(400, "Не указан пользователь Telegram")
+        rate_bucket = f"repair-request:telegram:{telegram_user_id}"
+    else:
+        rate_bucket = "repair-request:website"
+    rate_limit(request, rate_bucket, 5, 600)
     created = now_iso()
     repair_id = uuid.uuid4().hex[:12].upper()
     token_hash = (
@@ -7488,11 +7509,11 @@ def create_repair_request(
             """INSERT INTO repair_requests
                (id, created_at, name, phone, description, has_image, image_name,
                 upload_token_hash, notification_sent, status, updated_at,
-                idempotency_key_hash, request_hash)
-               VALUES (?, ?, ?, ?, ?, ?, NULL, ?, 0, 'new', ?, ?, ?)""",
+                idempotency_key_hash, request_hash, source)
+               VALUES (?, ?, ?, ?, ?, ?, NULL, ?, 0, 'new', ?, ?, ?, ?)""",
             (
                 repair_id, created, payload.name, payload.phone, payload.description,
-                int(payload.has_image), token_hash, created, key_hash, fingerprint,
+                int(payload.has_image), token_hash, created, key_hash, fingerprint, source,
             ),
         )
         record_personal_data_consent(
@@ -7500,7 +7521,7 @@ def create_repair_request(
             record_type="repair_request",
             record_id=repair_id,
             purpose="teaware_repair_enquiry",
-            source="website",
+            source=source,
             consented_at=created,
         )
     if not payload.has_image:
@@ -7530,7 +7551,7 @@ async def upload_repair_request_image(
         "image/jpeg", "image/png", "image/webp",
     }:
         raise HTTPException(415, "Поддерживаются JPG, PNG и WebP")
-    rate_limit(request, "repair-image", 8, 600)
+    rate_limit(request, f"repair-image:{row['id']}", 8, 600)
     data = prepare_catalog_image(await bounded_request_body(request, 8 * 1024 * 1024))
     filename = persist_repair_image(row["id"], data)
     with db() as con:

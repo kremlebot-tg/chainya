@@ -150,3 +150,112 @@ def test_telegram_booking_fails_closed_without_secret(monkeypatch):
         assert "BOOKING_BOT_SECRET" in str(exc)
     else:
         raise AssertionError("booking must fail closed without a shared secret")
+
+
+def test_repair_is_available_from_main_menu():
+    buttons = [button for row in bot.menu_kb().inline_keyboard for button in row]
+    repair = next(button for button in buttons if button.callback_data == "rep:info")
+    assert repair.text == "🏺 Кинцуги / ремонт посуды"
+    assert "Окончательная цена" in bot.REPAIR_CAP
+    assert len(bot.REPAIR_CAP) <= 1024
+
+
+def test_telegram_repair_uses_shared_backend_and_uploads_photo(monkeypatch):
+    json_calls = []
+    image_calls = []
+
+    def fake_json(path, **kwargs):
+        json_calls.append((path, kwargs))
+        return {"id": "REPAIR123", "accepted": True, "upload_required": True}
+
+    def fake_image(path, data, content_type, headers=None):
+        image_calls.append((path, data, content_type, headers))
+        return {"id": "REPAIR123", "accepted": True, "image_received": True}
+
+    monkeypatch.setattr(bot, "_booking_api_json", fake_json)
+    monkeypatch.setattr(bot, "_repair_api_image", fake_image)
+    monkeypatch.setattr(bot, "BOOKING_BOT_SECRET", "shared-secret")
+    flow = {
+        "name": "Анна",
+        "phone": "+7 999 111-22-33",
+        "description": "Треснула крышка чайника",
+        "photo": b"jpeg-data",
+        "photo_content_type": "image/jpeg",
+        "request_flow": "fixed-flow",
+    }
+
+    result = asyncio.run(bot.create_shared_repair(123456789, flow))
+
+    assert result["id"] == "REPAIR123"
+    assert json_calls[0][0] == "/api/repair-requests"
+    assert json_calls[0][1]["payload"] == {
+        "name": "Анна",
+        "phone": "+7 999 111-22-33",
+        "description": "Треснула крышка чайника",
+        "has_image": True,
+        "upload_token": flow["upload_token"],
+        "privacy_accepted": True,
+    }
+    assert json_calls[0][1]["headers"]["X-Booking-Bot-Secret"] == "shared-secret"
+    assert json_calls[0][1]["headers"]["X-Telegram-User-ID"] == "123456789"
+    assert json_calls[0][1]["headers"]["Idempotency-Key"].startswith("repair-telegram-")
+    assert image_calls == [(
+        "/api/repair-requests/REPAIR123/image",
+        b"jpeg-data",
+        "image/jpeg",
+        {
+            "X-Repair-Upload-Token": flow["upload_token"],
+            "X-Booking-Bot-Secret": "shared-secret",
+        },
+    )]
+
+
+def test_telegram_repair_without_photo_skips_upload(monkeypatch):
+    image_calls = []
+
+    monkeypatch.setattr(
+        bot,
+        "_booking_api_json",
+        lambda path, **kwargs: {"id": "REPAIR456", "accepted": True, "upload_required": False},
+    )
+    monkeypatch.setattr(bot, "_repair_api_image", lambda *args, **kwargs: image_calls.append(args))
+    monkeypatch.setattr(bot, "BOOKING_BOT_SECRET", "shared-secret")
+    flow = {
+        "name": "Иван",
+        "phone": "+7 999 444-55-66",
+        "description": "Скол на пиале",
+        "request_flow": "fixed-flow",
+    }
+
+    result = asyncio.run(bot.create_shared_repair(42, flow))
+
+    assert result["id"] == "REPAIR456"
+    assert image_calls == []
+
+
+def test_repair_photo_is_downloaded_only_when_submitting():
+    class FakeBot:
+        def __init__(self):
+            self.calls = []
+
+        async def download(self, file_id, destination):
+            self.calls.append(file_id)
+            destination.write(b"telegram-jpeg")
+
+    fake_bot = FakeBot()
+    flow = {"photo_file_id": "telegram-file-123"}
+
+    asyncio.run(bot.materialize_repair_photo(fake_bot, flow))
+
+    assert fake_bot.calls == ["telegram-file-123"]
+    assert flow["photo"] == b"telegram-jpeg"
+    assert flow["photo_content_type"] == "image/jpeg"
+
+
+def test_abandoned_repair_drafts_expire(monkeypatch):
+    bot.REPAIR_FLOWS.clear()
+    bot.REPAIR_FLOWS[7] = {"state": "photo", "updated_at": 100.0}
+
+    bot.cleanup_repair_flows(now=100.0 + bot.REPAIR_FLOW_TTL_SECONDS + 1)
+
+    assert 7 not in bot.REPAIR_FLOWS

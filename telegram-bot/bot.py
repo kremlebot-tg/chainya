@@ -27,10 +27,12 @@ import logging
 import os
 import random
 import secrets
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import date, timedelta
+from io import BytesIO
 
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.client.default import DefaultBotProperties
@@ -44,8 +46,11 @@ from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     InputMediaPhoto,
+    KeyboardButton,
     MenuButtonCommands,
     Message,
+    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
 )
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -92,6 +97,40 @@ PACKS = DATA["packs"]
 CATALOG_REVISION = DATA.get("revision", "local")
 router = Router()
 BOOKING_FLOWS = {}
+REPAIR_FLOWS = {}
+REPAIR_FLOW_TTL_SECONDS = 30 * 60
+REPAIR_PHOTO_MAX_BYTES = 8 * 1024 * 1024
+
+
+def cleanup_repair_flows(now=None):
+    """Forget abandoned drafts and never retain their personal data indefinitely."""
+    current = time.monotonic() if now is None else now
+    expired = [
+        user_id
+        for user_id, flow in REPAIR_FLOWS.items()
+        if current - flow.get("updated_at", 0) > REPAIR_FLOW_TTL_SECONDS
+    ]
+    for user_id in expired:
+        REPAIR_FLOWS.pop(user_id, None)
+
+
+def get_repair_flow(user_id):
+    cleanup_repair_flows()
+    flow = REPAIR_FLOWS.get(user_id)
+    if flow:
+        flow["updated_at"] = time.monotonic()
+    return flow
+
+
+def touch_repair_flow(flow):
+    flow["updated_at"] = time.monotonic()
+
+
+async def repair_flow_cleanup_loop():
+    """Remove expired repair drafts even when no user opens the flow again."""
+    while True:
+        await asyncio.sleep(300)
+        cleanup_repair_flows()
 
 
 def normalize_public_catalog(document):
@@ -221,6 +260,7 @@ async def catalog_refresh_loop():
 # ─────────────  КАРТИНКИ ЭКРАНОВ  ─────────────
 START_IMG = os.path.join(MEDIA, "start.jpg")
 HALL_IMG = os.path.join(MEDIA, "hall.jpg")
+REPAIR_IMG = os.path.join(MEDIA, "repair.jpg")
 
 
 def banner(name):
@@ -394,6 +434,7 @@ def menu_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [btn("🍵 Выбрать чай", "cats"), btn("🎯 Подобрать по вкусу", "taste")],
         [btn("📅 Забронировать стол", "bk:d")],
+        [btn("🏺 Кинцуги / ремонт посуды", "rep:info")],
         [btn("📍 Наш зал", "loc"), btn("❤️ Избранное", "favs")],
         [InlineKeyboardButton(text="📣 Наш канал", url=CHANNEL)],
     ])
@@ -453,6 +494,48 @@ def loc_kb():
         [InlineKeyboardButton(text="🗺 Открыть на карте", url=MAPS)],
         [btn("📅 Забронировать", "bk:d")],
         [btn("↩︎ В меню", "menu")],
+    ])
+
+
+def repair_info_kb():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [btn("🏺 Заказать ремонт", "rep:start")],
+        [btn("↩︎ В меню", "menu")],
+    ])
+
+
+def repair_name_kb(name):
+    label = " ".join(str(name or "Гость").split())[:48]
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [btn(f"Оставить имя: {label}", "rep:name")],
+        [btn("Отменить", "rep:cancel")],
+    ])
+
+
+def repair_phone_kb():
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="📱 Отправить мой номер", request_contact=True)],
+            [KeyboardButton(text="Отменить")],
+        ],
+        resize_keyboard=True,
+        one_time_keyboard=True,
+        input_field_placeholder="Или напишите номер",
+    )
+
+
+def repair_photo_kb():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [btn("Продолжить без фото", "rep:skip")],
+        [btn("Отменить", "rep:cancel")],
+    ])
+
+
+def repair_confirm_kb():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [btn("✅ Отправить заявку", "rep:submit")],
+        [btn("↻ Заполнить заново", "rep:start")],
+        [btn("Отменить", "rep:cancel")],
     ])
 
 
@@ -538,6 +621,90 @@ async def cancel_shared_booking(booking_id, token):
     )
 
 
+def _repair_api_image(path, data, content_type, headers=None):
+    request = urllib.request.Request(
+        BOOKING_API_URL + path,
+        data=data,
+        method="POST",
+        headers={
+            "Accept": "application/json",
+            "Content-Type": content_type,
+            **(headers or {}),
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=12) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        try:
+            detail = json.loads(exc.read().decode("utf-8")).get("detail", "")
+        except Exception:
+            detail = ""
+        raise BookingApiError(detail or f"HTTP {exc.code}") from exc
+    except Exception as exc:
+        raise BookingApiError("Сервис заявок временно недоступен") from exc
+
+
+async def create_shared_repair(user_id, flow):
+    if not BOOKING_BOT_SECRET:
+        raise BookingApiError("BOOKING_BOT_SECRET не настроен")
+    has_image = bool(flow.get("photo") or flow.get("photo_file_id"))
+    upload_token = flow.setdefault("upload_token", secrets.token_urlsafe(32)) if has_image else ""
+    request_flow = flow.setdefault("request_flow", secrets.token_hex(8))
+    digest = hashlib.sha256(
+        f"repair:{user_id}:{request_flow}".encode("utf-8")
+    ).hexdigest()[:32]
+    headers = {
+        "X-Booking-Bot-Secret": BOOKING_BOT_SECRET,
+        "X-Telegram-User-ID": str(user_id),
+        "Idempotency-Key": f"repair-telegram-{digest}",
+    }
+    result = await asyncio.to_thread(
+        _booking_api_json,
+        "/api/repair-requests",
+        payload={
+            "name": flow["name"],
+            "phone": flow["phone"],
+            "description": flow["description"],
+            "has_image": has_image,
+            "upload_token": upload_token,
+            "privacy_accepted": True,
+        },
+        headers=headers,
+    )
+    if has_image and result.get("upload_required", True):
+        if not flow.get("photo"):
+            raise BookingApiError("Фотография не загружена из Telegram")
+        await asyncio.to_thread(
+            _repair_api_image,
+            f"/api/repair-requests/{urllib.parse.quote(str(result['id']))}/image",
+            flow["photo"],
+            flow.get("photo_content_type", "image/jpeg"),
+            {
+                "X-Repair-Upload-Token": upload_token,
+                "X-Booking-Bot-Secret": BOOKING_BOT_SECRET,
+            },
+        )
+    return result
+
+
+async def materialize_repair_photo(bot_api, flow):
+    """Download a Telegram photo only for the duration of the API submission."""
+    file_id = flow.get("photo_file_id")
+    if not file_id:
+        return
+    buffer = BytesIO()
+    try:
+        await bot_api.download(file_id, destination=buffer)
+    except Exception as exc:
+        raise BookingApiError("Не удалось загрузить фотографию из Telegram") from exc
+    data = buffer.getvalue()
+    if not data or len(data) > REPAIR_PHOTO_MAX_BYTES:
+        raise BookingApiError("Не удалось прочитать фотографию из Telegram")
+    flow["photo"] = data
+    flow["photo_content_type"] = "image/jpeg"
+
+
 def date_days():
     t = date.today()
     return [t + timedelta(days=i) for i in range(7)]
@@ -604,6 +771,7 @@ WELCOME = (
     "🍵 выбрать чай в каталоге\n"
     "🎯 подобрать по вкусу или взять наугад\n"
     "📅 забронировать стол\n"
+    "🏺 заказать ремонт посуды\n"
     "📍 посмотреть, как нас найти\n\n"
     "Новости и анонсы — в нашем канале @chainyamsk."
 )
@@ -615,6 +783,19 @@ INFO = (
     f"📞 {PHONE}\n"
     "📣 Канал: @chainyamsk\n\n"
     "Небольшой зал на несколько столов: заварка при вас, чайник, знакомство с сортами."
+)
+REPAIR_CAP = (
+    "<b>Кинцуги / ремонт посуды</b>\n\n"
+    "Продлеваем жизнь любимой посуде. Восстанавливаем глиняную, фарфоровую и другую "
+    "чайную посуду с использованием техники кинцуги и подходящих методов ремонта.\n\n"
+    "<b>Стоимость — от 2 500 ₽</b>\n"
+    "<b>Срок — от 1 до 2 месяцев</b>\n"
+    "<b>Оплата — по факту выполнения работы</b>\n"
+    "<b>Гарантия — 1 год</b>\n\n"
+    "По фотографии можно предварительно оценить возможность ремонта. "
+    "<b>Окончательная цена фиксируется только после живого осмотра.</b>\n\n"
+    "Каждый заказ согласовывается индивидуально. После осмотра мы согласуем с вами способ ремонта, стоимость и сроки. "
+    "Если ремонт невозможен или нецелесообразен, обязательно сообщим об этом до начала работы."
 )
 
 
@@ -631,32 +812,44 @@ def favs_caption(uid):
 # ─────────────  КОМАНДЫ  ─────────────
 @router.message(CommandStart())
 async def cmd_start(m: Message):
+    REPAIR_FLOWS.pop(m.from_user.id, None)
     await send_screen(m, START_IMG, WELCOME, menu_kb())
 
 
 @router.message(Command("menu"))
 async def cmd_menu(m: Message):
+    REPAIR_FLOWS.pop(m.from_user.id, None)
     await send_screen(m, B_CAT, cats_caption(), cats_kb())
 
 
 @router.message(Command("taste"))
 async def cmd_taste(m: Message):
+    REPAIR_FLOWS.pop(m.from_user.id, None)
     await send_screen(m, B_TASTE, "🎯 <b>Подбор по вкусу</b>\n\nКакую ноту хотите поймать?", axes_kb())
 
 
 @router.message(Command("fav"))
 async def cmd_fav(m: Message):
+    REPAIR_FLOWS.pop(m.from_user.id, None)
     await send_screen(m, B_CAT, favs_caption(m.from_user.id), favs_kb(m.from_user.id))
 
 
 @router.message(Command("book"))
 async def cmd_book(m: Message):
+    REPAIR_FLOWS.pop(m.from_user.id, None)
     await send_screen(m, B_BOOK, "<b>Бронь стола</b>\nНа какой день?", dates_kb())
 
 
 @router.message(Command("contacts"))
 async def cmd_contacts(m: Message):
+    REPAIR_FLOWS.pop(m.from_user.id, None)
     await send_screen(m, HALL_IMG, INFO, loc_kb())
+
+
+@router.message(Command("repair"))
+async def cmd_repair(m: Message):
+    REPAIR_FLOWS.pop(m.from_user.id, None)
+    await send_screen(m, REPAIR_IMG, REPAIR_CAP, repair_info_kb())
 
 
 @router.message(Command("site"))
@@ -675,12 +868,14 @@ async def cmd_id(m: Message):
 # ─────────────  МЕНЮ / КАТАЛОГ  ─────────────
 @router.callback_query(F.data == "menu")
 async def cb_menu(c: CallbackQuery):
+    REPAIR_FLOWS.pop(c.from_user.id, None)
     await show(c, B_MENU, MENU_CAP, menu_kb())
     await c.answer()
 
 
 @router.callback_query(F.data == "cats")
 async def cb_cats(c: CallbackQuery):
+    REPAIR_FLOWS.pop(c.from_user.id, None)
     await show(c, B_CAT, cats_caption(), cats_kb())
     await c.answer()
 
@@ -708,6 +903,7 @@ async def cb_tea(c: CallbackQuery):
 # ─────────────  ПОДБОР ПО ВКУСУ  ─────────────
 @router.callback_query(F.data == "taste")
 async def cb_taste(c: CallbackQuery):
+    REPAIR_FLOWS.pop(c.from_user.id, None)
     await show(c, B_TASTE, "🎯 <b>Подбор по вкусу</b>\n\nКакую ноту хотите поймать?", axes_kb())
     await c.answer()
 
@@ -745,6 +941,7 @@ async def cb_fav(c: CallbackQuery):
 
 @router.callback_query(F.data == "favs")
 async def cb_favs(c: CallbackQuery):
+    REPAIR_FLOWS.pop(c.from_user.id, None)
     await show(c, B_CAT, favs_caption(c.from_user.id), favs_kb(c.from_user.id))
     await c.answer()
 
@@ -752,8 +949,196 @@ async def cb_favs(c: CallbackQuery):
 # ─────────────  НАШ ЗАЛ  ─────────────
 @router.callback_query(F.data == "loc")
 async def cb_loc(c: CallbackQuery):
+    REPAIR_FLOWS.pop(c.from_user.id, None)
     await show(c, HALL_IMG, INFO, loc_kb())
     await c.answer()
+
+
+# ─────────────  КИНЦУГИ / РЕМОНТ ПОСУДЫ  ─────────────
+@router.callback_query(F.data == "rep:info")
+async def cb_repair_info(c: CallbackQuery):
+    await show(c, REPAIR_IMG, REPAIR_CAP, repair_info_kb())
+    await c.answer()
+
+
+@router.callback_query(F.data == "rep:start")
+async def cb_repair_start(c: CallbackQuery):
+    cleanup_repair_flows()
+    REPAIR_FLOWS[c.from_user.id] = {
+        "state": "name",
+        "request_flow": secrets.token_hex(8),
+        "updated_at": time.monotonic(),
+    }
+    suggested = c.from_user.full_name or "Гость"
+    await c.message.answer(
+        "<b>Как вас зовут?</b>\n\nМожно оставить имя из Telegram или написать другое.",
+        reply_markup=repair_name_kb(suggested),
+    )
+    await c.answer()
+
+
+async def ask_repair_phone(message, flow):
+    flow["state"] = "phone"
+    touch_repair_flow(flow)
+    await message.answer(
+        "<b>На какой номер вам позвонить?</b>\n\n"
+        "Нажмите «Отправить мой номер» или напишите его вручную.",
+        reply_markup=repair_phone_kb(),
+    )
+
+
+@router.callback_query(F.data == "rep:name")
+async def cb_repair_name(c: CallbackQuery):
+    flow = get_repair_flow(c.from_user.id)
+    if not flow or flow.get("state") != "name":
+        return await c.answer("Начните заявку заново", show_alert=True)
+    flow["name"] = " ".join((c.from_user.full_name or "Гость Telegram").split())[:120]
+    await ask_repair_phone(c.message, flow)
+    await c.answer()
+
+
+async def ask_repair_description(message, flow):
+    flow["state"] = "description"
+    touch_repair_flow(flow)
+    await message.answer(
+        "<b>Что нужно отремонтировать?</b>\n\n"
+        "Напишите, что это за посуда, из чего она сделана и что случилось.",
+        reply_markup=ReplyKeyboardRemove(),
+    )
+
+
+async def ask_repair_photo(message, flow):
+    flow["state"] = "photo"
+    touch_repair_flow(flow)
+    await message.answer(
+        "<b>Пришлите фотографию повреждения</b>\n\n"
+        "По ней мы сможем предварительно оценить возможность ремонта. Фото можно пропустить.",
+        reply_markup=repair_photo_kb(),
+    )
+
+
+def repair_confirmation(flow):
+    return (
+        "<b>Проверьте заявку</b>\n\n"
+        f"Имя: {esc(flow['name'])}\n"
+        f"Телефон: {esc(flow['phone'])}\n"
+        f"Посуда и повреждение: {esc(flow['description'])}\n"
+        f"Фото: {'приложено' if flow.get('photo_file_id') or flow.get('photo') else 'не приложено'}\n\n"
+        "Нажимая «Отправить заявку», вы даёте отдельное "
+        '<a href="https://chainya.ru/consent-personal-data.html">согласие на обработку персональных данных</a>.'
+    )
+
+
+async def show_repair_confirmation(message, flow):
+    flow["state"] = "confirm"
+    touch_repair_flow(flow)
+    await message.answer(repair_confirmation(flow), reply_markup=repair_confirm_kb())
+
+
+@router.callback_query(F.data == "rep:skip")
+async def cb_repair_skip(c: CallbackQuery):
+    flow = get_repair_flow(c.from_user.id)
+    if not flow or flow.get("state") != "photo":
+        return await c.answer("Начните заявку заново", show_alert=True)
+    flow.pop("photo", None)
+    flow.pop("photo_file_id", None)
+    flow.pop("photo_size", None)
+    flow.pop("photo_content_type", None)
+    await show_repair_confirmation(c.message, flow)
+    await c.answer()
+
+
+@router.callback_query(F.data == "rep:submit")
+async def cb_repair_submit(c: CallbackQuery):
+    flow = get_repair_flow(c.from_user.id)
+    if not flow or flow.get("state") != "confirm":
+        return await c.answer("Заявка уже отправлена или устарела", show_alert=True)
+    flow["state"] = "submitting"
+    await c.answer("Отправляем…")
+    try:
+        await materialize_repair_photo(c.message.bot, flow)
+        result = await create_shared_repair(c.from_user.id, flow)
+    except BookingApiError:
+        logging.exception("заявка на ремонт из Telegram не сохранена")
+        flow["state"] = "confirm"
+        flow.pop("photo", None)
+        touch_repair_flow(flow)
+        await c.message.answer(
+            "Не удалось сохранить заявку. Ничего не потеряно — попробуйте ещё раз.",
+            reply_markup=repair_confirm_kb(),
+        )
+        return
+    REPAIR_FLOWS.pop(c.from_user.id, None)
+    with contextlib.suppress(Exception):
+        await c.message.edit_reply_markup(reply_markup=None)
+    await c.message.answer(
+        f"✅ <b>Заявка № {esc(result.get('id'))} принята</b>\n\n"
+        "Посмотрим фотографию и свяжемся по указанному номеру. До живого осмотра цена остаётся предварительной.",
+        reply_markup=menu_kb(),
+    )
+
+
+@router.callback_query(F.data == "rep:cancel")
+async def cb_repair_cancel(c: CallbackQuery):
+    REPAIR_FLOWS.pop(c.from_user.id, None)
+    await c.message.answer("Заявка отменена.", reply_markup=ReplyKeyboardRemove())
+    await c.answer()
+
+
+@router.message(F.contact)
+async def repair_contact(m: Message):
+    flow = get_repair_flow(m.from_user.id)
+    if not flow or flow.get("state") != "phone":
+        return
+    if m.contact.user_id and m.contact.user_id != m.from_user.id:
+        return await m.answer("Нужен ваш номер, а не контакт другого человека.")
+    flow["phone"] = m.contact.phone_number.strip()[:80]
+    await ask_repair_description(m, flow)
+
+
+@router.message(F.photo)
+async def repair_photo(m: Message):
+    flow = get_repair_flow(m.from_user.id)
+    if not flow or flow.get("state") != "photo":
+        return
+    photo = m.photo[-1]
+    if photo.file_size and photo.file_size > REPAIR_PHOTO_MAX_BYTES:
+        return await m.answer("Фото слишком большое. Пришлите файл до 8 МБ.")
+    flow["photo_file_id"] = photo.file_id
+    flow["photo_size"] = photo.file_size or 0
+    flow.pop("photo", None)
+    flow["photo_content_type"] = "image/jpeg"
+    touch_repair_flow(flow)
+    await show_repair_confirmation(m, flow)
+
+
+@router.message(F.text)
+async def repair_text(m: Message):
+    flow = get_repair_flow(m.from_user.id)
+    if not flow:
+        return
+    text = " ".join((m.text or "").split())
+    if text.casefold() == "отменить":
+        REPAIR_FLOWS.pop(m.from_user.id, None)
+        return await m.answer("Заявка отменена.", reply_markup=ReplyKeyboardRemove())
+    state = flow.get("state")
+    if state == "name":
+        if not text or len(text) > 120:
+            return await m.answer("Напишите имя длиной до 120 символов.")
+        flow["name"] = text
+        return await ask_repair_phone(m, flow)
+    if state == "phone":
+        if len("".join(ch for ch in text if ch.isdigit())) < 10 or len(text) > 80:
+            return await m.answer("Напишите полный номер телефона или отправьте его кнопкой.")
+        flow["phone"] = text
+        return await ask_repair_description(m, flow)
+    if state == "description":
+        if len(text) < 3 or len(text) > 1500:
+            return await m.answer("Описание должно быть от 3 до 1500 символов.")
+        flow["description"] = text
+        return await ask_repair_photo(m, flow)
+    if state == "photo":
+        return await m.answer("На этом шаге пришлите фотографию или нажмите «Продолжить без фото».")
 
 
 # ─────────────  БРОНЬ  ─────────────
@@ -761,6 +1146,7 @@ async def cb_loc(c: CallbackQuery):
 async def cb_bk_date(c: CallbackQuery):
     # edit на месте: при возврате «Заново»/«Другой день» правим текущий шаг,
     # иначе плодятся параллельные брони со старой живой кнопкой «Подтвердить».
+    REPAIR_FLOWS.pop(c.from_user.id, None)
     BOOKING_FLOWS[c.from_user.id] = secrets.token_hex(8)
     await show(c, B_BOOK, "<b>Бронь стола</b>\nНа какой день?", dates_kb())
     await c.answer()
@@ -956,6 +1342,7 @@ async def main():
         BotCommand(command="taste", description="Подобрать по вкусу"),
         BotCommand(command="fav", description="Избранное"),
         BotCommand(command="book", description="Забронировать стол"),
+        BotCommand(command="repair", description="Кинцуги / ремонт посуды"),
         BotCommand(command="contacts", description="Наш зал · адрес"),
     ])
     await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
@@ -964,12 +1351,16 @@ async def main():
     logging.info("Бот запущен. Чаёв: %d | брони → %s",
                  len(TEAS), ", ".join(OWNER_CHAT_IDS) or "(в лог)")
     refresh_task = asyncio.create_task(catalog_refresh_loop())
+    repair_cleanup_task = asyncio.create_task(repair_flow_cleanup_loop())
     try:
         await dp.start_polling(bot)
     finally:
         refresh_task.cancel()
+        repair_cleanup_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await refresh_task
+        with contextlib.suppress(asyncio.CancelledError):
+            await repair_cleanup_task
 
 
 if __name__ == "__main__":

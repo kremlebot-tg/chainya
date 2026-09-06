@@ -38,6 +38,9 @@ Re-dnd Scout. Поэтому нельзя запускать `caddy reload` из
 `/var/lib/chainya-shop`; нельзя снова направлять edge на старый origin или
 запускать две копии backend/бота одновременно.
 
+`deploy-bot.sh` также направлен только на этот Timeweb VPS. Старый origin не
+должен запускать `chainya-bot`: две polling-копии конфликтуют в Telegram API.
+
 Если изменился `Caddyfile.internal`, candidate сначала проверяется той же версией
 Caddy, которая работает в контейнере. Затем за уже включённым Chainya-only
 maintenance пересоздаётся только `chainya-edge-edge-1`. При ошибке скрипт

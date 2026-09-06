@@ -190,6 +190,8 @@ def test_legacy_static_deploy_never_controls_shared_nginx() -> None:
 
 def test_bot_deploy_uses_versioned_repository_sources() -> None:
     deploy = (ROOT / "deploy-bot.sh").read_text(encoding="utf-8")
+    assert 'HOST="root@5.42.123.182"' in deploy
+    assert 'HOST="liable-copper"' not in deploy
     assert 'BOT_ROOT="$ROOT/telegram-bot"' in deploy
     assert "../telegram-bot" not in deploy
     assert 'git -C "$ROOT" ls-files --error-unmatch "telegram-bot/$file"' in deploy

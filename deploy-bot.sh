@@ -2,7 +2,9 @@
 # Атомарный деплой Telegram-бота из этого Git-репозитория.
 set -Eeuo pipefail
 
-HOST="liable-copper"
+# Единственная рабочая копия бота с 01.09.2026 находится на Timeweb. Явный
+# текущий host не даёт случайно запустить второй polling на старом origin.
+HOST="root@5.42.123.182"
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 BOT_ROOT="$ROOT/telegram-bot"
 TMP="$(mktemp -d)"

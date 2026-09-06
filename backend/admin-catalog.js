@@ -561,15 +561,37 @@ function renderPendingQueue() {
     image.alt = '';
     const name = document.createElement('span');
     name.textContent = `${index + 1}. ${file.name}`;
+    const order = document.createElement('span');
+    order.className = 'photo-pending__order';
+    [['←', -1], ['→', 1]].forEach(([symbol, direction]) => {
+      const move = document.createElement('button');
+      move.type = 'button';
+      move.textContent = symbol;
+      move.disabled = index + direction < 0 || index + direction >= pendingImages.length;
+      move.setAttribute('aria-label', `${direction < 0 ? 'Сдвинуть раньше' : 'Сдвинуть позже'} выбранное фото ${index + 1}`);
+      move.onclick = () => movePendingImage(index, direction);
+      order.append(move);
+    });
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.className = 'photo-pending__remove';
     remove.textContent = '×';
     remove.setAttribute('aria-label', `Убрать выбранное фото ${index + 1}`);
     remove.onclick = () => removePendingImage(index);
-    row.append(image, name, remove);
+    row.append(image, name, order, remove);
     root.append(row);
   });
+}
+
+function movePendingImage(index, direction) {
+  const target = index + direction;
+  if (target < 0 || target >= pendingImages.length) return;
+  [pendingImages[index], pendingImages[target]] = [pendingImages[target], pendingImages[index]];
+  [pendingImageUrls[index], pendingImageUrls[target]] = [pendingImageUrls[target], pendingImageUrls[index]];
+  const preview = $('#photo-preview');
+  if (preview) preview.src = pendingImageUrls[0] || safeImage(draft.image_url);
+  renderPendingQueue();
+  setDirty(true);
 }
 
 function removePendingImage(index) {

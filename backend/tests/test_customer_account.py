@@ -32,6 +32,7 @@ def test_customer_registration_uses_hashed_credentials_and_http_only_session(tmp
         cookie = response.headers["set-cookie"].lower()
         assert "chainya_customer_session=" in cookie
         assert "httponly" in cookie
+        assert "secure" in cookie
         assert "samesite=strict" in cookie
         profile = client.get("/api/account")
         assert profile.status_code == 200

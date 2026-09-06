@@ -47,6 +47,29 @@ server {
     add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
     add_header Content-Security-Policy "default-src 'self'; script-src 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
 
+    # Фото заявки проходит потоковую проверку и обязательное перекодирование в
+    # WebP на backend. Обычный API остаётся ограничен 32 КБ; повышенный предел
+    # действует только для одного маршрута со случайным ключом загрузки.
+    location ~ "^/api/repair-requests/[A-F0-9]{12}/image$" {
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header Cross-Origin-Opener-Policy "same-origin" always;
+        add_header X-Permitted-Cross-Domain-Policies "none" always;
+        add_header Cache-Control "no-store" always;
+        add_header Referrer-Policy "no-referrer" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+        add_header Content-Security-Policy "default-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" always;
+        proxy_pass http://127.0.0.1:8077;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_request_buffering off;
+        client_max_body_size 8m;
+    }
+
     location ~ "^/api/admin/catalog/items/[a-z0-9][a-z0-9-]{0,79}/image$" {
         add_header Strict-Transport-Security "max-age=31536000" always;
         add_header X-Content-Type-Options "nosniff" always;

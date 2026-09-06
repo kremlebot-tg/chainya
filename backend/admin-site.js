@@ -98,7 +98,7 @@ function createLanguagePanels(root) {
     root.append(panel);
   }
 }
-function renderEditor() {
+function renderEditor({scroll = true} = {}) {
   const editor = $('#editor'); editor.replaceChildren($('#editor-template').content.cloneNode(true));
   const isNew = !selectedId;
   $('#editor-eyebrow').textContent = isNew ? 'Новая запись · сначала скрыта' : 'Карточка партнёра';
@@ -110,7 +110,7 @@ function renderEditor() {
   $('#partner-id').oninput = event => { draft.id = event.target.value.trim().toLocaleLowerCase('ru'); syncEditor(); };
   $('#save').onclick = savePartner;
   syncEditor();
-  if (window.innerWidth <= 900) editor.scrollIntoView({behavior:'smooth', block:'start'});
+  if (scroll && window.innerWidth <= 900) editor.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth', block:'start'});
 }
 function syncPreview() {
   const copy = displayTranslation(draft, activeLanguage);
@@ -130,11 +130,11 @@ function syncEditor() {
   $('#save').disabled = saving || !isDirty();
   syncPreview();
 }
-function selectPartner(id) {
+function selectPartner(id, {scroll = true} = {}) {
   if (id === selectedId && draft) return;
   if (!confirmDiscard()) return;
   const partner = documentState.partners.find(item => item.id === id); if (!partner) return;
-  selectedId = id; draft = clone(partner); baseline = snapshot(draft); activeLanguage = 'ru'; renderList(); renderEditor();
+  selectedId = id; draft = clone(partner); baseline = snapshot(draft); activeLanguage = 'ru'; renderList(); renderEditor({scroll});
 }
 function addPartner() {
   if (!confirmDiscard()) return;
@@ -179,7 +179,7 @@ async function movePartner(id, direction) {
   finally { saving = false; if (selectedId) { draft = clone(documentState.partners.find(item => item.id === selectedId)); baseline = snapshot(draft); } renderList(); }
 }
 async function load() {
-  try { documentState = await request('/api/admin/site/partners'); renderList(); if (documentState.partners.length) selectPartner(documentState.partners[0].id); }
+  try { documentState = await request('/api/admin/site/partners'); renderList(); if (documentState.partners.length) selectPartner(documentState.partners[0].id, {scroll:false}); }
   catch (error) { $('#partner-list').innerHTML = '<div class="list-empty"></div>'; $('.list-empty').textContent = error.message; toast(error.message); }
 }
 async function showHistory() {

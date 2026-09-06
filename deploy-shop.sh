@@ -4,6 +4,9 @@
 # внутри выделенного Chainya edge.
 set -Eeuo pipefail
 
+echo "deploy-shop.sh выведен из эксплуатации после переноса backend и SQLite на Timeweb; старый двухсерверный сценарий заблокирован, чтобы не запустить две рабочие базы" >&2
+exit 64
+
 HOST="${CHAINYA_ORIGIN_HOST:-liable-copper}"
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 BOT_ROOT="$ROOT/telegram-bot"

@@ -23,9 +23,27 @@ ExecStart=/opt/chainya-shop/.venv/bin/uvicorn backend.app:app --host 127.0.0.1 -
 Restart=always
 RestartSec=3
 NoNewPrivileges=true
+PrivateDevices=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+ProcSubset=pid
+RestrictNamespaces=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+RemoveIPC=true
 ReadWritePaths=/var/lib/chainya-shop
 
 [Install]

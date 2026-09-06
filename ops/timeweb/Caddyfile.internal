@@ -4,17 +4,12 @@
 }
 
 (chainya_origin) {
-	reverse_proxy https://79.137.194.101 {
-		transport http {
-			tls_server_name chainya.ru
-		}
-		header_up Host chainya.ru
+	reverse_proxy 127.0.0.1:8077 {
 		header_up X-Forwarded-Proto {http.request.header.X-Forwarded-Proto}
 		header_up X-Forwarded-For {http.request.header.X-Forwarded-For}
 		header_up X-Real-IP {http.request.header.X-Forwarded-For}
-		# Origin keeps the same headers for direct rollback traffic. At the edge
-		# strip those copies and emit one canonical value below, otherwise private
-		# pages receive the same header two or three times.
+		# Backend повторяет базовые заголовки для loopback-проверок. На edge
+		# оставляем единственный канонический набор без дублей.
 		header_down -Strict-Transport-Security
 		header_down -X-Content-Type-Options
 		header_down -Referrer-Policy
@@ -35,6 +30,9 @@
 }
 
 http://127.0.0.1:8078 {
+	# Site labels are request matchers in Caddy; bind is what keeps the
+	# maintenance/origin listener off the public network interface.
+	bind 127.0.0.1
 	encode zstd gzip
 	root * /var/www/chainya
 

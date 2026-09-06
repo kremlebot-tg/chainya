@@ -252,6 +252,50 @@ def test_repair_photo_is_downloaded_only_when_submitting():
     assert flow["photo_content_type"] == "image/jpeg"
 
 
+def test_repair_document_image_keeps_supported_content_type(monkeypatch):
+    class FakeMessage:
+        from_user = SimpleNamespace(id=77)
+        document = SimpleNamespace(
+            file_id="telegram-png-123",
+            file_size=1024,
+            mime_type="image/png",
+        )
+
+        async def answer(self, *args, **kwargs):
+            raise AssertionError("valid image document should advance without an error")
+
+    confirmations = []
+
+    async def fake_confirmation(message, flow):
+        confirmations.append((message, flow.copy()))
+
+    bot.REPAIR_FLOWS[77] = {"state": "photo", "updated_at": bot.time.monotonic()}
+    monkeypatch.setattr(bot, "show_repair_confirmation", fake_confirmation)
+
+    asyncio.run(bot.repair_photo_document(FakeMessage()))
+
+    flow = bot.REPAIR_FLOWS.pop(77)
+    assert flow["photo_file_id"] == "telegram-png-123"
+    assert flow["photo_content_type"] == "image/png"
+    assert confirmations and confirmations[0][1]["photo_file_id"] == "telegram-png-123"
+
+
+def test_materialized_repair_document_preserves_png_content_type():
+    class FakeBot:
+        async def download(self, file_id, destination):
+            destination.write(b"telegram-png")
+
+    flow = {
+        "photo_file_id": "telegram-file-png",
+        "photo_content_type": "image/png",
+    }
+
+    asyncio.run(bot.materialize_repair_photo(FakeBot(), flow))
+
+    assert flow["photo"] == b"telegram-png"
+    assert flow["photo_content_type"] == "image/png"
+
+
 def test_abandoned_repair_drafts_expire(monkeypatch):
     bot.REPAIR_FLOWS.clear()
     bot.REPAIR_FLOWS[7] = {"state": "photo", "updated_at": 100.0}

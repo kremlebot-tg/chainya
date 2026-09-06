@@ -214,6 +214,9 @@ def test_maintenance_is_chainya_only_and_returns_503() -> None:
     public = (ROOT / "ops/timeweb/Caddyfile.public-snippet").read_text(encoding="utf-8")
     compose = (ROOT / "ops/timeweb/docker-compose.edge.yml").read_text(encoding="utf-8")
     assert "http://127.0.0.1:8078" in internal
+    # A Caddy site label containing 127.0.0.1 is only a Host matcher.  The
+    # explicit bind is what prevents the internal edge from listening publicly.
+    assert "\tbind 127.0.0.1\n" in internal
     assert "chainya-maintenance.enabled" in internal
     assert " 503" in internal
     assert "chainya.ru" in public and "127.0.0.1:8078" in public
@@ -242,6 +245,18 @@ def test_maintenance_is_chainya_only_and_returns_503() -> None:
     assert "return 308 /$1;" in nginx
     assert "location = /sitemap.xml" in nginx
     assert "location ^~ /assets/" in nginx
+
+
+def test_repair_photo_upload_has_one_bounded_origin_route() -> None:
+    nginx = (ROOT / "ops/nginx-chainya.ru").read_text(encoding="utf-8")
+    upload = nginx.split(
+        'location ~ "^/api/repair-requests/[A-F0-9]{12}/image$" {', 1
+    )[1].split("\n    }", 1)[0]
+    assert "client_max_body_size 8m;" in upload
+    assert "proxy_request_buffering off;" in upload
+    assert 'add_header Cache-Control "no-store" always;' in upload
+    generic_api = nginx.split("location /api/ {", 1)[1].split("\n    }", 1)[0]
+    assert "client_max_body_size 32k;" in generic_api
 
 
 def test_public_edge_rejects_third_party_scripts_and_clickjacking() -> None:

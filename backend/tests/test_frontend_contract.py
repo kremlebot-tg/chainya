@@ -12,6 +12,8 @@ ADMIN_SITE_PATH = Path(__file__).resolve().parents[1] / "admin-site.html"
 ADMIN_SITE_JS_PATH = Path(__file__).resolve().parents[1] / "admin-site.js"
 ADMIN_PATH = Path(__file__).resolve().parents[1] / "admin.html"
 ADMIN_GUIDES_PATH = Path(__file__).resolve().parents[1] / "admin-guides.html"
+ADMIN_PROMOS_PATH = Path(__file__).resolve().parents[1] / "admin-promos.html"
+ADMIN_LOGIN_PATH = Path(__file__).resolve().parents[1] / "admin-login.html"
 ACCOUNT_PATH = Path(__file__).resolve().parents[1] / "account.html"
 LEGAL_CSS_PATH = Path(__file__).resolve().parents[2] / "legal.css"
 pytestmark = pytest.mark.skipif(
@@ -26,6 +28,8 @@ ADMIN_SITE = ADMIN_SITE_PATH.read_text(encoding="utf-8")
 ADMIN_SITE_JS = ADMIN_SITE_JS_PATH.read_text(encoding="utf-8")
 ADMIN_SOURCE = ADMIN_PATH.read_text(encoding="utf-8")
 ADMIN_GUIDES = ADMIN_GUIDES_PATH.read_text(encoding="utf-8")
+ADMIN_PROMOS = ADMIN_PROMOS_PATH.read_text(encoding="utf-8")
+ADMIN_LOGIN = ADMIN_LOGIN_PATH.read_text(encoding="utf-8")
 ACCOUNT_SOURCE = ACCOUNT_PATH.read_text(encoding="utf-8")
 LEGAL_CSS = LEGAL_CSS_PATH.read_text(encoding="utf-8") if LEGAL_CSS_PATH.exists() else ""
 
@@ -88,6 +92,7 @@ def test_catalog_explanation_is_short_and_before_the_products():
     assert note < products
     assert "Цены на пакеты считаются от цены за 10 г" not in SOURCE
     assert "Вес выбирается в карточке чая" in SOURCE
+    assert ".shop-note summary{ min-height:44px;" in SOURCE
 
 
 def test_owner_approved_home_copy_is_preserved():
@@ -104,6 +109,8 @@ def test_public_pages_use_quiet_account_probe_and_eager_hero_image():
     assert 'HERO_SOURCE = "/catalog-media/current-hero.webp" if web else' in BUILD_SOURCE
     assert 'rel="preload" as="image" href="{HERO_SOURCE}"' in BUILD_SOURCE
     assert 'rel="preload" as="font"' in BUILD_SOURCE
+    assert 'subset = "cyr" if language == "ru" else "lat"' in BUILD_SOURCE
+    assert 'for family in ("rubik", "onest")' in BUILD_SOURCE
     assert 'id="hero-img" src="{{img:tea-baihao}}"' in SOURCE
     assert "function displayCatalogImage(url, width=800)" in SOURCE
     assert "`${url}?w=${width}`" in SOURCE
@@ -154,6 +161,24 @@ def test_teaware_has_a_separate_public_navigation_route():
     assert 'data-i18n="nav_shop">Купить чай</a>' not in SOURCE
 
 
+def test_teaware_photos_keep_the_whole_object_visible():
+    assert '.tea[data-type^="teaware-"] .tea__art img{' in SOURCE
+    assert '.sheet[data-product-group="teaware"] .sheet__art img{ object-fit:contain; }' in SOURCE
+    assert "sheet.dataset.productGroup = teaware ? 'teaware' : 'tea';" in SOURCE
+
+
+def test_mobile_cart_stays_reachable_after_adding_from_a_long_catalog():
+    assert 'class="cart-dock" id="cart-dock"' in SOURCE
+    assert 'id="cart-dock-count"' in SOURCE
+    assert 'id="cart-dock-total"' in SOURCE
+    assert '.cart-dock[hidden]{ display:none; }' in SOURCE
+    assert "cartCount() > 0 && innerWidth <= 700 && siteNav.classList.contains('is-compact')" in SOURCE
+    assert "document.body.classList.toggle('has-cart-dock', visible);" in SOURCE
+    assert "updateCartDockVisibility();" in SOURCE
+    assert "$('#cart-dock-total').textContent = rub(cartTotal());" in SOURCE
+    assert "$('#cart-dock').addEventListener('click', openCart);" in SOURCE
+
+
 def test_teaware_repair_request_is_public_and_manageable_by_owner():
     heading = SOURCE.index('id="shop-heading"')
     repair = SOURCE.index('id="repair-service"')
@@ -161,8 +186,12 @@ def test_teaware_repair_request_is_public_and_manageable_by_owner():
     assert heading < repair < products
     assert "$('#repair-service').hidden = view !== 'teaware'" in SOURCE
     assert 'id="r-image" name="image" type="file" accept="image/jpeg,image/png,image/webp"' in SOURCE
+    assert 'id="r-image-preview" hidden' in SOURCE
+    assert 'id="r-image-remove" type="button"' in SOURCE
+    assert "repair_upload_error:'Заявка сохранена, но фото не загрузилось." in SOURCE
     assert "fetch('/api/repair-requests'" in SOURCE
     assert "X-Repair-Upload-Token" in SOURCE
+    assert "$('#repair-body').scrollIntoView" not in SOURCE
     assert 'data-view="repairs"' in ADMIN_SOURCE
     assert 'id="repairs-content"' in ADMIN_SOURCE
     assert "/api/admin/repair-requests" in ADMIN_SOURCE
@@ -227,11 +256,34 @@ def test_footer_links_keep_minimum_touch_targets():
     assert ".foot a{ min-height:24px; display:inline-flex; align-items:center;" in SOURCE
 
 
+def test_short_navigation_labels_keep_minimum_touch_target_width():
+    assert "justify-content:center; min-width:24px; min-height:44px;" in SOURCE
+
+
 def test_consent_checkboxes_meet_minimum_touch_target_size():
     assert ".consent input{width:24px;height:24px;" in SOURCE
     assert ".check input{width:24px;height:24px;" in ACCOUNT_SOURCE
     assert SOURCE.count('href="/consent-personal-data.html"') >= 4
     assert 'href="/consent-personal-data.html"' in ACCOUNT_SOURCE
+
+
+def test_form_errors_are_associated_with_the_fields_they_describe():
+    assert 'id="r-name" name="name" type="text" autocomplete="name" required maxlength="120" aria-describedby="repair-status"' in SOURCE
+    assert 'id="r-description" name="description" required minlength="3" maxlength="1500"' in SOURCE
+    assert 'id="r-privacy" name="privacy_accepted" value="yes" aria-describedby="repair-status"' in SOURCE
+    assert 'id="b-privacy" name="privacy_accepted" value="yes" aria-describedby="b2b-status"' in SOURCE
+    assert 'id="f-name" data-i18n-ph="f_name_ph" autocomplete="given-name" required maxlength="120" aria-describedby="f-status"' in SOURCE
+    assert 'id="f-privacy" required aria-describedby="f-status"' in SOURCE
+    assert 'id="c-name" data-i18n-ph="f_name_ph" autocomplete="given-name" required aria-describedby="cart-status"' in SOURCE
+    assert 'aria-describedby="c-phone-hint cart-status"' in SOURCE
+    assert 'id="c-privacy" aria-describedby="cart-status"' in SOURCE
+    assert 'id="register-privacy" type="checkbox" required aria-describedby="register-status"' in ACCOUNT_SOURCE
+
+
+def test_product_sheet_restores_focus_after_history_navigation():
+    assert "pendingHistoryFocus = null" in SOURCE
+    assert "if (returningViaHistory) pendingHistoryFocus = focusTarget" in SOURCE
+    assert "if (target) requestAnimationFrame(() => restoreFocus(target))" in SOURCE
 
 
 def test_account_text_inputs_do_not_trigger_ios_focus_zoom():
@@ -253,7 +305,25 @@ def test_account_tabs_support_keyboard_navigation_and_semantic_panels():
 def test_account_respects_reduced_motion_preference():
     assert "@media(prefers-reduced-motion:reduce)" in ACCOUNT_SOURCE
     assert "transition-duration:.01ms!important" in ACCOUNT_SOURCE
+
+
+def test_catalog_admin_respects_reduced_motion_preference():
+    assert "@media(prefers-reduced-motion:reduce)" in ADMIN_CATALOG
+    assert "animation-duration:.01ms!important" in ADMIN_CATALOG
+    assert "transition-duration:.01ms!important" in ADMIN_CATALOG
     assert "animation-iteration-count:1!important" in ACCOUNT_SOURCE
+
+
+def test_account_can_repeat_orders_and_recovers_from_loading_errors():
+    assert "function repeatOrder(order)" in ACCOUNT_SOURCE
+    assert "localStorage.setItem('chaynya-cart'" in ACCOUNT_SOURCE
+    assert "sessionStorage.setItem('chaynya-open-cart','1')" in ACCOUNT_SOURCE
+    assert "node('button','Повторить заказ','pay pay--quiet')" in ACCOUNT_SOURCE
+    assert "node('button','Попробовать ещё раз','btn btn--ghost')" in ACCOUNT_SOURCE
+    assert "sessionStorage.getItem('chaynya-open-cart')" in SOURCE
+    assert "rows.length===1?'бронь':rows.length<5?'брони':'броней'" in ACCOUNT_SOURCE
+    assert '.check input[aria-invalid="true"]' in ACCOUNT_SOURCE
+    assert '.empty a{width:max-content;min-height:44px;display:flex;align-items:center;margin:16px auto 0' in ACCOUNT_SOURCE
 
 
 def test_public_and_admin_motion_is_quiet_and_accessible():
@@ -430,6 +500,16 @@ def test_booking_controls_have_accessible_names_and_heading_order():
     assert "html,body{ overflow-x:hidden; overflow-x:clip; }" in SOURCE
 
 
+def test_booking_requires_a_name_and_all_public_consents_show_invalid_state():
+    assert 'id="f-name" data-i18n-ph="f_name_ph" autocomplete="given-name" required maxlength="120"' in SOURCE
+    assert "booking_name_required:'Укажите имя, чтобы мы знали, как к вам обращаться.'" in SOURCE
+    assert "if (!name){" in SOURCE
+    assert "$('#f-name').setAttribute('aria-invalid','true')" in SOURCE
+    for selector in ('#c-privacy', '#f-privacy', '#b-privacy', '#r-privacy'):
+        assert f"$('{selector}').setAttribute('aria-invalid','true')" in SOURCE
+    assert '.consent input[aria-invalid="true"]' in SOURCE
+
+
 def test_catalog_price_keeps_a_text_separator_before_its_unit():
     assert "`&nbsp;<small>${T().per_pc}</small>`" in SOURCE
     assert "`&nbsp;<small>${T().per_pack25}</small>`" in SOURCE
@@ -561,7 +641,17 @@ def test_catalog_supports_teaware_sections_and_multiple_product_photos():
         assert category in SOURCE
     assert "Посуда" in ADMIN_CATALOG
     assert 'id="ts-gallery"' in SOURCE
+    assert 'id="ts-gallery-status" hidden aria-live="polite"' in SOURCE
+    assert 'id="ts-gallery" hidden role="group"' in SOURCE
     assert "image_urls" in SOURCE
+    assert "function selectGalleryImage(index,{focus=false}={})" in SOURCE
+    assert "event.key==='ArrowRight'" in SOURCE
+    assert "event.key==='ArrowLeft'" in SOURCE
+    assert "event.key==='Home'" in SOURCE
+    assert "event.key==='End'" in SOURCE
+    assert "selectedButton.focus({preventScroll:true})" in SOURCE
+    assert "gallery.scrollTo({left:Math.max(0,left),behavior:motionBehavior()})" in SOURCE
+    assert "mainImage.onload=()=>{mainImage.onload=null;animate();}" in SOURCE
     assert "file.multiple = true" in ADMIN_CATALOG_JS
     assert "/images/${index}/primary" in ADMIN_CATALOG_JS
     assert "data-add-group=\"teaware\"" in ADMIN_CATALOG
@@ -610,9 +700,23 @@ def test_admin_catalog_has_owner_safe_creation_filters_preview_and_photo_queue()
     assert 'id="preview-dialog"' in ADMIN_CATALOG
     assert "img: 'logo-mark'" in ADMIN_CATALOG_JS
     assert "photo-pending__row" in ADMIN_CATALOG_JS
+    assert "function movePendingImage(index, direction)" in ADMIN_CATALOG_JS
+    assert "Сдвинуть раньше' : 'Сдвинуть позже'} выбранное фото" in ADMIN_CATALOG_JS
     assert "Порядок фотографий сохранён" in ADMIN_CATALOG_JS
     assert "Карточка сохранена, загружено фото" in ADMIN_CATALOG_JS
     assert "Технические настройки ссылки" in ADMIN_CATALOG_JS
+
+
+def test_repair_upload_and_hover_motion_match_the_public_design_system():
+    assert ".repair-upload input::file-selector-button" in SOURCE
+    assert ".repair-upload:focus-within" in SOURCE
+    assert ".repair-upload input::file-selector-button{min-height:44px" in SOURCE
+    assert ".repair-upload__remove{justify-self:start;min-height:44px" in SOURCE
+    assert "@media(max-width:760px){.repair-service__intro,.repair-service__grid{grid-template-columns:1fr}" in SOURCE
+    assert "@media (hover:hover) and (pointer:fine)" in SOURCE
+    hover_media = SOURCE.split("@media (hover:hover) and (pointer:fine)", 1)[1]
+    assert ".repair-service__work:hover img" in hover_media
+    assert "@media(hover:hover) and (pointer:fine){.auth-gallery:hover" in ACCOUNT_SOURCE
     assert "catalog-row__open" in ADMIN_CATALOG_JS
     assert ".catalog-row{grid-template-columns:minmax(0,1fr) auto;padding:0;gap:0}" in ADMIN_CATALOG
     assert "catalog-lang-tab-${language}" in ADMIN_CATALOG_JS
@@ -643,6 +747,27 @@ def test_admin_catalog_mobile_summary_wraps_without_a_clipped_horizontal_strip()
     assert ".stats{display:flex;overflow-x:auto;scroll-snap-type:x proximity" in ADMIN_CATALOG
     assert ".stats .stat{min-width:132px" in ADMIN_CATALOG
     assert "@media(max-width:900px){.items{max-height:none;overflow:visible}" in ADMIN_CATALOG
+
+
+def test_admin_mobile_workspace_has_persistent_primary_navigation_and_safe_actions():
+    for page in (ADMIN_SOURCE, ADMIN_CATALOG, ADMIN_PROMOS, ADMIN_SITE, ADMIN_GUIDES):
+        assert 'class="mobile-dock"' in page
+        assert 'href="/manage?view=orders"' in page
+        assert 'href="/manage/catalog"' in page
+        assert 'href="/manage/promos"' in page
+        assert 'href="/manage/site"' in page
+        assert "env(safe-area-inset-bottom)" in page
+    assert ".toast{bottom:calc(78px + env(safe-area-inset-bottom))}" in ADMIN_SOURCE
+    assert ".footer-actions{bottom:calc(66px + env(safe-area-inset-bottom))}" in ADMIN_CATALOG
+    assert ".form-actions{position:sticky;bottom:calc(66px + env(safe-area-inset-bottom))" in ADMIN_PROMOS
+    assert ".footer-actions{bottom:calc(66px + env(safe-area-inset-bottom))}" in ADMIN_SITE
+
+
+def test_admin_mobile_entry_and_site_editor_do_not_hide_context():
+    assert 'id="reveal"' in ADMIN_LOGIN
+    assert "input.type=visible?'password':'text'" in ADMIN_LOGIN
+    assert "selectPartner(documentState.partners[0].id, {scroll:false})" in ADMIN_SITE_JS
+    assert "scroll && window.innerWidth <= 900" in ADMIN_SITE_JS
 
 
 def test_compact_mobile_navigation_keeps_every_primary_route_visible():

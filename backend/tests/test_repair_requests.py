@@ -43,6 +43,10 @@ def test_repair_request_is_idempotent_and_visible_to_owner(tmp_path, monkeypatch
     assert listing.json()["total"] == 1
     assert listing.json()["requests"][0]["description"] == "Трещина на пиале"
     assert listing.json()["requests"][0]["source"] == "website"
+    assert "upload_token_hash" not in listing.json()["requests"][0]
+    assert "idempotency_key_hash" not in listing.json()["requests"][0]
+    assert "request_hash" not in listing.json()["requests"][0]
+    assert "image_name" not in listing.json()["requests"][0]
 
 
 def test_repair_photo_is_reencoded_private_and_retryable(tmp_path, monkeypatch):
@@ -77,6 +81,30 @@ def test_repair_photo_is_reencoded_private_and_retryable(tmp_path, monkeypatch):
     assert owner.status_code == 200
     assert owner.headers["content-type"].startswith("image/webp")
     assert owner.headers["cache-control"] == "private, no-store"
+
+
+def test_repair_photo_rejects_decompression_bomb_as_validation_error(
+    tmp_path, monkeypatch
+):
+    client, module = app_client(tmp_path, monkeypatch)
+    token = "B" * 43
+    monkeypatch.setattr(module.Image, "MAX_IMAGE_PIXELS", 1)
+    with client:
+        created = client.post(
+            "/api/repair-requests",
+            json=repair_payload(has_image=True, upload_token=token),
+            headers={"Idempotency-Key": "repair-photo-bomb"},
+        )
+        response = client.post(
+            f"/api/repair-requests/{created.json()['id']}/image",
+            content=image_bytes(),
+            headers={"Content-Type": "image/png", "X-Repair-Upload-Token": token},
+        )
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "detail": "Файл не является поддерживаемым изображением"
+    }
 
 
 def test_repair_request_rejects_bad_phone_and_owner_can_update_status(

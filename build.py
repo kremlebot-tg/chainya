@@ -125,10 +125,21 @@ HERO_PRELOAD = (
     f'<link rel="preload" as="image" href="{HERO_SOURCE}" fetchpriority="high">'
     if web else ""
 )
-FONT_PRELOAD = "\n".join(
-    f'<link rel="preload" as="font" href="/fonts/{name}.woff2" type="font/woff2" crossorigin>'
-    for name in ("prata-cyr", "prata-lat", "golos-cyr", "golos-lat")
-) if web else ""
+def font_preload(language: str) -> str:
+    """Preload only the font subset that can render the current locale.
+
+    A preload bypasses the unicode-range selection in @font-face. Preloading all
+    files therefore download the wrong language subsets on every page. Only
+    the two fonts needed for the first screen are preloaded; Prata remains a
+    deliberately sparse accent for the wordmark and prices.
+    """
+    if not web:
+        return ""
+    subset = "cyr" if language == "ru" else "lat"
+    return "\n".join(
+        f'<link rel="preload" as="font" href="/fonts/{family}-{subset}.woff2" type="font/woff2" crossorigin>'
+        for family in ("rubik", "onest")
+    )
 
 ROUTE_IMAGE_PRELOADS = {
     "teaware": '<link rel="preload" as="image" href="/img/kintsugi-work-1.webp" fetchpriority="high">',
@@ -264,7 +275,7 @@ def seo_head(
         ensure_ascii=False,
     ).join(('<script type="application/ld+json">', '</script>'))
     preload = "\n".join(part for part in (
-        FONT_PRELOAD,
+        font_preload(language),
         HERO_PRELOAD if preload_hero else "",
         ROUTE_IMAGE_PRELOADS.get(route, ""),
     ) if part)
@@ -315,7 +326,11 @@ def font_css(inline: bool) -> str:
         return (root / "fonts" / "fonts-inline.css").read_text(encoding="utf-8")
     css = (root / "fonts" / "fonts-inline.css").read_text(encoding="utf-8")
     # меняем data:-строки обратно на пути к файлам, порядок объявлений сохраняется
-    names = ["prata-cyr", "prata-lat", "golos-cyr", "golos-lat"]
+    names = [
+        "prata-cyr", "prata-lat",
+        "onest-cyr", "onest-lat",
+        "rubik-cyr", "rubik-lat",
+    ]
     parts = re.split(r"url\(data:font/woff2;base64,[^)]+\)", css)
     assert len(parts) == len(names) + 1, "не совпало число @font-face со списком файлов"
     out = parts[0]
@@ -398,20 +413,20 @@ def extract_inline_script(document_source: str, asset_path: str) -> tuple[str, s
 
 ERROR_STYLE = """
 <style>
-@font-face{font-family:'Prata';src:url('/fonts/prata-cyr.woff2') format('woff2');font-display:swap}
-@font-face{font-family:'Golos Text';src:url('/fonts/golos-cyr.woff2') format('woff2');font-display:swap}
+@font-face{font-family:'Onest';src:url('/fonts/onest-cyr.woff2') format('woff2');font-weight:400 700;font-display:swap}
+@font-face{font-family:'Rubik';src:url('/fonts/rubik-cyr.woff2') format('woff2');font-weight:400 700;font-display:swap}
 :root{color-scheme:dark;--ink:#f1ece4;--muted:#b9afa4;--line:#403833;--accent:#df6b66;--paper:#141110;--panel:#1b1715}
 *{box-sizing:border-box}
 html{min-width:320px;background:var(--paper)}
-body{min-height:100svh;background:var(--paper);color:var(--ink);font-family:'Golos Text',Arial,sans-serif}
+body{min-height:100svh;background:var(--paper);color:var(--ink);font-family:'Onest',Arial,sans-serif}
 .error-page{position:relative;min-height:100svh;display:grid;grid-template-rows:auto 1fr;overflow:hidden;padding:clamp(20px,4vw,48px)}
-.error-page::before{content:attr(data-code);position:absolute;right:-.04em;bottom:-.2em;color:#201b19;font:clamp(180px,38vw,560px)/.8 'Prata',Georgia,serif;letter-spacing:-.08em;pointer-events:none;user-select:none}
+.error-page::before{content:attr(data-code);position:absolute;right:-.04em;bottom:-.2em;color:#201b19;font:600 clamp(180px,38vw,560px)/.8 'Rubik',Arial,sans-serif;letter-spacing:-.08em;pointer-events:none;user-select:none}
 .error-nav{position:relative;z-index:2;display:flex;align-items:center;gap:13px;width:max-content;color:var(--ink);text-decoration:none;letter-spacing:.16em;font-size:13px}
 .error-nav img{width:31px;height:42px;object-fit:contain}
 .error-layout{position:relative;z-index:1;align-self:center;display:grid;grid-template-columns:minmax(0,600px) minmax(230px,360px);align-items:center;justify-content:center;gap:clamp(42px,8vw,120px);width:min(1120px,100%);margin:auto}
 .error-copy{padding-block:48px}
 .error-kicker{color:var(--accent);font-size:12px;font-weight:650;letter-spacing:.16em;text-transform:uppercase}
-.error-title{max-width:12ch;margin-top:18px;font:clamp(44px,7vw,88px)/1.03 'Prata',Georgia,serif;letter-spacing:-.035em;text-wrap:balance}
+.error-title{max-width:12ch;margin-top:18px;font:500 clamp(44px,7vw,88px)/1 'Rubik',Arial,sans-serif;letter-spacing:-.05em;text-wrap:balance}
 .error-text{max-width:34rem;margin-top:24px;color:var(--muted);font-size:clamp(16px,2vw,19px);line-height:1.6}
 .error-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:32px}
 .error-button{display:inline-flex;min-height:48px;align-items:center;justify-content:center;padding:0 21px;border:1px solid var(--line);color:var(--ink);text-decoration:none;font-size:14px;font-weight:600;transition:background .18s ease,border-color .18s ease,color .18s ease}
@@ -480,7 +495,12 @@ if web:
     (dist / "assets").mkdir()
     for name in sorted(used):
         shutil.copy(root / "img" / f"{name}.webp", dist / "img" / f"{name}.webp")
-    for f in ("prata-cyr", "prata-lat", "golos-cyr", "golos-lat"):
+    # Golos stays in the package for the current admin UI. The public site uses
+    # Onest + Rubik, while Prata is limited to its wordmark and price accents.
+    for f in (
+        "prata-cyr", "prata-lat", "golos-cyr", "golos-lat",
+        "onest-cyr", "onest-lat", "rubik-cyr", "rubik-lat",
+    ):
         shutil.copy(root / "fonts" / f"{f}.woff2", dist / "fonts" / f"{f}.woff2")
     shutil.copy(root / "src-assets" / "favicon.png", dist / "favicon.png")
     # Многие браузеры и поисковые роботы всё ещё запрашивают именно этот путь.

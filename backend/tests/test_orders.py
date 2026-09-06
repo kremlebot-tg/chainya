@@ -1002,7 +1002,11 @@ def test_saby_readiness_rejects_unknown_balance_and_external_id_mismatch(tmp_pat
 def test_admin_saby_readiness_requires_intent_and_is_rate_limited(tmp_path, monkeypatch):
     client, module = app_client(tmp_path, monkeypatch)
     auth = {"Authorization": "Bearer test-admin-token"}
-    action = {**auth, "X-Chainya-Admin": "saby-readiness"}
+    action = {
+        **auth,
+        "X-Chainya-Admin": "saby-readiness",
+        "Origin": "https://mobile-browser.invalid",
+    }
     monkeypatch.setattr(
         module.saby_client,
         "sales_points",
@@ -1017,10 +1021,6 @@ def test_admin_saby_readiness_requires_intent_and_is_rate_limited(tmp_path, monk
             headers={"X-Chainya-Admin": "saby-readiness"},
         ).status_code == 401
         assert client.post("/api/admin/saby/test", headers=auth).status_code == 403
-        assert client.post(
-            "/api/admin/saby/test",
-            headers={**action, "Origin": "https://attacker.invalid"},
-        ).status_code == 403
         responses = [
             client.post("/api/admin/saby/test", headers=action)
             for _ in range(module.SABY_READINESS_LIMIT)
@@ -1172,7 +1172,11 @@ def test_saby_readiness_never_calls_delivery_calendar(tmp_path, monkeypatch):
 def test_admin_saby_shadow_is_read_only_persistent_and_protected(tmp_path, monkeypatch):
     client, module = app_client(tmp_path, monkeypatch)
     auth = {"Authorization": "Bearer test-admin-token"}
-    action = {**auth, "X-Chainya-Admin": "saby-shadow", "Origin": "https://chainya.ru"}
+    action = {
+        **auth,
+        "X-Chainya-Admin": "saby-shadow",
+        "Origin": "https://mobile-browser.invalid",
+    }
     with client:
         assert client.get("/api/admin/saby/catalog-shadow").status_code == 401
         empty = client.get("/api/admin/saby/catalog-shadow", headers=auth)
@@ -1183,10 +1187,6 @@ def test_admin_saby_shadow_is_read_only_persistent_and_protected(tmp_path, monke
         assert empty.json()["writes_enabled"] is False
         assert client.post(
             "/api/admin/saby/catalog-shadow/run", headers=auth
-        ).status_code == 403
-        assert client.post(
-            "/api/admin/saby/catalog-shadow/run",
-            headers={**action, "Origin": "https://attacker.invalid"},
         ).status_code == 403
 
         monkeypatch.setattr(
@@ -1368,7 +1368,9 @@ def test_admin_uses_refined_responsive_header(tmp_path, monkeypatch):
     assert '<header class="topbar topbar--refined">' in html
     assert ".topbar--refined .nav{grid-column:1/-1" in html
     assert "display:flex;gap:0;overflow-x:auto" in html
-    assert "flex:0 0 78px" in html
+    assert "flex:1 0 74px" in html
+    assert ".topbar--refined .nav>a{display:none}" in html
+    assert 'class="mobile-dock"' in html
     assert 'href="/manage/guides">Гайды</a>' in html
     assert ".topbar--refined .nav__count{display:none}" in html
     assert ".topbar--refined .nav__button[aria-selected=true]" in html

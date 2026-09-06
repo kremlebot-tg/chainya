@@ -100,6 +100,7 @@ BOOKING_FLOWS = {}
 REPAIR_FLOWS = {}
 REPAIR_FLOW_TTL_SECONDS = 30 * 60
 REPAIR_PHOTO_MAX_BYTES = 8 * 1024 * 1024
+REPAIR_PHOTO_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 
 def cleanup_repair_flows(now=None):
@@ -702,7 +703,8 @@ async def materialize_repair_photo(bot_api, flow):
     if not data or len(data) > REPAIR_PHOTO_MAX_BYTES:
         raise BookingApiError("Не удалось прочитать фотографию из Telegram")
     flow["photo"] = data
-    flow["photo_content_type"] = "image/jpeg"
+    if flow.get("photo_content_type") not in REPAIR_PHOTO_TYPES:
+        flow["photo_content_type"] = "image/jpeg"
 
 
 def date_days():
@@ -1012,7 +1014,8 @@ async def ask_repair_photo(message, flow):
     touch_repair_flow(flow)
     await message.answer(
         "<b>Пришлите фотографию повреждения</b>\n\n"
-        "По ней мы сможем предварительно оценить возможность ремонта. Фото можно пропустить.",
+        "Можно отправить обычное фото или файл JPG, PNG, WebP до 8 МБ. "
+        "По нему мы предварительно оценим возможность ремонта. Фото можно пропустить.",
         reply_markup=repair_photo_kb(),
     )
 
@@ -1112,6 +1115,25 @@ async def repair_photo(m: Message):
     await show_repair_confirmation(m, flow)
 
 
+@router.message(F.document)
+async def repair_photo_document(m: Message):
+    flow = get_repair_flow(m.from_user.id)
+    if not flow or flow.get("state") != "photo":
+        return
+    document = m.document
+    content_type = (document.mime_type or "").lower()
+    if content_type not in REPAIR_PHOTO_TYPES:
+        return await m.answer("Нужен файл JPG, PNG или WebP.")
+    if document.file_size and document.file_size > REPAIR_PHOTO_MAX_BYTES:
+        return await m.answer("Фото слишком большое. Пришлите файл до 8 МБ.")
+    flow["photo_file_id"] = document.file_id
+    flow["photo_size"] = document.file_size or 0
+    flow.pop("photo", None)
+    flow["photo_content_type"] = content_type
+    touch_repair_flow(flow)
+    await show_repair_confirmation(m, flow)
+
+
 @router.message(F.text)
 async def repair_text(m: Message):
     flow = get_repair_flow(m.from_user.id)
@@ -1138,7 +1160,7 @@ async def repair_text(m: Message):
         flow["description"] = text
         return await ask_repair_photo(m, flow)
     if state == "photo":
-        return await m.answer("На этом шаге пришлите фотографию или нажмите «Продолжить без фото».")
+        return await m.answer("Пришлите фото или файл JPG, PNG, WebP либо нажмите «Продолжить без фото».")
 
 
 # ─────────────  БРОНЬ  ─────────────

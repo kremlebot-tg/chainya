@@ -25,6 +25,17 @@ def test_product_page_is_indexable_and_uses_live_catalog(tmp_path, monkeypatch):
     assert response.headers["cache-control"].startswith("public, max-age=60")
     assert '<link rel="canonical" href="https://chainya.ru/tea/baihao">' in response.text
     assert '<meta property="og:type" content="product">' in response.text
+    assert '<meta property="og:site_name" content="Чайня">' in response.text
+    assert '<link rel="preload" as="image" href="/img/tea-baihao.webp" fetchpriority="high">' in response.text
+    assert 'class="product__image" src="/img/tea-baihao.webp"' in response.text
+    assert 'loading="eager" fetchpriority="high"' in response.text
+    assert '<link rel="preload" as="font" href="/fonts/rubik-cyr.woff2"' in response.text
+    assert '<link rel="preload" as="font" href="/fonts/onest-cyr.woff2"' in response.text
+    assert 'font-display:optional' in response.text
+    assert '<meta name="twitter:image:alt" content="Бай Хао Инь Чжень">' in response.text
+    assert '<a class="skip" href="#main">Перейти к содержимому</a>' in response.text
+    assert '<main class="product product--tea" id="main">' in response.text
+    assert ":focus-visible{outline:2px solid var(--accent)" in response.text
     assert "Бай Хао Инь Чжень — купить китайский чай" in response.text
     data = json_ld(response.text)
     assert {item.get("@type") for item in data["@graph"]} >= {
@@ -47,6 +58,65 @@ def test_product_page_is_indexable_and_uses_live_catalog(tmp_path, monkeypatch):
     assert ".product{width:100%;max-width:1180px" in response.text
 
 
+def test_product_page_renders_all_catalog_images_as_accessible_gallery(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    document = module.get_catalog_store().get()
+    tea = next(item for item in document["teas"] if item["id"] == "baihao")
+    tea["images"] = [
+        {"kind": "seed", "name": "tea-baihao"},
+        {"kind": "seed", "name": "kintsugi-work-1"},
+        {"kind": "seed", "name": "kintsugi-work-2"},
+    ]
+    module.get_catalog_store()._write(document)
+
+    with client:
+        response = client.get("/tea/baihao")
+
+    assert response.status_code == 200
+    assert 'class="product__gallery" aria-label="Фотографии товара"' in response.text
+    assert response.text.count('class="product__thumb"') == 2
+    image_paths = [
+        "/img/tea-baihao.webp",
+        "/img/kintsugi-work-1.webp",
+        "/img/kintsugi-work-2.webp",
+    ]
+    for path in image_paths:
+        assert path in response.text
+    assert 'aria-label="Фото 2 / 3"' in response.text
+    assert 'aria-label="Фото 3 / 3"' in response.text
+    product = next(
+        item for item in json_ld(response.text)["@graph"] if item.get("@type") == "Product"
+    )
+    assert product["image"] == [f"https://chainya.ru{path}" for path in image_paths]
+
+
+def test_product_page_uses_display_variants_for_uploaded_photos(tmp_path, monkeypatch):
+    client, module = app_client(tmp_path, monkeypatch)
+    document = module.get_catalog_store().get()
+    tea = next(item for item in document["teas"] if item["id"] == "baihao")
+    first = "a" * 32 + ".webp"
+    second = "b" * 32 + ".webp"
+    tea["images"] = [
+        {"kind": "uploaded", "name": first},
+        {"kind": "uploaded", "name": second},
+    ]
+    tea["image"] = tea["images"][0]
+    module.get_catalog_store()._write(document)
+
+    response = client.get("/tea/baihao")
+
+    assert f'href="/catalog-media/{first}?w=960" fetchpriority="high"' in response.text
+    assert f'src="/catalog-media/{first}?w=960"' in response.text
+    assert f'src="/catalog-media/{second}?w=320"' in response.text
+    product = next(
+        item for item in json_ld(response.text)["@graph"] if item.get("@type") == "Product"
+    )
+    assert product["image"] == [
+        f"https://chainya.ru/catalog-media/{first}",
+        f"https://chainya.ru/catalog-media/{second}",
+    ]
+
+
 def test_product_pages_have_localized_urls_content_and_reciprocal_hreflang(tmp_path, monkeypatch):
     client, _module = app_client(tmp_path, monkeypatch)
 
@@ -59,10 +129,19 @@ def test_product_pages_have_localized_urls_content_and_reciprocal_hreflang(tmp_p
     assert '<link rel="canonical" href="https://chainya.ru/en/tea/baihao">' in english.text
     assert "Bai Hao Yin Zhen" in english.text
     assert "Open in the shop" in english.text
+    assert '<meta property="og:site_name" content="Chainya">' in english.text
+    assert '<a class="skip" href="#main">Skip to content</a>' in english.text
+    assert '/fonts/rubik-lat.woff2' in english.text
+    assert '/fonts/onest-lat.woff2' in english.text
+    assert '/fonts/rubik-cyr.woff2' not in english.text
+    assert '<span>CHAINYA</span>' in english.text
     assert '<html lang="zh-CN">' in chinese.text
     assert '<link rel="canonical" href="https://chainya.ru/zh/tea/baihao">' in chinese.text
     assert "白毫银针" in chinese.text
     assert "在商店中打开" in chinese.text
+    assert '<meta property="og:site_name" content="茶饮屋">' in chinese.text
+    assert '<a class="skip" href="#main">跳到主要内容</a>' in chinese.text
+    assert '<span>茶饮屋</span>' in chinese.text
     for page in (english.text, chinese.text):
         assert 'hreflang="ru" href="https://chainya.ru/tea/baihao"' in page
         assert 'hreflang="en" href="https://chainya.ru/en/tea/baihao"' in page
@@ -102,6 +181,8 @@ def test_teaware_product_has_its_own_routes_breadcrumbs_and_canonical(tmp_path, 
     assert breadcrumb["itemListElement"][1]["name"] == "Посуда"
     assert breadcrumb["itemListElement"][1]["item"] == "https://chainya.ru/teaware"
     assert "Эта вещь уже ушла с полки" in client.get("/teaware/missing-item").text
+    assert '<main class="product product--teaware" id="main">' in russian.text
+    assert ".product--teaware .product__image{object-fit:contain}" in russian.text
 
 
 def test_product_page_escapes_catalog_text_and_json_ld(tmp_path, monkeypatch):
@@ -152,6 +233,7 @@ def test_dynamic_sitemap_tracks_only_published_catalog_items(tmp_path, monkeypat
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("application/xml")
+    assert response.headers["cache-control"] == "public, max-age=300, stale-while-revalidate=3600"
     root = ET.fromstring(response.text)
     namespace = {
         "sm": "http://www.sitemaps.org/schemas/sitemap/0.9",

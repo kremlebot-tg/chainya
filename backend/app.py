@@ -48,6 +48,7 @@ from fastapi import (
 from fastapi.responses import (
     FileResponse,
     HTMLResponse,
+    JSONResponse,
     PlainTextResponse,
     RedirectResponse,
 )
@@ -684,6 +685,8 @@ class AdminPromo(BaseModel):
     code: str = Field(min_length=3, max_length=32)
     discount_percent: int = Field(ge=1, le=90)
     min_subtotal: int = Field(default=0, ge=0, le=10_000_000)
+    usage_limit: int = Field(default=0, ge=0, le=1_000_000)
+    per_customer_limit: int = Field(default=0, ge=0, le=10_000)
     expires_at: datetime | None = None
     active: bool = True
     note: str = Field(default="", max_length=240)
@@ -1311,6 +1314,8 @@ def init_db() -> None:
                 code TEXT PRIMARY KEY,
                 discount_percent INTEGER NOT NULL,
                 min_subtotal INTEGER NOT NULL DEFAULT 0,
+                usage_limit INTEGER NOT NULL DEFAULT 0,
+                per_customer_limit INTEGER NOT NULL DEFAULT 0,
                 expires_at TEXT,
                 active INTEGER NOT NULL DEFAULT 1,
                 note TEXT NOT NULL DEFAULT '',
@@ -1322,6 +1327,15 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_promo_codes_active "
             "ON promo_codes(active, expires_at)"
         )
+        promo_columns = {
+            row["name"] for row in con.execute("PRAGMA table_info(promo_codes)")
+        }
+        for column, declaration in {
+            "usage_limit": "INTEGER NOT NULL DEFAULT 0",
+            "per_customer_limit": "INTEGER NOT NULL DEFAULT 0",
+        }.items():
+            if column not in promo_columns:
+                con.execute(f"ALTER TABLE promo_codes ADD COLUMN {column} {declaration}")
         con.execute("""
             CREATE TABLE IF NOT EXISTS analytics_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1438,12 +1452,53 @@ def price_order(payload: CreateOrder) -> tuple[list[dict], int]:
     return lines, subtotal
 
 
-def active_promo(code: str, subtotal: int) -> sqlite3.Row:
-    normalized = code.strip().upper()
-    with db() as con:
-        row = con.execute(
-            "SELECT * FROM promo_codes WHERE code = ?", (normalized,)
-        ).fetchone()
+def promo_usage_counts(
+    con: sqlite3.Connection,
+    code: str,
+    customer_phone: str = "",
+) -> tuple[int, int]:
+    """Count paid uses plus short-lived checkout reservations atomically.
+
+    A checkout keeps a place for the same 15 minutes as the payment/stock
+    reservation. Failed and cancelled attempts do not consume a promo use.
+    """
+    cutoff = (datetime.now(timezone.utc) - timedelta(minutes=STOCK_RESERVATION_MINUTES)).isoformat()
+    rows = con.execute(
+        """SELECT paid_at, created_at, status, payment_state, customer_json
+           FROM orders WHERE promo_code = ? AND (
+             paid_at IS NOT NULL OR (
+               status = 'pending_payment'
+               AND payment_state IN ('initializing','checking','init_ambiguous','awaiting')
+               AND created_at >= ?
+             )
+           )""",
+        (code, cutoff),
+    ).fetchall()
+    normalized_customer = ""
+    if customer_phone:
+        try:
+            normalized_customer = normalize_customer_phone(customer_phone)
+        except ValueError:
+            normalized_customer = ""
+    customer_uses = 0
+    if normalized_customer:
+        for order in rows:
+            try:
+                stored_phone = normalize_customer_phone(
+                    str(json.loads(order["customer_json"]).get("phone", ""))
+                )
+            except (TypeError, ValueError, json.JSONDecodeError):
+                continue
+            customer_uses += int(stored_phone == normalized_customer)
+    return len(rows), customer_uses
+
+
+def validate_promo_row(
+    row: sqlite3.Row | None,
+    subtotal: int,
+    con: sqlite3.Connection,
+    customer_phone: str = "",
+) -> sqlite3.Row:
     if not row or not bool(row["active"]):
         raise HTTPException(422, "Промокод не найден или выключен")
     if row["expires_at"]:
@@ -1456,21 +1511,39 @@ def active_promo(code: str, subtotal: int) -> sqlite3.Row:
         except ValueError:
             raise HTTPException(422, "Промокод временно недоступен") from None
     if subtotal < int(row["min_subtotal"]):
-        raise HTTPException(
-            422,
-            f"Промокод действует от {int(row['min_subtotal'])} ₽",
-        )
+        raise HTTPException(422, f"Промокод действует от {int(row['min_subtotal'])} ₽")
+    total_uses, customer_uses = promo_usage_counts(con, str(row["code"]), customer_phone)
+    usage_limit = int(row["usage_limit"])
+    per_customer_limit = int(row["per_customer_limit"])
+    if usage_limit and total_uses >= usage_limit:
+        raise HTTPException(422, "Лимит применений промокода исчерпан")
+    if customer_phone and per_customer_limit and customer_uses >= per_customer_limit:
+        raise HTTPException(422, "Вы уже использовали этот промокод максимальное число раз")
     return row
 
 
-def apply_promo(lines: list[dict], subtotal: int, code: str) -> tuple[list[dict], dict]:
+def active_promo(code: str, subtotal: int, customer_phone: str = "") -> sqlite3.Row:
+    normalized = code.strip().upper()
+    with db() as con:
+        row = con.execute(
+            "SELECT * FROM promo_codes WHERE code = ?", (normalized,)
+        ).fetchone()
+        return validate_promo_row(row, subtotal, con, customer_phone)
+
+
+def apply_promo(
+    lines: list[dict],
+    subtotal: int,
+    code: str,
+    customer_phone: str = "",
+) -> tuple[list[dict], dict]:
     """Discount authoritative unit prices so bank, receipt and Saby totals agree."""
     if not code:
         return lines, {
             "code": "", "discount_percent": 0, "discount_amount": 0,
             "original_subtotal": subtotal, "subtotal": subtotal,
         }
-    promo = active_promo(code, subtotal)
+    promo = active_promo(code, subtotal, customer_phone)
     percent = int(promo["discount_percent"])
     discounted_lines: list[dict] = []
     discounted_subtotal = 0
@@ -2978,7 +3051,12 @@ def customer_account_for_request(
     return row
 
 
-def create_customer_session(response: Response, account_id: str) -> None:
+def customer_cookie_secure(request: Request) -> bool:
+    """Keep HTTPS sessions secure even when the backend is in fail-closed test mode."""
+    return not TEST_MODE or request.url.scheme == "https"
+
+
+def create_customer_session(response: Response, account_id: str, request: Request) -> None:
     token = secrets.token_urlsafe(32)
     created = datetime.now(timezone.utc)
     expires = created + timedelta(seconds=CUSTOMER_SESSION_SECONDS)
@@ -2998,7 +3076,7 @@ def create_customer_session(response: Response, account_id: str) -> None:
         token,
         max_age=CUSTOMER_SESSION_SECONDS,
         httponly=True,
-        secure=not TEST_MODE,
+        secure=customer_cookie_secure(request),
         samesite="strict",
         path="/",
     )
@@ -3080,9 +3158,36 @@ def require_admin(authorization: str) -> None:
 
 @app.middleware("http")
 async def admin_session_to_authorization(request: Request, call_next):
-    """Keep the raw owner token out of browser JavaScript after login."""
+    """Keep the raw owner key out of JavaScript after login.
+
+    Owner routes intentionally rely on the secret key and the signed,
+    ``SameSite=Strict`` session cookie.  Mobile and in-app browsers sometimes
+    rewrite ``Origin``/Fetch Metadata headers, so admin requests must not be
+    rejected because of those headers.  Customer-account mutations retain the
+    stricter cross-site request check below.
+    """
     path = request.url.path
-    if (
+    unsafe_method = request.method.upper() not in {"GET", "HEAD", "OPTIONS", "TRACE"}
+    customer_session = bool(request.cookies.get(CUSTOMER_SESSION_COOKIE))
+    customer_account_mutation = (
+        path == "/api/account"
+        or (
+            path.startswith("/api/account/")
+            and path not in {"/api/account/register", "/api/account/login"}
+        )
+    )
+    blocked_response: Response | None = None
+    if unsafe_method and customer_session and customer_account_mutation:
+        fetch_site = request.headers.get("sec-fetch-site", "").lower()
+        origin = request.headers.get("origin", "").rstrip("/")
+        expected_origin = f"{request.url.scheme}://{request.headers.get('host', '')}".rstrip("/")
+        if fetch_site == "cross-site" or (origin and origin != expected_origin):
+            blocked_response = JSONResponse(
+                status_code=403,
+                content={"detail": "Недопустимый источник запроса"},
+                headers={"Cache-Control": "no-store"},
+            )
+    if blocked_response is None and (
         path.startswith("/api/admin/")
         and path != "/api/admin/session"
         and not request.headers.get("authorization")
@@ -3091,7 +3196,26 @@ async def admin_session_to_authorization(request: Request, call_next):
         request.scope["headers"].append(
             (b"authorization", f"Bearer {ADMIN_TOKEN}".encode("ascii"))
         )
-    return await call_next(request)
+    response = blocked_response or await call_next(request)
+    # The reverse proxy emits the same baseline headers.  Keeping them on the
+    # application response protects direct loopback/canary checks as well and
+    # makes error responses fail closed if the proxy configuration drifts.
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+    response.headers.setdefault("X-Permitted-Cross-Domain-Policies", "none")
+    response.headers.setdefault(
+        "Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()"
+    )
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    if (
+        path.startswith(("/api/admin/", "/api/account"))
+        and "no-store" not in response.headers.get("Cache-Control", "").lower()
+    ):
+        response.headers["Cache-Control"] = "no-store"
+    if not TEST_MODE and request.url.scheme == "https":
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
+    return response
 
 
 def _stock_reservation_summary(rows: list[sqlite3.Row]) -> dict[str, object]:
@@ -3363,6 +3487,7 @@ def notify_repair_request(request_id: str) -> None:
     text = "\n".join((
         "🏺 Новая заявка · кинцуги / ремонт посуды",
         f"№ {row['id']}",
+        f"Источник: {'Telegram-бот' if row['source'] == 'telegram' else 'сайт'}",
         f"Имя: {row['name']}",
         f"Телефон: {row['phone']}",
         f"Что случилось: {row['description']}",
@@ -4536,6 +4661,9 @@ PRODUCT_LOCALES = {
         "per_piece": "за штуку",
         "per_10g": "за 10 г",
         "open_shop": "Открыть в магазине",
+        "skip": "Перейти к содержимому",
+        "gallery_label": "Фотографии товара",
+        "photo_label": "Фото",
     },
     "en": {
         "prefix": "/en",
@@ -4558,6 +4686,9 @@ PRODUCT_LOCALES = {
         "per_piece": "per piece",
         "per_10g": "per 10 g",
         "open_shop": "Open in the shop",
+        "skip": "Skip to content",
+        "gallery_label": "Product photos",
+        "photo_label": "Photo",
     },
     "zh": {
         "prefix": "/zh",
@@ -4580,6 +4711,9 @@ PRODUCT_LOCALES = {
         "per_piece": "每块",
         "per_10g": "每10克",
         "open_shop": "在商店中打开",
+        "skip": "跳到主要内容",
+        "gallery_label": "商品图片",
+        "photo_label": "图片",
     },
 }
 PRODUCT_TYPE_NAMES = {
@@ -4635,6 +4769,13 @@ def _product_alternates(item_id: str, group: str = "tea") -> dict[str, str]:
     }
 
 
+def _display_catalog_image_url(path: str, width: int) -> str:
+    """Use generated display variants for owner-uploaded catalogue photos."""
+    if path.startswith("/catalog-media/"):
+        return f"{path}?w={width}"
+    return path
+
+
 def _script_json(value: object) -> str:
     """Serialize JSON-LD without allowing catalog text to close the script tag."""
     return (
@@ -4685,7 +4826,9 @@ def _product_page_html(document: dict, item: dict, language: str = "ru") -> str:
     product_group = _catalog_product_group(document, item)
     canonical = _product_url(item["id"], language, product_group)
     alternates = _product_alternates(item["id"], product_group)
-    image_path = catalog_image_url(item)
+    image_paths = catalog_image_urls(item)
+    image_path = image_paths[0]
+    display_image_path = _display_catalog_image_url(image_path, 960)
     image_url = PUBLIC_SITE + image_path
     unit_label = locale["per_piece"] if item["unit"] == "pc" else locale["per_10g"]
     availability = (
@@ -4799,10 +4942,15 @@ def _product_page_html(document: dict, item: dict, language: str = "ru") -> str:
     safe_origin = html.escape(origin)
     safe_description = html.escape(description)
     safe_type = html.escape(type_name)
-    safe_image = html.escape(image_path, quote=True)
+    safe_display_image = html.escape(display_image_path, quote=True)
     safe_image_url = html.escape(image_url, quote=True)
     safe_canonical = html.escape(canonical, quote=True)
     safe_meta_description = html.escape(description[:300], quote=True)
+    font_subset = "cyr" if language == "ru" else "lat"
+    font_preloads = "\n".join(
+        f'<link rel="preload" as="font" href="/fonts/{family}-{font_subset}.woff2" type="font/woff2" crossorigin>'
+        for family in ("rubik", "onest")
+    )
     stock_label = locale["in_stock"] if item.get("stock", True) else locale["out_of_stock"]
     stock_class = "" if item.get("stock", True) else " product__stock--out"
     alternate_links = "\n".join(
@@ -4820,6 +4968,18 @@ def _product_page_html(document: dict, item: dict, language: str = "ru") -> str:
     section_path = "/teaware" if product_group == "teaware" else "/shop"
     section_label = locale["all_teaware"] if product_group == "teaware" else locale["all_teas"]
     shop_href = f"{locale['prefix']}{section_path}#tea-{item['id']}"
+    gallery_thumbnails = "".join(
+        f'<a class="product__thumb" href="{html.escape(path, quote=True)}" '
+        f'target="_blank" rel="noopener" aria-label="{locale["photo_label"]} {index} / {len(image_paths)}">'
+        f'<img src="{html.escape(_display_catalog_image_url(path, 320), quote=True)}" alt="{safe_name} — {locale["photo_label"].lower()} {index}" '
+        f'width="220" height="220" loading="lazy" decoding="async"></a>'
+        for index, path in enumerate(image_paths[1:], start=2)
+    )
+    gallery_thumbnails_html = (
+        f'<div class="product__thumbs">{gallery_thumbnails}</div>'
+        if gallery_thumbnails
+        else ""
+    )
     return f"""<!doctype html>
 <html lang="{locale['html_lang']}">
 <head>
@@ -4827,13 +4987,15 @@ def _product_page_html(document: dict, item: dict, language: str = "ru") -> str:
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{html.escape(title)}</title>
 <meta name="description" content="{safe_meta_description}">
-<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
 <meta name="theme-color" content="#141110">
 <link rel="canonical" href="{safe_canonical}">
 {alternate_links}
 <link rel="icon" href="/favicon.png" type="image/png">
+<link rel="preload" as="image" href="{safe_display_image}" fetchpriority="high">
+{font_preloads}
 <meta property="og:type" content="product">
-<meta property="og:site_name" content="Чайня">
+<meta property="og:site_name" content="{locale['brand']}">
 <meta property="og:title" content="{safe_name} — {locale['brand']}">
 <meta property="og:description" content="{safe_meta_description}">
 <meta property="og:url" content="{safe_canonical}">
@@ -4845,26 +5007,34 @@ def _product_page_html(document: dict, item: dict, language: str = "ru") -> str:
 <meta name="twitter:title" content="{safe_name} — {locale['brand']}">
 <meta name="twitter:description" content="{safe_meta_description}">
 <meta name="twitter:image" content="{safe_image_url}">
+<meta name="twitter:image:alt" content="{safe_name}">
 <script type="application/ld+json">{_script_json(graph)}</script>
 <style>
-@font-face{{font-family:Prata;src:url('/fonts/prata-cyr.woff2') format('woff2');font-display:swap}}
-@font-face{{font-family:Golos;src:url('/fonts/golos-cyr.woff2') format('woff2');font-display:swap}}
+@font-face{{font-family:Prata;src:url('/fonts/prata-{font_subset}.woff2') format('woff2');font-display:optional}}
+@font-face{{font-family:Onest;src:url('/fonts/onest-{font_subset}.woff2') format('woff2');font-weight:400 700;font-display:optional}}
+@font-face{{font-family:Rubik;src:url('/fonts/rubik-{font_subset}.woff2') format('woff2');font-weight:400 700;font-display:optional}}
 :root{{color-scheme:dark;--paper:#141110;--panel:#1c1816;--ink:#f1ece4;--muted:#b9afa4;--line:#453b35;--accent:#df6b66}}
-*{{box-sizing:border-box}}html{{background:var(--paper)}}body{{margin:0;background:var(--paper);color:var(--ink);font-family:Golos,Arial,sans-serif}}
+*{{box-sizing:border-box}}html{{background:var(--paper)}}body{{margin:0;background:var(--paper);color:var(--ink);font-family:Onest,Arial,sans-serif;letter-spacing:-.008em}}
+:focus-visible{{outline:2px solid var(--accent);outline-offset:3px}}.skip{{position:fixed;z-index:20;top:-64px;left:12px;padding:10px 15px;background:var(--accent);color:#171210;text-decoration:none;font-weight:700;transition:top .16s ease}}.skip:focus{{top:12px}}
 .shell{{min-height:100svh;display:grid;grid-template-rows:auto 1fr}}.nav{{display:flex;align-items:center;justify-content:space-between;padding:20px clamp(20px,5vw,72px);border-bottom:1px solid var(--line)}}
-.brand{{display:flex;align-items:center;gap:14px;color:var(--ink);text-decoration:none;letter-spacing:.15em}}.brand img{{width:30px;height:42px;object-fit:contain}}.back{{color:var(--muted);text-underline-offset:7px}}
+.brand{{display:flex;align-items:center;gap:14px;color:var(--ink);text-decoration:none;font-family:Prata,Georgia,serif;letter-spacing:.15em}}.brand img{{width:30px;height:42px;object-fit:contain}}.back{{color:var(--muted);text-underline-offset:7px}}
 .product{{width:100%;max-width:1180px;margin:auto;padding:clamp(32px,6vw,88px) clamp(20px,5vw,72px);display:grid;grid-template-columns:minmax(280px,1fr) minmax(300px,.82fr);gap:clamp(30px,6vw,84px);align-items:center}}
-.product__image{{display:block;width:100%;height:min(66vh,680px);min-height:420px;object-fit:cover;border:1px solid var(--line);background:var(--panel)}}.product__type{{margin:0 0 15px;color:var(--accent);font-size:12px;font-weight:700;letter-spacing:.17em;text-transform:uppercase}}
-h1{{margin:0;font:clamp(42px,6vw,78px)/1.06 Prata,Georgia,serif;letter-spacing:-.035em}}.product__origin{{margin:18px 0 0;color:var(--muted);font-size:17px}}.product__description{{margin:30px 0 0;font-size:18px;line-height:1.65}}
+.product__gallery{{min-width:0}}.product__image{{display:block;width:100%;height:min(66vh,680px);min-height:420px;object-fit:cover;border:1px solid var(--line);background:var(--panel)}}.product--teaware .product__image{{object-fit:contain}}.product__thumbs{{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:8px}}.product__thumb{{display:block;border:1px solid var(--line);background:var(--panel);overflow:hidden}}.product__thumb img{{display:block;width:100%;aspect-ratio:1;object-fit:cover;transition:transform .22s ease}}.product__thumb:focus-visible{{outline:2px solid var(--accent);outline-offset:3px}}.product__type{{margin:0 0 15px;color:var(--accent);font-size:12px;font-weight:700;letter-spacing:.17em;text-transform:uppercase}}
+h1{{margin:0;font:500 clamp(42px,6vw,78px)/1 Rubik,Onest,Arial,sans-serif;letter-spacing:-.05em;text-wrap:balance}}.product__origin{{margin:18px 0 0;color:var(--muted);font-size:17px}}.product__description{{margin:30px 0 0;font-size:18px;line-height:1.65}}
 .product__buy{{margin-top:34px;padding-top:26px;border-top:1px solid var(--line);display:flex;align-items:end;justify-content:space-between;gap:20px;flex-wrap:wrap}}.product__price{{font:36px/1 Prata,Georgia,serif}}.product__unit{{display:block;margin-top:7px;color:var(--muted);font-size:14px}}.product__stock{{display:inline-flex;margin-top:20px;padding:8px 12px;border:1px solid #788a67;color:#b9cba8;font-size:12px;letter-spacing:.08em;text-transform:uppercase}}.product__stock--out{{border-color:#865a55;color:#e78a82}}
 .button{{display:inline-flex;min-height:52px;align-items:center;justify-content:center;padding:0 24px;background:var(--accent);color:#171210;text-decoration:none;font-weight:700}}.button:hover{{background:#ef7a74}}
-@media(max-width:760px){{.nav{{padding:15px 20px}}.back{{font-size:14px}}.product{{grid-template-columns:1fr;align-content:start;padding-top:28px}}.product__image{{height:auto;min-height:0;aspect-ratio:4/3}}h1{{font-size:clamp(38px,12vw,58px)}}.product__description{{font-size:16px}}.button{{width:100%}}}}
+@media(max-width:760px){{.nav{{padding:15px 20px}}.back{{font-size:14px}}.product{{grid-template-columns:1fr;align-content:start;padding-top:28px}}.product__image{{height:auto;min-height:0;aspect-ratio:4/3}}.product__thumbs{{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;padding:0 0 5px;scrollbar-width:thin}}.product__thumb{{flex:0 0 88px;scroll-snap-align:start}}h1{{font-size:clamp(38px,12vw,58px)}}.product__description{{font-size:16px}}.button{{width:100%}}}}
+@media(hover:hover) and (pointer:fine){{.product__thumb:hover img{{transform:scale(1.035)}}}}
+@media(prefers-reduced-motion:reduce){{.product__thumb img,.skip{{transition:none}}}}
 </style>
 </head>
-<body><div class="shell">
-<header class="nav"><a class="brand" href="/"><img src="/img/logo-mark.webp" alt=""><span>ЧАЙНЯ</span></a><a class="back" href="{section_path}?lang={language}">{section_label}</a></header>
-<main class="product">
-  <img class="product__image" src="{safe_image}" alt="{safe_name}" width="900" height="900">
+<body><a class="skip" href="#main">{locale['skip']}</a><div class="shell">
+<header class="nav"><a class="brand" href="/"><img src="/img/logo-mark.webp" alt="" width="30" height="42" decoding="async"><span>{locale['brand'].upper()}</span></a><a class="back" href="{section_path}?lang={language}">{section_label}</a></header>
+<main class="product product--{product_group}" id="main">
+  <section class="product__gallery" aria-label="{locale['gallery_label']}">
+    <img class="product__image" src="{safe_display_image}" alt="{safe_name} — {locale['photo_label'].lower()} 1" width="900" height="900" loading="eager" fetchpriority="high" decoding="async">
+    {gallery_thumbnails_html}
+  </section>
   <article>
     <p class="product__type">{safe_type}</p>
     <h1>{safe_name}</h1>
@@ -5054,7 +5224,11 @@ def dynamic_sitemap():
         + "\n".join(rows)
         + "\n</urlset>\n"
     )
-    return PlainTextResponse(xml, media_type="application/xml")
+    return PlainTextResponse(
+        xml,
+        media_type="application/xml",
+        headers={"Cache-Control": "public, max-age=300, stale-while-revalidate=3600"},
+    )
 
 
 def admin_catalog_response(document: dict) -> dict:
@@ -5075,32 +5249,21 @@ def admin_catalog_response(document: dict) -> dict:
 
 
 def require_catalog_write_request(request: Request) -> None:
-    """Block cross-site form posts even though the owner cookie is SameSite."""
+    """Require the explicit marker emitted by the owner catalog UI."""
     if request.headers.get("x-chainya-admin") != "catalog":
         raise HTTPException(403, "Требуется подтверждение запроса админ-панели")
-    origin = request.headers.get("origin", "").rstrip("/")
-    expected = f"{request.url.scheme}://{request.headers.get('host', '')}"
-    if origin and origin != expected:
-        raise HTTPException(403, "Недопустимый источник запроса")
 
 
 def require_site_write_request(request: Request) -> None:
-    """Protect editable site content with an explicit same-origin request marker."""
+    """Require the explicit marker emitted by the owner site editor."""
     if request.headers.get("x-chainya-admin") != "site":
         raise HTTPException(403, "Требуется подтверждение запроса админ-панели")
-    origin = request.headers.get("origin", "").rstrip("/")
-    expected = f"{request.url.scheme}://{request.headers.get('host', '')}"
-    if origin and origin != expected:
-        raise HTTPException(403, "Недопустимый источник запроса")
 
 
 def require_promo_write_request(request: Request) -> None:
+    """Keep promo writes owner-only without relying on mobile Origin headers."""
     if request.headers.get("x-chainya-admin") != "promos":
         raise HTTPException(403, "Требуется подтверждение запроса админ-панели")
-    origin = request.headers.get("origin", "").rstrip("/")
-    expected = f"{request.url.scheme}://{request.headers.get('host', '')}"
-    if origin and origin != expected:
-        raise HTTPException(403, "Недопустимый источник запроса")
 
 
 def public_promo(
@@ -5112,6 +5275,8 @@ def public_promo(
         "code": row["code"],
         "discount_percent": row["discount_percent"],
         "min_subtotal": row["min_subtotal"],
+        "usage_limit": row["usage_limit"],
+        "per_customer_limit": row["per_customer_limit"],
         "expires_at": row["expires_at"],
         "active": bool(row["active"]),
         "note": row["note"],
@@ -5159,11 +5324,12 @@ def admin_create_promo(
         try:
             con.execute(
                 """INSERT INTO promo_codes
-                   (code, discount_percent, min_subtotal, expires_at, active,
-                    note, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                   (code, discount_percent, min_subtotal, usage_limit,
+                    per_customer_limit, expires_at, active, note, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (payload.code, payload.discount_percent, payload.min_subtotal,
-                 expires, int(payload.active), payload.note, created, created),
+                 payload.usage_limit, payload.per_customer_limit, expires,
+                 int(payload.active), payload.note, created, created),
             )
         except sqlite3.IntegrityError:
             raise HTTPException(409, "Такой промокод уже существует") from None
@@ -5187,9 +5353,11 @@ def admin_update_promo(
     with db() as con:
         changed = con.execute(
             """UPDATE promo_codes SET discount_percent = ?, min_subtotal = ?,
-               expires_at = ?, active = ?, note = ?, updated_at = ? WHERE code = ?""",
-            (payload.discount_percent, payload.min_subtotal, expires,
-             int(payload.active), payload.note, now_iso(), normalized),
+               usage_limit = ?, per_customer_limit = ?, expires_at = ?, active = ?,
+               note = ?, updated_at = ? WHERE code = ?""",
+            (payload.discount_percent, payload.min_subtotal, payload.usage_limit,
+             payload.per_customer_limit, expires, int(payload.active), payload.note,
+             now_iso(), normalized),
         )
         if changed.rowcount != 1:
             raise HTTPException(404, "Промокод не найден")
@@ -5554,7 +5722,7 @@ def prepare_catalog_image(source: bytes) -> bytes:
             output = io.BytesIO()
             image.save(output, "WEBP", quality=88, method=6)
             return output.getvalue()
-    except (UnidentifiedImageError, OSError, ValueError) as exc:
+    except (Image.DecompressionBombError, UnidentifiedImageError, OSError, ValueError) as exc:
         raise HTTPException(422, "Файл не является поддерживаемым изображением") from exc
 
 
@@ -6216,7 +6384,16 @@ def admin_repair_requests(
     return {
         "requests": [
             {
-                **dict(row),
+                "id": row["id"],
+                "created_at": row["created_at"],
+                "name": row["name"],
+                "phone": row["phone"],
+                "description": row["description"],
+                "has_image": bool(row["has_image"]),
+                "notification_sent": bool(row["notification_sent"]),
+                "status": row["status"],
+                "updated_at": row["updated_at"],
+                "source": row["source"],
                 "image_url": f"/api/admin/repair-requests/{row['id']}/image"
                 if row["image_name"] else None,
             }
@@ -6447,36 +6624,24 @@ def admin_saby_status(authorization: str = Header(default="")):
 
 
 def require_saby_shadow_run_request(request: Request) -> None:
-    """Require an intentional same-origin admin action for the manual read."""
+    """Require the explicit marker emitted by the owner dashboard."""
 
     if request.headers.get("x-chainya-admin") != "saby-shadow":
         raise HTTPException(403, "Требуется подтверждение запроса админ-панели")
-    origin = request.headers.get("origin", "").rstrip("/")
-    expected = f"{request.url.scheme}://{request.headers.get('host', '')}"
-    if origin and origin != expected:
-        raise HTTPException(403, "Недопустимый источник запроса")
 
 
 def require_saby_readiness_request(request: Request) -> None:
-    """Require an intentional same-origin admin action for live Saby reads."""
+    """Require the explicit marker emitted by the owner dashboard."""
 
     if request.headers.get("x-chainya-admin") != "saby-readiness":
         raise HTTPException(403, "Требуется подтверждение запроса админ-панели")
-    origin = request.headers.get("origin", "").rstrip("/")
-    expected = f"{request.url.scheme}://{request.headers.get('host', '')}"
-    if origin and origin != expected:
-        raise HTTPException(403, "Недопустимый источник запроса")
 
 
 def require_saby_shadow_ack_request(request: Request) -> None:
-    """Require an intentional same-origin acknowledgement from the admin UI."""
+    """Require the explicit acknowledgement marker from the owner dashboard."""
 
     if request.headers.get("x-chainya-admin") != "saby-shadow-ack":
         raise HTTPException(403, "Требуется подтверждение запроса админ-панели")
-    origin = request.headers.get("origin", "").rstrip("/")
-    expected = f"{request.url.scheme}://{request.headers.get('host', '')}"
-    if origin and origin != expected:
-        raise HTTPException(403, "Недопустимый источник запроса")
 
 
 @app.get("/api/admin/saby/catalog-shadow")
@@ -7035,7 +7200,7 @@ def register_customer(
             )
     except sqlite3.IntegrityError:
         raise HTTPException(409, "Для этого телефона уже создан личный кабинет") from None
-    create_customer_session(response, account_id)
+    create_customer_session(response, account_id, request)
     with db() as con:
         row = con.execute(
             "SELECT * FROM customer_accounts WHERE id = ?", (account_id,)
@@ -7066,7 +7231,7 @@ def login_customer(
         password_ok = False
     if not row or not password_ok:
         raise HTTPException(401, "Неверный телефон или пароль")
-    create_customer_session(response, row["id"])
+    create_customer_session(response, row["id"], request)
     return {"account": customer_profile(row)}
 
 
@@ -7086,7 +7251,7 @@ def logout_customer(request: Request, response: Response):
     response.delete_cookie(
         CUSTOMER_SESSION_COOKIE,
         path="/",
-        secure=not TEST_MODE,
+        secure=customer_cookie_secure(request),
         httponly=True,
         samesite="strict",
     )
@@ -7174,7 +7339,7 @@ def delete_customer_account(
     response.delete_cookie(
         CUSTOMER_SESSION_COOKIE,
         path="/",
-        secure=not TEST_MODE,
+        secure=customer_cookie_secure(request),
         httponly=True,
         samesite="strict",
     )
@@ -7349,7 +7514,9 @@ def create_order(
     rate_limit(request, "create-order", 12, 600)
 
     lines, original_subtotal = price_order(payload)
-    lines, promo = apply_promo(lines, original_subtotal, payload.promo_code)
+    lines, promo = apply_promo(
+        lines, original_subtotal, payload.promo_code, payload.phone
+    )
     subtotal = int(promo["subtotal"])
     stock_requirements = (
         verified_stock_requirements(lines) if stock_guard_enabled() else []
@@ -7385,7 +7552,7 @@ def create_order(
     payment_state = "initializing" if tbank_enabled else "awaiting"
     reused_row = None
     with db() as con:
-        if key_hash or stock_guard_enabled():
+        if key_hash or stock_guard_enabled() or payload.promo_code:
             con.execute("BEGIN IMMEDIATE")
         if key_hash:
             reused_row = con.execute(
@@ -7394,6 +7561,13 @@ def create_order(
             if reused_row and reused_row["request_hash"] != request_fingerprint:
                 raise HTTPException(409, "Idempotency-Key уже использован для другого заказа")
         if not reused_row:
+            if payload.promo_code:
+                promo_row = con.execute(
+                    "SELECT * FROM promo_codes WHERE code = ?", (promo["code"],)
+                ).fetchone()
+                validate_promo_row(
+                    promo_row, original_subtotal, con, payload.phone
+                )
             con.execute(
                 """INSERT INTO orders
                    (id, status, created_at, updated_at, subtotal, delivery_price, total,

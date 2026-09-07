@@ -19,8 +19,24 @@
   --on-accent: #101614;
   color-scheme: dark;
   --w-body:    440;
-  --w-ui:      600;
+  --w-heading: 520;
+  --w-ui:      560;
   --w-strong:  650;
+
+  /* Типографическая шкала: размеры привязаны к роли, а не к странице. */
+  --type-hero:    clamp(3rem,5.25vw,4.45rem);
+  --type-page:    clamp(2.35rem,4.4vw,4rem);
+  --type-section: clamp(2.05rem,3.7vw,3.15rem);
+  --type-title:   clamp(1.18rem,1.7vw,1.42rem);
+  --type-body-l:  clamp(1.02rem,1.25vw,1.16rem);
+  --type-body:    1rem;
+  --type-small:   .875rem;
+  --type-label:   .75rem;
+  --leading-display:.98;
+  --leading-heading:1.12;
+  --leading-body:1.62;
+  --tracking-display:-.042em;
+  --tracking-heading:-.026em;
 
   /* Цвет настоя — это данные, а не декор. Одинаков в обеих темах. */
   --lq-white:  #E3DCA6;
@@ -49,9 +65,8 @@
 html,body{ overflow-x:hidden; overflow-x:clip; }
 body{
   margin:0; background:var(--bg); color:var(--text);
-  font-family:var(--font-body);
-  font-size:17px; font-weight:var(--w-body);
-  line-height:1.62; letter-spacing:-.008em;
+  font-family:var(--font-body); font-size:17px; font-weight:var(--w-body);
+  line-height:var(--leading-body); letter-spacing:-.008em;
   -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
 }
 img{ max-width:100%; height:auto; display:block; }
@@ -81,14 +96,14 @@ h1, h2, h3, p{ text-wrap:pretty; }
 .wrap{ max-width:var(--maxw); margin-inline:auto; padding-inline:var(--pad); }
 
 .display{
-  font-family:var(--font-display); font-weight:var(--w-ui);
-  line-height:.99; letter-spacing:-.045em; text-wrap:balance;
+  font-family:var(--font-display); font-weight:var(--w-heading);
+  line-height:var(--leading-display); letter-spacing:var(--tracking-display); text-wrap:balance;
 }
 .label{
-  font-size:13px; font-weight:var(--w-ui); letter-spacing:.015em; text-transform:none;
+  font-size:var(--type-label); font-weight:var(--w-strong); letter-spacing:.075em; text-transform:uppercase;
   color:var(--accent-2); line-height:1.4;
 }
-.lead{ font-size:clamp(1.02rem,1.35vw,1.2rem); line-height:1.6; color:var(--text-2); }
+.lead{ font-size:var(--type-body-l); line-height:1.65; color:var(--text-2); }
 .num{ font-variant-numeric:tabular-nums; }
 
 /* ─────────────────────────  НАВИГАЦИЯ  ───────────────────────── */
@@ -152,8 +167,8 @@ h1, h2, h3, p{ text-wrap:pretty; }
 /* ─────────────────────────  КНОПКИ  ───────────────────────── */
 .btn{
   display:inline-flex; align-items:center; justify-content:center; gap:9px;
-  padding:13px 26px; border-radius:var(--r); font-size:15px; font-weight:var(--w-strong);
-  letter-spacing:.01em; white-space:nowrap;
+  min-height:50px; padding:13px 26px; border-radius:var(--r); font-size:14.5px; font-weight:var(--w-strong);
+  letter-spacing:.005em; white-space:nowrap;
   transition:background .22s var(--ease), border-color .22s var(--ease),
              color .22s var(--ease), transform .22s var(--ease), opacity .22s var(--ease);
 }
@@ -225,8 +240,11 @@ h1, h2, h3, p{ text-wrap:pretty; }
 }
 /* Текст держим в левой половине: правая отдана живому кадру. */
 .hero__copy{ max-width:min(54%, 660px); }
-.hero h1{ font-size:clamp(2.7rem,5.6vw,4.6rem); margin:18px 0 0; }
-.hero h1 em{ font-style:normal; color:var(--accent-2); }
+.hero h1{ max-width:11ch; font-size:var(--type-hero); margin:20px 0 0; }
+.hero h1 em{
+  font-family:var(--font-accent); font-size:.91em; font-weight:400;
+  font-style:normal; letter-spacing:-.025em; color:var(--accent-2);
+}
 .hero__lead{ margin:26px 0 0; max-width:44ch; }
 .hero__cta{ display:flex; flex-wrap:wrap; gap:12px; margin-top:30px; }
 
@@ -251,7 +269,7 @@ h1, h2, h3, p{ text-wrap:pretty; }
   display:grid; grid-template-columns:minmax(0,1fr) minmax(0,.62fr);
   gap:clamp(20px,4vw,56px); align-items:end; margin-bottom:clamp(28px,3.5vw,44px);
 }
-.sec__head h1, .sec__head h2{ font-size:clamp(2.15rem,4vw,3.35rem); margin:14px 0 0; }
+.sec__head h1, .sec__head h2{ font-size:var(--type-section); margin:14px 0 0; }
 .sec__head p{ margin:0; }
 .sec__head > .lead{ max-width:44ch; }
 .sec__head > .lead:empty{ display:none; }
@@ -271,7 +289,7 @@ h1, h2, h3, p{ text-wrap:pretty; }
   transition:transform var(--motion-slow) var(--ease), filter var(--motion-base) var(--ease);
 }
 .svc__body{ padding:20px 0 0; display:flex; flex-direction:column; flex:1; }
-.svc h3{ font-size:1.15rem; font-weight:600; margin:0; letter-spacing:-.01em; }
+.svc h3{ font-size:var(--type-title); font-weight:var(--w-ui); line-height:var(--leading-heading); margin:0; letter-spacing:var(--tracking-heading); }
 .svc p{ margin:10px 0 0; font-size:14.5px; color:var(--text-2); line-height:1.6; }
 .svc .link-arrow{ align-self:flex-start; margin-top:18px; }
 .svc__foot{
@@ -427,7 +445,7 @@ h1, h2, h3, p{ text-wrap:pretty; }
 .chip__n{ margin-left:4px; opacity:.65; }
 #fav-empty,#shop-empty{ max-width:42rem; margin:26px 0 0; color:var(--text-3); font-size:14.5px; line-height:1.6; }
 .tea__body{ padding:15px 2px 8px; display:flex; flex-direction:column; flex:1; }
-.tea__name{ font-family:var(--font-display); font-size:1.12rem; font-weight:var(--w-ui); line-height:1.24; letter-spacing:-.025em; overflow-wrap:anywhere; }
+.tea__name{ font-family:var(--font-body); font-size:1.08rem; font-weight:var(--w-ui); line-height:1.3; letter-spacing:-.018em; overflow-wrap:anywhere; }
 .tea__orig{ margin-top:5px; font-size:12.5px; color:var(--text-3); overflow-wrap:anywhere; }
 .tea__foot{
   margin-top:auto; padding-top:14px; display:flex; align-items:baseline;
@@ -464,8 +482,8 @@ h1, h2, h3, p{ text-wrap:pretty; }
 /* ── Фильтры карты ── */
 .shop-heading{
   margin:0 0 clamp(28px,4vw,44px); max-width:16ch;
-  font-family:var(--font-display); font-size:clamp(2.35rem,4.4vw,4.25rem);
-  font-weight:var(--w-ui); line-height:1; letter-spacing:-.05em;
+  font-family:var(--font-display); font-size:var(--type-page);
+  font-weight:var(--w-heading); line-height:var(--leading-display); letter-spacing:var(--tracking-display);
 }
 .repair-service{margin:-8px 0 30px;border:1px solid var(--line);background:linear-gradient(135deg,var(--bg-2),var(--bg-3));border-radius:var(--r);overflow:hidden}
 .repair-service[hidden]{display:none}.repair-service__intro{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:center;padding:24px clamp(20px,3vw,36px)}

@@ -619,6 +619,15 @@ def test_web_build_uses_root_relative_assets_for_clean_routes():
     assert '"teaware": \'<link rel="preload" as="image" href="/img/kintsugi-work-1.webp" fetchpriority="high">\'' in BUILD_SOURCE
 
 
+def test_public_typography_keeps_body_calm_and_emphasizes_actions():
+    assert "--w-body:    440;" in SOURCE
+    assert "--w-ui:      600;" in SOURCE
+    assert "--w-strong:  650;" in SOURCE
+    assert "font-family:var(--font-display); font-weight:var(--w-ui);" in SOURCE
+    assert "font-weight:var(--w-strong); }" in SOURCE
+    assert ".price{ font-family:var(--font-accent);" in SOURCE
+
+
 def test_admin_catalog_surfaces_incomplete_food_labelling():
     assert 'id="stat-incomplete"' in ADMIN_CATALOG
     assert 'id="catalog-filter"' in ADMIN_CATALOG

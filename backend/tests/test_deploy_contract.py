@@ -289,6 +289,9 @@ def test_edge_config_change_is_validated_and_rolls_back_only_chainya_edge() -> N
     assert '"$release/assets/site.js"' in deploy
     assert 'https://chainya.ru/assets/site.js' in deploy
     assert 'site\\.js\\?v=[0-9a-f]{12}' in deploy
+    assert 'health.get("test_mode") is not False' in deploy
+    assert 'health.get("version") != sys.argv[2]' not in deploy
+    assert "--w-heading: 520" in deploy
     assert "systemctl" not in deploy
 
 

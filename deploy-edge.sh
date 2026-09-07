@@ -160,16 +160,19 @@ grep -Eq '<script src="/assets/site\.js\?v=[0-9a-f]{12}" defer></script>' "$TMP/
 ! grep -Eq 'id="ts-taste"|renderRadar' "$TMP/public-shop.html"
 curl -fsS https://chainya.ru/assets/site.js -o "$TMP/public-site.js"
 grep -Fq 'Рекомендуем начать свой чайный путь с этих позиций:' "$TMP/public-site.js"
+grep -Fq -- '--w-heading: 520' "$TMP/public-site.js"
 curl -fsS https://chainya.ru/business -o "$TMP/public-business.html"
 grep -Fq 'Можно начать с небольшой партии и проверить спрос.' "$TMP/public-business.html"
 curl -fsS https://chainya.ru/api/health -o "$TMP/public-health.json"
-python3 - "$TMP/public-health.json" "${RELEASE_COMMIT:0:12}" <<'PY'
+python3 - "$TMP/public-health.json" <<'PY'
 import json
 import sys
 
 with open(sys.argv[1], encoding="utf-8") as source:
     health = json.load(source)
-if health.get("ok") is not True or health.get("version") != sys.argv[2]:
+# Edge releases intentionally do not restart the Timeweb backend. Its version
+# identifies the active backend release, not the static commit.
+if health.get("ok") is not True or health.get("test_mode") is not False:
     raise SystemExit(f"production health mismatch: {health}")
 PY
 

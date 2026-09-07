@@ -161,8 +161,9 @@ grep -Eq '<script src="/assets/site\.js\?v=[0-9a-f]{12}" defer></script>' "$TMP/
 grep -Fq -- '--w-heading: 520' "$TMP/public-shop.html"
 curl -fsS https://chainya.ru/assets/site.js -o "$TMP/public-site.js"
 grep -Fq 'Рекомендуем начать свой чайный путь с этих позиций:' "$TMP/public-site.js"
+grep -Fq 'Можно начать с небольшой партии и проверить спрос.' "$TMP/public-site.js"
 curl -fsS https://chainya.ru/business -o "$TMP/public-business.html"
-grep -Fq 'Можно начать с небольшой партии и проверить спрос.' "$TMP/public-business.html"
+grep -Eq '<script src="/assets/site\.js\?v=[0-9a-f]{12}" defer></script>' "$TMP/public-business.html"
 curl -fsS https://chainya.ru/api/health -o "$TMP/public-health.json"
 python3 - "$TMP/public-health.json" <<'PY'
 import json
